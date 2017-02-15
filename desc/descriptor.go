@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"errors"
 )
 
 const (
@@ -44,6 +45,8 @@ type Descriptor interface {
 	// GetFile returns the file descriptor in which this element was declared. File
 	// descriptors return themselves.
 	GetFile() *FileDescriptor
+	// GetOptions returns the options proto containing options for the described element.
+	GetOptions() proto.Message
 	// GetSourceInfo returns any source code information that was present in the file
 	// descriptor. Source code info is optional. If no source code info is available for
 	// the element (including if there is none at all in the file descriptor) then this
@@ -70,7 +73,7 @@ type FileDescriptor struct {
 // The file's direct dependencies must be provided. If the given dependencies do not include
 // all of the file's dependencies or if the contents of the descriptors are internally
 // inconsistent (e.g. contain unresolvable symbols) then an error is returned.
-func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps []*FileDescriptor) (*FileDescriptor, error) {
+func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) (*FileDescriptor, error) {
 	ret := &FileDescriptor{ proto: fd, symbols: map[string]Descriptor{} }
 	pkg := fd.GetPackage()
 
@@ -123,7 +126,7 @@ func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps []*FileDescriptor) (
 
 	// now we can resolve all type references and source code info
 	scopes := []scope{fileScope(ret)}
-	path := make([]int32, 0, 8)
+	path := make([]int32, 1, 8)
 	path[0] = file_messagesTag
 	for i, md := range(ret.messages) {
 		if err := md.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
@@ -150,11 +153,55 @@ func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps []*FileDescriptor) (
 	return ret, nil
 }
 
+// CreateFileDescriptorFromSet creates a descriptor from the given file descriptor set. The
+// set's first file will be the returned descriptor. The set's remaining files must comprise
+// the full set of transitive dependencies of that first file.
+func CreateFileDescriptorFromSet(fds *dpb.FileDescriptorSet) (*FileDescriptor, error) {
+	if len(fds.GetFile()) == 0 {
+		return nil, errors.New("file descriptor set is empty")
+	}
+	files := map[string]*dpb.FileDescriptorProto{}
+	resolved := map[string]*FileDescriptor{}
+	var name string
+	for i, fd := range(fds.GetFile()) {
+		if i == 0 {
+			name = fd.GetName()
+		}
+		files[fd.GetName()] = fd
+	}
+	return createFromSet(name, files, resolved)
+}
+
+// createFromSet creates a descriptor for the given filename. It recursively
+// creates descriptors for the given file's dependencies.
+func createFromSet(filename string, files map[string]*dpb.FileDescriptorProto, resolved map[string]*FileDescriptor) (*FileDescriptor, error) {
+	if d, ok := resolved[filename]; ok {
+		return d, nil
+	}
+	fdp := files[filename]
+	if fdp == nil {
+		return nil, fmt.Errorf("file descriptor set missing a dependency: %s", filename)
+	}
+	deps := make([]*FileDescriptor, len(fdp.GetDependency()))
+	for i, depName := range(fdp.GetDependency()) {
+		if dep, err := createFromSet(depName, files, resolved); err != nil {
+			return nil, err
+		} else {
+			deps[i] = dep
+		}
+	}
+	return CreateFileDescriptor(fdp, deps...)
+}
+
 func (fd *FileDescriptor) GetName() string {
 	return fd.proto.GetName()
 }
 
 func (fd *FileDescriptor) GetFullyQualifiedName() string {
+	return fd.proto.GetName()
+}
+
+func (fd *FileDescriptor) GetPackage() string {
 	return fd.proto.GetPackage()
 }
 
@@ -164,6 +211,14 @@ func (fd *FileDescriptor) GetParent() Descriptor {
 
 func (fd *FileDescriptor) GetFile() *FileDescriptor {
 	return fd
+}
+
+func (fd *FileDescriptor) GetOptions() proto.Message {
+	return fd.proto.GetOptions()
+}
+
+func (fd *FileDescriptor) GetFileOptions() *dpb.FileOptions {
+	return fd.proto.GetOptions()
 }
 
 func (fd *FileDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
@@ -176,6 +231,10 @@ func (fd *FileDescriptor) AsProto() proto.Message {
 
 func (fd *FileDescriptor) AsFileDescriptorProto() *dpb.FileDescriptorProto {
 	return fd.proto
+}
+
+func (fd *FileDescriptor) String() string {
+	return fd.proto.String()
 }
 
 // GetDependencies returns all of this file's dependencies. These correspond to
@@ -316,6 +375,14 @@ func (md *MessageDescriptor) GetFile() *FileDescriptor {
 	return md.file
 }
 
+func (md *MessageDescriptor) GetOptions() proto.Message {
+	return md.proto.GetOptions()
+}
+
+func (md *MessageDescriptor) GetMessageOptions() *dpb.MessageOptions {
+	return md.proto.GetOptions()
+}
+
 func (md *MessageDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
 	return md.sourceInfo
 }
@@ -326,6 +393,16 @@ func (md *MessageDescriptor) AsProto() proto.Message {
 
 func (md *MessageDescriptor) AsDescriptorProto() *dpb.DescriptorProto {
 	return md.proto
+}
+
+func (md *MessageDescriptor) String() string {
+	return md.proto.String()
+}
+
+// IsMapEntry returns true if this is a synthetic message type that represents an entry
+// in a map field.
+func (md *MessageDescriptor) IsMapEntry() bool {
+	return md.proto.GetOptions().GetMapEntry()
 }
 
 // GetFields returns all of the fields for this message.
@@ -423,6 +500,14 @@ func (fd *FieldDescriptor) GetFile() *FileDescriptor {
 	return fd.file
 }
 
+func (fd *FieldDescriptor) GetOptions() proto.Message {
+	return fd.proto.GetOptions()
+}
+
+func (fd *FieldDescriptor) GetFieldOptions() *dpb.FieldOptions {
+	return fd.proto.GetOptions()
+}
+
 func (fd *FieldDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
 	return fd.sourceInfo
 }
@@ -433,6 +518,10 @@ func (fd *FieldDescriptor) AsProto() proto.Message {
 
 func (fd *FieldDescriptor) AsFieldDescriptorProto() *dpb.FieldDescriptorProto {
 	return fd.proto
+}
+
+func (fd *FieldDescriptor) String() string {
+	return fd.proto.String()
 }
 
 // GetOwner returns the message type that this field belongs to. If this is a normal
@@ -458,6 +547,31 @@ func (fd *FieldDescriptor) GetOneOf() *OneOfDescriptor {
 // message type can be queried via GetMessageType.
 func (fd *FieldDescriptor) GetType() dpb.FieldDescriptorProto_Type {
 	return fd.proto.GetType()
+}
+
+// GetLabel returns the label for this field. The label can be required (proto2-only),
+// optional (default for proto3), or required.
+func (fd *FieldDescriptor) GetLabel() dpb.FieldDescriptorProto_Label {
+	return fd.proto.GetLabel()
+}
+
+// IsRequired returns true if this field has the "required" label.
+func (fd *FieldDescriptor) IsRequired() bool {
+	return fd.proto.GetLabel() == dpb.FieldDescriptorProto_LABEL_REQUIRED
+}
+
+// IsRepeated returns true if this field has the "repeated" label.
+func (fd *FieldDescriptor) IsRepeated() bool {
+	return fd.proto.GetLabel() == dpb.FieldDescriptorProto_LABEL_REPEATED
+}
+
+// IsMap returns true if this is a map field. If so, it will have the "repeated"
+// label its type will be a message that represents a map entry. The map entry
+// message will have exactly two fields: tag #1 is  key and tag #2 is the value.
+func (fd *FieldDescriptor) IsMap() bool {
+	return fd.proto.GetLabel() == dpb.FieldDescriptorProto_LABEL_REPEATED &&
+		fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_MESSAGE &&
+		fd.GetMessageType().GetMessageOptions().GetMapEntry()
 }
 
 // GetMessageType returns the type of this field if it is a message type. If
@@ -517,6 +631,14 @@ func (ed *EnumDescriptor) GetFile() *FileDescriptor {
 	return ed.file
 }
 
+func (ed *EnumDescriptor) GetOptions() proto.Message {
+	return ed.proto.GetOptions()
+}
+
+func (ed *EnumDescriptor) GetEnumOptions() *dpb.EnumOptions {
+	return ed.proto.GetOptions()
+}
+
 func (ed *EnumDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
 	return ed.sourceInfo
 }
@@ -527,6 +649,10 @@ func (ed *EnumDescriptor) AsProto() proto.Message {
 
 func (ed *EnumDescriptor) AsEnumDescriptorProto() *dpb.EnumDescriptorProto {
 	return ed.proto
+}
+
+func (ed *EnumDescriptor) String() string {
+	return ed.proto.String()
 }
 
 // GetValues returns all of the allowed values defined for this enum.
@@ -578,6 +704,14 @@ func (vd *EnumValueDescriptor) GetFile() *FileDescriptor {
 	return vd.file
 }
 
+func (vd *EnumValueDescriptor) GetOptions() proto.Message {
+	return vd.proto.GetOptions()
+}
+
+func (vd *EnumValueDescriptor) GetEnumValueOptions() *dpb.EnumValueOptions {
+	return vd.proto.GetOptions()
+}
+
 func (vd *EnumValueDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
 	return vd.sourceInfo
 }
@@ -588,6 +722,10 @@ func (vd *EnumValueDescriptor) AsProto() proto.Message {
 
 func (vd *EnumValueDescriptor) AsEnumValueDescriptorProto() *dpb.EnumValueDescriptorProto {
 	return vd.proto
+}
+
+func (vd *EnumValueDescriptor) String() string {
+	return vd.proto.String()
 }
 
 // ServiceDescriptor describes an RPC service declared in a proto file.
@@ -637,6 +775,14 @@ func (sd *ServiceDescriptor) GetFile() *FileDescriptor {
 	return sd.file
 }
 
+func (sd *ServiceDescriptor) GetOptions() proto.Message {
+	return sd.proto.GetOptions()
+}
+
+func (sd *ServiceDescriptor) GetServiceOptions() *dpb.ServiceOptions {
+	return sd.proto.GetOptions()
+}
+
 func (sd *ServiceDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
 	return sd.sourceInfo
 }
@@ -647,6 +793,10 @@ func (sd *ServiceDescriptor) AsProto() proto.Message {
 
 func (sd *ServiceDescriptor) AsServiceDescriptorProto() *dpb.ServiceDescriptorProto {
 	return sd.proto
+}
+
+func (sd *ServiceDescriptor) String() string {
+	return sd.proto.String()
 }
 
 // GetMethods returns all of the RPC methods for this service.
@@ -707,6 +857,14 @@ func (md *MethodDescriptor) GetFile() *FileDescriptor {
 	return md.file
 }
 
+func (md *MethodDescriptor) GetOptions() proto.Message {
+	return md.proto.GetOptions()
+}
+
+func (md *MethodDescriptor) GetMethodOptions() *dpb.MethodOptions {
+	return md.proto.GetOptions()
+}
+
 func (md *MethodDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
 	return md.sourceInfo
 }
@@ -717,6 +875,20 @@ func (md *MethodDescriptor) AsProto() proto.Message {
 
 func (md *MethodDescriptor) AsMethodDescriptorProto() *dpb.MethodDescriptorProto {
 	return md.proto
+}
+
+func (md *MethodDescriptor) String() string {
+	return md.proto.String()
+}
+
+// IsServerStreaming returns true if this is a server-streaming method.
+func (md *MethodDescriptor) IsServerStreaming() bool {
+	return md.proto.GetServerStreaming()
+}
+
+// IsClientStreaming returns true if this is a client-streaming method.
+func (md *MethodDescriptor) IsClientStreaming() bool {
+	return md.proto.GetClientStreaming()
 }
 
 // GetInputType returns the input type, or request type, of the RPC method.
@@ -777,6 +949,14 @@ func (od *OneOfDescriptor) GetFile() *FileDescriptor {
 	return od.file
 }
 
+func (od *OneOfDescriptor) GetOptions() proto.Message {
+	return od.proto.GetOptions()
+}
+
+func (od *OneOfDescriptor) GetOneOfOptions() *dpb.OneofOptions {
+	return od.proto.GetOptions()
+}
+
 func (od *OneOfDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
 	return od.sourceInfo
 }
@@ -787,6 +967,10 @@ func (od *OneOfDescriptor) AsProto() proto.Message {
 
 func (od *OneOfDescriptor) AsOneofDescriptorProto() *dpb.OneofDescriptorProto {
 	return od.proto
+}
+
+func (od *OneOfDescriptor) String() string {
+	return od.proto.String()
 }
 
 // GetChoices returns the fields that are part of the one-of field set. At most one of

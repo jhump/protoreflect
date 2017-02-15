@@ -64,7 +64,7 @@ func toFileDescriptorLocked(fd *dpb.FileDescriptorProto) (*FileDescriptor, error
 			return nil, err
 		}
 	}
-	return CreateFileDescriptor(fd, deps)
+	return CreateFileDescriptor(fd, deps...)
 }
 
 func decodeFileDescriptor(file string, fdb []byte) (*dpb.FileDescriptorProto, error) {
@@ -166,7 +166,7 @@ func messageFromType(mt reflect.Type) (protoMessage, error) {
 	if mt.Kind() != reflect.Ptr {
 		mt = reflect.PtrTo(mt)
 	}
-	m, ok := reflect.Zero(reflect.PtrTo(mt)).Interface().(protoMessage)
+	m, ok := reflect.Zero(mt).Interface().(protoMessage)
 	if !ok {
 		return nil, fmt.Errorf("failed to create message from type: %v", mt)
 	}
