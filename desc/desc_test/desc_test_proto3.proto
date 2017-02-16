@@ -27,6 +27,6 @@ message TestResponse {
 service TestService {
 	rpc DoSomething (TestRequest) returns (jhump.protoreflect.desc.Bar);
 	rpc DoSomethingElse (stream TestMessage) returns (TestResponse);
-	rpc DoSomethingAgain (jhump.protoreflect.desc.Bar) returns (AnotherTestMessage);
+	rpc DoSomethingAgain (jhump.protoreflect.desc.Bar) returns (stream AnotherTestMessage);
 	rpc DoSomethingForever (stream TestRequest) returns (stream TestResponse);
 }

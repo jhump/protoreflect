@@ -44,9 +44,9 @@ type extDesc struct {
 	extensionNumber     int32
 }
 
-// ClientReflection is a client connection to a server for performing reflection
-// calls and resolving remote symbols. ClientReflection is *not* thread-safe.
-type ClientReflection struct {
+// Client is a client connection to a server for performing reflection calls
+// and resolving remote symbols. Client is *not* thread-safe.
+type Client struct {
 	ctx  context.Context
 	stub rpb.ServerReflectionClient
 
@@ -59,18 +59,25 @@ type ClientReflection struct {
 	filesByExtension map[extDesc]*desc.FileDescriptor
 }
 
-// NewClientReflection creates a new ClientReflection with the given root
-// context and using the given RPC stub for talking to the server.
-func NewClientReflection(ctx context.Context, stub rpb.ServerReflectionClient) *ClientReflection {
-	cr := &ClientReflection{ctx: ctx, stub: stub}
+// NewClient creates a new Client with the given root context and using the
+// given RPC stub for talking to the server.
+func NewClient(ctx context.Context, stub rpb.ServerReflectionClient) *Client {
+	cr := &Client{
+		ctx:              ctx,
+		stub:             stub,
+		protosByName:     map[string]*dpb.FileDescriptorProto{},
+		filesByName:      map[string]*desc.FileDescriptor{},
+		filesBySymbol:    map[string]*desc.FileDescriptor{},
+		filesByExtension: map[extDesc]*desc.FileDescriptor{},
+	}
 	// don't leak a grpc stream
-	runtime.SetFinalizer(cr, cr.Reset)
+	runtime.SetFinalizer(cr, (*Client).Reset)
 	return cr
 }
 
 // FileByFilename asks the server for a file descriptor for the proto file with
 // the given name.
-func (cr *ClientReflection) FileByFilename(filename string) (*desc.FileDescriptor, error) {
+func (cr *Client) FileByFilename(filename string) (*desc.FileDescriptor, error) {
 	// hit the cache first
 	if fd, ok := cr.filesByName[filename]; ok {
 		return fd, nil
@@ -91,7 +98,7 @@ func (cr *ClientReflection) FileByFilename(filename string) (*desc.FileDescripto
 
 // FileContainingSymbol asks the server for a file descriptor for the proto file
 // that declares the given fully-qualified symbol.
-func (cr *ClientReflection) FileContainingSymbol(symbol string) (*desc.FileDescriptor, error) {
+func (cr *Client) FileContainingSymbol(symbol string) (*desc.FileDescriptor, error) {
 	// hit the cache first
 	if fd, ok := cr.filesBySymbol[symbol]; ok {
 		return fd, nil
@@ -108,7 +115,7 @@ func (cr *ClientReflection) FileContainingSymbol(symbol string) (*desc.FileDescr
 // FileContainingExtension asks the server for a file descriptor for the proto
 // file that declares an extension with the given number for the given
 // fully-qualified message name.
-func (cr *ClientReflection) FileContainingExtension(extendedMessageName string, extensionNumber int32) (*desc.FileDescriptor, error) {
+func (cr *Client) FileContainingExtension(extendedMessageName string, extensionNumber int32) (*desc.FileDescriptor, error) {
 	// hit the cache first
 	if fd, ok := cr.filesByExtension[extDesc{extendedMessageName, extensionNumber}]; ok {
 		return fd, nil
@@ -125,7 +132,7 @@ func (cr *ClientReflection) FileContainingExtension(extendedMessageName string, 
 	return cr.getAndCacheFileDescriptors(req)
 }
 
-func (cr *ClientReflection) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest) (*desc.FileDescriptor, error) {
+func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest) (*desc.FileDescriptor, error) {
 	resp, err := cr.send(req)
 	if err != nil {
 		return nil, err
@@ -158,16 +165,16 @@ func (cr *ClientReflection) getAndCacheFileDescriptors(req *rpb.ServerReflection
 	return cr.descriptorFromProto(firstFd)
 }
 
-func (cr *ClientReflection) descriptorFromProto(fd *dpb.FileDescriptorProto) (*desc.FileDescriptor, error) {
+func (cr *Client) descriptorFromProto(fd *dpb.FileDescriptorProto) (*desc.FileDescriptor, error) {
 	deps := make([]*desc.FileDescriptor, len(fd.GetDependency()))
-	for i, depName := range(fd.GetDependency()) {
+	for i, depName := range fd.GetDependency() {
 		if dep, err := cr.FileByFilename(depName); err != nil {
 			return nil, err
 		} else {
 			deps[i] = dep
 		}
 	}
-	d, err := desc.CreateFileDescriptor(fd, deps)
+	d, err := desc.CreateFileDescriptor(fd, deps...)
 	if err != nil {
 		return nil, err
 	}
@@ -175,58 +182,58 @@ func (cr *ClientReflection) descriptorFromProto(fd *dpb.FileDescriptorProto) (*d
 	return d, nil
 }
 
-func (cr *ClientReflection) cacheFile(fd *desc.FileDescriptor) {
+func (cr *Client) cacheFile(fd *desc.FileDescriptor) {
 	// cache file descriptor by name
 	cr.filesByName[fd.GetName()] = fd
 
 	// also cache by symbols and extensions
-	for _, m := range(fd.GetMessageTypes()) {
+	for _, m := range fd.GetMessageTypes() {
 		cr.cacheMessage(fd, m)
 	}
-	for _, e := range(fd.GetEnumTypes()) {
+	for _, e := range fd.GetEnumTypes() {
 		cr.filesBySymbol[e.GetFullyQualifiedName()] = fd
-		for _, v := range(e.GetValues()) {
+		for _, v := range e.GetValues() {
 			cr.filesBySymbol[v.GetFullyQualifiedName()] = fd
 		}
 	}
-	for _, e := range(fd.GetExtensions()) {
+	for _, e := range fd.GetExtensions() {
 		cr.filesBySymbol[e.GetFullyQualifiedName()] = fd
 		cr.filesByExtension[extDesc{e.GetOwner().GetFullyQualifiedName(), e.GetNumber()}] = fd
 	}
-	for _, s := range(fd.GetServices()) {
+	for _, s := range fd.GetServices() {
 		cr.filesBySymbol[s.GetFullyQualifiedName()] = fd
-		for _, m := range(s.GetMethods()) {
+		for _, m := range s.GetMethods() {
 			cr.filesBySymbol[m.GetFullyQualifiedName()] = fd
 		}
 	}
 }
 
-func (cr *ClientReflection) cacheMessage(fd *desc.FileDescriptor, md *desc.MessageDescriptor) {
+func (cr *Client) cacheMessage(fd *desc.FileDescriptor, md *desc.MessageDescriptor) {
 	cr.filesBySymbol[md.GetFullyQualifiedName()] = fd
-	for _, f := range(md.GetFields()) {
+	for _, f := range md.GetFields() {
 		cr.filesBySymbol[f.GetFullyQualifiedName()] = fd
 	}
-	for _, o := range(md.GetOneOfs()) {
+	for _, o := range md.GetOneOfs() {
 		cr.filesBySymbol[o.GetFullyQualifiedName()] = fd
 	}
-	for _, e := range(md.GetNestedEnumTypes()) {
+	for _, e := range md.GetNestedEnumTypes() {
 		cr.filesBySymbol[e.GetFullyQualifiedName()] = fd
-		for _, v := range(e.GetValues()) {
+		for _, v := range e.GetValues() {
 			cr.filesBySymbol[v.GetFullyQualifiedName()] = fd
 		}
 	}
-	for _, e := range(md.GetNestedExtensions()) {
+	for _, e := range md.GetNestedExtensions()  {
 		cr.filesBySymbol[e.GetFullyQualifiedName()] = fd
 		cr.filesByExtension[extDesc{e.GetOwner().GetFullyQualifiedName(), e.GetNumber()}] = fd
 	}
-	for _, m := range(md.GetNestedMessageTypes()) {
+	for _, m := range md.GetNestedMessageTypes() {
 		cr.cacheMessage(fd, m) // recurse
 	}
 }
 
 // AllExtensionNumbersForType asks the server for all known extension numbers
 // for the given fully-qualified message name.
-func (cr *ClientReflection) AllExtensionNumbersForType(extendedMessageName string) ([]int32, error) {
+func (cr *Client) AllExtensionNumbersForType(extendedMessageName string) ([]int32, error) {
 	req := &rpb.ServerReflectionRequest{
 		MessageRequest: &rpb.ServerReflectionRequest_AllExtensionNumbersOfType{
 			AllExtensionNumbersOfType: extendedMessageName,
@@ -246,7 +253,7 @@ func (cr *ClientReflection) AllExtensionNumbersForType(extendedMessageName strin
 
 // ListServices asks the server for the fully-qualified names of all exposed
 // services.
-func (cr *ClientReflection) ListServices() ([]string, error) {
+func (cr *Client) ListServices() ([]string, error) {
 	req := &rpb.ServerReflectionRequest{
 		MessageRequest: &rpb.ServerReflectionRequest_ListServices{
 			// proto doesn't indicate any purpose for this value and server impl
@@ -270,7 +277,7 @@ func (cr *ClientReflection) ListServices() ([]string, error) {
 	return serviceNames, nil
 }
 
-func (cr *ClientReflection) send(req *rpb.ServerReflectionRequest) (*rpb.ServerReflectionResponse, error) {
+func (cr *Client) send(req *rpb.ServerReflectionRequest) (*rpb.ServerReflectionResponse, error) {
 	// we allow one immediate retry, in case we have a stale stream
 	// (e.g. closed by server)
 	resp, err := cr.doSend(true, req)
@@ -290,7 +297,7 @@ func (cr *ClientReflection) send(req *rpb.ServerReflectionRequest) (*rpb.ServerR
 	return resp, nil
 }
 
-func (cr *ClientReflection) doSend(retry bool, req *rpb.ServerReflectionRequest) (*rpb.ServerReflectionResponse, error) {
+func (cr *Client) doSend(retry bool, req *rpb.ServerReflectionRequest) (*rpb.ServerReflectionResponse, error) {
 	if err := cr.initStream(); err != nil {
 		return nil, err
 	}
@@ -314,7 +321,7 @@ func (cr *ClientReflection) doSend(retry bool, req *rpb.ServerReflectionRequest)
 	}
 }
 
-func (cr *ClientReflection) initStream() error {
+func (cr *Client) initStream() error {
 	if cr.stream != nil {
 		return nil
 	}
@@ -327,7 +334,7 @@ func (cr *ClientReflection) initStream() error {
 
 // Reset ensures that any active stream with the server is closed, releasing any
 // resources.
-func (cr *ClientReflection) Reset() {
+func (cr *Client) Reset() {
 	if cr.stream != nil {
 		cr.stream.CloseSend()
 		cr.stream = nil
@@ -340,7 +347,7 @@ func (cr *ClientReflection) Reset() {
 
 // ResolveService asks the server to resolve the given fully-qualified service
 // name into a service descriptor.
-func (cr *ClientReflection) ResolveService(serviceName string) (*desc.ServiceDescriptor, error) {
+func (cr *Client) ResolveService(serviceName string) (*desc.ServiceDescriptor, error) {
 	file, err := cr.FileContainingSymbol(serviceName)
 	if err != nil {
 		return nil, err
@@ -358,7 +365,7 @@ func (cr *ClientReflection) ResolveService(serviceName string) (*desc.ServiceDes
 
 // ResolveMessage asks the server to resolve the given fully-qualified message
 // name into a message descriptor.
-func (cr *ClientReflection) ResolveMessage(messageName string) (*desc.MessageDescriptor, error) {
+func (cr *Client) ResolveMessage(messageName string) (*desc.MessageDescriptor, error) {
 	file, err := cr.FileContainingSymbol(messageName)
 	if err != nil {
 		return nil, err
@@ -376,7 +383,7 @@ func (cr *ClientReflection) ResolveMessage(messageName string) (*desc.MessageDes
 
 // ResolveEnum asks the server to resolve the given fully-qualified enum name
 // into an enum descriptor.
-func (cr *ClientReflection) ResolveEnum(enumName string) (*desc.EnumDescriptor, error) {
+func (cr *Client) ResolveEnum(enumName string) (*desc.EnumDescriptor, error) {
 	file, err := cr.FileContainingSymbol(enumName)
 	if err != nil {
 		return nil, err
@@ -394,7 +401,7 @@ func (cr *ClientReflection) ResolveEnum(enumName string) (*desc.EnumDescriptor, 
 
 // ResolveEnumValues asks the server to resolve the given fully-qualified enum
 // name into a map of names to numbers that represents the enum's values.
-func (cr *ClientReflection) ResolveEnumValues(enumName string) (map[string]int32, error) {
+func (cr *Client) ResolveEnumValues(enumName string) (map[string]int32, error) {
 	enumDesc, err := cr.ResolveEnum(enumName)
 	if err != nil {
 		return nil, err
@@ -408,7 +415,7 @@ func (cr *ClientReflection) ResolveEnumValues(enumName string) (map[string]int32
 
 // ResolveExtension asks the server to resolve the given extension number and
 // fully-qualified message name into a field descriptor.
-func (cr *ClientReflection) ResolveExtension(extendedType string, extensionNumber int32) (*desc.FieldDescriptor, error) {
+func (cr *Client) ResolveExtension(extendedType string, extensionNumber int32) (*desc.FieldDescriptor, error) {
 	file, err := cr.FileContainingExtension(extendedType, extensionNumber)
 	if err != nil {
 		return nil, err

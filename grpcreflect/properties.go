@@ -12,7 +12,7 @@ import (
 // given GRPC server.
 func LoadServiceDescriptors(s *grpc.Server) (map[string]*desc.ServiceDescriptor, error) {
 	descs := map[string]*desc.ServiceDescriptor{}
-	for name, info := range(s.GetServiceInfo()) {
+	for name, info := range s.GetServiceInfo() {
 		file, ok := info.Metadata.(string)
 		if !ok {
 			return nil, fmt.Errorf("Service %q has unexpected metadata. Expecting a string, got %v", name, info.Metadata)

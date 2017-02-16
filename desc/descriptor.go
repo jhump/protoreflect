@@ -79,48 +79,48 @@ func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) 
 
 	// populate references to file descriptor dependencies
 	files := map[string]*FileDescriptor{}
-	for _, f := range(deps) {
+	for _, f := range deps {
 		files[f.proto.GetName()] = f
 	}
 	ret.deps = make([]*FileDescriptor, len(fd.GetDependency()))
-	for i, d := range(fd.GetDependency()) {
+	for i, d := range fd.GetDependency() {
 		ret.deps[i] = files[d]
 		if ret.deps[i] == nil {
 			return nil, fmt.Errorf("Given dependencies did not include %q", d)
 		}
 	}
 	ret.publicDeps = make([]*FileDescriptor, len(fd.GetPublicDependency()))
-	for i, pd := range(fd.GetPublicDependency()) {
+	for i, pd := range fd.GetPublicDependency() {
 		ret.publicDeps[i] = ret.deps[pd]
 	}
 	ret.weakDeps = make([]*FileDescriptor, len(fd.GetWeakDependency()))
-	for i, wd := range(fd.GetWeakDependency()) {
+	for i, wd := range fd.GetWeakDependency() {
 		ret.weakDeps[i] = ret.deps[wd]
 	}
 
 	// populate all tables of child descriptors
-	for _, m := range(fd.GetMessageType()) {
+	for _, m := range fd.GetMessageType() {
 		md, n := createMessageDescriptor(ret, ret, pkg, m, ret.symbols)
 		ret.symbols[n] = md
 		ret.messages = append(ret.messages, md)
 	}
-	for _, e := range(fd.GetEnumType()) {
+	for _, e := range fd.GetEnumType() {
 		ed, n := createEnumDescriptor(ret, ret, pkg, e, ret.symbols)
 		ret.symbols[n] = ed
 		ret.enums = append(ret.enums, ed)
 	}
-	for _, ex := range(fd.GetExtension()) {
+	for _, ex := range fd.GetExtension() {
 		exd, n := createFieldDescriptor(ret, ret, pkg, ex)
 		ret.symbols[n] = exd
 		ret.extensions = append(ret.extensions, exd)
 	}
-	for _, s := range(fd.GetService()) {
+	for _, s := range fd.GetService() {
 		sd, n := createServiceDescriptor(ret, pkg, s, ret.symbols)
 		ret.symbols[n] = sd
 		ret.services = append(ret.services, sd)
 	}
 	sourceCodeInfo := map[string]*dpb.SourceCodeInfo_Location{}
-	for _, scl := range(fd.GetSourceCodeInfo().GetLocation()) {
+	for _, scl := range fd.GetSourceCodeInfo().GetLocation() {
 		sourceCodeInfo[pathAsKey(scl.GetPath())] = scl
 	}
 
@@ -128,23 +128,23 @@ func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) 
 	scopes := []scope{fileScope(ret)}
 	path := make([]int32, 1, 8)
 	path[0] = file_messagesTag
-	for i, md := range(ret.messages) {
+	for i, md := range ret.messages {
 		if err := md.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
 			return nil, err
 		}
 	}
 	path[0] = file_enumsTag
-	for i, ed := range(ret.enums) {
+	for i, ed := range ret.enums {
 		ed.resolve(append(path, int32(i)), sourceCodeInfo)
 	}
 	path[0] = file_extensionsTag
-	for i, exd := range(ret.extensions) {
+	for i, exd := range ret.extensions {
 		if err := exd.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
 			return nil, err
 		}
 	}
 	path[0] = file_servicesTag
-	for i, sd := range(ret.services) {
+	for i, sd := range ret.services {
 		if err := sd.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
 			return nil, err
 		}
@@ -163,7 +163,7 @@ func CreateFileDescriptorFromSet(fds *dpb.FileDescriptorSet) (*FileDescriptor, e
 	files := map[string]*dpb.FileDescriptorProto{}
 	resolved := map[string]*FileDescriptor{}
 	var name string
-	for i, fd := range(fds.GetFile()) {
+	for i, fd := range fds.GetFile() {
 		if i == 0 {
 			name = fd.GetName()
 		}
@@ -183,7 +183,7 @@ func createFromSet(filename string, files map[string]*dpb.FileDescriptorProto, r
 		return nil, fmt.Errorf("file descriptor set missing a dependency: %s", filename)
 	}
 	deps := make([]*FileDescriptor, len(fdp.GetDependency()))
-	for i, depName := range(fdp.GetDependency()) {
+	for i, depName := range fdp.GetDependency() {
 		if dep, err := createFromSet(depName, files, resolved); err != nil {
 			return nil, err
 		} else {
@@ -299,27 +299,27 @@ type MessageDescriptor struct {
 func createMessageDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, md *dpb.DescriptorProto, symbols map[string]Descriptor) (*MessageDescriptor, string) {
 	msgName := merge(enclosing, md.GetName())
 	ret := &MessageDescriptor{ proto: md, parent: parent, file: fd, fqn: msgName }
-	for _, f := range(md.GetField()) {
+	for _, f := range md.GetField() {
 		fld, n := createFieldDescriptor(fd, ret, msgName, f)
 		symbols[n] = fld
 		ret.fields = append(ret.fields, fld)
 	}
-	for _, nm := range(md.NestedType) {
+	for _, nm := range md.NestedType {
 		nmd, n := createMessageDescriptor(fd, ret, msgName, nm, symbols)
 		symbols[n] = nmd
 		ret.nested = append(ret.nested, nmd)
 	}
-	for _, e := range(md.EnumType) {
+	for _, e := range md.EnumType {
 		ed, n := createEnumDescriptor(fd, ret, msgName, e, symbols)
 		symbols[n] = ed
 		ret.enums = append(ret.enums, ed)
 	}
-	for _, ex := range(md.GetExtension()) {
+	for _, ex := range md.GetExtension() {
 		exd, n := createFieldDescriptor(fd, ret, msgName, ex)
 		symbols[n] = exd
 		ret.extensions = append(ret.extensions, exd)
 	}
-	for i, o := range(md.GetOneofDecl()) {
+	for i, o := range md.GetOneofDecl() {
 		od, n := createOneOfDescriptor(fd, ret, i, msgName, o)
 		symbols[n] = od
 		ret.oneOfs = append(ret.oneOfs, od)
@@ -331,29 +331,29 @@ func (md *MessageDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dp
 	md.sourceInfo = sourceCodeInfo[pathAsKey(path)]
 	path = append(path, message_nestedMessagesTag)
 	scopes = append(scopes, messageScope(md))
-	for i, nmd := range(md.nested) {
+	for i, nmd := range md.nested {
 		if err := nmd.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
 			return err
 		}
 	}
 	path[len(path) - 1] = message_enumsTag
-	for i, ed := range(md.enums) {
+	for i, ed := range md.enums {
 		ed.resolve(append(path, int32(i)), sourceCodeInfo)
 	}
 	path[len(path) - 1] = message_fieldsTag
-	for i, fld := range(md.fields) {
+	for i, fld := range md.fields {
 		if err := fld.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
 			return err
 		}
 	}
 	path[len(path) - 1] = message_extensionsTag
-	for i, exd := range(md.extensions) {
+	for i, exd := range md.extensions {
 		if err := exd.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
 			return err
 		}
 	}
 	path[len(path) - 1] = message_oneOfsTag
-	for i, od := range(md.oneOfs) {
+	for i, od := range md.oneOfs {
 		od.resolve(append(path, int32(i)), sourceCodeInfo)
 	}
 	return nil
@@ -599,7 +599,7 @@ type EnumDescriptor struct {
 func createEnumDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, ed *dpb.EnumDescriptorProto, symbols map[string]Descriptor) (*EnumDescriptor, string) {
 	enumName := merge(enclosing, ed.GetName())
 	ret := &EnumDescriptor{ proto: ed, parent: parent, file: fd, fqn: enumName }
-	for _, ev := range(ed.GetValue()) {
+	for _, ev := range ed.GetValue() {
 		evd, n := createEnumValueDescriptor(fd, ret, enumName, ev)
 		symbols[n] = evd
 		ret.values = append(ret.values, evd)
@@ -610,7 +610,7 @@ func createEnumDescriptor(fd *FileDescriptor, parent Descriptor, enclosing strin
 func (ed *EnumDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dpb.SourceCodeInfo_Location) {
 	ed.sourceInfo = sourceCodeInfo[pathAsKey(path)]
 	path = append(path, enum_valuesTag)
-	for i, evd := range(ed.values) {
+	for i, evd := range ed.values {
 		evd.resolve(append(path, int32(i)), sourceCodeInfo)
 	}
 }
@@ -740,7 +740,7 @@ type ServiceDescriptor struct {
 func createServiceDescriptor(fd *FileDescriptor, enclosing string, sd *dpb.ServiceDescriptorProto, symbols map[string]Descriptor) (*ServiceDescriptor, string) {
 	serviceName := merge(enclosing, sd.GetName())
 	ret := &ServiceDescriptor{ proto: sd, file: fd, fqn: serviceName }
-	for _, m := range(sd.GetMethod()) {
+	for _, m := range sd.GetMethod() {
 		md, n := createMethodDescriptor(fd, ret, serviceName, m)
 		symbols[n] = md
 		ret.methods = append(ret.methods, md)
@@ -751,7 +751,7 @@ func createServiceDescriptor(fd *FileDescriptor, enclosing string, sd *dpb.Servi
 func (sd *ServiceDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dpb.SourceCodeInfo_Location, scopes []scope) error {
 	sd.sourceInfo = sourceCodeInfo[pathAsKey(path)]
 	path = append(path, service_methodsTag)
-	for i, md := range(sd.methods) {
+	for i, md := range sd.methods {
 		if err := md.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
 			return err
 		}
@@ -914,7 +914,7 @@ type OneOfDescriptor struct {
 func createOneOfDescriptor(fd *FileDescriptor, parent *MessageDescriptor, index int, enclosing string, od *dpb.OneofDescriptorProto) (*OneOfDescriptor, string) {
 	oneOfName := merge(enclosing, od.GetName())
 	ret := &OneOfDescriptor{ proto: od, parent: parent, file: fd, fqn: oneOfName }
-	for _, f := range(parent.fields) {
+	for _, f := range parent.fields {
 		oi := f.proto.OneofIndex
 		if oi != nil && *oi == int32(index) {
 			f.oneOf = ret
@@ -982,7 +982,7 @@ func (od *OneOfDescriptor) GetChoices() []*FieldDescriptor {
 func pathAsKey(path []int32) string {
 	var b bytes.Buffer
 	first := true
-	for _, i := range(path) {
+	for _, i := range path {
 		if first {
 			first = false
 		} else {
@@ -1004,7 +1004,7 @@ func fileScope(fd *FileDescriptor) scope {
 	fds := collectFilesInPackage(pkg, fd.deps, []*FileDescriptor{ fd })
 	return func(name string) Descriptor {
 		n := merge(pkg, name)
-		for _, fd := range(fds) {
+		for _, fd := range fds {
 			if d, ok := fd.symbols[n]; ok {
 				return d
 			}
@@ -1014,7 +1014,7 @@ func fileScope(fd *FileDescriptor) scope {
 }
 
 func collectFilesInPackage(pkg string, fds []*FileDescriptor, results []*FileDescriptor) []*FileDescriptor {
-	for _, fd := range(fds) {
+	for _, fd := range fds {
 		if fd.proto.GetPackage() == pkg {
 			results = append(results, fd)
 		}
@@ -1067,7 +1067,7 @@ func findSymbol(fd *FileDescriptor, name string, public bool) Descriptor {
 	} else {
 		deps = fd.deps
 	}
-	for _, dep := range(deps) {
+	for _, dep := range deps {
 		d = findSymbol(dep, name, true)
 		if d != nil {
 			return d

@@ -57,7 +57,7 @@ func loadFileDescriptorLocked(file string) (*FileDescriptor, error) {
 
 func toFileDescriptorLocked(fd *dpb.FileDescriptorProto) (*FileDescriptor, error) {
 	deps := make([]*FileDescriptor, len(fd.GetDependency()))
-	for i, dep := range(fd.GetDependency()) {
+	for i, dep := range fd.GetDependency() {
 		var err error
 		deps[i], err = loadFileDescriptorLocked(dep)
 		if err != nil {
@@ -103,7 +103,7 @@ func putCacheLocked(filename string, fd *FileDescriptor) {
 }
 
 func putMessageCacheLocked(mds []*MessageDescriptor) {
-	for _, md := range(mds) {
+	for _, md := range mds {
 		messagesCache[md.fqn] = md
 		putMessageCacheLocked(md.nested)
 	}

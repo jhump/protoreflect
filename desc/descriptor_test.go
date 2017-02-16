@@ -456,7 +456,7 @@ type childCases struct {
 
 func refs(names ...string) []descCase {
 	r := make([]descCase, len(names))
-	for i, n := range(names) {
+	for i, n := range names {
 		r[i] = descCase{ name: n, skipParent: true }
 	}
 	return r
@@ -464,7 +464,7 @@ func refs(names ...string) []descCase {
 
 func children(names ...string) []descCase {
 	ch := make([]descCase, len(names))
-	for i, n := range(names) {
+	for i, n := range names {
 		ch[i] = descCase{ name: n }
 	}
 	return ch
@@ -477,7 +477,7 @@ type fld struct {
 
 func fields(flds ... fld) []descCase {
 	f := make([]descCase, len(flds))
-	for i, field := range(flds) {
+	for i, field := range flds {
 		f[i] = descCase{ name: field.name, number: field.number, skipParent: true }
 	}
 	return f
@@ -486,8 +486,7 @@ func fields(flds ... fld) []descCase {
 func checkDescriptor(t *testing.T, caseName string, num int32, d Descriptor, parent Descriptor, fd *FileDescriptor, c descCase) {
 	// name and fully-qualified name
 	eq(t, c.name, d.GetFullyQualifiedName(), caseName)
-	_, isFile := d.(*FileDescriptor)
-	if isFile {
+	if _, ok := d.(*FileDescriptor); ok {
 		eq(t, c.name, d.GetName(), caseName)
 	} else {
 		pos := strings.LastIndex(c.name, ".")
@@ -496,6 +495,8 @@ func checkDescriptor(t *testing.T, caseName string, num int32, d Descriptor, par
 			n = c.name[pos+1:]
 		}
 		eq(t, n, d.GetName(), caseName)
+		// check that this object matches the canonical one returned by file descriptor
+		eq(t, d, d.GetFile().FindSymbol(d.GetFullyQualifiedName()), caseName)
 	}
 
 	// number
@@ -521,13 +522,7 @@ func checkDescriptor(t *testing.T, caseName string, num int32, d Descriptor, par
 	// parent and file
 	if !c.skipParent {
 		eq(t, parent, d.GetParent(), caseName)
-		if eq(t, fd, d.GetFile(), caseName) && !isFile {
-			eq(t, d, fd.FindSymbol(d.GetFullyQualifiedName()), caseName)
-		}
-	} else {
-		if fd == d.GetFile() && !isFile {
-			eq(t, d, fd.FindSymbol(d.GetFullyQualifiedName()), caseName)
-		}
+		eq(t, fd, d.GetFile(), caseName)
 	}
 
 	// comment
@@ -536,11 +531,11 @@ func checkDescriptor(t *testing.T, caseName string, num int32, d Descriptor, par
 	}
 
 	// references
-	for name, cases := range(c.references) {
+	for name, cases := range c.references {
 		caseName := fmt.Sprintf("%s>%s", caseName, name)
 		children := runQuery(d, cases.query)
 		if eq(t, len(cases.cases), len(children), caseName + " length") {
-			for i, childCase := range(cases.cases) {
+			for i, childCase := range cases.cases {
 				caseName := fmt.Sprintf("%s[%d]", caseName, i)
 				checkDescriptor(t, caseName, int32(i), children[i], d, fd, childCase)
 			}
