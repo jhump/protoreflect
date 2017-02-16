@@ -5,15 +5,15 @@ import (
 	"net"
 	"os"
 	"sort"
+	"sync/atomic"
 	"testing"
-
-	"github.com/jhump/protoreflect/desc/desc_test"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
-	"sync/atomic"
+
+	"github.com/jhump/protoreflect/desc/desc_test"
 )
 
 var client *Client

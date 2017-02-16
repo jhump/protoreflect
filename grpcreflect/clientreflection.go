@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
+	"sync"
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
-
 	"golang.org/x/net/context"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
@@ -45,14 +44,16 @@ type extDesc struct {
 }
 
 // Client is a client connection to a server for performing reflection calls
-// and resolving remote symbols. Client is *not* thread-safe.
+// and resolving remote symbols.
 type Client struct {
 	ctx  context.Context
 	stub rpb.ServerReflectionClient
 
+	connMu sync.Mutex
 	cancel context.CancelFunc
 	stream rpb.ServerReflection_ServerReflectionInfoClient
 
+	cacheMu          sync.RWMutex
 	protosByName     map[string]*dpb.FileDescriptorProto
 	filesByName      map[string]*desc.FileDescriptor
 	filesBySymbol    map[string]*desc.FileDescriptor
@@ -79,12 +80,15 @@ func NewClient(ctx context.Context, stub rpb.ServerReflectionClient) *Client {
 // the given name.
 func (cr *Client) FileByFilename(filename string) (*desc.FileDescriptor, error) {
 	// hit the cache first
+	cr.cacheMu.RLock()
 	if fd, ok := cr.filesByName[filename]; ok {
+		cr.cacheMu.RUnlock()
 		return fd, nil
 	}
-
+	fdp, ok := cr.protosByName[filename]
+	cr.cacheMu.RUnlock()
 	// not there? see if we've downloaded the proto
-	if fdp, ok := cr.protosByName[filename]; ok {
+	if ok {
 		return cr.descriptorFromProto(fdp)
 	}
 
@@ -100,7 +104,10 @@ func (cr *Client) FileByFilename(filename string) (*desc.FileDescriptor, error) 
 // that declares the given fully-qualified symbol.
 func (cr *Client) FileContainingSymbol(symbol string) (*desc.FileDescriptor, error) {
 	// hit the cache first
-	if fd, ok := cr.filesBySymbol[symbol]; ok {
+	cr.cacheMu.RLock()
+	fd, ok := cr.filesBySymbol[symbol]
+	cr.cacheMu.RUnlock()
+	if ok {
 		return fd, nil
 	}
 
@@ -117,7 +124,10 @@ func (cr *Client) FileContainingSymbol(symbol string) (*desc.FileDescriptor, err
 // fully-qualified message name.
 func (cr *Client) FileContainingExtension(extendedMessageName string, extensionNumber int32) (*desc.FileDescriptor, error) {
 	// hit the cache first
-	if fd, ok := cr.filesByExtension[extDesc{extendedMessageName, extensionNumber}]; ok {
+	cr.cacheMu.RLock()
+	fd, ok := cr.filesByExtension[extDesc{extendedMessageName, extensionNumber}]
+	cr.cacheMu.RUnlock()
+	if ok {
 		return fd, nil
 	}
 
@@ -142,6 +152,7 @@ func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest) (
 	if fdResp == nil {
 		return nil, &ProtocolError{reflect.TypeOf(fdResp).Elem()}
 	}
+
 	// Response can contain the result file descriptor, but also its transitive
 	// deps. Furthermore, protocol states that subsequent requests do not need
 	// to send transitive deps that have been sent in prior responses. So we
@@ -153,7 +164,22 @@ func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest) (
 		if err = proto.Unmarshal(fdBytes, fd); err != nil {
 			return nil, err
 		}
-		cr.protosByName[fd.GetName()] = fd
+
+		cr.cacheMu.Lock()
+		// see if this file was created and cached concurrently
+		if firstFd == nil {
+			if d, ok := cr.filesByName[fd.GetName()]; ok {
+				cr.cacheMu.Unlock()
+				return d, nil
+			}
+		}
+		// store in cache of raw descriptor protos, but don't overwrite existing protos
+		if existingFd, ok := cr.protosByName[fd.GetName()]; ok {
+			fd = existingFd
+		} else {
+			cr.protosByName[fd.GetName()] = fd
+		}
+		cr.cacheMu.Unlock()
 		if firstFd == nil {
 			firstFd = fd
 		}
@@ -178,17 +204,24 @@ func (cr *Client) descriptorFromProto(fd *dpb.FileDescriptorProto) (*desc.FileDe
 	if err != nil {
 		return nil, err
 	}
-	cr.cacheFile(d)
+	d = cr.cacheFile(d)
 	return d, nil
 }
 
-func (cr *Client) cacheFile(fd *desc.FileDescriptor) {
-	// cache file descriptor by name
+func (cr *Client) cacheFile(fd *desc.FileDescriptor) *desc.FileDescriptor {
+	cr.cacheMu.Lock()
+	defer cr.cacheMu.Unlock()
+
+	// cache file descriptor by name, but don't overwrite existing entry
+	// (existing entry could come from concurrent caller)
+	if existingFd, ok := cr.filesByName[fd.GetName()]; ok {
+		return existingFd
+	}
 	cr.filesByName[fd.GetName()] = fd
 
 	// also cache by symbols and extensions
 	for _, m := range fd.GetMessageTypes() {
-		cr.cacheMessage(fd, m)
+		cr.cacheMessageLocked(fd, m)
 	}
 	for _, e := range fd.GetEnumTypes() {
 		cr.filesBySymbol[e.GetFullyQualifiedName()] = fd
@@ -206,9 +239,11 @@ func (cr *Client) cacheFile(fd *desc.FileDescriptor) {
 			cr.filesBySymbol[m.GetFullyQualifiedName()] = fd
 		}
 	}
+
+	return fd
 }
 
-func (cr *Client) cacheMessage(fd *desc.FileDescriptor, md *desc.MessageDescriptor) {
+func (cr *Client) cacheMessageLocked(fd *desc.FileDescriptor, md *desc.MessageDescriptor) {
 	cr.filesBySymbol[md.GetFullyQualifiedName()] = fd
 	for _, f := range md.GetFields() {
 		cr.filesBySymbol[f.GetFullyQualifiedName()] = fd
@@ -227,7 +262,7 @@ func (cr *Client) cacheMessage(fd *desc.FileDescriptor, md *desc.MessageDescript
 		cr.filesByExtension[extDesc{e.GetOwner().GetFullyQualifiedName(), e.GetNumber()}] = fd
 	}
 	for _, m := range md.GetNestedMessageTypes() {
-		cr.cacheMessage(fd, m) // recurse
+		cr.cacheMessageLocked(fd, m) // recurse
 	}
 }
 
@@ -298,22 +333,31 @@ func (cr *Client) send(req *rpb.ServerReflectionRequest) (*rpb.ServerReflectionR
 }
 
 func (cr *Client) doSend(retry bool, req *rpb.ServerReflectionRequest) (*rpb.ServerReflectionResponse, error) {
-	if err := cr.initStream(); err != nil {
+	// TODO: Streams are thread-safe, so we shouldn't need to lock. But without locking, we'll need more machinery
+	// (goroutines and channels) to ensure that responses are correctly correlated with their requests and thus
+	// delivered in correct oder.
+	cr.connMu.Lock()
+	defer cr.connMu.Unlock()
+	return cr.doSendLocked(retry, req)
+}
+
+func (cr *Client) doSendLocked(retry bool, req *rpb.ServerReflectionRequest) (*rpb.ServerReflectionResponse, error) {
+	if err := cr.initStreamLocked(); err != nil {
 		return nil, err
 	}
 
 	if err := cr.stream.Send(req); err != nil {
-		cr.Reset()
+		cr.resetLocked()
 		if retry {
-			return cr.doSend(false, req)
+			return cr.doSendLocked(false, req)
 		}
 		return nil, err
 	}
 
 	if resp, err := cr.stream.Recv(); err != nil {
-		cr.Reset()
+		cr.resetLocked()
 		if retry {
-			return cr.doSend(false, req)
+			return cr.doSendLocked(false, req)
 		}
 		return nil, err
 	} else {
@@ -321,7 +365,7 @@ func (cr *Client) doSend(retry bool, req *rpb.ServerReflectionRequest) (*rpb.Ser
 	}
 }
 
-func (cr *Client) initStream() error {
+func (cr *Client) initStreamLocked() error {
 	if cr.stream != nil {
 		return nil
 	}
@@ -335,6 +379,12 @@ func (cr *Client) initStream() error {
 // Reset ensures that any active stream with the server is closed, releasing any
 // resources.
 func (cr *Client) Reset() {
+	cr.connMu.Lock()
+	defer cr.connMu.Unlock()
+	cr.resetLocked()
+}
+
+func (cr *Client) resetLocked() {
 	if cr.stream != nil {
 		cr.stream.CloseSend()
 		cr.stream = nil

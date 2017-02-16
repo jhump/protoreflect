@@ -1,15 +1,15 @@
 package desc
 
 import (
+	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/golang/protobuf/proto"
+	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc/desc_test"
-	"fmt"
-	"strings"
-	"reflect"
 )
 
 func TestFileDescriptorObjectGraph(t *testing.T) {

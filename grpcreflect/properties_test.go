@@ -2,7 +2,9 @@ package grpcreflect
 
 import (
 	"testing"
+
 	"google.golang.org/grpc"
+
 	"github.com/jhump/protoreflect/desc/desc_test"
 )
 
