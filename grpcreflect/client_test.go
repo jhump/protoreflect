@@ -106,6 +106,7 @@ func TestFileContainingExtension(t *testing.T) {
 	// shallow check that the descriptor appears correct and complete
 	eq(t, "desc_test2.proto", fd.GetName())
 	eq(t, "desc_test", fd.GetPackage())
+	eq(t, 3, len(fd.GetMessageTypes()))
 	eq(t, "Frobnitz", fd.GetMessageTypes()[0].GetName())
 	eq(t, "Whatchamacallit", fd.GetMessageTypes()[1].GetName())
 	eq(t, "Whatzit", fd.GetMessageTypes()[2].GetName())
@@ -191,3 +192,4 @@ func TestRecover(t *testing.T) {
 	ok(t, err)
 	eq(t, true, client.stream != nil && client.stream != stream)
 }
+

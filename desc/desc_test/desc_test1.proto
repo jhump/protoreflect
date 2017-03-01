@@ -67,6 +67,24 @@ message TestMessage {
 message AnotherTestMessage {
 	// Comment for dne
 	optional TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum dne = 1;
+	// Comment for map_field1
+	map<int32, string> map_field1 = 2;
+	// Comment for map_field2
+	map<int64, float> map_field2 = 3;
+	// Comment for map_field3
+	map<uint32, bool> map_field3 = 4;
+	// Comment for map_field4
+	map<string, AnotherTestMessage> map_field4 = 5;
+	// Comment for RockNRoll
+	optional group RockNRoll = 6 {
+		// Comment for beatles
+		optional string beatles = 7;
+		// Comment for stones
+		optional string stones = 8;
+		// Comment for doors
+		optional string doors = 9;
+	}
+
 	extensions 100 to 200;
 }
 
