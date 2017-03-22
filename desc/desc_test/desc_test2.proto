@@ -35,4 +35,9 @@ message Whatzit {
 
 extend TopLevel {
 	optional TopLevel otl = 100;
+
+	optional group GroupX = 104 {
+		optional int64 groupxi = 1041;
+		optional string groupxs = 1042;
+	}
 }

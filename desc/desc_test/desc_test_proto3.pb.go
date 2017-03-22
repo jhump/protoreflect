@@ -41,7 +41,7 @@ var Proto3Enum_value = map[string]int32{
 func (x Proto3Enum) String() string {
 	return proto.EnumName(Proto3Enum_name, int32(x))
 }
-func (Proto3Enum) EnumDescriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
+func (Proto3Enum) EnumDescriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
 
 type TestRequest struct {
 	Foo   []Proto3Enum                                    `protobuf:"varint,1,rep,packed,name=foo,enum=desc_test.Proto3Enum" json:"foo,omitempty"`
@@ -53,7 +53,7 @@ type TestRequest struct {
 func (m *TestRequest) Reset()                    { *m = TestRequest{} }
 func (m *TestRequest) String() string            { return proto.CompactTextString(m) }
 func (*TestRequest) ProtoMessage()               {}
-func (*TestRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
+func (*TestRequest) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
 
 func (m *TestRequest) GetFoo() []Proto3Enum {
 	if m != nil {
@@ -90,7 +90,7 @@ type TestResponse struct {
 func (m *TestResponse) Reset()                    { *m = TestResponse{} }
 func (m *TestResponse) String() string            { return proto.CompactTextString(m) }
 func (*TestResponse) ProtoMessage()               {}
-func (*TestResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{1} }
+func (*TestResponse) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
 
 func (m *TestResponse) GetAtm() *AnotherTestMessage {
 	if m != nil {
@@ -370,9 +370,9 @@ var _TestService_serviceDesc = grpc.ServiceDesc{
 	Metadata: "desc_test_proto3.proto",
 }
 
-func init() { proto.RegisterFile("desc_test_proto3.proto", fileDescriptor2) }
+func init() { proto.RegisterFile("desc_test_proto3.proto", fileDescriptor4) }
 
-var fileDescriptor2 = []byte{
+var fileDescriptor4 = []byte{
 	// 402 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x7c, 0x92, 0xc1, 0x6e, 0xd3, 0x40,
 	0x10, 0x86, 0xd9, 0x18, 0x8a, 0x3a, 0x46, 0x60, 0x8d, 0x44, 0x6b, 0x59, 0x20, 0x45, 0xbd, 0x60,
