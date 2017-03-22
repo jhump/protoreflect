@@ -10,13 +10,14 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc/desc_test"
+	"github.com/jhump/protoreflect/testutil"
 )
 
 func TestFileDescriptorObjectGraph(t *testing.T) {
 	// This checks the structure of the descriptor for desc_test1.proto to make sure
 	// the "rich descriptor" accurately models everything therein.
 	fd, err := CreateFileDescriptorFromSet(desc_test.GetDescriptorSet())
-	ok(t, err)
+	testutil.Ok(t, err)
 	checkDescriptor(t, "file", 0, fd, nil, fd, descCase{
 		name: "desc_test1.proto",
 		references: map[string]childCases {
@@ -470,9 +471,9 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 
 func TestOneOfDescriptors(t *testing.T) {
 	fd, err := LoadFileDescriptor("desc_test2.proto")
-	ok(t, err)
+	testutil.Ok(t, err)
 	md, err := LoadMessageDescriptor("desc_test.Frobnitz")
-	ok(t, err)
+	testutil.Ok(t, err)
 	checkDescriptor(t, "message", 0, md, fd, fd, descCase {
 		name: "desc_test.Frobnitz",
 		references: map[string]childCases{
@@ -588,10 +589,46 @@ func TestOneOfDescriptors(t *testing.T) {
 	})
 }
 
+func TestMessageDescriptorFindField(t *testing.T) {
+	md, err := LoadMessageDescriptor("desc_test.Frobnitz")
+	testutil.Ok(t, err)
+	for _, fd := range md.GetFields() {
+		found := md.FindFieldByName(fd.GetName())
+		testutil.Eq(t, fd, found)
+		found = md.FindFieldByNumber(fd.GetNumber())
+		testutil.Eq(t, fd, found)
+	}
+	testutil.Eq(t, (*FieldDescriptor)(nil), md.FindFieldByName("junk name"))
+	testutil.Eq(t, (*FieldDescriptor)(nil), md.FindFieldByNumber(99999))
+}
+
+func TestEnumDescriptorFindValue(t *testing.T) {
+	fd, err := LoadFileDescriptor("desc_test_defaults.proto")
+	testutil.Ok(t, err)
+	ed, ok := fd.FindSymbol("desc_test.Number").(*EnumDescriptor)
+	testutil.Eq(t, true, ok)
+	lastNumber := int32(-1)
+	for _, vd := range ed.GetValues() {
+		found := ed.FindValueByName(vd.GetName())
+		testutil.Eq(t, vd, found)
+		found = ed.FindValueByNumber(vd.GetNumber())
+		if lastNumber == vd.GetNumber() {
+			// found value will be the first one with the given number, not this one
+			testutil.Eq(t, false, vd == found)
+		} else {
+			testutil.Eq(t, vd, found)
+			lastNumber = vd.GetNumber()
+		}
+	}
+	testutil.Eq(t, (*EnumValueDescriptor)(nil), ed.FindValueByName("junk name"))
+	testutil.Eq(t, (*EnumValueDescriptor)(nil), ed.FindValueByNumber(99999))
+}
+
 func TestServiceDescriptors(t *testing.T) {
 	fd, err := LoadFileDescriptor("desc_test_proto3.proto")
-	ok(t, err)
+	testutil.Ok(t, err)
 	sd := fd.FindSymbol("desc_test.TestService").(*ServiceDescriptor)
+	// check the descriptor graph for this service and its descendants
 	checkDescriptor(t, "service", 0, sd, fd, fd, descCase{
 		name: "desc_test.TestService",
 		references: map[string]childCases{
@@ -627,6 +664,12 @@ func TestServiceDescriptors(t *testing.T) {
 			}},
 		},
 	})
+	// now verify that FindMethodByName works correctly
+	for _, md := range sd.GetMethods() {
+		found := sd.FindMethodByName(md.GetName())
+		testutil.Eq(t, md, found)
+	}
+	testutil.Eq(t, (*MethodDescriptor)(nil), sd.FindMethodByName("junk name"))
 }
 
 type descCase struct {
@@ -672,18 +715,18 @@ func fields(flds ... fld) []descCase {
 
 func checkDescriptor(t *testing.T, caseName string, num int32, d Descriptor, parent Descriptor, fd *FileDescriptor, c descCase) {
 	// name and fully-qualified name
-	eq(t, c.name, d.GetFullyQualifiedName(), caseName)
+	testutil.Eq(t, c.name, d.GetFullyQualifiedName(), caseName)
 	if _, ok := d.(*FileDescriptor); ok {
-		eq(t, c.name, d.GetName(), caseName)
+		testutil.Eq(t, c.name, d.GetName(), caseName)
 	} else {
 		pos := strings.LastIndex(c.name, ".")
 		n := c.name
 		if pos >= 0 {
 			n = c.name[pos+1:]
 		}
-		eq(t, n, d.GetName(), caseName)
+		testutil.Eq(t, n, d.GetName(), caseName)
 		// check that this object matches the canonical one returned by file descriptor
-		eq(t, d, d.GetFile().FindSymbol(d.GetFullyQualifiedName()), caseName)
+		testutil.Eq(t, d, d.GetFile().FindSymbol(d.GetFullyQualifiedName()), caseName)
 	}
 
 	// number
@@ -693,13 +736,13 @@ func checkDescriptor(t *testing.T, caseName string, num int32, d Descriptor, par
 		if c.number != 0 {
 			n = c.number
 		}
-		eq(t, n, d.GetNumber(), caseName)
+		testutil.Eq(t, n, d.GetNumber(), caseName)
 	case (*EnumValueDescriptor):
 		n := num + 1
 		if c.number != 0 {
 			n = c.number
 		}
-		eq(t, n, d.GetNumber(), caseName)
+		testutil.Eq(t, n, d.GetNumber(), caseName)
 	default:
 		if c.number != 0 {
 			panic(fmt.Sprintf("%s: number should only be specified by fields and enum values! numnber = %d, desc = %v", caseName, c.number, d))
@@ -708,8 +751,8 @@ func checkDescriptor(t *testing.T, caseName string, num int32, d Descriptor, par
 
 	// parent and file
 	if !c.skipParent {
-		eq(t, parent, d.GetParent(), caseName)
-		eq(t, fd, d.GetFile(), caseName)
+		testutil.Eq(t, parent, d.GetParent(), caseName)
+		testutil.Eq(t, fd, d.GetFile(), caseName)
 	}
 
 	// comment
@@ -725,14 +768,14 @@ func checkDescriptor(t *testing.T, caseName string, num int32, d Descriptor, par
 				expectedComment = ""
 			}
 		}
-		eq(t, expectedComment, strings.TrimSpace(d.GetSourceInfo().GetLeadingComments()), caseName)
+		testutil.Eq(t, expectedComment, strings.TrimSpace(d.GetSourceInfo().GetLeadingComments()), caseName)
 	}
 
 	// references
 	for name, cases := range c.references {
 		caseName := fmt.Sprintf("%s>%s", caseName, name)
 		children := runQuery(d, cases.query)
-		if eq(t, len(cases.cases), len(children), caseName + " length") {
+		if testutil.Eq(t, len(cases.cases), len(children), caseName + " length") {
 			for i, childCase := range cases.cases {
 				caseName := fmt.Sprintf("%s[%d]", caseName, i)
 				checkDescriptor(t, caseName, int32(i), children[i], d, fd, childCase)
@@ -771,125 +814,90 @@ func TestFileDescriptorDeps(t *testing.T) {
 	}, fd1, fd2, fd3, fd4, fd5)
 
 	deps := fd.GetDependencies()
-	eq(t, 5, len(deps))
-	eq(t, fd1, deps[0])
-	eq(t, fd2, deps[1])
-	eq(t, fd3, deps[2])
-	eq(t, fd4, deps[3])
-	eq(t, fd5, deps[4])
+	testutil.Eq(t, 5, len(deps))
+	testutil.Eq(t, fd1, deps[0])
+	testutil.Eq(t, fd2, deps[1])
+	testutil.Eq(t, fd3, deps[2])
+	testutil.Eq(t, fd4, deps[3])
+	testutil.Eq(t, fd5, deps[4])
 
 	deps = fd.GetPublicDependencies()
-	eq(t, 2, len(deps))
-	eq(t, fd2, deps[0])
-	eq(t, fd4, deps[1])
+	testutil.Eq(t, 2, len(deps))
+	testutil.Eq(t, fd2, deps[0])
+	testutil.Eq(t, fd4, deps[1])
 
 	deps = fd.GetWeakDependencies()
-	eq(t, 2, len(deps))
-	eq(t, fd3, deps[0])
-	eq(t, fd5, deps[1])
+	testutil.Eq(t, 2, len(deps))
+	testutil.Eq(t, fd3, deps[0])
+	testutil.Eq(t, fd5, deps[1])
 
 	// Now try on a simple descriptor emitted by protoc
 	fd6, err := LoadFileDescriptor("nopkg/desc_test_nopkg.proto")
-	ok(t, err)
+	testutil.Ok(t, err)
 	fd7, err := LoadFileDescriptor("nopkg/desc_test_nopkg_new.proto")
-	ok(t, err)
+	testutil.Ok(t, err)
 	deps = fd6.GetPublicDependencies()
-	eq(t, 1, len(deps))
-	eq(t, fd7, deps[0])
+	testutil.Eq(t, 1, len(deps))
+	testutil.Eq(t, fd7, deps[0])
 }
 
 func createDesc(t *testing.T, fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) *FileDescriptor {
 	desc, err := CreateFileDescriptor(fd, deps...)
-	ok(t, err)
+	testutil.Ok(t, err)
 	return desc
 }
 
 func TestLoadFileDescriptor(t *testing.T) {
 	fd, err := LoadFileDescriptor("desc_test1.proto")
-	ok(t, err)
+	testutil.Ok(t, err)
 	// some very shallow tests (we have more detailed ones in other test cases)
-	eq(t, "desc_test1.proto", fd.GetName())
-	eq(t, "desc_test1.proto", fd.GetFullyQualifiedName())
-	eq(t, "desc_test", fd.GetPackage())
+	testutil.Eq(t, "desc_test1.proto", fd.GetName())
+	testutil.Eq(t, "desc_test1.proto", fd.GetFullyQualifiedName())
+	testutil.Eq(t, "desc_test", fd.GetPackage())
 }
 
 func TestLoadMessageDescriptor(t *testing.T) {
 	// loading enclosed messages should return the same descriptor
 	// and have a reference to the same file descriptor
 	md, err := LoadMessageDescriptor("desc_test.TestMessage")
-	ok(t, err)
-	eq(t, "TestMessage", md.GetName())
-	eq(t, "desc_test.TestMessage", md.GetFullyQualifiedName())
+	testutil.Ok(t, err)
+	testutil.Eq(t, "TestMessage", md.GetName())
+	testutil.Eq(t, "desc_test.TestMessage", md.GetFullyQualifiedName())
 	fd := md.GetFile()
-	eq(t, "desc_test1.proto", fd.GetName())
-	eq(t, fd, md.GetParent())
+	testutil.Eq(t, "desc_test1.proto", fd.GetName())
+	testutil.Eq(t, fd, md.GetParent())
 
 	md2, err := LoadMessageDescriptorForMessage((*desc_test.TestMessage)(nil))
-	ok(t, err)
-	eq(t, md, md2)
+	testutil.Ok(t, err)
+	testutil.Eq(t, md, md2)
 
 	md3, err := LoadMessageDescriptorForType(reflect.TypeOf((*desc_test.TestMessage)(nil)))
-	ok(t, err)
-	eq(t, md, md3)
+	testutil.Ok(t, err)
+	testutil.Eq(t, md, md3)
 }
 
 func TestLoadFileDescriptorWithDeps(t *testing.T) {
 	// Try one with some imports
 	fd, err := LoadFileDescriptor("desc_test2.proto")
-	ok(t, err)
-	eq(t, "desc_test2.proto", fd.GetName())
-	eq(t, "desc_test2.proto", fd.GetFullyQualifiedName())
-	eq(t, "desc_test", fd.GetPackage())
+	testutil.Ok(t, err)
+	testutil.Eq(t, "desc_test2.proto", fd.GetName())
+	testutil.Eq(t, "desc_test2.proto", fd.GetFullyQualifiedName())
+	testutil.Eq(t, "desc_test", fd.GetPackage())
 
 	deps := fd.GetDependencies()
-	eq(t, 3, len(deps))
-	eq(t, "desc_test1.proto", deps[0].GetName())
-	eq(t, "pkg/desc_test_pkg.proto", deps[1].GetName())
-	eq(t, "nopkg/desc_test_nopkg.proto", deps[2].GetName())
+	testutil.Eq(t, 3, len(deps))
+	testutil.Eq(t, "desc_test1.proto", deps[0].GetName())
+	testutil.Eq(t, "pkg/desc_test_pkg.proto", deps[1].GetName())
+	testutil.Eq(t, "nopkg/desc_test_nopkg.proto", deps[2].GetName())
 
 	// loading the dependencies yields same descriptor objects
 	fd, err = LoadFileDescriptor("desc_test1.proto")
-	ok(t, err)
-	eq(t, deps[0], fd)
+	testutil.Ok(t, err)
+	testutil.Eq(t, deps[0], fd)
 	fd, err = LoadFileDescriptor("pkg/desc_test_pkg.proto")
-	ok(t, err)
-	eq(t, deps[1], fd)
+	testutil.Ok(t, err)
+	testutil.Eq(t, deps[1], fd)
 	fd, err = LoadFileDescriptor("nopkg/desc_test_nopkg.proto")
-	ok(t, err)
-	eq(t, deps[2], fd)
-}
-
-func eq(t *testing.T, expected, actual interface{}, context ...interface{}) bool {
-	if expected != actual {
-		ctxString := formatContext(context)
-		if ctxString == "" {
-			t.Errorf("Expecting %v, got %v", expected, actual)
-		} else {
-			t.Errorf("%s: Expecting %v, got %v", ctxString, expected, actual)
-		}
-		return false
-	}
-	return true
-}
-
-func ok(t *testing.T, err error, context ...interface{}) {
-	if err != nil {
-		ctxString := formatContext(context)
-		if ctxString == "" {
-			t.Fatalf("Unexpected error: %s", err.Error())
-		} else {
-			t.Fatalf("%s: Unexpected error: %s", ctxString, err.Error())
-		}
-	}
-}
-
-func formatContext(context []interface{}) string {
-	if len(context) == 0 {
-		return ""
-	} else if len(context) == 1 {
-		return context[0].(string)
-	} else {
-		format := context[0].(string)
-		return fmt.Sprintf(format, context[1:]...)
-	}
+	testutil.Ok(t, err)
+	testutil.Eq(t, deps[2], fd)
 }

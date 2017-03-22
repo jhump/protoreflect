@@ -40,12 +40,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
-	"sort"
 )
 
 const (
@@ -106,6 +107,7 @@ type FileDescriptor struct {
 	extensions []*FieldDescriptor
 	services   []*ServiceDescriptor
 	fieldIndex map[string]map[int32]*FieldDescriptor
+	isProto3   bool
 }
 
 // CreateFileDescriptor instantiates a new file descriptor for the given descriptor proto.
@@ -136,6 +138,7 @@ func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) 
 	for i, wd := range fd.GetWeakDependency() {
 		ret.weakDeps[i] = ret.deps[wd]
 	}
+	ret.isProto3 = fd.GetSyntax() == "proto3"
 
 	// populate all tables of child descriptors
 	for _, m := range fd.GetMessageType() {
@@ -285,6 +288,11 @@ func (fd *FileDescriptor) String() string {
 	return fd.proto.String()
 }
 
+// IsProto3 returns true if the file declares a syntax of "proto3".
+func (fd *FileDescriptor) IsProto3() bool {
+	return fd.isProto3
+}
+
 // GetDependencies returns all of this file's dependencies. These correspond to
 // import statements in the file.
 func (fd *FileDescriptor) GetDependencies() []*FileDescriptor {
@@ -393,6 +401,8 @@ type MessageDescriptor struct {
 	extRanges  extRanges
 	fqn        string
 	sourceInfo *dpb.SourceCodeInfo_Location
+	isProto3   bool
+	isMapEntry bool
 }
 
 func createMessageDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, md *dpb.DescriptorProto, symbols map[string]Descriptor) (*MessageDescriptor, string) {
@@ -427,6 +437,11 @@ func createMessageDescriptor(fd *FileDescriptor, parent Descriptor, enclosing st
 		ret.extRanges = append(ret.extRanges, proto.ExtensionRange{r.GetStart(), r.GetEnd()})
 	}
 	sort.Sort(ret.extRanges)
+	ret.isProto3 = fd.isProto3
+	ret.isMapEntry = md.GetOptions().GetMapEntry() &&
+			len(ret.fields) == 2 &&
+			ret.fields[0].GetNumber() == 1 &&
+			ret.fields[1].GetNumber() == 2
 
 	return ret, msgName
 }
@@ -506,7 +521,7 @@ func (md *MessageDescriptor) String() string {
 // IsMapEntry returns true if this is a synthetic message type that represents an entry
 // in a map field.
 func (md *MessageDescriptor) IsMapEntry() bool {
-	return md.proto.GetOptions().GetMapEntry()
+	return md.isMapEntry
 }
 
 // GetFields returns all of the fields for this message.
@@ -532,6 +547,11 @@ func (md *MessageDescriptor) GetNestedExtensions() []*FieldDescriptor {
 // GetOneOfs returns all of the one-of field sets declared inside this message.
 func (md *MessageDescriptor) GetOneOfs() []*OneOfDescriptor {
 	return md.oneOfs
+}
+
+// IsProto3 returns true if the file in which this message is defined declares a syntax of "proto3".
+func (md *MessageDescriptor) IsProto3() bool {
+	return md.isProto3
 }
 
 // GetExtensionRanges returns the ranges of extension field numbers for this message.
@@ -620,6 +640,8 @@ type FieldDescriptor struct {
 	enumType   *EnumDescriptor
 	fqn        string
 	sourceInfo *dpb.SourceCodeInfo_Location
+	def        interface{}
+	isMap      bool
 }
 
 func createFieldDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, fld *dpb.FieldDescriptorProto) (*FieldDescriptor, string) {
@@ -656,7 +678,138 @@ func (fd *FieldDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dpb.
 		}
 	}
 	fd.file.registerField(fd)
+	fd.def = fd.determineDefault()
+	fd.isMap = fd.proto.GetLabel() == dpb.FieldDescriptorProto_LABEL_REPEATED &&
+			fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_MESSAGE &&
+			fd.GetMessageType().IsMapEntry()
 	return nil
+}
+
+func (fd *FieldDescriptor) determineDefault() interface{} {
+	if fd.IsMap() {
+		return map[interface{}]interface{}(nil)
+	} else if fd.IsRepeated() {
+		return []interface{}(nil)
+	} else if fd.msgType != nil {
+		return nil
+	}
+
+	proto3 := fd.file.isProto3
+	if !proto3 {
+		def := fd.AsFieldDescriptorProto().GetDefaultValue()
+		if def != "" {
+			ret := parseDefaultValue(fd, def)
+			if ret != nil {
+				return ret
+			}
+			// if we can't parse default value, fall-through to return normal default...
+		}
+	}
+
+	switch fd.GetType() {
+	case dpb.FieldDescriptorProto_TYPE_FIXED32,
+		dpb.FieldDescriptorProto_TYPE_UINT32:
+		return uint32(0)
+	case dpb.FieldDescriptorProto_TYPE_SFIXED32,
+		dpb.FieldDescriptorProto_TYPE_INT32,
+		dpb.FieldDescriptorProto_TYPE_SINT32:
+		return int32(0)
+	case dpb.FieldDescriptorProto_TYPE_FIXED64,
+		dpb.FieldDescriptorProto_TYPE_UINT64:
+		return uint64(0)
+	case dpb.FieldDescriptorProto_TYPE_SFIXED64,
+		dpb.FieldDescriptorProto_TYPE_INT64,
+		dpb.FieldDescriptorProto_TYPE_SINT64:
+		return int64(0)
+	case dpb.FieldDescriptorProto_TYPE_FLOAT:
+		return float32(0.0)
+	case dpb.FieldDescriptorProto_TYPE_DOUBLE:
+		return float64(0.0)
+	case dpb.FieldDescriptorProto_TYPE_BOOL:
+		return false
+	case dpb.FieldDescriptorProto_TYPE_BYTES:
+		return []byte(nil)
+	case dpb.FieldDescriptorProto_TYPE_STRING:
+		return ""
+	case dpb.FieldDescriptorProto_TYPE_ENUM:
+		if proto3 {
+			return int32(0)
+		}
+		enumVals := fd.GetEnumType().GetValues()
+		if len(enumVals) > 0 {
+			return enumVals[0].GetNumber()
+		} else {
+			return int32(0) // WTF?
+		}
+	default:
+		panic(fmt.Sprintf("Unknown field type: %v", fd.GetType()))
+	}
+}
+
+func parseDefaultValue(fd *FieldDescriptor, val string) interface{} {
+	switch fd.GetType() {
+	case dpb.FieldDescriptorProto_TYPE_ENUM:
+		vd := fd.GetEnumType().FindValueByName(val)
+		if vd != nil {
+			return vd.GetNumber()
+		}
+		return nil
+	case dpb.FieldDescriptorProto_TYPE_BOOL:
+		if val == "true" {
+			return true
+		} else if val == "false" {
+			return false
+		}
+		return nil
+	case dpb.FieldDescriptorProto_TYPE_BYTES:
+		return []byte(val)
+	case dpb.FieldDescriptorProto_TYPE_STRING:
+		return val
+	case dpb.FieldDescriptorProto_TYPE_FLOAT:
+		if f, err := strconv.ParseFloat(val, 32); err == nil {
+			return float32(f)
+		} else {
+			return float32(0)
+		}
+	case dpb.FieldDescriptorProto_TYPE_DOUBLE:
+		if f, err := strconv.ParseFloat(val, 64); err == nil {
+			return f
+		} else {
+			return float64(0)
+		}
+	case dpb.FieldDescriptorProto_TYPE_INT32,
+		dpb.FieldDescriptorProto_TYPE_SINT32,
+		dpb.FieldDescriptorProto_TYPE_SFIXED32:
+		if i, err := strconv.ParseInt(val, 10, 32); err == nil {
+			return int32(i)
+		} else {
+			return int32(0)
+		}
+	case dpb.FieldDescriptorProto_TYPE_UINT32,
+		dpb.FieldDescriptorProto_TYPE_FIXED32:
+		if i, err := strconv.ParseUint(val, 10, 32); err == nil {
+			return uint32(i)
+		} else {
+			return uint32(0)
+		}
+	case dpb.FieldDescriptorProto_TYPE_INT64,
+		dpb.FieldDescriptorProto_TYPE_SINT64,
+		dpb.FieldDescriptorProto_TYPE_SFIXED64:
+		if i, err := strconv.ParseInt(val, 10, 64); err == nil {
+			return i
+		} else {
+			return int64(0)
+		}
+	case dpb.FieldDescriptorProto_TYPE_UINT64,
+		dpb.FieldDescriptorProto_TYPE_FIXED64:
+		if i, err := strconv.ParseUint(val, 10, 64); err == nil {
+			return i
+		} else {
+			return uint64(0)
+		}
+	default:
+		return nil
+	}
 }
 
 func (fd *FieldDescriptor) GetName() string {
@@ -749,12 +902,7 @@ func (fd *FieldDescriptor) IsRepeated() bool {
 // label its type will be a message that represents a map entry. The map entry
 // message will have exactly two fields: tag #1 is the key and tag #2 is the value.
 func (fd *FieldDescriptor) IsMap() bool {
-	return fd.proto.GetLabel() == dpb.FieldDescriptorProto_LABEL_REPEATED &&
-		fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_MESSAGE &&
-		fd.GetMessageType().GetMessageOptions().GetMapEntry() &&
-		len(fd.GetMessageType().GetFields()) == 2 &&
-			fd.GetMessageType().GetFields()[0].GetNumber() == 1 &&
-			fd.GetMessageType().GetFields()[1].GetNumber() == 2
+	return fd.isMap
 }
 
 // GetMessageType returns the type of this field if it is a message type. If
@@ -769,14 +917,57 @@ func (fd *FieldDescriptor) GetEnumType() *EnumDescriptor {
 	return fd.enumType
 }
 
+// GetDefaultValue returns the default value for this field.
+//
+// If this field represents a message type, this method always returns nil (even though
+// for proto2 files, the default value should be a default instance of the message type).
+// If the field represents an enum type, this method returns an int32 corresponding to the
+// enum value. If this field is a map, it returns a nil map[interface{}]interface{}. If
+// this field is repeated (and not a map), it returns a nil []interface{}.
+//
+// Otherwise, it returns the declared default value for the field or a zero value, if no
+// default is declared or if the file is proto3. The type of said return value corresponds
+// to the type of the field:
+// |-------------------------|
+// | Declared Type | Go Type |
+// |---------------+---------|
+// | int32         |         |
+// | sint32        | int32   |
+// | sfixed32      |         |
+// |---------------+---------|
+// | uint32        | uint32  |
+// | fixed32       |         |
+// |---------------+---------|
+// | int64         |         |
+// | sint64        | int64   |
+// | sfixed64      |         |
+// |---------------+---------|
+// | uint64        | uint64  |
+// | fixed64       |         |
+// |---------------+---------|
+// | float         | float32 |
+// |---------------+---------|
+// | double        | float64 |
+// |---------------+---------|
+// | bool          | bool    |
+// |---------------+---------|
+// | bytes         | []byte  |
+// |---------------+---------|
+// | string        | string  |
+// |-------------------------|
+func (fd *FieldDescriptor) GetDefaultValue() interface{} {
+	return fd.def
+}
+
 // EnumDescriptor describes an enum declared in a proto file.
 type EnumDescriptor struct {
-	proto      *dpb.EnumDescriptorProto
-	parent     Descriptor
-	file       *FileDescriptor
-	values     []*EnumValueDescriptor
-	fqn        string
-	sourceInfo *dpb.SourceCodeInfo_Location
+	proto       *dpb.EnumDescriptorProto
+	parent      Descriptor
+	file        *FileDescriptor
+	values      []*EnumValueDescriptor
+	valuesByNum sortedValues
+	fqn         string
+	sourceInfo  *dpb.SourceCodeInfo_Location
 }
 
 func createEnumDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, ed *dpb.EnumDescriptorProto, symbols map[string]Descriptor) (*EnumDescriptor, string) {
@@ -787,7 +978,26 @@ func createEnumDescriptor(fd *FileDescriptor, parent Descriptor, enclosing strin
 		symbols[n] = evd
 		ret.values = append(ret.values, evd)
 	}
+	if len(ret.values) > 0 {
+		ret.valuesByNum = make(sortedValues, len(ret.values))
+		copy(ret.valuesByNum, ret.values)
+		sort.Stable(ret.valuesByNum)
+	}
 	return ret, enumName
+}
+
+type sortedValues []*EnumValueDescriptor
+
+func (sv sortedValues) Len() int {
+	return len(sv)
+}
+
+func (sv sortedValues) Less(i, j int) bool {
+	return sv[i].GetNumber() < sv[j].GetNumber()
+}
+
+func (sv sortedValues) Swap(i, j int) {
+	sv[i], sv[j] = sv[j], sv[i]
 }
 
 func (ed *EnumDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dpb.SourceCodeInfo_Location) {
@@ -841,6 +1051,31 @@ func (ed *EnumDescriptor) String() string {
 // GetValues returns all of the allowed values defined for this enum.
 func (ed *EnumDescriptor) GetValues() []*EnumValueDescriptor {
 	return ed.values
+}
+
+// FindValueByName finds the enum value with the given name. If no such value exists
+// then nil is returned.
+func (ed *EnumDescriptor) FindValueByName(name string) *EnumValueDescriptor {
+	fqn := fmt.Sprintf("%s.%s", ed.fqn, name)
+	if vd, ok := ed.file.symbols[fqn].(*EnumValueDescriptor); ok {
+		return vd
+	} else {
+		return nil
+	}
+}
+
+// FindValueByNumber finds the value with the given numeric value. If no such value
+// exists then nil is returned. If aliases are allowed and multiple values have the
+// given number, the first declared value is returned.
+func (ed *EnumDescriptor) FindValueByNumber(num int32) *EnumValueDescriptor {
+	index := sort.Search(len(ed.valuesByNum), func(i int) bool { return ed.valuesByNum[i].GetNumber() >= num })
+	if index < len(ed.valuesByNum) {
+		vd := ed.valuesByNum[index]
+		if vd.GetNumber() == num {
+			return vd
+		}
+	}
+	return nil
 }
 
 // EnumValueDescriptor describes an allowed value of an enum declared in a proto file.
@@ -985,6 +1220,17 @@ func (sd *ServiceDescriptor) String() string {
 // GetMethods returns all of the RPC methods for this service.
 func (sd *ServiceDescriptor) GetMethods() []*MethodDescriptor {
 	return sd.methods
+}
+
+// FindMethodByName finds the method with the given name. If no such method exists
+// then nil is returned.
+func (sd *ServiceDescriptor) FindMethodByName(name string) *MethodDescriptor {
+	fqn := fmt.Sprintf("%s.%s", sd.fqn, name)
+	if md, ok := sd.file.symbols[fqn].(*MethodDescriptor); ok {
+		return md
+	} else {
+		return nil
+	}
 }
 
 // MethodDescriptor describes an RPC method declared in a proto file.

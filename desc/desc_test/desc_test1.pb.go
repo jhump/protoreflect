@@ -8,6 +8,8 @@ Package desc_test is a generated protocol buffer package.
 It is generated from these files:
 	desc_test1.proto
 	desc_test2.proto
+	desc_test_defaults.proto
+	desc_test_field_types.proto
 	desc_test_proto3.proto
 
 It has these top-level messages:
@@ -16,6 +18,15 @@ It has these top-level messages:
 	Frobnitz
 	Whatchamacallit
 	Whatzit
+	GroupX
+	PrimitiveDefaults
+	StringAndBytesDefaults
+	EnumDefaults
+	UnaryFields
+	RepeatedFields
+	RepeatedPackedFields
+	MapKeyFields
+	MapValFields
 	TestRequest
 	TestResponse
 */

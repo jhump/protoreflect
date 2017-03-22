@@ -14,6 +14,7 @@ import (
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 
 	"github.com/jhump/protoreflect/desc/desc_test"
+	"github.com/jhump/protoreflect/testutil"
 )
 
 var client *Client
@@ -56,107 +57,107 @@ func TestMain(m *testing.M) {
 
 func TestFileByFileName(t *testing.T) {
 	fd, err := client.FileByFilename("desc_test1.proto")
-	ok(t, err)
+	testutil.Ok(t, err)
 	// shallow check that the descriptor appears correct and complete
-	eq(t, "desc_test1.proto", fd.GetName())
-	eq(t, "desc_test", fd.GetPackage())
+	testutil.Eq(t, "desc_test1.proto", fd.GetName())
+	testutil.Eq(t, "desc_test", fd.GetPackage())
 	md := fd.GetMessageTypes()[0]
-	eq(t, "TestMessage", md.GetName())
+	testutil.Eq(t, "TestMessage", md.GetName())
 	md = md.GetNestedMessageTypes()[0]
-	eq(t, "NestedMessage", md.GetName())
+	testutil.Eq(t, "NestedMessage", md.GetName())
 	md = md.GetNestedMessageTypes()[0]
-	eq(t, "AnotherNestedMessage", md.GetName())
+	testutil.Eq(t, "AnotherNestedMessage", md.GetName())
 	md = md.GetNestedMessageTypes()[0]
-	eq(t, "YetAnotherNestedMessage", md.GetName())
+	testutil.Eq(t, "YetAnotherNestedMessage", md.GetName())
 	ed := md.GetNestedEnumTypes()[0]
-	eq(t, "DeeplyNestedEnum", ed.GetName())
+	testutil.Eq(t, "DeeplyNestedEnum", ed.GetName())
 
 	_, err = client.FileByFilename("does not exist")
-	eq(t, FileOrSymbolNotFound, err)
+	testutil.Eq(t, FileOrSymbolNotFound, err)
 }
 
 func TestFileContainingSymbol(t *testing.T) {
 	fd, err := client.FileContainingSymbol("TopLevel")
-	ok(t, err)
+	testutil.Ok(t, err)
 	// shallow check that the descriptor appears correct and complete
-	eq(t, "nopkg/desc_test_nopkg_new.proto", fd.GetName())
-	eq(t, "", fd.GetPackage())
+	testutil.Eq(t, "nopkg/desc_test_nopkg_new.proto", fd.GetName())
+	testutil.Eq(t, "", fd.GetPackage())
 	md := fd.GetMessageTypes()[0]
-	eq(t, "TopLevel", md.GetName())
-	eq(t, "i", md.GetFields()[0].GetName())
-	eq(t, "j", md.GetFields()[1].GetName())
-	eq(t, "k", md.GetFields()[2].GetName())
-	eq(t, "l", md.GetFields()[3].GetName())
-	eq(t, "m", md.GetFields()[4].GetName())
-	eq(t, "n", md.GetFields()[5].GetName())
-	eq(t, "o", md.GetFields()[6].GetName())
-	eq(t, "p", md.GetFields()[7].GetName())
-	eq(t, "q", md.GetFields()[8].GetName())
-	eq(t, "r", md.GetFields()[9].GetName())
-	eq(t, "s", md.GetFields()[10].GetName())
-	eq(t, "t", md.GetFields()[11].GetName())
+	testutil.Eq(t, "TopLevel", md.GetName())
+	testutil.Eq(t, "i", md.GetFields()[0].GetName())
+	testutil.Eq(t, "j", md.GetFields()[1].GetName())
+	testutil.Eq(t, "k", md.GetFields()[2].GetName())
+	testutil.Eq(t, "l", md.GetFields()[3].GetName())
+	testutil.Eq(t, "m", md.GetFields()[4].GetName())
+	testutil.Eq(t, "n", md.GetFields()[5].GetName())
+	testutil.Eq(t, "o", md.GetFields()[6].GetName())
+	testutil.Eq(t, "p", md.GetFields()[7].GetName())
+	testutil.Eq(t, "q", md.GetFields()[8].GetName())
+	testutil.Eq(t, "r", md.GetFields()[9].GetName())
+	testutil.Eq(t, "s", md.GetFields()[10].GetName())
+	testutil.Eq(t, "t", md.GetFields()[11].GetName())
 
 	_, err = client.FileContainingSymbol("does not exist")
-	eq(t, FileOrSymbolNotFound, err)
+	testutil.Eq(t, FileOrSymbolNotFound, err)
 }
 
 func TestFileContainingExtension(t *testing.T) {
 	fd, err := client.FileContainingExtension("TopLevel", 100)
-	ok(t, err)
+	testutil.Ok(t, err)
 	// shallow check that the descriptor appears correct and complete
-	eq(t, "desc_test2.proto", fd.GetName())
-	eq(t, "desc_test", fd.GetPackage())
-	eq(t, 3, len(fd.GetMessageTypes()))
-	eq(t, "Frobnitz", fd.GetMessageTypes()[0].GetName())
-	eq(t, "Whatchamacallit", fd.GetMessageTypes()[1].GetName())
-	eq(t, "Whatzit", fd.GetMessageTypes()[2].GetName())
+	testutil.Eq(t, "desc_test2.proto", fd.GetName())
+	testutil.Eq(t, "desc_test", fd.GetPackage())
+	testutil.Eq(t, 3, len(fd.GetMessageTypes()))
+	testutil.Eq(t, "Frobnitz", fd.GetMessageTypes()[0].GetName())
+	testutil.Eq(t, "Whatchamacallit", fd.GetMessageTypes()[1].GetName())
+	testutil.Eq(t, "Whatzit", fd.GetMessageTypes()[2].GetName())
 
-	eq(t, "desc_test1.proto", fd.GetDependencies()[0].GetName())
-	eq(t, "pkg/desc_test_pkg.proto", fd.GetDependencies()[1].GetName())
-	eq(t, "nopkg/desc_test_nopkg.proto", fd.GetDependencies()[2].GetName())
+	testutil.Eq(t, "desc_test1.proto", fd.GetDependencies()[0].GetName())
+	testutil.Eq(t, "pkg/desc_test_pkg.proto", fd.GetDependencies()[1].GetName())
+	testutil.Eq(t, "nopkg/desc_test_nopkg.proto", fd.GetDependencies()[2].GetName())
 
 	_, err = client.FileContainingExtension("does not exist", 100)
-	eq(t, FileOrSymbolNotFound, err)
+	testutil.Eq(t, FileOrSymbolNotFound, err)
 	_, err = client.FileContainingExtension("TopLevel", -9)
-	eq(t, FileOrSymbolNotFound, err)
+	testutil.Eq(t, FileOrSymbolNotFound, err)
 }
 
 func TestAllExtensionNumbersForType(t *testing.T) {
 	nums, err := client.AllExtensionNumbersForType("TopLevel")
-	ok(t, err)
-	eq(t, 1, len(nums))
-	eq(t, 100, int(nums[0]))
+	testutil.Ok(t, err)
+	testutil.Eq(t, 1, len(nums))
+	testutil.Eq(t, 100, int(nums[0]))
 
 	nums, err = client.AllExtensionNumbersForType("desc_test.AnotherTestMessage")
-	ok(t, err)
-	eq(t, 5, len(nums))
+	testutil.Ok(t, err)
+	testutil.Eq(t, 5, len(nums))
 	inums := make([]int, len(nums))
 	for idx, v := range nums {
 		inums[idx] = int(v)
 	}
 	sort.Ints(inums)
-	eq(t, 100, inums[0])
-	eq(t, 101, inums[1])
-	eq(t, 102, inums[2])
-	eq(t, 103, inums[3])
-	eq(t, 200, inums[4])
+	testutil.Eq(t, 100, inums[0])
+	testutil.Eq(t, 101, inums[1])
+	testutil.Eq(t, 102, inums[2])
+	testutil.Eq(t, 103, inums[3])
+	testutil.Eq(t, 200, inums[4])
 
 	_, err = client.AllExtensionNumbersForType("does not exist")
-	eq(t, FileOrSymbolNotFound, err)
+	testutil.Eq(t, FileOrSymbolNotFound, err)
 }
 
 func TestListServices(t *testing.T) {
 	s, err := client.ListServices()
-	ok(t, err)
+	testutil.Ok(t, err)
 
 	sort.Strings(s)
-	eq(t, "desc_test.TestService", s[0])
-	eq(t, "grpc.reflection.v1alpha.ServerReflection", s[1])
+	testutil.Eq(t, "desc_test.TestService", s[0])
+	testutil.Eq(t, "grpc.reflection.v1alpha.ServerReflection", s[1])
 }
 
 func TestReset(t *testing.T) {
 	_, err := client.ListServices()
-	ok(t, err)
+	testutil.Ok(t, err)
 
 	// save the current stream
 	stream := client.stream
@@ -169,19 +170,19 @@ func TestReset(t *testing.T) {
 	}
 
 	client.Reset()
-	eq(t, int32(1), atomic.LoadInt32(&cancelled))
-	eq(t, nil, client.stream)
+	testutil.Eq(t, int32(1), atomic.LoadInt32(&cancelled))
+	testutil.Eq(t, nil, client.stream)
 
 	_, err = client.ListServices()
-	ok(t, err)
+	testutil.Ok(t, err)
 
 	// stream was re-created
-	eq(t, true, client.stream != nil && client.stream != stream)
+	testutil.Eq(t, true, client.stream != nil && client.stream != stream)
 }
 
 func TestRecover(t *testing.T) {
 	_, err := client.ListServices()
-	ok(t, err)
+	testutil.Ok(t, err)
 
 	// kill the stream
 	stream := client.stream
@@ -189,7 +190,7 @@ func TestRecover(t *testing.T) {
 
 	// it should auto-recover and re-create stream
 	_, err = client.ListServices()
-	ok(t, err)
-	eq(t, true, client.stream != nil && client.stream != stream)
+	testutil.Ok(t, err)
+	testutil.Eq(t, true, client.stream != nil && client.stream != stream)
 }
 

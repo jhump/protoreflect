@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/jhump/protoreflect/desc/desc_test"
+	"github.com/jhump/protoreflect/testutil"
 )
 
 type testService struct {
@@ -16,8 +17,8 @@ func TestLoadServiceDescriptors(t *testing.T) {
 	s := grpc.NewServer()
 	desc_test.RegisterTestServiceServer(s, testService{})
 	sds, err := LoadServiceDescriptors(s)
-	ok(t, err)
-	eq(t, 1, len(sds))
+	testutil.Ok(t, err)
+	testutil.Eq(t, 1, len(sds))
 	sd := sds["desc_test.TestService"]
 
 	cases := []struct{ method, request, response string }{
@@ -27,12 +28,12 @@ func TestLoadServiceDescriptors(t *testing.T) {
 		{"DoSomethingForever", "desc_test.TestRequest", "desc_test.TestResponse" },
 	}
 
-	eq(t, len(cases), len(sd.GetMethods()))
+	testutil.Eq(t, len(cases), len(sd.GetMethods()))
 
 	for i, c := range cases {
 		md := sd.GetMethods()[i]
-		eq(t, c.method, md.GetName())
-		eq(t, c.request, md.GetInputType().GetFullyQualifiedName())
-		eq(t, c.response, md.GetOutputType().GetFullyQualifiedName())
+		testutil.Eq(t, c.method, md.GetName())
+		testutil.Eq(t, c.request, md.GetInputType().GetFullyQualifiedName())
+		testutil.Eq(t, c.response, md.GetOutputType().GetFullyQualifiedName())
 	}
 }
