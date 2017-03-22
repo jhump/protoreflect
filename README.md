@@ -14,3 +14,5 @@ to use.
 The `grpcreflect` package provides an easy-to-use client for the
 [GRPC reflection service](https://github.com/grpc/grpc-go/blob/6bd4f6eb1ea9d81d1209494242554dcde44429a4/reflection/grpc_reflection_v1alpha/reflection.proto#L36),
 making it much easier to query for and work with the schemas of remote services.
+
+The `dynamic` package provides a dynamic message implementation. It implements `proto.Message` but is backed by a message descriptor and a map of fields->values, instead of a generated struct.
