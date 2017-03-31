@@ -43,7 +43,8 @@ func jsonTranslationParty(t *testing.T, msg proto.Message) {
 	doTranslationParty(t, msg,
 		func(pm proto.Message) ([]byte, error) {
 			// TODO: jsonpb should handle case where given message implements json.Marshaler
-			// As is, it cannot handle dynamic message :(
+			// https://github.com/golang/protobuf/pull/325
+			// Remove the following three lines if/when that change is merged
 			if dm, ok := pm.(*Message); ok {
 				return dm.MarshalJSON()
 			}
@@ -57,7 +58,8 @@ func jsonTranslationParty(t *testing.T, msg proto.Message) {
 		},
 		func(b []byte, pm proto.Message) error {
 			// TODO: jsonpb should handle case where given message implements json.Marshaler
-			// As is, it cannot handle dynamic message :(
+			// https://github.com/golang/protobuf/pull/325
+			// Remove the following three lines if/when that change is merged
 			if dm, ok := pm.(*Message); ok {
 				return dm.UnmarshalJSON(b)
 			}

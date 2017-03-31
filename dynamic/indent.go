@@ -53,7 +53,7 @@ func (b *indentBuffer) next() error {
 }
 
 func (b *indentBuffer) newLine(comma bool) error {
-	if b.comma {
+	if comma {
 		err := b.WriteByte(',')
 		if err != nil { return err }
 	}

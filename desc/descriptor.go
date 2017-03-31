@@ -196,8 +196,10 @@ func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) 
 }
 
 // CreateFileDescriptorFromSet creates a descriptor from the given file descriptor set. The
-// set's first file will be the returned descriptor. The set's remaining files must comprise
-// the full set of transitive dependencies of that first file.
+// set's *last* file will be the returned descriptor. The set's remaining files must comprise
+// the full set of transitive dependencies of that last file. This is the same format and
+// order used by protoc when emitting a FileDescriptorSet file with an invocation like so:
+//    protoc --descriptor_set_out=./test.protoset --include_imports -I. test.proto
 func CreateFileDescriptorFromSet(fds *dpb.FileDescriptorSet) (*FileDescriptor, error) {
 	if len(fds.GetFile()) == 0 {
 		return nil, errors.New("file descriptor set is empty")
@@ -205,11 +207,9 @@ func CreateFileDescriptorFromSet(fds *dpb.FileDescriptorSet) (*FileDescriptor, e
 	files := map[string]*dpb.FileDescriptorProto{}
 	resolved := map[string]*FileDescriptor{}
 	var name string
-	for i, fd := range fds.GetFile() {
-		if i == 0 {
-			name = fd.GetName()
-		}
-		files[fd.GetName()] = fd
+	for _, fd := range fds.GetFile() {
+		name = fd.GetName()
+		files[name] = fd
 	}
 	return createFromSet(name, files, resolved)
 }
