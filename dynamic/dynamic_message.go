@@ -948,35 +948,35 @@ func validElementFieldValue(fd *desc.FieldDescriptor, val interface{}) (interfac
 		descriptor.FieldDescriptorProto_TYPE_INT32,
 		descriptor.FieldDescriptorProto_TYPE_SINT32,
 		descriptor.FieldDescriptorProto_TYPE_ENUM:
-		return toInt32(v, typeName, fd.GetFullyQualifiedName())
+		return toInt32(elem(v), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_SFIXED64,
 		descriptor.FieldDescriptorProto_TYPE_INT64,
 		descriptor.FieldDescriptorProto_TYPE_SINT64:
-		return toInt64(v, typeName, fd.GetFullyQualifiedName())
+		return toInt64(elem(v), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
 		descriptor.FieldDescriptorProto_TYPE_UINT32:
-		return toUint32(v, typeName, fd.GetFullyQualifiedName())
+		return toUint32(elem(v), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
 		descriptor.FieldDescriptorProto_TYPE_UINT64:
-		return toUint64(v, typeName, fd.GetFullyQualifiedName())
+		return toUint64(elem(v), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		return toFloat32(v, typeName, fd.GetFullyQualifiedName())
+		return toFloat32(elem(v), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		return toFloat64(v, typeName, fd.GetFullyQualifiedName())
+		return toFloat64(elem(v), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		return toBool(v, typeName, fd.GetFullyQualifiedName())
+		return toBool(elem(v), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		return toBytes(v, typeName, fd.GetFullyQualifiedName())
+		return toBytes(elem(v), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
-		return toString(v, typeName, fd.GetFullyQualifiedName())
+		return toString(elem(v), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
 		descriptor.FieldDescriptorProto_TYPE_GROUP:
@@ -999,6 +999,13 @@ func validElementFieldValue(fd *desc.FieldDescriptor, val interface{}) (interfac
 	default:
 		return nil, fmt.Errorf("unable to handle unrecognized field type: %v", fd.GetType())
 	}
+}
+
+func elem(v reflect.Value) reflect.Value {
+	if v.Kind() == reflect.Ptr {
+		return v.Elem()
+	}
+	return v
 }
 
 func toInt32(v reflect.Value, what string, fieldName string) (int32, error) {
@@ -1155,6 +1162,9 @@ func (m *Message) mergeInto(pm proto.Message) error {
 	// check that we can successfully do the merge
 	structProps := proto.GetProperties(reflect.TypeOf(pm).Elem())
 	for _, prop := range structProps.Prop {
+		if prop.Tag == 0 {
+			continue // one-of or special field (such as XXX_unrecognized, etc.)
+		}
 		tag := int32(prop.Tag)
 		v, ok := m.values[tag]
 		if !ok {
@@ -1405,7 +1415,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 	}
 
 	// check that we can successfully do the merge
-	src := reflect.ValueOf(pm)
+	src := reflect.ValueOf(pm).Elem()
 	values := map[*desc.FieldDescriptor]interface{}{}
 	var extraFields []*desc.FieldDescriptor
 	props := proto.GetProperties(reflect.TypeOf(pm).Elem())
@@ -1415,6 +1425,9 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 
 	// regular fields
 	for _, prop := range props.Prop {
+		if prop.Tag == 0 {
+			continue // one-of or special field (such as XXX_unrecognized, etc.)
+		}
 		rv := src.FieldByName(prop.Name)
 		var keyProps, valProps *proto.Properties
 		if rv.Kind() == reflect.Map {
@@ -1441,7 +1454,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 			}
 			fd = md.FindFieldByNumber(int32(prop.Tag))
 			if fd == nil {
-				return fmt.Errorf("Message descriptor %q did not contain field for tag %d", md.GetFullyQualifiedName(), prop.Tag)
+				return fmt.Errorf("Message descriptor %q did not contain field for tag %d (%q)", md.GetFullyQualifiedName(), prop.Tag, prop.Name)
 			} else {
 				extraFields = append(extraFields, fd)
 			}
@@ -1472,7 +1485,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 			}
 			fd = md.FindFieldByNumber(int32(prop.Tag))
 			if fd == nil {
-				return fmt.Errorf("Message descriptor %q did not contain field for tag %d", md.GetFullyQualifiedName(), prop.Tag)
+				return fmt.Errorf("Message descriptor %q did not contain field for tag %d (%q in one-of %q)", md.GetFullyQualifiedName(), prop.Tag, prop.Name, src.Type().Field(oop.Field).Name)
 			} else {
 				extraFields = append(extraFields, fd)
 			}
