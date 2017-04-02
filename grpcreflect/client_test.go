@@ -20,39 +20,37 @@ import (
 var client *Client
 
 func TestMain(m *testing.M) {
+	code := 1
+	defer func() {
+		p := recover()
+		if p != nil {
+			fmt.Fprintf(os.Stderr, "PANIC: %v\n", p)
+		}
+		os.Exit(code)
+	}()
+
 	svr := grpc.NewServer()
 	desc_test.RegisterTestServiceServer(svr, testService{})
 	reflection.Register(svr)
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to open server socket: %s", err.Error())
-		os.Exit(1)
+		panic(fmt.Sprintf("Failed to open server socket: %s", err.Error()))
 	}
-
 	go svr.Serve(l)
 	defer svr.Stop()
 
-	// wait for server to be accepting
-	port := l.Addr().(*net.TCPAddr).Port
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	c, err := net.Dial("tcp", addr)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to open connection to server: %s", err.Error())
-		os.Exit(1)
-	}
-	c.Close()
-
 	// create grpc client
+	addr := fmt.Sprintf(l.Addr().String())
 	cconn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create grpc client: %s", err.Error())
-		os.Exit(1)
+		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))
 	}
 	defer cconn.Close()
 
 	stub := rpb.NewServerReflectionClient(cconn)
 	client = NewClient(context.Background(), stub)
-	os.Exit(m.Run())
+
+	code = m.Run()
 }
 
 func TestFileByFileName(t *testing.T) {

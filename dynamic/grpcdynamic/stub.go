@@ -2,6 +2,7 @@ package grpcdynamic
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/context"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
-	"io"
 )
 
 // Stub is an RPC client stub, used for dynamically dispatching RPCs to a server.
@@ -20,26 +20,30 @@ type Stub struct {
 }
 
 // NewStub creates a new RPC stub that uses the given connection for communicating with a server.
-func NewStub(conn *grpc.ClientConn) *Stub {
+func NewStub(conn *grpc.ClientConn) Stub {
 	return NewStubWithExtensionRegistry(conn, nil)
 }
 
 // NewStub creates a new RPC stub that uses the given connection for communicating with a server and the
 // given ExtensionRegistry when parsing responses.
-func NewStubWithExtensionRegistry(conn *grpc.ClientConn, er *dynamic.ExtensionRegistry) *Stub {
-	return &Stub{conn, er}
+func NewStubWithExtensionRegistry(conn *grpc.ClientConn, er *dynamic.ExtensionRegistry) Stub {
+	return Stub{conn, er}
+}
+
+func requestMethod(md *desc.MethodDescriptor) string {
+	return fmt.Sprintf("/%s/%s", md.GetService().GetFullyQualifiedName(), md.GetName())
 }
 
 // InvokeRpc sends a unary RPC and returns the response. Use this for unary methods.
 func (s Stub) InvokeRpc(ctx context.Context, method *desc.MethodDescriptor, request proto.Message, opts ...grpc.CallOption) (*dynamic.Message, error) {
 	if method.IsClientStreaming() || method.IsServerStreaming() {
-		return fmt.Errorf("InvokeRpc is for unary methods; %q is %s", method.GetFullyQualifiedName(), methodType(method))
+		return nil, fmt.Errorf("InvokeRpc is for unary methods; %q is %s", method.GetFullyQualifiedName(), methodType(method))
 	}
 	if err := checkMessageType(method.GetInputType(), request); err != nil {
-		return err
+		return nil, err
 	}
 	resp := dynamic.NewMessageWithExtensionRegistry(method.GetOutputType(), s.er)
-	if err := grpc.Invoke(ctx, method.GetFullyQualifiedName(), request, resp, s.conn, opts); err != nil {
+	if err := grpc.Invoke(ctx, requestMethod(method), request, resp, s.conn, opts...); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -48,18 +52,18 @@ func (s Stub) InvokeRpc(ctx context.Context, method *desc.MethodDescriptor, requ
 // InvokeRpcServerStream sends a unary RPC and returns the response stream. Use this for server-streaming methods.
 func (s Stub) InvokeRpcServerStream(ctx context.Context, method *desc.MethodDescriptor, request proto.Message, opts ...grpc.CallOption) (*ServerStream, error) {
 	if method.IsClientStreaming() || !method.IsServerStreaming() {
-		return fmt.Errorf("InvokeRpcServerStream is for server-streaming methods; %q is %s", method.GetFullyQualifiedName(), methodType(method))
+		return nil, fmt.Errorf("InvokeRpcServerStream is for server-streaming methods; %q is %s", method.GetFullyQualifiedName(), methodType(method))
 	}
 	if err := checkMessageType(method.GetInputType(), request); err != nil {
-		return err
+		return nil, err
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	sd := grpc.StreamDesc{
-		StreamName: method.GetFullyQualifiedName(),
+		StreamName: method.GetName(),
 		ServerStreams: method.IsServerStreaming(),
 		ClientStreams: method.IsClientStreaming(),
 	}
-	if cs, err := grpc.NewClientStream(ctx, &sd, s.conn, method.GetFullyQualifiedName(), opts); err != nil {
+	if cs, err := grpc.NewClientStream(ctx, &sd, s.conn, requestMethod(method), opts...); err != nil {
 		return nil, err
 	} else {
 		err = cs.SendMsg(request)
@@ -80,15 +84,15 @@ func (s Stub) InvokeRpcServerStream(ctx context.Context, method *desc.MethodDesc
 // receive the response message. Use this for client-streaming methods.
 func (s Stub) InvokeRpcClientStream(ctx context.Context, method *desc.MethodDescriptor, opts ...grpc.CallOption) (*ClientStream, error) {
 	if !method.IsClientStreaming() || method.IsServerStreaming() {
-		return fmt.Errorf("InvokeRpcClientStream is for client-streaming methods; %q is %s", method.GetFullyQualifiedName(), methodType(method))
+		return nil, fmt.Errorf("InvokeRpcClientStream is for client-streaming methods; %q is %s", method.GetFullyQualifiedName(), methodType(method))
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	sd := grpc.StreamDesc{
-		StreamName: method.GetFullyQualifiedName(),
+		StreamName: method.GetName(),
 		ServerStreams: method.IsServerStreaming(),
 		ClientStreams: method.IsClientStreaming(),
 	}
-	if cs, err := grpc.NewClientStream(ctx, &sd, s.conn, method.GetFullyQualifiedName(), opts); err != nil {
+	if cs, err := grpc.NewClientStream(ctx, &sd, s.conn, requestMethod(method), opts...); err != nil {
 		return nil, err
 	} else {
 		return &ClientStream{cs, method, s.er, cancel}, nil
@@ -99,14 +103,14 @@ func (s Stub) InvokeRpcClientStream(ctx context.Context, method *desc.MethodDesc
 // messages. Use this for bidi-streaming methods.
 func (s Stub) InvokeRpcBidiStream(ctx context.Context, method *desc.MethodDescriptor, opts ...grpc.CallOption) (*BidiStream, error) {
 	if !method.IsClientStreaming() || !method.IsServerStreaming() {
-		return fmt.Errorf("InvokeRpcBidiStream is for bidi-streaming methods; %q is %s", method.GetFullyQualifiedName(), methodType(method))
+		return nil, fmt.Errorf("InvokeRpcBidiStream is for bidi-streaming methods; %q is %s", method.GetFullyQualifiedName(), methodType(method))
 	}
 	sd := grpc.StreamDesc{
-		StreamName: method.GetFullyQualifiedName(),
+		StreamName: method.GetName(),
 		ServerStreams: method.IsServerStreaming(),
 		ClientStreams: method.IsClientStreaming(),
 	}
-	if cs, err := grpc.NewClientStream(ctx, &sd, s.conn, method.GetFullyQualifiedName(), opts); err != nil {
+	if cs, err := grpc.NewClientStream(ctx, &sd, s.conn, requestMethod(method), opts...); err != nil {
 		return nil, err
 	} else {
 		return &BidiStream{cs, method.GetInputType(), method.GetOutputType(), s.er}, nil
@@ -160,7 +164,7 @@ func (s *ServerStream) Trailer() (metadata.MD) {
 
 // Context returns the context associated with this streaming operation.
 func (s *ServerStream) Context() context.Context {
-	return
+	return s.stream.Context()
 }
 
 // RecvMsg returns the next message in the response stream or an error. If the stream
@@ -196,7 +200,7 @@ func (s *ClientStream) Trailer() (metadata.MD) {
 
 // Context returns the context associated with this streaming operation.
 func (s *ClientStream) Context() context.Context {
-	return
+	return s.stream.Context()
 }
 
 // SendMsg sends a request message to the server.
@@ -210,7 +214,7 @@ func (s *ClientStream) SendMsg(m proto.Message) error {
 // CloseAndRecvMsg closes the outgoing request stream and then blocks for the server's response.
 func (s *ClientStream) CloseAndReceive() (*dynamic.Message, error) {
 	if err := s.stream.CloseSend(); err != nil {
-		return err
+		return nil, err
 	}
 	resp := dynamic.NewMessageWithExtensionRegistry(s.method.GetOutputType(), s.er)
 	if err := s.stream.RecvMsg(resp); err != nil {
@@ -253,7 +257,7 @@ func (s *BidiStream) Trailer() (metadata.MD) {
 
 // Context returns the context associated with this streaming operation.
 func (s *BidiStream) Context() context.Context {
-	return
+	return s.stream.Context()
 }
 
 // SendMsg sends a request message to the server.

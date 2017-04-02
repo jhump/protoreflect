@@ -1,10 +1,12 @@
 package dynamic
 
 import (
-	"github.com/golang/protobuf/proto"
-	"github.com/jhump/protoreflect/desc"
-	"reflect"
 	"bytes"
+	"reflect"
+
+	"github.com/golang/protobuf/proto"
+
+	"github.com/jhump/protoreflect/desc"
 )
 
 // Equal returns true if the given two dynamic messages are equal. Two messages are equal when they
