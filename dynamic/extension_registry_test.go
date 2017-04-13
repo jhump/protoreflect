@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/desc_test"
 	"github.com/jhump/protoreflect/internal/testutil"
+	"github.com/jhump/protoreflect/internal/testprotos"
 )
 
 func TestExtensionRegistry_AddExtension(t *testing.T) {
@@ -16,14 +16,14 @@ func TestExtensionRegistry_AddExtension(t *testing.T) {
 
 	er.AddExtension(file.GetExtensions()...)
 
-	fds := er.AllExtensionsForType("desc_test.AnotherTestMessage")
+	fds := er.AllExtensionsForType("testprotos.AnotherTestMessage")
 	sort.Sort(fields(fds))
 
 	testutil.Eq(t, []desc.Descriptor{
-		file.FindSymbol("desc_test.xtm"),
-		file.FindSymbol("desc_test.xs"),
-		file.FindSymbol("desc_test.xi"),
-		file.FindSymbol("desc_test.xui"),
+		file.FindSymbol("testprotos.xtm"),
+		file.FindSymbol("testprotos.xs"),
+		file.FindSymbol("testprotos.xi"),
+		file.FindSymbol("testprotos.xui"),
 	}, fds)
 
 	checkFindExtension(t, er, fds)
@@ -32,18 +32,18 @@ func TestExtensionRegistry_AddExtension(t *testing.T) {
 func TestExtensionRegistry_AddExtensionDesc(t *testing.T) {
 	er := &ExtensionRegistry{}
 
-	er.AddExtensionDesc(desc_test.E_Xtm, desc_test.E_Xs, desc_test.E_Xi)
+	er.AddExtensionDesc(testprotos.E_Xtm, testprotos.E_Xs, testprotos.E_Xi)
 
-	fds := er.AllExtensionsForType("desc_test.AnotherTestMessage")
+	fds := er.AllExtensionsForType("testprotos.AnotherTestMessage")
 	sort.Sort(fields(fds))
 
 	file, err := desc.LoadFileDescriptor("desc_test1.proto")
 	testutil.Ok(t, err)
 
 	testutil.Eq(t, 3, len(fds))
-	testutil.Eq(t, file.FindSymbol("desc_test.xtm"), fds[0])
-	testutil.Eq(t, file.FindSymbol("desc_test.xs"), fds[1])
-	testutil.Eq(t, file.FindSymbol("desc_test.xi"), fds[2])
+	testutil.Eq(t, file.FindSymbol("testprotos.xtm"), fds[0])
+	testutil.Eq(t, file.FindSymbol("testprotos.xs"), fds[1])
+	testutil.Eq(t, file.FindSymbol("testprotos.xi"), fds[2])
 
 	checkFindExtension(t, er, fds)
 }
@@ -55,40 +55,40 @@ func TestExtensionRegistry_AddExtensionsFromFile(t *testing.T) {
 
 	er.AddExtensionsFromFile(file)
 
-	fds := er.AllExtensionsForType("desc_test.AnotherTestMessage")
+	fds := er.AllExtensionsForType("testprotos.AnotherTestMessage")
 	sort.Sort(fields(fds))
 
 	testutil.Eq(t, 5, len(fds))
-	testutil.Eq(t, file.FindSymbol("desc_test.xtm"), fds[0])
-	testutil.Eq(t, file.FindSymbol("desc_test.xs"), fds[1])
-	testutil.Eq(t, file.FindSymbol("desc_test.xi"), fds[2])
-	testutil.Eq(t, file.FindSymbol("desc_test.xui"), fds[3])
-	testutil.Eq(t, file.FindSymbol("desc_test.TestMessage.NestedMessage.AnotherNestedMessage.flags"), fds[4])
+	testutil.Eq(t, file.FindSymbol("testprotos.xtm"), fds[0])
+	testutil.Eq(t, file.FindSymbol("testprotos.xs"), fds[1])
+	testutil.Eq(t, file.FindSymbol("testprotos.xi"), fds[2])
+	testutil.Eq(t, file.FindSymbol("testprotos.xui"), fds[3])
+	testutil.Eq(t, file.FindSymbol("testprotos.TestMessage.NestedMessage.AnotherNestedMessage.flags"), fds[4])
 
 	checkFindExtension(t, er, fds)
 }
 
 func TestExtensionRegistry_Empty(t *testing.T) {
 	er := ExtensionRegistry{}
-	fds := er.AllExtensionsForType("desc_test.AnotherTestMessage")
+	fds := er.AllExtensionsForType("testprotos.AnotherTestMessage")
 	testutil.Eq(t, 0, len(fds))
 }
 
 func TestExtensionRegistry_Defaults(t *testing.T) {
 	er := NewRegistryWithDefaults()
 
-	fds := er.AllExtensionsForType("desc_test.AnotherTestMessage")
+	fds := er.AllExtensionsForType("testprotos.AnotherTestMessage")
 	sort.Sort(fields(fds))
 
 	file, err := desc.LoadFileDescriptor("desc_test1.proto")
 	testutil.Ok(t, err)
 
 	testutil.Eq(t, 5, len(fds))
-	testutil.Eq(t, file.FindSymbol("desc_test.xtm").AsProto(), fds[0].AsProto())
-	testutil.Eq(t, file.FindSymbol("desc_test.xs").AsProto(), fds[1].AsProto())
-	testutil.Eq(t, file.FindSymbol("desc_test.xi").AsProto(), fds[2].AsProto())
-	testutil.Eq(t, file.FindSymbol("desc_test.xui").AsProto(), fds[3].AsProto())
-	testutil.Eq(t, file.FindSymbol("desc_test.TestMessage.NestedMessage.AnotherNestedMessage.flags").AsProto(), fds[4].AsProto())
+	testutil.Eq(t, file.FindSymbol("testprotos.xtm").AsProto(), fds[0].AsProto())
+	testutil.Eq(t, file.FindSymbol("testprotos.xs").AsProto(), fds[1].AsProto())
+	testutil.Eq(t, file.FindSymbol("testprotos.xi").AsProto(), fds[2].AsProto())
+	testutil.Eq(t, file.FindSymbol("testprotos.xui").AsProto(), fds[3].AsProto())
+	testutil.Eq(t, file.FindSymbol("testprotos.TestMessage.NestedMessage.AnotherNestedMessage.flags").AsProto(), fds[4].AsProto())
 
 	checkFindExtension(t, er, fds)
 }

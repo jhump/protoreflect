@@ -1,8 +1,8 @@
 syntax = "proto2";
 
-option go_package = "github.com/jhump/protoreflect/desc/desc_test;desc_test";
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
-package desc_test;
+package testprotos;
 
 import "desc_test1.proto";
 import "pkg/desc_test_pkg.proto";

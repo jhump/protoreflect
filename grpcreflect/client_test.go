@@ -13,8 +13,8 @@ import (
 	"google.golang.org/grpc/reflection"
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 
-	"github.com/jhump/protoreflect/desc/desc_test"
 	"github.com/jhump/protoreflect/internal/testutil"
+	"github.com/jhump/protoreflect/internal/testprotos"
 )
 
 var client *Client
@@ -30,7 +30,7 @@ func TestMain(m *testing.M) {
 	}()
 
 	svr := grpc.NewServer()
-	desc_test.RegisterTestServiceServer(svr, testService{})
+	testprotos.RegisterTestServiceServer(svr, testService{})
 	reflection.Register(svr)
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -58,7 +58,7 @@ func TestFileByFileName(t *testing.T) {
 	testutil.Ok(t, err)
 	// shallow check that the descriptor appears correct and complete
 	testutil.Eq(t, "desc_test1.proto", fd.GetName())
-	testutil.Eq(t, "desc_test", fd.GetPackage())
+	testutil.Eq(t, "testprotos", fd.GetPackage())
 	md := fd.GetMessageTypes()[0]
 	testutil.Eq(t, "TestMessage", md.GetName())
 	md = md.GetNestedMessageTypes()[0]
@@ -104,11 +104,12 @@ func TestFileContainingExtension(t *testing.T) {
 	testutil.Ok(t, err)
 	// shallow check that the descriptor appears correct and complete
 	testutil.Eq(t, "desc_test2.proto", fd.GetName())
-	testutil.Eq(t, "desc_test", fd.GetPackage())
-	testutil.Eq(t, 3, len(fd.GetMessageTypes()))
+	testutil.Eq(t, "testprotos", fd.GetPackage())
+	testutil.Eq(t, 4, len(fd.GetMessageTypes()))
 	testutil.Eq(t, "Frobnitz", fd.GetMessageTypes()[0].GetName())
 	testutil.Eq(t, "Whatchamacallit", fd.GetMessageTypes()[1].GetName())
 	testutil.Eq(t, "Whatzit", fd.GetMessageTypes()[2].GetName())
+	testutil.Eq(t, "GroupX", fd.GetMessageTypes()[3].GetName())
 
 	testutil.Eq(t, "desc_test1.proto", fd.GetDependencies()[0].GetName())
 	testutil.Eq(t, "pkg/desc_test_pkg.proto", fd.GetDependencies()[1].GetName())
@@ -123,10 +124,9 @@ func TestFileContainingExtension(t *testing.T) {
 func TestAllExtensionNumbersForType(t *testing.T) {
 	nums, err := client.AllExtensionNumbersForType("TopLevel")
 	testutil.Ok(t, err)
-	testutil.Eq(t, 1, len(nums))
-	testutil.Eq(t, 100, int(nums[0]))
+	testutil.Eq(t, []int32{100, 104}, nums)
 
-	nums, err = client.AllExtensionNumbersForType("desc_test.AnotherTestMessage")
+	nums, err = client.AllExtensionNumbersForType("testprotos.AnotherTestMessage")
 	testutil.Ok(t, err)
 	testutil.Eq(t, 5, len(nums))
 	inums := make([]int, len(nums))
@@ -134,11 +134,7 @@ func TestAllExtensionNumbersForType(t *testing.T) {
 		inums[idx] = int(v)
 	}
 	sort.Ints(inums)
-	testutil.Eq(t, 100, inums[0])
-	testutil.Eq(t, 101, inums[1])
-	testutil.Eq(t, 102, inums[2])
-	testutil.Eq(t, 103, inums[3])
-	testutil.Eq(t, 200, inums[4])
+	testutil.Eq(t, []int{100, 101, 102, 103, 200}, inums)
 
 	_, err = client.AllExtensionNumbersForType("does not exist")
 	testutil.Eq(t, FileOrSymbolNotFound, err)
@@ -149,8 +145,8 @@ func TestListServices(t *testing.T) {
 	testutil.Ok(t, err)
 
 	sort.Strings(s)
-	testutil.Eq(t, "desc_test.TestService", s[0])
-	testutil.Eq(t, "grpc.reflection.v1alpha.ServerReflection", s[1])
+	testutil.Eq(t, "grpc.reflection.v1alpha.ServerReflection", s[0])
+	testutil.Eq(t, "testprotos.TestService", s[1])
 }
 
 func TestReset(t *testing.T) {

@@ -38,6 +38,8 @@ func main() {
 		pos := strings.LastIndex(pkg, ";")
 		if pos >= 0 {
 			pkg = pkg[pos+1:]
+		} else {
+			pkg = fd.GetPackage()
 		}
 	}
 	if pkg == "" {

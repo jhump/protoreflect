@@ -9,52 +9,52 @@ import (
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
-	"github.com/jhump/protoreflect/desc/desc_test"
 	"github.com/jhump/protoreflect/internal/testutil"
+	"github.com/jhump/protoreflect/internal/testprotos"
 )
 
 func TestFileDescriptorObjectGraph(t *testing.T) {
 	// This checks the structure of the descriptor for desc_test1.proto to make sure
 	// the "rich descriptor" accurately models everything therein.
-	fd, err := CreateFileDescriptorFromSet(desc_test.GetDescriptorSet())
+	fd, err := CreateFileDescriptorFromSet(testprotos.GetDescriptorSet())
 	testutil.Ok(t, err)
 	checkDescriptor(t, "file", 0, fd, nil, fd, descCase{
 		name: "desc_test1.proto",
 		references: map[string]childCases {
 			"messages": { (*FileDescriptor).GetMessageTypes, []descCase{
 				{
-					name: "desc_test.TestMessage",
+					name: "testprotos.TestMessage",
 					references: map[string]childCases {
 						"fields": { (*MessageDescriptor).GetFields, []descCase {
 							{
-								name: "desc_test.TestMessage.nm",
+								name: "testprotos.TestMessage.nm",
 								references: map[string]childCases {
-									"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage.NestedMessage") },
+									"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage.NestedMessage") },
 									"enum type": { (*FieldDescriptor).GetEnumType, nil },
 									"one of": { (*FieldDescriptor).GetOneOf, nil },
 								},
 							},
 							{
-								name: "desc_test.TestMessage.anm",
+								name: "testprotos.TestMessage.anm",
 								references: map[string]childCases {
-									"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage.NestedMessage.AnotherNestedMessage") },
+									"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage.NestedMessage.AnotherNestedMessage") },
 									"enum type": { (*FieldDescriptor).GetEnumType, nil },
 									"one of": { (*FieldDescriptor).GetOneOf, nil },
 								},
 							},
 							{
-								name: "desc_test.TestMessage.yanm",
+								name: "testprotos.TestMessage.yanm",
 								references: map[string]childCases {
-									"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage") },
+									"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage") },
 									"enum type": { (*FieldDescriptor).GetEnumType, nil },
 									"one of": { (*FieldDescriptor).GetOneOf, nil },
 								},
 							},
 							{
-								name: "desc_test.TestMessage.ne",
+								name: "testprotos.TestMessage.ne",
 								references: map[string]childCases {
 									"message type": { (*FieldDescriptor).GetMessageType, nil },
-									"enum type": { (*FieldDescriptor).GetEnumType, refs("desc_test.TestMessage.NestedEnum") },
+									"enum type": { (*FieldDescriptor).GetEnumType, refs("testprotos.TestMessage.NestedEnum") },
 									"one of": { (*FieldDescriptor).GetOneOf, nil },
 								},
 							},
@@ -62,21 +62,21 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 						// this rabbit hole goes pretty deep...
 						"nested messages": { (*MessageDescriptor).GetNestedMessageTypes, []descCase{
 							{
-								name: "desc_test.TestMessage.NestedMessage",
+								name: "testprotos.TestMessage.NestedMessage",
 								references: map[string]childCases {
 									"fields": { (*MessageDescriptor).GetFields, []descCase{
 										{
-											name: "desc_test.TestMessage.NestedMessage.anm",
+											name: "testprotos.TestMessage.NestedMessage.anm",
 											references: map[string]childCases {
-												"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage.NestedMessage.AnotherNestedMessage") },
+												"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage.NestedMessage.AnotherNestedMessage") },
 												"enum type": { (*FieldDescriptor).GetEnumType, nil },
 												"one of": { (*FieldDescriptor).GetOneOf, nil },
 											},
 										},
 										{
-											name: "desc_test.TestMessage.NestedMessage.yanm",
+											name: "testprotos.TestMessage.NestedMessage.yanm",
 											references: map[string]childCases {
-												"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage") },
+												"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage") },
 												"enum type": { (*FieldDescriptor).GetEnumType, nil },
 												"one of": { (*FieldDescriptor).GetOneOf, nil },
 											},
@@ -84,13 +84,13 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 									}},
 									"nested messages": { (*MessageDescriptor).GetNestedMessageTypes, []descCase{
 										{
-											name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage",
+											name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage",
 											references: map[string]childCases {
 												"fields": { (*MessageDescriptor).GetFields, []descCase{
 													{
-														name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage.yanm",
+														name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.yanm",
 														references: map[string]childCases {
-															"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage") },
+															"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage") },
 															"enum type": { (*FieldDescriptor).GetEnumType, nil },
 															"one of": { (*FieldDescriptor).GetOneOf, nil },
 														},
@@ -98,11 +98,11 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 												}},
 												"nested messages": { (*MessageDescriptor).GetNestedMessageTypes, []descCase{
 													{
-														name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage",
+														name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage",
 														references: map[string]childCases {
 															"nested fields": { (*MessageDescriptor).GetFields, []descCase{
 																{
-																	name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.foo",
+																	name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.foo",
 																	references: map[string]childCases {
 																		"message type": { (*FieldDescriptor).GetMessageType, nil },
 																		"enum type": { (*FieldDescriptor).GetEnumType, nil },
@@ -110,7 +110,7 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 																	},
 																},
 																{
-																	name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.bar",
+																	name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.bar",
 																	references: map[string]childCases {
 																		"message type": { (*FieldDescriptor).GetMessageType, nil },
 																		"enum type": { (*FieldDescriptor).GetEnumType, nil },
@@ -118,7 +118,7 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 																	},
 																},
 																{
-																	name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.baz",
+																	name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.baz",
 																	references: map[string]childCases {
 																		"message type": { (*FieldDescriptor).GetMessageType, nil },
 																		"enum type": { (*FieldDescriptor).GetEnumType, nil },
@@ -126,33 +126,33 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 																	},
 																},
 																{
-																	name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.dne",
+																	name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.dne",
 																	references: map[string]childCases {
 																		"message type": { (*FieldDescriptor).GetMessageType, nil },
-																		"enum type": { (*FieldDescriptor).GetEnumType, refs("desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum") },
+																		"enum type": { (*FieldDescriptor).GetEnumType, refs("testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum") },
 																		"one of": { (*FieldDescriptor).GetOneOf, nil },
 																	},
 																},
 																{
-																	name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.anm",
+																	name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.anm",
 																	references: map[string]childCases {
-																		"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage.NestedMessage.AnotherNestedMessage") },
+																		"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage.NestedMessage.AnotherNestedMessage") },
 																		"enum type": { (*FieldDescriptor).GetEnumType, nil },
 																		"one of": { (*FieldDescriptor).GetOneOf, nil },
 																	},
 																},
 																{
-																	name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.nm",
+																	name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.nm",
 																	references: map[string]childCases {
-																		"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage.NestedMessage") },
+																		"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage.NestedMessage") },
 																		"enum type": { (*FieldDescriptor).GetEnumType, nil },
 																		"one of": { (*FieldDescriptor).GetOneOf, nil },
 																	},
 																},
 																{
-																	name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.tm",
+																	name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.tm",
 																	references: map[string]childCases {
-																		"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage") },
+																		"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage") },
 																		"enum type": { (*FieldDescriptor).GetEnumType, nil },
 																		"one of": { (*FieldDescriptor).GetOneOf, nil },
 																	},
@@ -161,11 +161,11 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 															"nested messages": { (*MessageDescriptor).GetNestedMessageTypes, nil },
 															"nested enums": { (*MessageDescriptor).GetNestedEnumTypes, []descCase{
 																{
-																	name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum",
+																	name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum",
 																	references: map[string]childCases {
 																		"values": { (*EnumDescriptor).GetValues, children(
-																			"desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum.VALUE1",
-																			"desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum.VALUE2"),
+																			"testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum.VALUE1",
+																			"testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum.VALUE2"),
 																		},
 																	},
 
@@ -179,10 +179,10 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 												"nested enums": { (*MessageDescriptor).GetNestedEnumTypes, nil },
 												"nested extensions": { (*MessageDescriptor).GetNestedExtensions, []descCase{
 													{
-														name: "desc_test.TestMessage.NestedMessage.AnotherNestedMessage.flags",
+														name: "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.flags",
 														number: 200,
 														references: map[string]childCases {
-															"owner": { (*FieldDescriptor).GetOwner, refs("desc_test.AnotherTestMessage") },
+															"owner": { (*FieldDescriptor).GetOwner, refs("testprotos.AnotherTestMessage") },
 															"message type": { (*FieldDescriptor).GetMessageType, nil },
 															"enum type": { (*FieldDescriptor).GetEnumType, nil },
 															"one of": { (*FieldDescriptor).GetOneOf, nil },
@@ -202,10 +202,10 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 						}},
 						"nested enums": { (*MessageDescriptor).GetNestedEnumTypes, []descCase{
 							{
-								name: "desc_test.TestMessage.NestedEnum",
+								name: "testprotos.TestMessage.NestedEnum",
 								references: map[string]childCases {
 									"values": { (*EnumDescriptor).GetValues, children(
-										"desc_test.TestMessage.NestedEnum.VALUE1", "desc_test.TestMessage.NestedEnum.VALUE2"),
+										"testprotos.TestMessage.NestedEnum.VALUE1", "testprotos.TestMessage.NestedEnum.VALUE2"),
 									},
 								},
 							},
@@ -215,53 +215,53 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 					},
 				},
 				{
-					name: "desc_test.AnotherTestMessage",
+					name: "testprotos.AnotherTestMessage",
 					references: map[string]childCases {
 						"fields": { (*MessageDescriptor).GetFields, []descCase {
 							{
-								name: "desc_test.AnotherTestMessage.dne",
+								name: "testprotos.AnotherTestMessage.dne",
 								references: map[string]childCases {
 									"message type": { (*FieldDescriptor).GetMessageType, nil },
-									"enum type": { (*FieldDescriptor).GetEnumType, refs("desc_test.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum") },
+									"enum type": { (*FieldDescriptor).GetEnumType, refs("testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum") },
 									"one of": { (*FieldDescriptor).GetOneOf, nil },
 								},
 							},
 							{
-								name: "desc_test.AnotherTestMessage.map_field1",
+								name: "testprotos.AnotherTestMessage.map_field1",
 								references: map[string]childCases {
-									"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.AnotherTestMessage.MapField1Entry") },
+									"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.AnotherTestMessage.MapField1Entry") },
 									"enum type": { (*FieldDescriptor).GetEnumType, nil },
 									"one of": { (*FieldDescriptor).GetOneOf, nil },
 								},
 							},
 							{
-								name: "desc_test.AnotherTestMessage.map_field2",
+								name: "testprotos.AnotherTestMessage.map_field2",
 								references: map[string]childCases {
-									"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.AnotherTestMessage.MapField2Entry") },
+									"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.AnotherTestMessage.MapField2Entry") },
 									"enum type": { (*FieldDescriptor).GetEnumType, nil },
 									"one of": { (*FieldDescriptor).GetOneOf, nil },
 								},
 							},
 							{
-								name: "desc_test.AnotherTestMessage.map_field3",
+								name: "testprotos.AnotherTestMessage.map_field3",
 								references: map[string]childCases {
-									"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.AnotherTestMessage.MapField3Entry") },
+									"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.AnotherTestMessage.MapField3Entry") },
 									"enum type": { (*FieldDescriptor).GetEnumType, nil },
 									"one of": { (*FieldDescriptor).GetOneOf, nil },
 								},
 							},
 							{
-								name: "desc_test.AnotherTestMessage.map_field4",
+								name: "testprotos.AnotherTestMessage.map_field4",
 								references: map[string]childCases {
-									"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.AnotherTestMessage.MapField4Entry") },
+									"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.AnotherTestMessage.MapField4Entry") },
 									"enum type": { (*FieldDescriptor).GetEnumType, nil },
 									"one of": { (*FieldDescriptor).GetOneOf, nil },
 								},
 							},
 							{
-								name: "desc_test.AnotherTestMessage.rocknroll",
+								name: "testprotos.AnotherTestMessage.rocknroll",
 								references: map[string]childCases {
-									"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.AnotherTestMessage.RockNRoll") },
+									"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.AnotherTestMessage.RockNRoll") },
 									"enum type": { (*FieldDescriptor).GetEnumType, nil },
 									"one of": { (*FieldDescriptor).GetOneOf, nil },
 								},
@@ -269,11 +269,11 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 						}},
 						"nested messages": { (*MessageDescriptor).GetNestedMessageTypes, []descCase{
 							{
-								name: "desc_test.AnotherTestMessage.MapField1Entry",
+								name: "testprotos.AnotherTestMessage.MapField1Entry",
 								references: map[string]childCases {
 									"fields": { (*MessageDescriptor).GetFields, []descCase{
 										{
-											name: "desc_test.AnotherTestMessage.MapField1Entry.key",
+											name: "testprotos.AnotherTestMessage.MapField1Entry.key",
 											references: map[string]childCases {
 												"message type": { (*FieldDescriptor).GetMessageType, nil },
 												"enum type": { (*FieldDescriptor).GetEnumType, nil },
@@ -281,7 +281,7 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 											},
 										},
 										{
-											name: "desc_test.AnotherTestMessage.MapField1Entry.value",
+											name: "testprotos.AnotherTestMessage.MapField1Entry.value",
 											references: map[string]childCases {
 												"message type": { (*FieldDescriptor).GetMessageType, nil },
 												"enum type": { (*FieldDescriptor).GetEnumType, nil },
@@ -296,11 +296,11 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 								},
 							},
 							{
-								name: "desc_test.AnotherTestMessage.MapField2Entry",
+								name: "testprotos.AnotherTestMessage.MapField2Entry",
 								references: map[string]childCases {
 									"fields": { (*MessageDescriptor).GetFields, []descCase{
 										{
-											name: "desc_test.AnotherTestMessage.MapField2Entry.key",
+											name: "testprotos.AnotherTestMessage.MapField2Entry.key",
 											references: map[string]childCases {
 												"message type": { (*FieldDescriptor).GetMessageType, nil },
 												"enum type": { (*FieldDescriptor).GetEnumType, nil },
@@ -308,7 +308,7 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 											},
 										},
 										{
-											name: "desc_test.AnotherTestMessage.MapField2Entry.value",
+											name: "testprotos.AnotherTestMessage.MapField2Entry.value",
 											references: map[string]childCases {
 												"message type": { (*FieldDescriptor).GetMessageType, nil },
 												"enum type": { (*FieldDescriptor).GetEnumType, nil },
@@ -323,11 +323,11 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 								},
 							},
 							{
-								name: "desc_test.AnotherTestMessage.MapField3Entry",
+								name: "testprotos.AnotherTestMessage.MapField3Entry",
 								references: map[string]childCases {
 									"fields": { (*MessageDescriptor).GetFields, []descCase{
 										{
-											name: "desc_test.AnotherTestMessage.MapField3Entry.key",
+											name: "testprotos.AnotherTestMessage.MapField3Entry.key",
 											references: map[string]childCases {
 												"message type": { (*FieldDescriptor).GetMessageType, nil },
 												"enum type": { (*FieldDescriptor).GetEnumType, nil },
@@ -335,7 +335,7 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 											},
 										},
 										{
-											name: "desc_test.AnotherTestMessage.MapField3Entry.value",
+											name: "testprotos.AnotherTestMessage.MapField3Entry.value",
 											references: map[string]childCases {
 												"message type": { (*FieldDescriptor).GetMessageType, nil },
 												"enum type": { (*FieldDescriptor).GetEnumType, nil },
@@ -350,11 +350,11 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 								},
 							},
 							{
-								name: "desc_test.AnotherTestMessage.MapField4Entry",
+								name: "testprotos.AnotherTestMessage.MapField4Entry",
 								references: map[string]childCases {
 									"fields": { (*MessageDescriptor).GetFields, []descCase{
 										{
-											name: "desc_test.AnotherTestMessage.MapField4Entry.key",
+											name: "testprotos.AnotherTestMessage.MapField4Entry.key",
 											references: map[string]childCases {
 												"message type": { (*FieldDescriptor).GetMessageType, nil },
 												"enum type": { (*FieldDescriptor).GetEnumType, nil },
@@ -362,9 +362,9 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 											},
 										},
 										{
-											name: "desc_test.AnotherTestMessage.MapField4Entry.value",
+											name: "testprotos.AnotherTestMessage.MapField4Entry.value",
 											references: map[string]childCases {
-												"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.AnotherTestMessage") },
+												"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.AnotherTestMessage") },
 												"enum type": { (*FieldDescriptor).GetEnumType, nil },
 												"one of": { (*FieldDescriptor).GetOneOf, nil },
 											},
@@ -377,11 +377,11 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 								},
 							},
 							{
-								name: "desc_test.AnotherTestMessage.RockNRoll",
+								name: "testprotos.AnotherTestMessage.RockNRoll",
 								references: map[string]childCases {
 									"fields": { (*MessageDescriptor).GetFields, []descCase{
 										{
-											name: "desc_test.AnotherTestMessage.RockNRoll.beatles",
+											name: "testprotos.AnotherTestMessage.RockNRoll.beatles",
 											number: 7,
 											references: map[string]childCases {
 												"message type": { (*FieldDescriptor).GetMessageType, nil },
@@ -390,7 +390,7 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 											},
 										},
 										{
-											name: "desc_test.AnotherTestMessage.RockNRoll.stones",
+											name: "testprotos.AnotherTestMessage.RockNRoll.stones",
 											number: 8,
 											references: map[string]childCases {
 												"message type": { (*FieldDescriptor).GetMessageType, nil },
@@ -399,7 +399,7 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 											},
 										},
 										{
-											name: "desc_test.AnotherTestMessage.RockNRoll.doors",
+											name: "testprotos.AnotherTestMessage.RockNRoll.doors",
 											number: 9,
 											references: map[string]childCases {
 												"message type": { (*FieldDescriptor).GetMessageType, nil },
@@ -425,40 +425,40 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 			"services": { (*FileDescriptor).GetServices, nil },
 			"extensions": { (*FileDescriptor).GetExtensions, []descCase{
 				{
-					name: "desc_test.xtm",
+					name: "testprotos.xtm",
 					number: 100,
 					references: map[string]childCases {
-						"owner": { (*FieldDescriptor).GetOwner, refs("desc_test.AnotherTestMessage") },
-						"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage") },
+						"owner": { (*FieldDescriptor).GetOwner, refs("testprotos.AnotherTestMessage") },
+						"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage") },
 						"enum type": { (*FieldDescriptor).GetEnumType, nil },
 						"one of": { (*FieldDescriptor).GetOneOf, nil },
 					},
 				},
 				{
-					name: "desc_test.xs",
+					name: "testprotos.xs",
 					number: 101,
 					references: map[string]childCases {
-						"owner": { (*FieldDescriptor).GetOwner, refs("desc_test.AnotherTestMessage") },
+						"owner": { (*FieldDescriptor).GetOwner, refs("testprotos.AnotherTestMessage") },
 						"message type": { (*FieldDescriptor).GetMessageType, nil },
 						"enum type": { (*FieldDescriptor).GetEnumType, nil },
 						"one of": { (*FieldDescriptor).GetOneOf, nil },
 					},
 				},
 				{
-					name: "desc_test.xi",
+					name: "testprotos.xi",
 					number: 102,
 					references: map[string]childCases {
-						"owner": { (*FieldDescriptor).GetOwner, refs("desc_test.AnotherTestMessage") },
+						"owner": { (*FieldDescriptor).GetOwner, refs("testprotos.AnotherTestMessage") },
 						"message type": { (*FieldDescriptor).GetMessageType, nil },
 						"enum type": { (*FieldDescriptor).GetEnumType, nil },
 						"one of": { (*FieldDescriptor).GetOneOf, nil },
 					},
 				},
 				{
-					name: "desc_test.xui",
+					name: "testprotos.xui",
 					number: 103,
 					references: map[string]childCases {
-						"owner": { (*FieldDescriptor).GetOwner, refs("desc_test.AnotherTestMessage") },
+						"owner": { (*FieldDescriptor).GetOwner, refs("testprotos.AnotherTestMessage") },
 						"message type": { (*FieldDescriptor).GetMessageType, nil },
 						"enum type": { (*FieldDescriptor).GetEnumType, nil },
 						"one of": { (*FieldDescriptor).GetOneOf, nil },
@@ -472,90 +472,90 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 func TestOneOfDescriptors(t *testing.T) {
 	fd, err := LoadFileDescriptor("desc_test2.proto")
 	testutil.Ok(t, err)
-	md, err := LoadMessageDescriptor("desc_test.Frobnitz")
+	md, err := LoadMessageDescriptor("testprotos.Frobnitz")
 	testutil.Ok(t, err)
 	checkDescriptor(t, "message", 0, md, fd, fd, descCase {
-		name: "desc_test.Frobnitz",
+		name: "testprotos.Frobnitz",
 		references: map[string]childCases{
 			"fields": { (*MessageDescriptor).GetFields, []descCase{
 				{
-					name: "desc_test.Frobnitz.a",
+					name: "testprotos.Frobnitz.a",
 					references: map[string]childCases{
-						"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage") },
+						"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage") },
 						"enum type": { (*FieldDescriptor).GetEnumType, nil },
 						"one of": { (*FieldDescriptor).GetOneOf, nil },
 					},
 				},
 				{
-					name: "desc_test.Frobnitz.b",
+					name: "testprotos.Frobnitz.b",
 					references: map[string]childCases{
-						"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.AnotherTestMessage") },
+						"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.AnotherTestMessage") },
 						"enum type": { (*FieldDescriptor).GetEnumType, nil },
 						"one of": { (*FieldDescriptor).GetOneOf, nil },
 					},
 				},
 				{
-					name: "desc_test.Frobnitz.c1",
+					name: "testprotos.Frobnitz.c1",
 					references: map[string]childCases{
-						"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage.NestedMessage") },
+						"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage.NestedMessage") },
 						"enum type": { (*FieldDescriptor).GetEnumType, nil },
-						"one of": { (*FieldDescriptor).GetOneOf, refs("desc_test.Frobnitz.abc") },
+						"one of": { (*FieldDescriptor).GetOneOf, refs("testprotos.Frobnitz.abc") },
 					},
 				},
 				{
-					name: "desc_test.Frobnitz.c2",
+					name: "testprotos.Frobnitz.c2",
 					references: map[string]childCases{
 						"message type": { (*FieldDescriptor).GetMessageType, nil },
-						"enum type": { (*FieldDescriptor).GetEnumType, refs("desc_test.TestMessage.NestedEnum") },
-						"one of": { (*FieldDescriptor).GetOneOf, refs("desc_test.Frobnitz.abc") },
+						"enum type": { (*FieldDescriptor).GetEnumType, refs("testprotos.TestMessage.NestedEnum") },
+						"one of": { (*FieldDescriptor).GetOneOf, refs("testprotos.Frobnitz.abc") },
 					},
 				},
 				{
-					name: "desc_test.Frobnitz.d",
+					name: "testprotos.Frobnitz.d",
 					references: map[string]childCases{
-						"message type": { (*FieldDescriptor).GetMessageType, refs("desc_test.TestMessage.NestedMessage") },
-						"enum type": { (*FieldDescriptor).GetEnumType, nil },
-						"one of": { (*FieldDescriptor).GetOneOf, nil },
-					},
-				},
-				{
-					name: "desc_test.Frobnitz.e",
-					references: map[string]childCases{
-						"message type": { (*FieldDescriptor).GetMessageType, nil },
-						"enum type": { (*FieldDescriptor).GetEnumType, refs("desc_test.TestMessage.NestedEnum") },
-						"one of": { (*FieldDescriptor).GetOneOf, nil },
-					},
-				},
-				{
-					name: "desc_test.Frobnitz.f",
-					references: map[string]childCases{
-						"message type": { (*FieldDescriptor).GetMessageType, nil },
+						"message type": { (*FieldDescriptor).GetMessageType, refs("testprotos.TestMessage.NestedMessage") },
 						"enum type": { (*FieldDescriptor).GetEnumType, nil },
 						"one of": { (*FieldDescriptor).GetOneOf, nil },
 					},
 				},
 				{
-					name: "desc_test.Frobnitz.g1",
+					name: "testprotos.Frobnitz.e",
 					references: map[string]childCases{
 						"message type": { (*FieldDescriptor).GetMessageType, nil },
-						"enum type": { (*FieldDescriptor).GetEnumType, nil },
-						"one of": { (*FieldDescriptor).GetOneOf, refs("desc_test.Frobnitz.def") },
+						"enum type": { (*FieldDescriptor).GetEnumType, refs("testprotos.TestMessage.NestedEnum") },
+						"one of": { (*FieldDescriptor).GetOneOf, nil },
 					},
 				},
 				{
-					name: "desc_test.Frobnitz.g2",
+					name: "testprotos.Frobnitz.f",
 					references: map[string]childCases{
 						"message type": { (*FieldDescriptor).GetMessageType, nil },
 						"enum type": { (*FieldDescriptor).GetEnumType, nil },
-						"one of": { (*FieldDescriptor).GetOneOf, refs("desc_test.Frobnitz.def") },
+						"one of": { (*FieldDescriptor).GetOneOf, nil },
 					},
 				},
 				{
-					name: "desc_test.Frobnitz.g3",
+					name: "testprotos.Frobnitz.g1",
 					references: map[string]childCases{
 						"message type": { (*FieldDescriptor).GetMessageType, nil },
 						"enum type": { (*FieldDescriptor).GetEnumType, nil },
-						"one of": { (*FieldDescriptor).GetOneOf, refs("desc_test.Frobnitz.def") },
+						"one of": { (*FieldDescriptor).GetOneOf, refs("testprotos.Frobnitz.def") },
+					},
+				},
+				{
+					name: "testprotos.Frobnitz.g2",
+					references: map[string]childCases{
+						"message type": { (*FieldDescriptor).GetMessageType, nil },
+						"enum type": { (*FieldDescriptor).GetEnumType, nil },
+						"one of": { (*FieldDescriptor).GetOneOf, refs("testprotos.Frobnitz.def") },
+					},
+				},
+				{
+					name: "testprotos.Frobnitz.g3",
+					references: map[string]childCases{
+						"message type": { (*FieldDescriptor).GetMessageType, nil },
+						"enum type": { (*FieldDescriptor).GetEnumType, nil },
+						"one of": { (*FieldDescriptor).GetOneOf, refs("testprotos.Frobnitz.def") },
 					},
 				},
 			}},
@@ -564,23 +564,23 @@ func TestOneOfDescriptors(t *testing.T) {
 			"nested extensions": { (*MessageDescriptor).GetNestedExtensions, nil },
 			"one ofs": { (*MessageDescriptor).GetOneOfs, []descCase{
 				{
-					name: "desc_test.Frobnitz.abc",
+					name: "testprotos.Frobnitz.abc",
 					skipParent: true,
 					references: map[string]childCases{
 						"fields": { (*OneOfDescriptor).GetChoices, fields(
-							fld{"desc_test.Frobnitz.c1", 3},
-							fld{"desc_test.Frobnitz.c2", 4}),
+							fld{"testprotos.Frobnitz.c1", 3},
+							fld{"testprotos.Frobnitz.c2", 4}),
 						},
 					},
 				},
 				{
-					name: "desc_test.Frobnitz.def",
+					name: "testprotos.Frobnitz.def",
 					skipParent: true,
 					references: map[string]childCases{
 						"fields": { (*OneOfDescriptor).GetChoices, fields(
-							fld{"desc_test.Frobnitz.g1", 8},
-							fld{"desc_test.Frobnitz.g2", 9},
-							fld{"desc_test.Frobnitz.g3", 10}),
+							fld{"testprotos.Frobnitz.g1", 8},
+							fld{"testprotos.Frobnitz.g2", 9},
+							fld{"testprotos.Frobnitz.g3", 10}),
 						},
 					},
 				},
@@ -590,7 +590,7 @@ func TestOneOfDescriptors(t *testing.T) {
 }
 
 func TestMessageDescriptorFindField(t *testing.T) {
-	md, err := LoadMessageDescriptor("desc_test.Frobnitz")
+	md, err := LoadMessageDescriptor("testprotos.Frobnitz")
 	testutil.Ok(t, err)
 	for _, fd := range md.GetFields() {
 		found := md.FindFieldByName(fd.GetName())
@@ -605,7 +605,7 @@ func TestMessageDescriptorFindField(t *testing.T) {
 func TestEnumDescriptorFindValue(t *testing.T) {
 	fd, err := LoadFileDescriptor("desc_test_defaults.proto")
 	testutil.Ok(t, err)
-	ed, ok := fd.FindSymbol("desc_test.Number").(*EnumDescriptor)
+	ed, ok := fd.FindSymbol("testprotos.Number").(*EnumDescriptor)
 	testutil.Eq(t, true, ok)
 	lastNumber := int32(-1)
 	for _, vd := range ed.GetValues() {
@@ -627,38 +627,38 @@ func TestEnumDescriptorFindValue(t *testing.T) {
 func TestServiceDescriptors(t *testing.T) {
 	fd, err := LoadFileDescriptor("desc_test_proto3.proto")
 	testutil.Ok(t, err)
-	sd := fd.FindSymbol("desc_test.TestService").(*ServiceDescriptor)
+	sd := fd.FindSymbol("testprotos.TestService").(*ServiceDescriptor)
 	// check the descriptor graph for this service and its descendants
 	checkDescriptor(t, "service", 0, sd, fd, fd, descCase{
-		name: "desc_test.TestService",
+		name: "testprotos.TestService",
 		references: map[string]childCases{
 			"methods": { (*ServiceDescriptor).GetMethods, []descCase{
 				{
-					name: "desc_test.TestService.DoSomething",
+					name: "testprotos.TestService.DoSomething",
 					references: map[string]childCases{
-						"request": { (*MethodDescriptor).GetInputType, refs("desc_test.TestRequest") },
+						"request": { (*MethodDescriptor).GetInputType, refs("testprotos.TestRequest") },
 						"response": { (*MethodDescriptor).GetOutputType, refs("jhump.protoreflect.desc.Bar") },
 					},
 				},
 				{
-					name: "desc_test.TestService.DoSomethingElse",
+					name: "testprotos.TestService.DoSomethingElse",
 					references: map[string]childCases{
-						"request": { (*MethodDescriptor).GetInputType, refs("desc_test.TestMessage") },
-						"response": { (*MethodDescriptor).GetOutputType, refs("desc_test.TestResponse") },
+						"request": { (*MethodDescriptor).GetInputType, refs("testprotos.TestMessage") },
+						"response": { (*MethodDescriptor).GetOutputType, refs("testprotos.TestResponse") },
 					},
 				},
 				{
-					name: "desc_test.TestService.DoSomethingAgain",
+					name: "testprotos.TestService.DoSomethingAgain",
 					references: map[string]childCases{
 						"request": { (*MethodDescriptor).GetInputType, refs("jhump.protoreflect.desc.Bar") },
-						"response": { (*MethodDescriptor).GetOutputType, refs("desc_test.AnotherTestMessage") },
+						"response": { (*MethodDescriptor).GetOutputType, refs("testprotos.AnotherTestMessage") },
 					},
 				},
 				{
-					name: "desc_test.TestService.DoSomethingForever",
+					name: "testprotos.TestService.DoSomethingForever",
 					references: map[string]childCases{
-						"request": { (*MethodDescriptor).GetInputType, refs("desc_test.TestRequest") },
-						"response": { (*MethodDescriptor).GetOutputType, refs("desc_test.TestResponse") },
+						"request": { (*MethodDescriptor).GetInputType, refs("testprotos.TestRequest") },
+						"response": { (*MethodDescriptor).GetOutputType, refs("testprotos.TestResponse") },
 					},
 				},
 			}},
@@ -853,25 +853,25 @@ func TestLoadFileDescriptor(t *testing.T) {
 	// some very shallow tests (we have more detailed ones in other test cases)
 	testutil.Eq(t, "desc_test1.proto", fd.GetName())
 	testutil.Eq(t, "desc_test1.proto", fd.GetFullyQualifiedName())
-	testutil.Eq(t, "desc_test", fd.GetPackage())
+	testutil.Eq(t, "testprotos", fd.GetPackage())
 }
 
 func TestLoadMessageDescriptor(t *testing.T) {
 	// loading enclosed messages should return the same descriptor
 	// and have a reference to the same file descriptor
-	md, err := LoadMessageDescriptor("desc_test.TestMessage")
+	md, err := LoadMessageDescriptor("testprotos.TestMessage")
 	testutil.Ok(t, err)
 	testutil.Eq(t, "TestMessage", md.GetName())
-	testutil.Eq(t, "desc_test.TestMessage", md.GetFullyQualifiedName())
+	testutil.Eq(t, "testprotos.TestMessage", md.GetFullyQualifiedName())
 	fd := md.GetFile()
 	testutil.Eq(t, "desc_test1.proto", fd.GetName())
 	testutil.Eq(t, fd, md.GetParent())
 
-	md2, err := LoadMessageDescriptorForMessage((*desc_test.TestMessage)(nil))
+	md2, err := LoadMessageDescriptorForMessage((*testprotos.TestMessage)(nil))
 	testutil.Ok(t, err)
 	testutil.Eq(t, md, md2)
 
-	md3, err := LoadMessageDescriptorForType(reflect.TypeOf((*desc_test.TestMessage)(nil)))
+	md3, err := LoadMessageDescriptorForType(reflect.TypeOf((*testprotos.TestMessage)(nil)))
 	testutil.Ok(t, err)
 	testutil.Eq(t, md, md3)
 }
@@ -882,7 +882,7 @@ func TestLoadFileDescriptorWithDeps(t *testing.T) {
 	testutil.Ok(t, err)
 	testutil.Eq(t, "desc_test2.proto", fd.GetName())
 	testutil.Eq(t, "desc_test2.proto", fd.GetFullyQualifiedName())
-	testutil.Eq(t, "desc_test", fd.GetPackage())
+	testutil.Eq(t, "testprotos", fd.GetPackage())
 
 	deps := fd.GetDependencies()
 	testutil.Eq(t, 3, len(deps))
