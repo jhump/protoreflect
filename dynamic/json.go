@@ -27,26 +27,29 @@ type MarshalJSONOpts struct {
 	EmitDefaults bool
 }
 
-func (m *Message) MarshalJSON() ([]byte, error) {
+func (m *Message) MarshalJSONCustom(opts MarshalJSONOpts) ([]byte, error) {
 	var b indentBuffer
-	b.indent = -1 // no indentation
+	if !opts.Indent {
+		b.indent = -1
+	}
 	b.comma = true
-	if err := m.marshalJSON(&b); err != nil {
+	if err := m.marshalJSON(&b, opts); err != nil {
 		return nil, err
 	}
 	return b.Bytes(), nil
+}
+
+func (m *Message) MarshalJSON() ([]byte, error) {
+	b, err := m.MarshalJSONCustom(MarshalJSONOpts{})
+	return b, err
 }
 
 func (m *Message) MarshalJSONIndent() ([]byte, error) {
-	var b indentBuffer
-	b.comma = true
-	if err := m.marshalJSON(&b); err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
+	b, err := m.MarshalJSONCustom(MarshalJSONOpts{Indent: true})
+	return b, err
 }
 
-func (m *Message) marshalJSON(b *indentBuffer) error {
+func (m *Message) marshalJSON(b *indentBuffer, opts MarshalJSONOpts) error {
 	err := b.WriteByte('{')
 	if err != nil {
 		return err
@@ -56,18 +59,34 @@ func (m *Message) marshalJSON(b *indentBuffer) error {
 		return err
 	}
 
+	emitDefaults := opts.EmitDefaults
+
+	var tags []int
+	if emitDefaults {
+		tags = m.allKnownFieldTags()
+	} else {
+		tags = m.knownFieldTags()
+	}
+
 	first := true
+
 	// first the known fields
-	for _, tag := range m.knownFieldTags() {
+	for _, tag := range tags {
 		itag := int32(tag)
-		v := m.values[itag]
 		fd := m.FindFieldDescriptor(itag)
+
+		v, ok := m.values[itag]
+		if !ok {
+			if emitDefaults {
+				v = fd.GetDefaultValue()
+			}
+		}
 
 		err := b.maybeNext(&first)
 		if err != nil {
 			return err
 		}
-		err = marshalKnownFieldJSON(b, fd, v)
+		err = marshalKnownFieldJSON(b, fd, v, opts)
 		if err != nil {
 			return err
 		}
@@ -85,7 +104,7 @@ func (m *Message) marshalJSON(b *indentBuffer) error {
 	return nil
 }
 
-func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}) error {
+func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts MarshalJSONOpts) error {
 	jsonName := fd.AsFieldDescriptorProto().GetJsonName()
 	if jsonName == "" {
 		jsonName = fd.GetName()
@@ -97,6 +116,10 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 	err = b.sep()
 	if err != nil {
 		return err
+	}
+
+	if v == nil {
+		return writeString(b, "null")
 	}
 
 	if fd.IsMap() {
@@ -128,7 +151,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 					return err
 				}
 
-				err = marshalKnownFieldMapEntryJSON(b, kfd, mk, vfd, mv)
+				err = marshalKnownFieldMapEntryJSON(b, kfd, mk, vfd, mv, opts)
 				if err != nil {
 					return err
 				}
@@ -140,7 +163,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 				if err != nil {
 					return err
 				}
-				err = marshalKnownFieldMapEntryJSON(b, kfd, mk, vfd, mv)
+				err = marshalKnownFieldMapEntryJSON(b, kfd, mk, vfd, mv, opts)
 				if err != nil {
 					return err
 				}
@@ -170,7 +193,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 			if err != nil {
 				return err
 			}
-			err = marshalKnownFieldValueJSON(b, fd, slv)
+			err = marshalKnownFieldValueJSON(b, fd, slv, opts)
 			if err != nil {
 				return err
 			}
@@ -183,11 +206,11 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 		return b.WriteByte(']')
 
 	} else {
-		return marshalKnownFieldValueJSON(b, fd, v)
+		return marshalKnownFieldValueJSON(b, fd, v, opts)
 	}
 }
 
-func marshalKnownFieldMapEntryJSON(b *indentBuffer, kfd *desc.FieldDescriptor, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}) error {
+func marshalKnownFieldMapEntryJSON(b *indentBuffer, kfd *desc.FieldDescriptor, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}, opts MarshalJSONOpts) error {
 	rk := reflect.ValueOf(mk)
 	var strkey string
 	switch rk.Kind() {
@@ -210,10 +233,10 @@ func marshalKnownFieldMapEntryJSON(b *indentBuffer, kfd *desc.FieldDescriptor, m
 	if err != nil {
 		return err
 	}
-	return marshalKnownFieldValueJSON(b, vfd, mv)
+	return marshalKnownFieldValueJSON(b, vfd, mv, opts)
 }
 
-func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}) error {
+func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts MarshalJSONOpts) error {
 	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
 	case reflect.Int32, reflect.Int64:
@@ -265,7 +288,7 @@ func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v int
 	default:
 		// must be a message
 		if dm, ok := v.(*Message); ok {
-			return dm.marshalJSON(b)
+			return dm.marshalJSON(b, opts)
 		} else {
 			var err error
 			if b.indent == -1 {
