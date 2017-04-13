@@ -561,11 +561,6 @@ func (m *Message) unmarshalKnownField(fd *desc.FieldDescriptor, encoding int8, b
 
 	if fd.IsMap() {
 		newEntry := val.(*Message)
-		mp, ok := m.values[fd.GetNumber()].(map[interface{}]interface{})
-		if !ok {
-			mp = map[interface{}]interface{}{}
-			m.internalSetField(fd, mp)
-		}
 		k, err := newEntry.TryGetFieldByNumber(1)
 		if err != nil {
 			return err
@@ -574,21 +569,26 @@ func (m *Message) unmarshalKnownField(fd *desc.FieldDescriptor, encoding int8, b
 		if err != nil {
 			return err
 		}
-		mp[k] = v
+		if existing, ok := m.values[fd.GetNumber()]; ok {
+			mp := existing.(map[interface{}]interface{})
+			mp[k] = v
+		} else {
+			m.internalSetField(fd, map[interface{}]interface{}{ k: v })
+		}
 	} else if fd.IsRepeated() {
 		t := reflect.TypeOf(val)
-		existing, ok := m.values[fd.GetNumber()].([]interface{})
-		if !ok {
-			existing = []interface{}(nil)
-			m.internalSetField(fd, existing)
+		var slice []interface{}
+		if existing, ok := m.values[fd.GetNumber()]; ok {
+			slice = existing.([]interface{})
 		}
 		if t.Kind() == reflect.Slice && t != typeOfBytes {
 			// append slices if we unmarshalled a packed repeated field
 			sl := val.([]interface{})
-			m.values[fd.GetNumber()] = append(existing, sl...)
+			slice = append(slice, sl...)
 		} else {
-			m.values[fd.GetNumber()] = append(existing, val)
+			slice = append(slice, val)
 		}
+		m.internalSetField(fd, slice)
 	} else {
 		m.internalSetField(fd, val)
 	}
