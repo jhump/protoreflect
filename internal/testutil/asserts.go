@@ -43,7 +43,7 @@ func require(caller string, t *testing.T, condition bool, context []interface{})
 		} else {
 			msg := context[0].(string)
 			// if any args were deferred (e.g. a function instead of a value), get those args now
-			args := make([]interface{}, len(context) - 1)
+			args := make([]interface{}, len(context)-1)
 			for i, a := range context[1:] {
 				rv := reflect.ValueOf(a)
 				if rv.Kind() == reflect.Func {
@@ -58,19 +58,19 @@ func require(caller string, t *testing.T, condition bool, context []interface{})
 
 func mergeContext(context []interface{}, msg string, msgArgs ...interface{}) []interface{} {
 	if len(context) == 0 {
-		ret := make([]interface{}, len(msgArgs) + 1)
+		ret := make([]interface{}, len(msgArgs)+1)
 		ret[0] = msg
 		for i, a := range msgArgs {
-			ret[i + 1] = a
+			ret[i+1] = a
 		}
 		return ret
 	} else {
-		ret := make([]interface{}, len(msgArgs) + 2)
+		ret := make([]interface{}, len(msgArgs)+2)
 		ret[0] = msg + ": %s"
 		for i, a := range msgArgs {
-			ret[i + 1] = a
+			ret[i+1] = a
 		}
-		ret[len(ret) - 1] = func() string {
+		ret[len(ret)-1] = func() string {
 			f := context[0].(string)
 			return fmt.Sprintf(f, context[1:]...)
 		}

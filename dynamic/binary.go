@@ -140,7 +140,7 @@ func marshalField(tag int32, fd *desc.FieldDescriptor, val interface{}, b *coded
 			return err
 		}
 		if fd.AsFieldDescriptorProto().GetOptions().GetPacked() && len(sl) > 1 &&
-				(wt == proto.WireVarint || wt == proto.WireFixed32 || wt == proto.WireFixed64) {
+			(wt == proto.WireVarint || wt == proto.WireFixed32 || wt == proto.WireFixed64) {
 			// packed repeated field
 			var packedBuffer codedBuffer
 			for _, v := range sl {
@@ -356,7 +356,7 @@ func (m *Message) UnmarshalMerge(b []byte) error {
 
 func (m *Message) unmarshal(buf *codedBuffer, isGroup bool) error {
 	for !buf.eof() {
-		tagNumber, wireType, err :=  buf.decodeTagAndWireType()
+		tagNumber, wireType, err := buf.decodeTagAndWireType()
 		if err != nil {
 			return err
 		}
@@ -454,7 +454,7 @@ func unmarshalLengthDelimitedField(fd *desc.FieldDescriptor, bytes []byte, er *E
 		return string(bytes), nil
 
 	case fd.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE ||
-			fd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP:
+		fd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP:
 		dm := NewMessageWithExtensionRegistry(fd.GetMessageType(), er)
 		err := dm.Unmarshal(bytes)
 		if err != nil {
@@ -596,7 +596,7 @@ func (m *Message) unmarshalKnownField(fd *desc.FieldDescriptor, encoding int8, b
 }
 
 func (m *Message) unmarshalUnknownField(tagNumber int32, encoding int8, b *codedBuffer) error {
-	u := UnknownField{ Encoding: encoding }
+	u := UnknownField{Encoding: encoding}
 	var err error
 	switch encoding {
 	case proto.WireFixed32:
@@ -611,7 +611,7 @@ func (m *Message) unmarshalUnknownField(tagNumber int32, encoding int8, b *coded
 		var groupEnd, dataEnd int
 		groupEnd, dataEnd, err = skipGroup(b)
 		if err == nil {
-			u.Contents = make([]byte, dataEnd - b.index)
+			u.Contents = make([]byte, dataEnd-b.index)
 			copy(u.Contents, b.buf[b.index:])
 			b.index = groupEnd
 		}
@@ -658,7 +658,7 @@ func skipGroup(b *codedBuffer) (int, int, error) {
 				if i >= len(bs) {
 					return 0, 0, io.ErrUnexpectedEOF
 				}
-				if bs[i] & 0x80 == 0 {
+				if bs[i]&0x80 == 0 {
 					break
 				}
 				i++

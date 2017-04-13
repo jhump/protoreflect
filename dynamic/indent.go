@@ -55,15 +55,21 @@ func (b *indentBuffer) next() error {
 func (b *indentBuffer) newLine(comma bool) error {
 	if comma {
 		err := b.WriteByte(',')
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 
 	err := b.WriteByte('\n')
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	for i := 0; i < b.indent; i++ {
 		_, err := b.WriteString("  ")
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

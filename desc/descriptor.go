@@ -53,17 +53,17 @@ const (
 	// NB: It would be nice to use constants from generated code instead of hard-coding these here.
 	// But code-gen does not emit these as constants anywhere. The only places they appear in generated
 	// code are struct tags on fields of the generated descriptor protos.
-	file_messagesTag = 4
-	file_enumsTag = 5
-	file_servicesTag = 6
-	file_extensionsTag = 7
-	message_fieldsTag = 2
+	file_messagesTag          = 4
+	file_enumsTag             = 5
+	file_servicesTag          = 6
+	file_extensionsTag        = 7
+	message_fieldsTag         = 2
 	message_nestedMessagesTag = 3
-	message_enumsTag = 4
-	message_extensionsTag = 6
-	message_oneOfsTag = 8
-	enum_valuesTag = 2
-	service_methodsTag = 2
+	message_enumsTag          = 4
+	message_extensionsTag     = 6
+	message_oneOfsTag         = 8
+	enum_valuesTag            = 2
+	service_methodsTag        = 2
 )
 
 // Descriptor is the common interface implemented by all descriptor objects.
@@ -115,7 +115,7 @@ type FileDescriptor struct {
 // all of the file's dependencies or if the contents of the descriptors are internally
 // inconsistent (e.g. contain unresolvable symbols) then an error is returned.
 func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) (*FileDescriptor, error) {
-	ret := &FileDescriptor{ proto: fd, symbols: map[string]Descriptor{}, fieldIndex: map[string]map[int32]*FieldDescriptor{} }
+	ret := &FileDescriptor{proto: fd, symbols: map[string]Descriptor{}, fieldIndex: map[string]map[int32]*FieldDescriptor{}}
 	pkg := fd.GetPackage()
 
 	// populate references to file descriptor dependencies
@@ -407,7 +407,7 @@ type MessageDescriptor struct {
 
 func createMessageDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, md *dpb.DescriptorProto, symbols map[string]Descriptor) (*MessageDescriptor, string) {
 	msgName := merge(enclosing, md.GetName())
-	ret := &MessageDescriptor{ proto: md, parent: parent, file: fd, fqn: msgName }
+	ret := &MessageDescriptor{proto: md, parent: parent, file: fd, fqn: msgName}
 	for _, f := range md.GetField() {
 		fld, n := createFieldDescriptor(fd, ret, msgName, f)
 		symbols[n] = fld
@@ -439,9 +439,9 @@ func createMessageDescriptor(fd *FileDescriptor, parent Descriptor, enclosing st
 	sort.Sort(ret.extRanges)
 	ret.isProto3 = fd.isProto3
 	ret.isMapEntry = md.GetOptions().GetMapEntry() &&
-			len(ret.fields) == 2 &&
-			ret.fields[0].GetNumber() == 1 &&
-			ret.fields[1].GetNumber() == 2
+		len(ret.fields) == 2 &&
+		ret.fields[0].GetNumber() == 1 &&
+		ret.fields[1].GetNumber() == 2
 
 	return ret, msgName
 }
@@ -455,23 +455,23 @@ func (md *MessageDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dp
 			return err
 		}
 	}
-	path[len(path) - 1] = message_enumsTag
+	path[len(path)-1] = message_enumsTag
 	for i, ed := range md.enums {
 		ed.resolve(append(path, int32(i)), sourceCodeInfo)
 	}
-	path[len(path) - 1] = message_fieldsTag
+	path[len(path)-1] = message_fieldsTag
 	for i, fld := range md.fields {
 		if err := fld.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
 			return err
 		}
 	}
-	path[len(path) - 1] = message_extensionsTag
+	path[len(path)-1] = message_extensionsTag
 	for i, exd := range md.extensions {
 		if err := exd.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
 			return err
 		}
 	}
-	path[len(path) - 1] = message_oneOfsTag
+	path[len(path)-1] = message_oneOfsTag
 	for i, od := range md.oneOfs {
 		od.resolve(append(path, int32(i)), sourceCodeInfo)
 	}
@@ -646,7 +646,7 @@ type FieldDescriptor struct {
 
 func createFieldDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, fld *dpb.FieldDescriptorProto) (*FieldDescriptor, string) {
 	fldName := merge(enclosing, fld.GetName())
-	ret := &FieldDescriptor{ proto: fld, parent: parent, file: fd, fqn: fldName }
+	ret := &FieldDescriptor{proto: fld, parent: parent, file: fd, fqn: fldName}
 	if fld.GetExtendee() == "" {
 		ret.owner = parent.(*MessageDescriptor)
 	}
@@ -680,8 +680,8 @@ func (fd *FieldDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dpb.
 	fd.file.registerField(fd)
 	fd.def = fd.determineDefault()
 	fd.isMap = fd.proto.GetLabel() == dpb.FieldDescriptorProto_LABEL_REPEATED &&
-			fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_MESSAGE &&
-			fd.GetMessageType().IsMapEntry()
+		fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_MESSAGE &&
+		fd.GetMessageType().IsMapEntry()
 	return nil
 }
 
@@ -972,7 +972,7 @@ type EnumDescriptor struct {
 
 func createEnumDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, ed *dpb.EnumDescriptorProto, symbols map[string]Descriptor) (*EnumDescriptor, string) {
 	enumName := merge(enclosing, ed.GetName())
-	ret := &EnumDescriptor{ proto: ed, parent: parent, file: fd, fqn: enumName }
+	ret := &EnumDescriptor{proto: ed, parent: parent, file: fd, fqn: enumName}
 	for _, ev := range ed.GetValue() {
 		evd, n := createEnumValueDescriptor(fd, ret, enumName, ev)
 		symbols[n] = evd
@@ -1089,7 +1089,7 @@ type EnumValueDescriptor struct {
 
 func createEnumValueDescriptor(fd *FileDescriptor, parent *EnumDescriptor, enclosing string, evd *dpb.EnumValueDescriptorProto) (*EnumValueDescriptor, string) {
 	valName := merge(enclosing, evd.GetName())
-	return &EnumValueDescriptor{ proto: evd, parent: parent, file: fd, fqn: valName }, valName
+	return &EnumValueDescriptor{proto: evd, parent: parent, file: fd, fqn: valName}, valName
 }
 
 func (vd *EnumValueDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dpb.SourceCodeInfo_Location) {
@@ -1157,7 +1157,7 @@ type ServiceDescriptor struct {
 
 func createServiceDescriptor(fd *FileDescriptor, enclosing string, sd *dpb.ServiceDescriptorProto, symbols map[string]Descriptor) (*ServiceDescriptor, string) {
 	serviceName := merge(enclosing, sd.GetName())
-	ret := &ServiceDescriptor{ proto: sd, file: fd, fqn: serviceName }
+	ret := &ServiceDescriptor{proto: sd, file: fd, fqn: serviceName}
 	for _, m := range sd.GetMethod() {
 		md, n := createMethodDescriptor(fd, ret, serviceName, m)
 		symbols[n] = md
@@ -1247,7 +1247,7 @@ type MethodDescriptor struct {
 func createMethodDescriptor(fd *FileDescriptor, parent *ServiceDescriptor, enclosing string, md *dpb.MethodDescriptorProto) (*MethodDescriptor, string) {
 	// request and response types get resolved later
 	methodName := merge(enclosing, md.GetName())
-	return &MethodDescriptor{ proto: md, parent: parent, file: fd, fqn: methodName }, methodName
+	return &MethodDescriptor{proto: md, parent: parent, file: fd, fqn: methodName}, methodName
 }
 
 func (md *MethodDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dpb.SourceCodeInfo_Location, scopes []scope) error {
@@ -1342,7 +1342,7 @@ type OneOfDescriptor struct {
 
 func createOneOfDescriptor(fd *FileDescriptor, parent *MessageDescriptor, index int, enclosing string, od *dpb.OneofDescriptorProto) (*OneOfDescriptor, string) {
 	oneOfName := merge(enclosing, od.GetName())
-	ret := &OneOfDescriptor{ proto: od, parent: parent, file: fd, fqn: oneOfName }
+	ret := &OneOfDescriptor{proto: od, parent: parent, file: fd, fqn: oneOfName}
 	for _, f := range parent.fields {
 		oi := f.proto.OneofIndex
 		if oi != nil && *oi == int32(index) {
@@ -1430,7 +1430,7 @@ func fileScope(fd *FileDescriptor) scope {
 	// we search symbols in this file, but also symbols in other files
 	// that have the same package as this file
 	pkg := fd.proto.GetPackage()
-	fds := collectFilesInPackage(pkg, fd.deps, []*FileDescriptor{ fd })
+	fds := collectFilesInPackage(pkg, fd.deps, []*FileDescriptor{fd})
 	return func(name string) Descriptor {
 		n := merge(pkg, name)
 		for _, fd := range fds {
@@ -1515,8 +1515,8 @@ func merge(a, b string) string {
 }
 
 var (
-	cacheMu sync.RWMutex
-	filesCache = map[string]*FileDescriptor{}
+	cacheMu       sync.RWMutex
+	filesCache    = map[string]*FileDescriptor{}
 	messagesCache = map[string]*MessageDescriptor{}
 )
 

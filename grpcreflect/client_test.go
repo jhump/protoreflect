@@ -191,4 +191,3 @@ func TestRecover(t *testing.T) {
 	testutil.Ok(t, err)
 	testutil.Eq(t, true, client.stream != nil && client.stream != stream)
 }
-
