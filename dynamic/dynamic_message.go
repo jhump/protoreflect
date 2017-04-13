@@ -1583,7 +1583,7 @@ func (m *Message) knownFieldTags() []int {
 // allKnownFieldTags return tags of present and recognized fields, including those that are unset, in sorted order.
 func (m *Message) allKnownFieldTags() []int {
 	fds := m.md.GetFields()
-	keys := make([]int, 0, len(fds))
+	keys := make([]int, len(fds))
 
 	i := 0
 	for _, fd := range fds {
