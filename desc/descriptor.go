@@ -305,7 +305,7 @@ func (fd *FileDescriptor) GetPublicDependencies() []*FileDescriptor {
 	return fd.publicDeps
 }
 
-// GetWeakDependencies returns all of this file's public dependencies. These
+// GetWeakDependencies returns all of this file's weak dependencies. These
 // correspond to weak import statements in the file.
 func (fd *FileDescriptor) GetWeakDependencies() []*FileDescriptor {
 	return fd.weakDeps
@@ -928,33 +928,33 @@ func (fd *FieldDescriptor) GetEnumType() *EnumDescriptor {
 // Otherwise, it returns the declared default value for the field or a zero value, if no
 // default is declared or if the file is proto3. The type of said return value corresponds
 // to the type of the field:
-// |-------------------------|
-// | Declared Type | Go Type |
-// |---------------+---------|
-// | int32         |         |
-// | sint32        | int32   |
-// | sfixed32      |         |
-// |---------------+---------|
-// | uint32        | uint32  |
-// | fixed32       |         |
-// |---------------+---------|
-// | int64         |         |
-// | sint64        | int64   |
-// | sfixed64      |         |
-// |---------------+---------|
-// | uint64        | uint64  |
-// | fixed64       |         |
-// |---------------+---------|
-// | float         | float32 |
-// |---------------+---------|
-// | double        | float64 |
-// |---------------+---------|
-// | bool          | bool    |
-// |---------------+---------|
-// | bytes         | []byte  |
-// |---------------+---------|
-// | string        | string  |
-// |-------------------------|
+//   |-------------------------|
+//   | Declared Type | Go Type |
+//   |---------------+---------|
+//   | int32         |         |
+//   | sint32        | int32   |
+//   | sfixed32      |         |
+//   |---------------+---------|
+//   | uint32        | uint32  |
+//   | fixed32       |         |
+//   |---------------+---------|
+//   | int64         |         |
+//   | sint64        | int64   |
+//   | sfixed64      |         |
+//   |---------------+---------|
+//   | uint64        | uint64  |
+//   | fixed64       |         |
+//   |---------------+---------|
+//   | float         | float32 |
+//   |---------------+---------|
+//   | double        | float64 |
+//   |---------------+---------|
+//   | bool          | bool    |
+//   |---------------+---------|
+//   | bytes         | []byte  |
+//   |---------------+---------|
+//   | string        | string  |
+//   |-------------------------|
 func (fd *FieldDescriptor) GetDefaultValue() interface{} {
 	return fd.def
 }
