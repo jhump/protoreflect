@@ -6,16 +6,16 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/jhump/protoreflect/desc/desc_test"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal/testutil"
+	"github.com/jhump/protoreflect/internal/testprotos"
 )
 
 // Shared stuff for marshalling and unmarshalling tests. This is used for the binary format, the text
 // format, and the JSON format.
 
 
-var unaryFieldsMsg = &desc_test.UnaryFields{
+var unaryFieldsMsg = &testprotos.UnaryFields{
 	I: proto.Int32(1),
 	J: proto.Int64(2),
 	K: proto.Int32(3),
@@ -31,18 +31,18 @@ var unaryFieldsMsg = &desc_test.UnaryFields{
 	U: []byte{ 0, 1, 2, 3, 4, 5, 6, 7 },
 	V: proto.String("foobar"),
 	W: proto.Bool(true),
-	X: &desc_test.RepeatedFields{
+	X: &testprotos.RepeatedFields{
 		I: []int32{ -3, },
 		V: []string{ "baz" },
 	},
-	Groupy: &desc_test.UnaryFields_GroupY{
+	Groupy: &testprotos.UnaryFields_GroupY{
 		Ya: proto.String("bedazzle"),
 		Yb: proto.Int32(42),
 	},
-	Z: desc_test.TestEnum_SECOND.Enum(),
+	Z: testprotos.TestEnum_SECOND.Enum(),
 }
 
-var repeatedFieldsMsg = &desc_test.RepeatedFields{
+var repeatedFieldsMsg = &testprotos.RepeatedFields{
 	I: []int32{ 1, 2, 3 },
 	J: []int64{ 4, 5, 6 },
 	K: []int32{ 7, 8, 9 },
@@ -58,18 +58,18 @@ var repeatedFieldsMsg = &desc_test.RepeatedFields{
 	U: [][]byte{ {0, 1, 2, 3}, {4, 5, 6, 7}, {8, 9, 10, 11} },
 	V: []string{ "foo", "bar", "baz" },
 	W: []bool{ true, false, true },
-	X: []*desc_test.UnaryFields{
+	X: []*testprotos.UnaryFields{
 		{ I: proto.Int32(-32), V: proto.String("baz") },
 		{ I: proto.Int32(-64), V: proto.String("bozo") },
 	},
-	Groupy: []*desc_test.RepeatedFields_GroupY{
+	Groupy: []*testprotos.RepeatedFields_GroupY{
 		{ Ya: proto.String("bedazzle"), Yb: proto.Int32(42) },
 		{ Ya: proto.String("buzzard"), Yb: proto.Int32(-421) },
 	},
-	Z: []desc_test.TestEnum{ desc_test.TestEnum_SECOND, desc_test.TestEnum_THIRD, desc_test.TestEnum_FIRST },
+	Z: []testprotos.TestEnum{ testprotos.TestEnum_SECOND, testprotos.TestEnum_THIRD, testprotos.TestEnum_FIRST },
 }
 
-var repeatedPackedFieldsMsg = &desc_test.RepeatedPackedFields{
+var repeatedPackedFieldsMsg = &testprotos.RepeatedPackedFields{
 	I: []int32{ 1, 2, 3 },
 	J: []int64{ 4, 5, 6 },
 	K: []int32{ 7, 8, 9 },
@@ -83,14 +83,14 @@ var repeatedPackedFieldsMsg = &desc_test.RepeatedPackedFields{
 	S: []float32{ 31, 32, 33 },
 	T: []float64{ 34, 35, 36 },
 	U: []bool{ true, false, true },
-	Groupy: []*desc_test.RepeatedPackedFields_GroupY{
+	Groupy: []*testprotos.RepeatedPackedFields_GroupY{
 		{ Yb: []int32{ 42, 84, 126, 168, 210 } },
 		{ Yb: []int32{ -210, -168, -126, -84, -42 } },
 	},
-	V: []desc_test.TestEnum{ desc_test.TestEnum_SECOND, desc_test.TestEnum_THIRD, desc_test.TestEnum_FIRST },
+	V: []testprotos.TestEnum{ testprotos.TestEnum_SECOND, testprotos.TestEnum_THIRD, testprotos.TestEnum_FIRST },
 }
 
-var mapKeyFieldsMsg = &desc_test.MapKeyFields{
+var mapKeyFieldsMsg = &testprotos.MapKeyFields{
 	I: map[int32]string{ 1: "foo", 2: "bar", 3: "baz" },
 	J: map[int64]string{ 4: "foo", 5: "bar", 6: "baz" },
 	K: map[int32]string{ 7: "foo", 8: "bar", 9: "baz" },
@@ -105,7 +105,7 @@ var mapKeyFieldsMsg = &desc_test.MapKeyFields{
 	T: map[bool]string{ true: "foo", false: "bar" },
 }
 
-var mapValueFieldsMsg = &desc_test.MapValFields{
+var mapValueFieldsMsg = &testprotos.MapValFields{
 	I: map[string]int32{ "a": 1, "b": 2, "c": 3 },
 	J: map[string]int64{ "a": 4, "b": 5, "c": 6 },
 	K: map[string]int32{ "a": 7, "b": 8, "c": 9 },
@@ -121,11 +121,11 @@ var mapValueFieldsMsg = &desc_test.MapValFields{
 	U: map[string][]byte{ "a": {0, 1, 2, 3}, "b": {4, 5, 6, 7}, "c": {8, 9, 10, 11} },
 	V: map[string]string{ "a": "foo", "b": "bar", "c": "baz" },
 	W: map[string]bool{ "a": true, "b": false, "c": true },
-	X: map[string]*desc_test.UnaryFields{
+	X: map[string]*testprotos.UnaryFields{
 		"a": { I: proto.Int32(-32), V: proto.String("baz") },
 		"b": { I: proto.Int32(-64), V: proto.String("bozo") },
 	},
-	Y: map[string]desc_test.TestEnum{ "a": desc_test.TestEnum_SECOND, "b": desc_test.TestEnum_THIRD, "c": desc_test.TestEnum_FIRST },
+	Y: map[string]testprotos.TestEnum{ "a": testprotos.TestEnum_SECOND, "b": testprotos.TestEnum_THIRD, "c": testprotos.TestEnum_FIRST },
 }
 
 func doTranslationParty(t *testing.T, msg proto.Message,

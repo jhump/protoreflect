@@ -1,8 +1,8 @@
 syntax = "proto2";
 
-package desc_test;
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
-option go_package = "github.com/jhump/protoreflect/desc/desc_test;desc_test";
+package testprotos;
 
 message UnaryFields {
 	optional int32 i = 1;

@@ -5,27 +5,27 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/jhump/protoreflect/desc/desc_test"
 	"github.com/jhump/protoreflect/internal/testutil"
+	"github.com/jhump/protoreflect/internal/testprotos"
 )
 
 type testService struct {
-	desc_test.TestServiceServer
+	testprotos.TestServiceServer
 }
 
 func TestLoadServiceDescriptors(t *testing.T) {
 	s := grpc.NewServer()
-	desc_test.RegisterTestServiceServer(s, testService{})
+	testprotos.RegisterTestServiceServer(s, testService{})
 	sds, err := LoadServiceDescriptors(s)
 	testutil.Ok(t, err)
 	testutil.Eq(t, 1, len(sds))
-	sd := sds["desc_test.TestService"]
+	sd := sds["testprotos.TestService"]
 
 	cases := []struct{ method, request, response string }{
-		{"DoSomething", "desc_test.TestRequest", "jhump.protoreflect.desc.Bar" },
-		{"DoSomethingElse", "desc_test.TestMessage", "desc_test.TestResponse" },
-		{"DoSomethingAgain", "jhump.protoreflect.desc.Bar", "desc_test.AnotherTestMessage" },
-		{"DoSomethingForever", "desc_test.TestRequest", "desc_test.TestResponse" },
+		{"DoSomething", "testprotos.TestRequest", "jhump.protoreflect.desc.Bar" },
+		{"DoSomethingElse", "testprotos.TestMessage", "testprotos.TestResponse" },
+		{"DoSomethingAgain", "jhump.protoreflect.desc.Bar", "testprotos.AnotherTestMessage" },
+		{"DoSomethingForever", "testprotos.TestRequest", "testprotos.TestResponse" },
 	}
 
 	testutil.Eq(t, len(cases), len(sd.GetMethods()))

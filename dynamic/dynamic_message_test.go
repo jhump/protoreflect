@@ -16,7 +16,7 @@ var typeOfGenericMap = reflect.TypeOf(map[interface{}]interface{}(nil))
 func TestGetSetClearScalarFields(t *testing.T) {
 	fd, err := desc.LoadFileDescriptor("desc_test_field_types.proto")
 	testutil.Ok(t, err)
-	md := fd.FindSymbol("desc_test.UnaryFields").(*desc.MessageDescriptor)
+	md := fd.FindSymbol("testprotos.UnaryFields").(*desc.MessageDescriptor)
 	dm := NewMessage(md)
 
 	inputs := map[reflect.Kind]struct {
@@ -112,7 +112,7 @@ func TestGetSetClearScalarFields(t *testing.T) {
 func TestGetSetClearRepeatedFields(t *testing.T) {
 	fd, err := desc.LoadFileDescriptor("desc_test_field_types.proto")
 	testutil.Ok(t, err)
-	md := fd.FindSymbol("desc_test.RepeatedFields").(*desc.MessageDescriptor)
+	md := fd.FindSymbol("testprotos.RepeatedFields").(*desc.MessageDescriptor)
 	dm := NewMessage(md)
 
 	inputs := map[reflect.Kind]interface{} {
@@ -231,7 +231,7 @@ func TestGetSetClearRepeatedFields(t *testing.T) {
 func TestGetSetClearMapFields_KeyTypes(t *testing.T) {
 	fd, err := desc.LoadFileDescriptor("desc_test_field_types.proto")
 	testutil.Ok(t, err)
-	md := fd.FindSymbol("desc_test.MapKeyFields").(*desc.MessageDescriptor)
+	md := fd.FindSymbol("testprotos.MapKeyFields").(*desc.MessageDescriptor)
 	dm := NewMessage(md)
 
 	inputs := map[reflect.Kind]interface{} {
@@ -342,7 +342,7 @@ func TestGetSetClearMapFields_KeyTypes(t *testing.T) {
 func TestGetSetClearMapFields_ValueTypes(t *testing.T) {
 	fd, err := desc.LoadFileDescriptor("desc_test_field_types.proto")
 	testutil.Ok(t, err)
-	md := fd.FindSymbol("desc_test.MapValFields").(*desc.MessageDescriptor)
+	md := fd.FindSymbol("testprotos.MapValFields").(*desc.MessageDescriptor)
 	dm := NewMessage(md)
 
 	inputs := map[reflect.Kind]interface{} {
