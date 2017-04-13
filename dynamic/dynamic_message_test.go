@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/testutil"
+	"github.com/jhump/protoreflect/internal/testutil"
 )
 
 var typeOfGenericSlice = reflect.TypeOf([]interface{}(nil))

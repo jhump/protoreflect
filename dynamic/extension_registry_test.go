@@ -6,7 +6,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/desc_test"
-	"github.com/jhump/protoreflect/testutil"
+	"github.com/jhump/protoreflect/internal/testutil"
 )
 
 func TestExtensionRegistry_AddExtension(t *testing.T) {

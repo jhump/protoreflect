@@ -6,7 +6,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/jhump/protoreflect/desc/desc_test"
-	"github.com/jhump/protoreflect/testutil"
+	"github.com/jhump/protoreflect/internal/testutil"
 )
 
 type testService struct {

@@ -10,7 +10,7 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc/desc_test"
-	"github.com/jhump/protoreflect/testutil"
+	"github.com/jhump/protoreflect/internal/testutil"
 )
 
 func TestFileDescriptorObjectGraph(t *testing.T) {
