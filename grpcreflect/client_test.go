@@ -13,8 +13,8 @@ import (
 	"google.golang.org/grpc/reflection"
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 
-	"github.com/jhump/protoreflect/internal/testutil"
 	"github.com/jhump/protoreflect/internal/testprotos"
+	"github.com/jhump/protoreflect/internal/testutil"
 )
 
 var client *Client
@@ -187,4 +187,3 @@ func TestRecover(t *testing.T) {
 	testutil.Ok(t, err)
 	testutil.Eq(t, true, client.stream != nil && client.stream != stream)
 }
-

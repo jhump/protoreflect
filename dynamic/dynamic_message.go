@@ -100,8 +100,8 @@ func NewMessage(md *desc.MessageDescriptor) *Message {
 
 func NewMessageWithExtensionRegistry(md *desc.MessageDescriptor, er *ExtensionRegistry) *Message {
 	return &Message{
-		md:     md,
-		er:     er,
+		md: md,
+		er: er,
 	}
 }
 
@@ -113,7 +113,7 @@ func (m *Message) GetKnownFields() []*desc.FieldDescriptor {
 	if len(m.extraFields) == 0 {
 		return m.md.GetFields()
 	}
-	flds := make([]*desc.FieldDescriptor, len(m.md.GetFields()) + len(m.extraFields))
+	flds := make([]*desc.FieldDescriptor, len(m.md.GetFields())+len(m.extraFields))
 	copy(flds, m.md.GetFields())
 	for _, fld := range m.extraFields {
 		flds = append(flds, fld)
@@ -207,13 +207,13 @@ func (m *Message) FindFieldDescriptorByName(name string) *desc.FieldDescriptor {
 			return nil
 		}
 		mustBeExt = true
-		name = name[1:len(name)-1]
+		name = name[1 : len(name)-1]
 	} else if name[0] == '[' {
 		if name[len(name)-1] != ']' {
 			// malformed name
 			return nil
 		}
-		name = name[1:len(name)-1]
+		name = name[1 : len(name)-1]
 	}
 	fd = m.er.FindExtensionByName(m.md.GetFullyQualifiedName(), name)
 	if fd != nil {
@@ -1347,7 +1347,7 @@ func convert(src, target reflect.Value) {
 			target.SetLen(newL)
 		}
 		for i := 0; i < src.Len(); i++ {
-			convert(src.Index(i), target.Index(l + i))
+			convert(src.Index(i), target.Index(l+i))
 		}
 	} else if targetType.Kind() == reflect.Map {
 		tkt := targetType.Key()

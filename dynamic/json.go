@@ -43,9 +43,13 @@ func (m *Message) MarshalJSONIndent() ([]byte, error) {
 
 func (m *Message) marshalJSON(b *indentBuffer) error {
 	err := b.WriteByte('{')
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = b.start()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	first := true
 	// first the known fields
@@ -55,15 +59,23 @@ func (m *Message) marshalJSON(b *indentBuffer) error {
 		fd := m.FindFieldDescriptor(itag)
 
 		err := b.maybeNext(&first)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		err = marshalKnownFieldJSON(b, fd, v)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 
 	err = b.end()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = b.WriteByte('}')
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -74,15 +86,23 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 		jsonName = fd.GetName()
 	}
 	err := writeJsonString(b, jsonName)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = b.sep()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	if fd.IsMap() {
 		err = b.WriteByte('{')
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		err = b.start()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		md := fd.GetMessageType()
 		kfd := md.FindFieldByNumber(1)
@@ -99,42 +119,62 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 			for _, mk := range keys {
 				mv := mp[mk]
 				err := b.maybeNext(&first)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 
 				err = marshalKnownFieldMapEntryJSON(b, kfd, mk, vfd, mv)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			first := true
 			for mk, mv := range mp {
 				err := b.maybeNext(&first)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				err = marshalKnownFieldMapEntryJSON(b, kfd, mk, vfd, mv)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 			}
 		}
 
 		err = b.end()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		return b.WriteByte('}')
 
 	} else if fd.IsRepeated() {
 		err = b.WriteByte('[')
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		err = b.start()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		sl := v.([]interface{})
 		first := true
 		for _, slv := range sl {
 			err := b.maybeNext(&first)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			err = marshalKnownFieldValueJSON(b, fd, slv)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 
 		err = b.end()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		return b.WriteByte(']')
 
 	} else {
@@ -158,9 +198,13 @@ func marshalKnownFieldMapEntryJSON(b *indentBuffer, kfd *desc.FieldDescriptor, m
 		return fmt.Errorf("Invalid map key value: %v (%v)", mk, rk.Type())
 	}
 	err := writeString(b, strkey)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = b.sep()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	return marshalKnownFieldValueJSON(b, vfd, mv)
 }
 
@@ -228,7 +272,9 @@ func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v int
 			} else {
 				m := jsonpb.Marshaler{Indent: "  "}
 				str, err := m.MarshalToString(v.(proto.Message))
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				indent := strings.Repeat("  ", b.indent)
 				pos := 0
 				// add indention prefix to each line
@@ -242,9 +288,13 @@ func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v int
 					}
 					line := str[start:pos]
 					_, err = b.WriteString(indent)
-					if err != nil { return err }
+					if err != nil {
+						return err
+					}
 					_, err = b.WriteString(line)
-					if err != nil { return err }
+					if err != nil {
+						return err
+					}
 				}
 			}
 			return err
@@ -270,7 +320,7 @@ func (m *Message) UnmarshalJSON(js []byte) error {
 }
 
 func (m *Message) UnmarshalMergeJSON(js []byte) error {
-	r := &jsReader{ dec: json.NewDecoder(bytes.NewReader(js)) }
+	r := &jsReader{dec: json.NewDecoder(bytes.NewReader(js))}
 	r.dec.UseNumber()
 	err := m.unmarshalJson(r)
 	if err != nil {
@@ -424,7 +474,7 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, er *ExtensionRegist
 			return nil, nil
 		}
 		if fd.IsRepeated() {
-			return []interface{} { v }, nil
+			return []interface{}{v}, nil
 		} else {
 			return v, nil
 		}
