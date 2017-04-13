@@ -14,7 +14,7 @@ import (
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 
 	"github.com/jhump/protoreflect/desc/desc_test"
-	"github.com/jhump/protoreflect/testutil"
+	"github.com/jhump/protoreflect/internal/testutil"
 )
 
 var client *Client
