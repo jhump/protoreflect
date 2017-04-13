@@ -22,7 +22,7 @@ type codedBuffer struct {
 }
 
 func newCodedBuffer(buf []byte) *codedBuffer {
-	return &codedBuffer { buf: buf }
+	return &codedBuffer{buf: buf}
 }
 
 func (p *codedBuffer) reset() {
@@ -162,7 +162,7 @@ func (p *codedBuffer) decodeVarint() (uint64, error) {
 
 	return 0, ErrOverflow
 
-	done:
+done:
 	p.index = i
 	return x, nil
 }
@@ -317,7 +317,7 @@ func (p *codedBuffer) encodeFixed32(x uint64) error {
 }
 
 func encodeZigZag64(v int64) uint64 {
-	return (uint64(v) << 1) ^ uint64(v >> 63)
+	return (uint64(v) << 1) ^ uint64(v>>63)
 }
 
 func encodeZigZag32(v int32) uint64 {

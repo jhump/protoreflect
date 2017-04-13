@@ -58,31 +58,47 @@ func (m *Message) marshalText(b *indentBuffer) error {
 				for _, mk := range keys {
 					mv := mp[mk]
 					err := b.maybeNext(&first)
-					if err != nil { return err }
+					if err != nil {
+						return err
+					}
 					err = marshalKnownFieldMapEntryText(b, fd, kfd, mk, vfd, mv)
-					if err != nil { return err }
+					if err != nil {
+						return err
+					}
 				}
 			} else {
 				for mk, mv := range mp {
 					err := b.maybeNext(&first)
-					if err != nil { return err }
+					if err != nil {
+						return err
+					}
 					err = marshalKnownFieldMapEntryText(b, fd, kfd, mk, vfd, mv)
-					if err != nil { return err }
+					if err != nil {
+						return err
+					}
 				}
 			}
 		} else if fd.IsRepeated() {
 			sl := v.([]interface{})
 			for _, slv := range sl {
 				err := b.maybeNext(&first)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				err = marshalKnownFieldText(b, fd, slv)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			err := b.maybeNext(&first)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			err = marshalKnownFieldText(b, fd, v)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 	}
 	// then the unknown fields
@@ -91,25 +107,41 @@ func (m *Message) marshalText(b *indentBuffer) error {
 		ufs := m.unknownFields[itag]
 		for _, uf := range ufs {
 			err := b.maybeNext(&first)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			_, err = fmt.Fprintf(b, "%d", tag)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			if uf.Encoding == proto.WireStartGroup {
 				err = b.WriteByte('{')
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				err = b.start()
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				in := newCodedBuffer(uf.Contents)
 				err = marshalUnknownGroupText(b, in, true)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				err = b.end()
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				err = b.WriteByte('}')
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				continue
 			} else {
 				err = b.sep()
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				if uf.Encoding == proto.WireBytes {
 					return writeString(b, string(uf.Contents))
 				} else {
@@ -130,24 +162,40 @@ func marshalKnownFieldMapEntryText(b *indentBuffer, fd *desc.FieldDescriptor, kf
 		name = fd.GetName()
 	}
 	_, err := b.WriteString(name)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = b.sep()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	err = b.WriteByte('<')
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = b.start()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	err = marshalKnownFieldText(b, kfd, mk)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = b.next()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = marshalKnownFieldText(b, vfd, mv)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	err = b.end()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	return b.WriteByte('>')
 }
 
@@ -161,7 +209,9 @@ func marshalKnownFieldText(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 			name = fd.GetMessageType().GetName()
 		}
 		_, err := b.WriteString(name)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	} else {
 		var name string
 		if fd.IsExtension() {
@@ -170,9 +220,13 @@ func marshalKnownFieldText(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 			name = fd.GetName()
 		}
 		_, err := b.WriteString(name)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		err = b.sep()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
@@ -229,19 +283,29 @@ func marshalKnownFieldText(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 		} else {
 			err = b.WriteByte('<')
 		}
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		err = b.start()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		// must be a message
 		if dm, ok := v.(*Message); ok {
 			err = dm.marshalText(b)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		} else {
 			err = proto.MarshalText(b, v.(proto.Message))
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 		err = b.end()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		if group {
 			return b.WriteByte('}')
 		} else {
@@ -302,32 +366,52 @@ func marshalUnknownGroupText(b *indentBuffer, in *codedBuffer, topLevel bool) er
 			return io.ErrUnexpectedEOF
 		}
 		tag, wireType, err := in.decodeTagAndWireType()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		if wireType == proto.WireEndGroup {
 			return nil
 		}
 		err = b.maybeNext(&first)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		_, err = fmt.Fprintf(b, "%d", tag)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		if wireType == proto.WireStartGroup {
 			err = b.WriteByte('{')
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			err = b.start()
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			err = marshalUnknownGroupText(b, in, false)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			err = b.end()
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			err = b.WriteByte('}')
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			continue
 		} else {
 			err = b.sep()
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			if wireType == proto.WireBytes {
 				contents, err := in.decodeRawBytes(false)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				return writeString(b, string(contents))
 			} else {
 				var v uint64
@@ -341,7 +425,9 @@ func marshalUnknownGroupText(b *indentBuffer, in *codedBuffer, topLevel bool) er
 				default:
 					return proto.ErrInternalBadWireType
 				}
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				_, err = b.WriteString(strconv.FormatUint(v, 10))
 				return err
 			}
@@ -471,8 +557,9 @@ func textError(tok *token, format string, args ...interface{}) error {
 }
 
 type setFunction func(*Message, *desc.FieldDescriptor, interface{}) error
+
 var (
-	setUnaryField = (*Message).TrySetField
+	setUnaryField    = (*Message).TrySetField
 	setRepeatedField = (*Message).TryAddRepeatedField
 )
 
@@ -791,17 +878,17 @@ func newReader(text []byte) *txtReader {
 	sc := scanner.Scanner{}
 	sc.Init(bytes.NewReader(text))
 	sc.Mode = scanner.ScanIdents | scanner.ScanInts | scanner.ScanFloats | scanner.ScanChars |
-			scanner.ScanStrings | scanner.ScanComments | scanner.SkipComments
+		scanner.ScanStrings | scanner.ScanComments | scanner.SkipComments
 	// identifiers are same restrictions as Go identifiers, except we also allow dots since
 	// we accept fully-qualified names
 	sc.IsIdentRune = func(ch rune, i int) bool {
 		return ch == '_' || unicode.IsLetter(ch) ||
-				(i > 0 && unicode.IsDigit(ch)) ||
-				(i > 0 && ch == '.')
+			(i > 0 && unicode.IsDigit(ch)) ||
+			(i > 0 && ch == '.')
 	}
 	// ignore errors; we handle them if/when we see malformed tokens
-	sc.Error = func (s *scanner.Scanner, msg string) {}
-	return &txtReader {	scanner: sc	}
+	sc.Error = func(s *scanner.Scanner, msg string) {}
+	return &txtReader{scanner: sc}
 }
 
 func (p *txtReader) peek() *token {

@@ -257,7 +257,7 @@ func (cr *Client) cacheMessageLocked(fd *desc.FileDescriptor, md *desc.MessageDe
 			cr.filesBySymbol[v.GetFullyQualifiedName()] = fd
 		}
 	}
-	for _, e := range md.GetNestedExtensions()  {
+	for _, e := range md.GetNestedExtensions() {
 		cr.filesBySymbol[e.GetFullyQualifiedName()] = fd
 		cr.filesByExtension[extDesc{e.GetOwner().GetFullyQualifiedName(), e.GetNumber()}] = fd
 	}

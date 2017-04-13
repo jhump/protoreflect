@@ -17,7 +17,7 @@ type ExtensionRegistry struct {
 }
 
 func NewRegistryWithDefaults() *ExtensionRegistry {
-	return &ExtensionRegistry{ includeDefault: true }
+	return &ExtensionRegistry{includeDefault: true}
 }
 
 func (r *ExtensionRegistry) AddExtensionDesc(exts ...*proto.ExtensionDesc) error {
@@ -48,7 +48,7 @@ func asFieldDescriptor(ext *proto.ExtensionDesc) (*desc.FieldDescriptor, error) 
 	field, ok := file.FindSymbol(ext.Name).(*desc.FieldDescriptor)
 	// make sure descriptor agrees with attributes of the ExtensionDesc
 	if !ok || !field.IsExtension() || field.GetOwner().GetFullyQualifiedName() != proto.MessageName(ext.ExtendedType) ||
-			field.GetNumber() != ext.Field {
+		field.GetNumber() != ext.Field {
 		return nil, fmt.Errorf("File descriptor contained unexpected object with name %s:", ext.Name)
 	}
 	return field, nil
@@ -162,7 +162,7 @@ func (r *ExtensionRegistry) AllExtensionsForType(messageName string) []*desc.Fie
 	if r.includeDefault {
 		exts := getDefaultExtensions(messageName)
 		if len(exts) > 0 || len(flds) > 0 {
-			ret = make([]*desc.FieldDescriptor, 0, len(exts) + len(flds))
+			ret = make([]*desc.FieldDescriptor, 0, len(exts)+len(flds))
 		}
 		for tag, ext := range exts {
 			if _, ok := flds[tag]; ok {

@@ -22,10 +22,10 @@ func TestLoadServiceDescriptors(t *testing.T) {
 	sd := sds["desc_test.TestService"]
 
 	cases := []struct{ method, request, response string }{
-		{"DoSomething", "desc_test.TestRequest", "jhump.protoreflect.desc.Bar" },
-		{"DoSomethingElse", "desc_test.TestMessage", "desc_test.TestResponse" },
-		{"DoSomethingAgain", "jhump.protoreflect.desc.Bar", "desc_test.AnotherTestMessage" },
-		{"DoSomethingForever", "desc_test.TestRequest", "desc_test.TestResponse" },
+		{"DoSomething", "desc_test.TestRequest", "jhump.protoreflect.desc.Bar"},
+		{"DoSomethingElse", "desc_test.TestMessage", "desc_test.TestResponse"},
+		{"DoSomethingAgain", "jhump.protoreflect.desc.Bar", "desc_test.AnotherTestMessage"},
+		{"DoSomethingForever", "desc_test.TestRequest", "desc_test.TestResponse"},
 	}
 
 	testutil.Eq(t, len(cases), len(sd.GetMethods()))
