@@ -31,7 +31,7 @@ func main() {
 	}
 	// and also to extract package for generated file
 	fd := fileset.GetFile()[0]
-	pkg := fd.GetOptions().GetGoPackage();
+	pkg := fd.GetOptions().GetGoPackage()
 	if pkg == "" {
 		pkg = fd.GetPackage()
 	} else {

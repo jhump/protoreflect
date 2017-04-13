@@ -9,7 +9,7 @@ import (
 )
 
 // very simple test service that just echos back request payloads
-type TestService struct {}
+type TestService struct{}
 
 func (_ TestService) EmptyCall(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
 	return &grpc_testing.Empty{}, nil
@@ -34,8 +34,12 @@ func (_ TestService) StreamingInputCall(ss grpc_testing.TestService_StreamingInp
 	sz := 0
 	for {
 		req, err := ss.Recv()
-		if err == io.EOF { break }
-		if err != nil { return err }
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
 		sz += len(req.Payload.GetBody())
 	}
 	return ss.SendAndClose(&grpc_testing.StreamingInputCallResponse{
@@ -46,13 +50,19 @@ func (_ TestService) StreamingInputCall(ss grpc_testing.TestService_StreamingInp
 func (_ TestService) FullDuplexCall(ss grpc_testing.TestService_FullDuplexCallServer) error {
 	for {
 		req, err := ss.Recv()
-		if err == io.EOF { return nil }
-		if err != nil { return err }
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
 
 		err = ss.Send(&grpc_testing.StreamingOutputCallResponse{
 			Payload: req.Payload,
 		})
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 }
 
@@ -60,8 +70,12 @@ func (_ TestService) HalfDuplexCall(ss grpc_testing.TestService_HalfDuplexCallSe
 	var data []*grpc_testing.Payload
 	for {
 		req, err := ss.Recv()
-		if err == io.EOF { break }
-		if err != nil { return err }
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
 		data = append(data, req.Payload)
 	}
 
@@ -69,7 +83,9 @@ func (_ TestService) HalfDuplexCall(ss grpc_testing.TestService_HalfDuplexCallSe
 		err := ss.Send(&grpc_testing.StreamingOutputCallResponse{
 			Payload: d,
 		})
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -22,38 +22,38 @@ func TestGetSetClearScalarFields(t *testing.T) {
 	inputs := map[reflect.Kind]struct {
 		input interface{}
 		zero  interface{}
-	} {
-		reflect.Bool:    { input: true, zero: false },
-		reflect.Int32:   { input: int32(-12), zero: int32(0) },
-		reflect.Int64:   { input: int64(-1234), zero: int64(0) },
-		reflect.Uint32:  { input: uint32(45), zero: uint32(0) },
-		reflect.Uint64:  { input: uint64(4567), zero: uint64(0) },
-		reflect.Float32: { input: float32(2.718), zero: float32(0) },
-		reflect.Float64: { input: float64(3.14159), zero: float64(0) },
-		reflect.String:  { input: "foobar", zero: "" },
-		reflect.Slice:   { input: []byte("snafu"), zero: []byte(nil) },
+	}{
+		reflect.Bool:    {input: true, zero: false},
+		reflect.Int32:   {input: int32(-12), zero: int32(0)},
+		reflect.Int64:   {input: int64(-1234), zero: int64(0)},
+		reflect.Uint32:  {input: uint32(45), zero: uint32(0)},
+		reflect.Uint64:  {input: uint64(4567), zero: uint64(0)},
+		reflect.Float32: {input: float32(2.718), zero: float32(0)},
+		reflect.Float64: {input: float64(3.14159), zero: float64(0)},
+		reflect.String:  {input: "foobar", zero: ""},
+		reflect.Slice:   {input: []byte("snafu"), zero: []byte(nil)},
 	}
 
 	cases := []struct {
 		kind      reflect.Kind
 		tagNumber int
 		fieldName string
-	} {
-		{ kind: reflect.Int32, tagNumber: 1, fieldName: "i" },
-		{ kind: reflect.Int64, tagNumber: 2, fieldName: "j" },
-		{ kind: reflect.Int32, tagNumber: 3, fieldName: "k" },
-		{ kind: reflect.Int64, tagNumber: 4, fieldName: "l" },
-		{ kind: reflect.Uint32, tagNumber: 5, fieldName: "m" },
-		{ kind: reflect.Uint64, tagNumber: 6, fieldName: "n" },
-		{ kind: reflect.Uint32, tagNumber: 7, fieldName: "o" },
-		{ kind: reflect.Uint64, tagNumber: 8, fieldName: "p" },
-		{ kind: reflect.Int32, tagNumber: 9, fieldName: "q" },
-		{ kind: reflect.Int64, tagNumber: 10, fieldName: "r" },
-		{ kind: reflect.Float32, tagNumber: 11, fieldName: "s" },
-		{ kind: reflect.Float64, tagNumber: 12, fieldName: "t" },
-		{ kind: reflect.Slice, tagNumber: 13, fieldName: "u" },
-		{ kind: reflect.String, tagNumber: 14, fieldName: "v" },
-		{ kind: reflect.Bool, tagNumber: 15, fieldName: "w" },
+	}{
+		{kind: reflect.Int32, tagNumber: 1, fieldName: "i"},
+		{kind: reflect.Int64, tagNumber: 2, fieldName: "j"},
+		{kind: reflect.Int32, tagNumber: 3, fieldName: "k"},
+		{kind: reflect.Int64, tagNumber: 4, fieldName: "l"},
+		{kind: reflect.Uint32, tagNumber: 5, fieldName: "m"},
+		{kind: reflect.Uint64, tagNumber: 6, fieldName: "n"},
+		{kind: reflect.Uint32, tagNumber: 7, fieldName: "o"},
+		{kind: reflect.Uint64, tagNumber: 8, fieldName: "p"},
+		{kind: reflect.Int32, tagNumber: 9, fieldName: "q"},
+		{kind: reflect.Int64, tagNumber: 10, fieldName: "r"},
+		{kind: reflect.Float32, tagNumber: 11, fieldName: "s"},
+		{kind: reflect.Float64, tagNumber: 12, fieldName: "t"},
+		{kind: reflect.Slice, tagNumber: 13, fieldName: "u"},
+		{kind: reflect.String, tagNumber: 14, fieldName: "v"},
+		{kind: reflect.Bool, tagNumber: 15, fieldName: "w"},
 	}
 
 	for _, c := range cases {
@@ -115,7 +115,7 @@ func TestGetSetClearRepeatedFields(t *testing.T) {
 	md := fd.FindSymbol("testprotos.RepeatedFields").(*desc.MessageDescriptor)
 	dm := NewMessage(md)
 
-	inputs := map[reflect.Kind]interface{} {
+	inputs := map[reflect.Kind]interface{}{
 		reflect.Bool:    true,
 		reflect.Int32:   int32(-12),
 		reflect.Int64:   int64(-1234),
@@ -127,14 +127,14 @@ func TestGetSetClearRepeatedFields(t *testing.T) {
 		reflect.Slice:   []byte("snafu"),
 	}
 
-	sliceKinds := []func(interface{}) interface{} {
+	sliceKinds := []func(interface{}) interface{}{
 		// index 0 will not work since it doesn't return a slice
 		func(v interface{}) interface{} {
 			return v
 		},
 		func(v interface{}) interface{} {
 			// generic slice
-			return []interface{} { v, v, v }
+			return []interface{}{v, v, v}
 		},
 		func(v interface{}) interface{} {
 			// slice element type is the same as value type
@@ -151,22 +151,22 @@ func TestGetSetClearRepeatedFields(t *testing.T) {
 		kind      reflect.Kind
 		tagNumber int
 		fieldName string
-	} {
-		{ kind: reflect.Int32, tagNumber: 1, fieldName: "i" },
-		{ kind: reflect.Int64, tagNumber: 2, fieldName: "j" },
-		{ kind: reflect.Int32, tagNumber: 3, fieldName: "k" },
-		{ kind: reflect.Int64, tagNumber: 4, fieldName: "l" },
-		{ kind: reflect.Uint32, tagNumber: 5, fieldName: "m" },
-		{ kind: reflect.Uint64, tagNumber: 6, fieldName: "n" },
-		{ kind: reflect.Uint32, tagNumber: 7, fieldName: "o" },
-		{ kind: reflect.Uint64, tagNumber: 8, fieldName: "p" },
-		{ kind: reflect.Int32, tagNumber: 9, fieldName: "q" },
-		{ kind: reflect.Int64, tagNumber: 10, fieldName: "r" },
-		{ kind: reflect.Float32, tagNumber: 11, fieldName: "s" },
-		{ kind: reflect.Float64, tagNumber: 12, fieldName: "t" },
-		{ kind: reflect.Slice, tagNumber: 13, fieldName: "u" },
-		{ kind: reflect.String, tagNumber: 14, fieldName: "v" },
-		{ kind: reflect.Bool, tagNumber: 15, fieldName: "w" },
+	}{
+		{kind: reflect.Int32, tagNumber: 1, fieldName: "i"},
+		{kind: reflect.Int64, tagNumber: 2, fieldName: "j"},
+		{kind: reflect.Int32, tagNumber: 3, fieldName: "k"},
+		{kind: reflect.Int64, tagNumber: 4, fieldName: "l"},
+		{kind: reflect.Uint32, tagNumber: 5, fieldName: "m"},
+		{kind: reflect.Uint64, tagNumber: 6, fieldName: "n"},
+		{kind: reflect.Uint32, tagNumber: 7, fieldName: "o"},
+		{kind: reflect.Uint64, tagNumber: 8, fieldName: "p"},
+		{kind: reflect.Int32, tagNumber: 9, fieldName: "q"},
+		{kind: reflect.Int64, tagNumber: 10, fieldName: "r"},
+		{kind: reflect.Float32, tagNumber: 11, fieldName: "s"},
+		{kind: reflect.Float64, tagNumber: 12, fieldName: "t"},
+		{kind: reflect.Slice, tagNumber: 13, fieldName: "u"},
+		{kind: reflect.String, tagNumber: 14, fieldName: "v"},
+		{kind: reflect.Bool, tagNumber: 15, fieldName: "w"},
 	}
 
 	zero := reflect.Zero(typeOfGenericSlice).Interface()
@@ -234,23 +234,23 @@ func TestGetSetClearMapFields_KeyTypes(t *testing.T) {
 	md := fd.FindSymbol("testprotos.MapKeyFields").(*desc.MessageDescriptor)
 	dm := NewMessage(md)
 
-	inputs := map[reflect.Kind]interface{} {
-		reflect.Bool:    true,
-		reflect.Int32:   int32(-12),
-		reflect.Int64:   int64(-1234),
-		reflect.Uint32:  uint32(45),
-		reflect.Uint64:  uint64(4567),
-		reflect.String:  "foobar",
+	inputs := map[reflect.Kind]interface{}{
+		reflect.Bool:   true,
+		reflect.Int32:  int32(-12),
+		reflect.Int64:  int64(-1234),
+		reflect.Uint32: uint32(45),
+		reflect.Uint64: uint64(4567),
+		reflect.String: "foobar",
 	}
 
-	mapKinds := []func(interface{}) interface{} {
+	mapKinds := []func(interface{}) interface{}{
 		// index 0 will not work since it doesn't return a map
 		func(v interface{}) interface{} {
 			return v
 		},
 		func(v interface{}) interface{} {
 			// generic slice
-			return map[interface{}]interface{} { v: "foo" }
+			return map[interface{}]interface{}{v: "foo"}
 		},
 		func(v interface{}) interface{} {
 			// specific key and value types
@@ -265,19 +265,19 @@ func TestGetSetClearMapFields_KeyTypes(t *testing.T) {
 		kind      reflect.Kind
 		tagNumber int
 		fieldName string
-	} {
-		{ kind: reflect.Int32, tagNumber: 1, fieldName: "i" },
-		{ kind: reflect.Int64, tagNumber: 2, fieldName: "j" },
-		{ kind: reflect.Int32, tagNumber: 3, fieldName: "k" },
-		{ kind: reflect.Int64, tagNumber: 4, fieldName: "l" },
-		{ kind: reflect.Uint32, tagNumber: 5, fieldName: "m" },
-		{ kind: reflect.Uint64, tagNumber: 6, fieldName: "n" },
-		{ kind: reflect.Uint32, tagNumber: 7, fieldName: "o" },
-		{ kind: reflect.Uint64, tagNumber: 8, fieldName: "p" },
-		{ kind: reflect.Int32, tagNumber: 9, fieldName: "q" },
-		{ kind: reflect.Int64, tagNumber: 10, fieldName: "r" },
-		{ kind: reflect.String, tagNumber: 11, fieldName: "s" },
-		{ kind: reflect.Bool, tagNumber: 12, fieldName: "t" },
+	}{
+		{kind: reflect.Int32, tagNumber: 1, fieldName: "i"},
+		{kind: reflect.Int64, tagNumber: 2, fieldName: "j"},
+		{kind: reflect.Int32, tagNumber: 3, fieldName: "k"},
+		{kind: reflect.Int64, tagNumber: 4, fieldName: "l"},
+		{kind: reflect.Uint32, tagNumber: 5, fieldName: "m"},
+		{kind: reflect.Uint64, tagNumber: 6, fieldName: "n"},
+		{kind: reflect.Uint32, tagNumber: 7, fieldName: "o"},
+		{kind: reflect.Uint64, tagNumber: 8, fieldName: "p"},
+		{kind: reflect.Int32, tagNumber: 9, fieldName: "q"},
+		{kind: reflect.Int64, tagNumber: 10, fieldName: "r"},
+		{kind: reflect.String, tagNumber: 11, fieldName: "s"},
+		{kind: reflect.Bool, tagNumber: 12, fieldName: "t"},
 	}
 
 	zero := reflect.Zero(typeOfGenericMap).Interface()
@@ -345,7 +345,7 @@ func TestGetSetClearMapFields_ValueTypes(t *testing.T) {
 	md := fd.FindSymbol("testprotos.MapValFields").(*desc.MessageDescriptor)
 	dm := NewMessage(md)
 
-	inputs := map[reflect.Kind]interface{} {
+	inputs := map[reflect.Kind]interface{}{
 		reflect.Bool:    true,
 		reflect.Int32:   int32(-12),
 		reflect.Int64:   int64(-1234),
@@ -357,14 +357,14 @@ func TestGetSetClearMapFields_ValueTypes(t *testing.T) {
 		reflect.Slice:   []byte("snafu"),
 	}
 
-	mapKinds := []func(interface{}) interface{} {
+	mapKinds := []func(interface{}) interface{}{
 		// index 0 will not work since it doesn't return a map
 		func(v interface{}) interface{} {
 			return v
 		},
 		func(v interface{}) interface{} {
 			// generic slice
-			return map[interface{}]interface{} { "foo": v, "bar": v, "baz": v }
+			return map[interface{}]interface{}{"foo": v, "bar": v, "baz": v}
 		},
 		func(v interface{}) interface{} {
 			// specific key and value types
@@ -381,22 +381,22 @@ func TestGetSetClearMapFields_ValueTypes(t *testing.T) {
 		kind      reflect.Kind
 		tagNumber int
 		fieldName string
-	} {
-		{ kind: reflect.Int32, tagNumber: 1, fieldName: "i" },
-		{ kind: reflect.Int64, tagNumber: 2, fieldName: "j" },
-		{ kind: reflect.Int32, tagNumber: 3, fieldName: "k" },
-		{ kind: reflect.Int64, tagNumber: 4, fieldName: "l" },
-		{ kind: reflect.Uint32, tagNumber: 5, fieldName: "m" },
-		{ kind: reflect.Uint64, tagNumber: 6, fieldName: "n" },
-		{ kind: reflect.Uint32, tagNumber: 7, fieldName: "o" },
-		{ kind: reflect.Uint64, tagNumber: 8, fieldName: "p" },
-		{ kind: reflect.Int32, tagNumber: 9, fieldName: "q" },
-		{ kind: reflect.Int64, tagNumber: 10, fieldName: "r" },
-		{ kind: reflect.Float32, tagNumber: 11, fieldName: "s" },
-		{ kind: reflect.Float64, tagNumber: 12, fieldName: "t" },
-		{ kind: reflect.Slice, tagNumber: 13, fieldName: "u" },
-		{ kind: reflect.String, tagNumber: 14, fieldName: "v" },
-		{ kind: reflect.Bool, tagNumber: 15, fieldName: "w" },
+	}{
+		{kind: reflect.Int32, tagNumber: 1, fieldName: "i"},
+		{kind: reflect.Int64, tagNumber: 2, fieldName: "j"},
+		{kind: reflect.Int32, tagNumber: 3, fieldName: "k"},
+		{kind: reflect.Int64, tagNumber: 4, fieldName: "l"},
+		{kind: reflect.Uint32, tagNumber: 5, fieldName: "m"},
+		{kind: reflect.Uint64, tagNumber: 6, fieldName: "n"},
+		{kind: reflect.Uint32, tagNumber: 7, fieldName: "o"},
+		{kind: reflect.Uint64, tagNumber: 8, fieldName: "p"},
+		{kind: reflect.Int32, tagNumber: 9, fieldName: "q"},
+		{kind: reflect.Int64, tagNumber: 10, fieldName: "r"},
+		{kind: reflect.Float32, tagNumber: 11, fieldName: "s"},
+		{kind: reflect.Float64, tagNumber: 12, fieldName: "t"},
+		{kind: reflect.Slice, tagNumber: 13, fieldName: "u"},
+		{kind: reflect.String, tagNumber: 14, fieldName: "v"},
+		{kind: reflect.Bool, tagNumber: 15, fieldName: "w"},
 	}
 
 	zero := reflect.Zero(typeOfGenericMap).Interface()

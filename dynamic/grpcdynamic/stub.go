@@ -59,7 +59,7 @@ func (s Stub) InvokeRpcServerStream(ctx context.Context, method *desc.MethodDesc
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	sd := grpc.StreamDesc{
-		StreamName: method.GetName(),
+		StreamName:    method.GetName(),
 		ServerStreams: method.IsServerStreaming(),
 		ClientStreams: method.IsClientStreaming(),
 	}
@@ -88,7 +88,7 @@ func (s Stub) InvokeRpcClientStream(ctx context.Context, method *desc.MethodDesc
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	sd := grpc.StreamDesc{
-		StreamName: method.GetName(),
+		StreamName:    method.GetName(),
 		ServerStreams: method.IsServerStreaming(),
 		ClientStreams: method.IsClientStreaming(),
 	}
@@ -106,7 +106,7 @@ func (s Stub) InvokeRpcBidiStream(ctx context.Context, method *desc.MethodDescri
 		return nil, fmt.Errorf("InvokeRpcBidiStream is for bidi-streaming methods; %q is %s", method.GetFullyQualifiedName(), methodType(method))
 	}
 	sd := grpc.StreamDesc{
-		StreamName: method.GetName(),
+		StreamName:    method.GetName(),
 		ServerStreams: method.IsServerStreaming(),
 		ClientStreams: method.IsClientStreaming(),
 	}
@@ -158,7 +158,7 @@ func (s *ServerStream) Header() (metadata.MD, error) {
 
 // Trailer returns the trailer metadata sent by the server. It must only be called after
 // RecvMsg returns a non-nil error (which may be EOF for normal completion of stream).
-func (s *ServerStream) Trailer() (metadata.MD) {
+func (s *ServerStream) Trailer() metadata.MD {
 	return s.stream.Trailer()
 }
 
@@ -180,10 +180,10 @@ func (s *ServerStream) RecvMsg() (*dynamic.Message, error) {
 }
 
 type ClientStream struct {
-	stream   grpc.ClientStream
-	method   *desc.MethodDescriptor
-	er       *dynamic.ExtensionRegistry
-	cancel   context.CancelFunc
+	stream grpc.ClientStream
+	method *desc.MethodDescriptor
+	er     *dynamic.ExtensionRegistry
+	cancel context.CancelFunc
 }
 
 // Header returns any header metadata sent by the server (blocks if necessary until headers are
@@ -194,7 +194,7 @@ func (s *ClientStream) Header() (metadata.MD, error) {
 
 // Trailer returns the trailer metadata sent by the server. It must only be called after
 // RecvMsg returns a non-nil error (which may be EOF for normal completion of stream).
-func (s *ClientStream) Trailer() (metadata.MD) {
+func (s *ClientStream) Trailer() metadata.MD {
 	return s.stream.Trailer()
 }
 
@@ -251,7 +251,7 @@ func (s *BidiStream) Header() (metadata.MD, error) {
 
 // Trailer returns the trailer metadata sent by the server. It must only be called after
 // RecvMsg returns a non-nil error (which may be EOF for normal completion of stream).
-func (s *BidiStream) Trailer() (metadata.MD) {
+func (s *BidiStream) Trailer() metadata.MD {
 	return s.stream.Trailer()
 }
 
@@ -285,4 +285,3 @@ func (s *BidiStream) RecvMsg() (*dynamic.Message, error) {
 		return resp, nil
 	}
 }
-

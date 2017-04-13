@@ -3,8 +3,8 @@ package dynamic
 import (
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/jsonpb"
+	"github.com/golang/protobuf/proto"
 )
 
 func TestUnaryFieldsJSON(t *testing.T) {
