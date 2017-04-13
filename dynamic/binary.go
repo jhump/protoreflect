@@ -585,9 +585,9 @@ func (m *Message) unmarshalKnownField(fd *desc.FieldDescriptor, encoding int8, b
 		if t.Kind() == reflect.Slice && t != typeOfBytes {
 			// append slices if we unmarshalled a packed repeated field
 			sl := val.([]interface{})
-			m.values[fd.GetNumber()] = append(existing, sl...)
+			m.internalSetField(fd, append(existing, sl...))
 		} else {
-			m.values[fd.GetNumber()] = append(existing, val)
+			m.internalSetField(fd, append(existing, val))
 		}
 	} else {
 		m.internalSetField(fd, val)
