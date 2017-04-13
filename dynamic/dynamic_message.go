@@ -359,7 +359,13 @@ func (m *Message) setField(fd *desc.FieldDescriptor, val interface{}) error {
 func (m *Message) internalSetField(fd *desc.FieldDescriptor, val interface{}) {
 	if m.md.IsProto3() {
 		// proto3 considers fields that are set to their zero value as unset
-		if fd.GetDefaultValue() == val {
+		if fd.IsRepeated() {
+			// can't use == comparison below for map and slices, so just test length
+			// (zero length is same as default)
+			if reflect.ValueOf(val).Len() == 0 {
+				return
+			}
+		} else if fd.GetDefaultValue() == val {
 			return
 		}
 	}
