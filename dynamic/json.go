@@ -22,6 +22,11 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
+type MarshalJSONOpts struct {
+	Indent       bool
+	EmitDefaults bool
+}
+
 func (m *Message) MarshalJSON() ([]byte, error) {
 	var b indentBuffer
 	b.indent = -1 // no indentation
