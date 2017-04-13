@@ -1568,12 +1568,35 @@ func (m *Message) knownFieldTags() []int {
 	if len(m.values) == 0 {
 		return []int(nil)
 	}
+
 	keys := make([]int, len(m.values))
 	i := 0
 	for k := range m.values {
 		keys[i] = int(k)
 		i++
 	}
+
+	sort.Ints(keys)
+	return keys
+}
+
+// allKnownFieldTags return tags of present and recognized fields, including those that are unset, in sorted order.
+func (m *Message) allKnownFieldTags() []int {
+	fds := m.md.GetFields()
+	keys := make([]int, 0, len(fds))
+
+	i := 0
+	for _, fd := range fds {
+		keys[i] = int(fd.GetNumber())
+		i++
+	}
+
+	for _, fd := range m.extraFields {
+		if !fd.IsExtension() {
+			keys = append(keys, int(fd.GetNumber()))
+		}
+	}
+
 	sort.Ints(keys)
 	return keys
 }
