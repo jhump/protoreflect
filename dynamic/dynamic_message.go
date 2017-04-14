@@ -1585,10 +1585,8 @@ func (m *Message) allKnownFieldTags() []int {
 	fds := m.md.GetFields()
 	keys := make([]int, len(fds))
 
-	i := 0
-	for _, fd := range fds {
+	for i, fd := range fds {
 		keys[i] = int(fd.GetNumber())
-		i++
 	}
 
 	for _, fd := range m.extraFields {

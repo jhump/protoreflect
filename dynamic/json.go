@@ -22,12 +22,12 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
-type MarshalJSONOpts struct {
+type MarshalJSONOptions struct {
 	Indent       bool
 	EmitDefaults bool
 }
 
-func (m *Message) MarshalJSONCustom(opts MarshalJSONOpts) ([]byte, error) {
+func (m *Message) MarshalJSONWithOptions(opts MarshalJSONOptions) ([]byte, error) {
 	var b indentBuffer
 	if !opts.Indent {
 		b.indent = -1
@@ -40,16 +40,16 @@ func (m *Message) MarshalJSONCustom(opts MarshalJSONOpts) ([]byte, error) {
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
-	b, err := m.MarshalJSONCustom(MarshalJSONOpts{})
+	b, err := m.MarshalJSONWithOptions(MarshalJSONOptions{})
 	return b, err
 }
 
 func (m *Message) MarshalJSONIndent() ([]byte, error) {
-	b, err := m.MarshalJSONCustom(MarshalJSONOpts{Indent: true})
+	b, err := m.MarshalJSONWithOptions(MarshalJSONOptions{Indent: true})
 	return b, err
 }
 
-func (m *Message) marshalJSON(b *indentBuffer, opts MarshalJSONOpts) error {
+func (m *Message) marshalJSON(b *indentBuffer, opts MarshalJSONOptions) error {
 	err := b.WriteByte('{')
 	if err != nil {
 		return err
@@ -77,9 +77,7 @@ func (m *Message) marshalJSON(b *indentBuffer, opts MarshalJSONOpts) error {
 
 		v, ok := m.values[itag]
 		if !ok {
-			if emitDefaults {
-				v = fd.GetDefaultValue()
-			}
+			v = fd.GetDefaultValue()
 		}
 
 		err := b.maybeNext(&first)
@@ -104,7 +102,7 @@ func (m *Message) marshalJSON(b *indentBuffer, opts MarshalJSONOpts) error {
 	return nil
 }
 
-func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts MarshalJSONOpts) error {
+func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts MarshalJSONOptions) error {
 	jsonName := fd.AsFieldDescriptorProto().GetJsonName()
 	if jsonName == "" {
 		jsonName = fd.GetName()
@@ -119,7 +117,8 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 	}
 
 	if v == nil {
-		return writeString(b, "null")
+		_, err := b.WriteString("null")
+		return err
 	}
 
 	if fd.IsMap() {
@@ -210,7 +209,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 	}
 }
 
-func marshalKnownFieldMapEntryJSON(b *indentBuffer, kfd *desc.FieldDescriptor, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}, opts MarshalJSONOpts) error {
+func marshalKnownFieldMapEntryJSON(b *indentBuffer, kfd *desc.FieldDescriptor, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}, opts MarshalJSONOptions) error {
 	rk := reflect.ValueOf(mk)
 	var strkey string
 	switch rk.Kind() {
@@ -236,7 +235,7 @@ func marshalKnownFieldMapEntryJSON(b *indentBuffer, kfd *desc.FieldDescriptor, m
 	return marshalKnownFieldValueJSON(b, vfd, mv, opts)
 }
 
-func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts MarshalJSONOpts) error {
+func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts MarshalJSONOptions) error {
 	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
 	case reflect.Int32, reflect.Int64:
