@@ -1,4 +1,5 @@
 # Protocol Buffer Reflection
+[![Build Status](https://travis-ci.org/jhump/protoreflect.svg?branch=master)](https://travis-ci.org/jhump/protoreflect/branches)
 
 This repo provides reflection APIs for protocol buffers (also known as "protobufs" for short).
 The core of reflection in protobufs is the [descriptor](https://github.com/google/protobuf/blob/199d82fde1734ab5bc931cd0de93309e50cd7ab9/src/google/protobuf/descriptor.proto).
