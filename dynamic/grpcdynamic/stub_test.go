@@ -74,8 +74,9 @@ var payload = &grpc_testing.Payload{
 func TestUnaryRpc(t *testing.T) {
 	resp, err := stub.InvokeRpc(context.Background(), unaryMd, &grpc_testing.SimpleRequest{Payload: payload})
 	testutil.Ok(t, err, "Failed to invoke unary RPC")
-	fd := resp.GetMessageDescriptor().FindFieldByName("payload")
-	p := resp.GetField(fd)
+	dm := resp.(*dynamic.Message)
+	fd := dm.GetMessageDescriptor().FindFieldByName("payload")
+	p := dm.GetField(fd)
 	testutil.Require(t, dynamic.MessagesEqual(p.(proto.Message), payload), "Incorrect payload returned from RPC: %v != %v", p, payload)
 }
 
@@ -89,8 +90,9 @@ func TestClientStreamingRpc(t *testing.T) {
 	}
 	resp, err := cs.CloseAndReceive()
 	testutil.Ok(t, err, "Failed to receive response")
-	fd := resp.GetMessageDescriptor().FindFieldByName("aggregated_payload_size")
-	sz := resp.GetField(fd)
+	dm := resp.(*dynamic.Message)
+	fd := dm.GetMessageDescriptor().FindFieldByName("aggregated_payload_size")
+	sz := dm.GetField(fd)
 	expectedSz := 3 * len(payload.Body)
 	testutil.Eq(t, expectedSz, int(sz.(int32)), "Incorrect response returned from RPC")
 }
@@ -106,8 +108,9 @@ func TestServerStreamingRpc(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		resp, err := ss.RecvMsg()
 		testutil.Ok(t, err, "Failed to receive response message")
-		fd := resp.GetMessageDescriptor().FindFieldByName("payload")
-		p := resp.GetField(fd)
+		dm := resp.(*dynamic.Message)
+		fd := dm.GetMessageDescriptor().FindFieldByName("payload")
+		p := dm.GetField(fd)
 		testutil.Require(t, dynamic.MessagesEqual(p.(proto.Message), payload), "Incorrect payload returned from RPC: %v != %v", p, payload)
 	}
 	_, err = ss.RecvMsg()
@@ -122,8 +125,9 @@ func TestBidiStreamingRpc(t *testing.T) {
 		testutil.Ok(t, err, "Failed to send request message")
 		resp, err := bds.RecvMsg()
 		testutil.Ok(t, err, "Failed to receive response message")
-		fd := resp.GetMessageDescriptor().FindFieldByName("payload")
-		p := resp.GetField(fd)
+		dm := resp.(*dynamic.Message)
+		fd := dm.GetMessageDescriptor().FindFieldByName("payload")
+		p := dm.GetField(fd)
 		testutil.Require(t, dynamic.MessagesEqual(p.(proto.Message), payload), "Incorrect payload returned from RPC: %v != %v", p, payload)
 	}
 	err = bds.CloseSend()

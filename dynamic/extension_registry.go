@@ -10,13 +10,15 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
+// ExtensionRegistry is a registry of known extension fields. This is used to parse
+// extension fields encountered when de-serializing a dynamic message.
 type ExtensionRegistry struct {
 	includeDefault bool
 	mu             sync.RWMutex
 	exts           map[string]map[int32]*desc.FieldDescriptor
 }
 
-func NewRegistryWithDefaults() *ExtensionRegistry {
+func NewExtensionRegistryWithDefaults() *ExtensionRegistry {
 	return &ExtensionRegistry{includeDefault: true}
 }
 

@@ -75,7 +75,7 @@ func TestExtensionRegistry_Empty(t *testing.T) {
 }
 
 func TestExtensionRegistry_Defaults(t *testing.T) {
-	er := NewRegistryWithDefaults()
+	er := NewExtensionRegistryWithDefaults()
 
 	fds := er.AllExtensionsForType("testprotos.AnotherTestMessage")
 	sort.Sort(fields(fds))

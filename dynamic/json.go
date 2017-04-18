@@ -59,10 +59,8 @@ func (m *Message) marshalJSON(b *indentBuffer, opts MarshalJSONOptions) error {
 		return err
 	}
 
-	emitDefaults := opts.EmitDefaults
-
 	var tags []int
-	if emitDefaults {
+	if opts.EmitDefaults {
 		tags = m.allKnownFieldTags()
 	} else {
 		tags = m.knownFieldTags()
@@ -132,7 +130,6 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 		}
 
 		md := fd.GetMessageType()
-		kfd := md.FindFieldByNumber(1)
 		vfd := md.FindFieldByNumber(2)
 
 		mp := v.(map[interface{}]interface{})
@@ -150,7 +147,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 					return err
 				}
 
-				err = marshalKnownFieldMapEntryJSON(b, kfd, mk, vfd, mv, opts)
+				err = marshalKnownFieldMapEntryJSON(b, mk, vfd, mv, opts)
 				if err != nil {
 					return err
 				}
@@ -162,7 +159,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 				if err != nil {
 					return err
 				}
-				err = marshalKnownFieldMapEntryJSON(b, kfd, mk, vfd, mv, opts)
+				err = marshalKnownFieldMapEntryJSON(b, mk, vfd, mv, opts)
 				if err != nil {
 					return err
 				}
@@ -209,7 +206,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 	}
 }
 
-func marshalKnownFieldMapEntryJSON(b *indentBuffer, kfd *desc.FieldDescriptor, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}, opts MarshalJSONOptions) error {
+func marshalKnownFieldMapEntryJSON(b *indentBuffer, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}, opts MarshalJSONOptions) error {
 	rk := reflect.ValueOf(mk)
 	var strkey string
 	switch rk.Kind() {
@@ -386,7 +383,7 @@ func (m *Message) unmarshalJson(r *jsReader) error {
 			r.skip()
 			continue
 		}
-		v, err := unmarshalJsField(fd, r, m.er)
+		v, err := unmarshalJsField(fd, r, m.mf)
 		if err != nil {
 			return err
 		}
@@ -404,7 +401,7 @@ func (m *Message) unmarshalJson(r *jsReader) error {
 	return nil
 }
 
-func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, er *ExtensionRegistry) (interface{}, error) {
+func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory) (interface{}, error) {
 	t, err := r.peek()
 	if err != nil {
 		return nil, err
@@ -430,11 +427,11 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, er *ExtensionRegist
 			return nil, err
 		}
 		for r.hasNext() {
-			kk, err := unmarshalJsFieldElement(keyType, r, er)
+			kk, err := unmarshalJsFieldElement(keyType, r, mf)
 			if err != nil {
 				return nil, err
 			}
-			vv, err := unmarshalJsFieldElement(valueType, r, er)
+			vv, err := unmarshalJsFieldElement(valueType, r, mf)
 			if err != nil {
 				return nil, err
 			}
@@ -457,7 +454,7 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, er *ExtensionRegist
 		var v interface{}
 		for r.hasNext() {
 			var err error
-			v, err = unmarshalJsFieldElement(fd, r, er)
+			v, err = unmarshalJsFieldElement(fd, r, mf)
 			if err != nil {
 				return nil, err
 			}
@@ -493,7 +490,7 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, er *ExtensionRegist
 		// binary wire format that supports changing an optional field to repeated and vice versa.
 		// If the field is repeated, we store value as singleton slice of that one value.
 
-		v, err := unmarshalJsFieldElement(fd, r, er)
+		v, err := unmarshalJsFieldElement(fd, r, mf)
 		if err != nil {
 			return nil, err
 		}
@@ -508,7 +505,7 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, er *ExtensionRegist
 	}
 }
 
-func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, er *ExtensionRegistry) (interface{}, error) {
+func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory) (interface{}, error) {
 	t, err := r.peek()
 	if err != nil {
 		return nil, err
@@ -522,7 +519,8 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, er *Extensio
 	switch fd.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
 		descriptor.FieldDescriptorProto_TYPE_GROUP:
-		m := NewMessageWithExtensionRegistry(fd.GetMessageType(), er)
+		// TODO: use mf.NewMessage and, if not a dynamic message, use jsonpb to unmarshal it
+		m := newMessageWithMessageFactory(fd.GetMessageType(), mf)
 		if err := m.unmarshalJson(r); err != nil {
 			return nil, err
 		} else {

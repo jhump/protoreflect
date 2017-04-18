@@ -7,12 +7,12 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"sort"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc"
-	"sort"
 )
 
 // sort_map_keys is set to true in tests, for deterministic serialization of protos with map fields
@@ -445,7 +445,7 @@ func unmarshalSimpleField(fd *desc.FieldDescriptor, v uint64) (interface{}, erro
 	}
 }
 
-func unmarshalLengthDelimitedField(fd *desc.FieldDescriptor, bytes []byte, er *ExtensionRegistry) (interface{}, error) {
+func unmarshalLengthDelimitedField(fd *desc.FieldDescriptor, bytes []byte, mf *MessageFactory) (interface{}, error) {
 	switch {
 	case fd.GetType() == descriptor.FieldDescriptorProto_TYPE_BYTES:
 		return bytes, nil
@@ -455,12 +455,12 @@ func unmarshalLengthDelimitedField(fd *desc.FieldDescriptor, bytes []byte, er *E
 
 	case fd.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE ||
 		fd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP:
-		dm := NewMessageWithExtensionRegistry(fd.GetMessageType(), er)
-		err := dm.Unmarshal(bytes)
+		msg := mf.NewMessage(fd.GetMessageType())
+		err := proto.Unmarshal(bytes, msg)
 		if err != nil {
 			return nil, err
 		} else {
-			return dm, nil
+			return msg, nil
 		}
 
 	default:
@@ -538,7 +538,7 @@ func (m *Message) unmarshalKnownField(fd *desc.FieldDescriptor, encoding int8, b
 			var raw []byte
 			raw, err = b.decodeRawBytes(false)
 			if err == nil {
-				val, err = unmarshalLengthDelimitedField(fd, raw, m.er)
+				val, err = unmarshalLengthDelimitedField(fd, raw, m.mf)
 			}
 		}
 
@@ -546,10 +546,22 @@ func (m *Message) unmarshalKnownField(fd *desc.FieldDescriptor, encoding int8, b
 		if fd.GetMessageType() == nil {
 			return fmt.Errorf("cannot parse field %s from group-encoded wire type", fd.GetFullyQualifiedName())
 		}
-		dm := NewMessageWithExtensionRegistry(fd.GetMessageType(), m.er)
-		err = dm.unmarshal(b, true)
-		if err == nil {
-			val = dm
+		msg := m.mf.NewMessage(fd.GetMessageType())
+		if dm, ok := msg.(*Message); ok {
+			err = dm.unmarshal(b, true)
+			if err == nil {
+				val = dm
+			}
+		} else {
+			var groupEnd, dataEnd int
+			groupEnd, dataEnd, err = skipGroup(b)
+			if err == nil {
+				err = proto.Unmarshal(b.buf[b.index:dataEnd], msg)
+				if err == nil {
+					val = msg
+				}
+				b.index = groupEnd
+			}
 		}
 
 	default:
