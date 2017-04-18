@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-go get -d github.com/golang/protobuf/{proto,ptypes,protoc-gen-go} google.golang.org/grpc golang.org/x/net/context
-
 fmtdiff="$(gofmt -s -l ./)"
 if [[ -n "$fmtdiff" ]]; then
   gofmt -s -l ./ >&2
