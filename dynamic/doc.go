@@ -6,11 +6,12 @@
 // contexts, including the use of proto.Marshal and proto.Unmarshal to
 // serialize and de-serialize messages.
 //
-// This package also contains a type named ExtensionRegistry. This allows the
-// parsing of dynamic messages to recognize and parse extension fields. It is
-// the dynamic analog of the various extension-related methods in the proto
-// package (that allow code to query for known extensions and to get extension
-// field values from message objects).
+// This package also contains a several registries, for managing known types and
+// descriptors. The MessageRegistry is used for interacting with Any messages
+// where the actual embedded value may be a dynamic message. The KnownTypeRegistry
+// allows de-serialization to use generated message types, instead of dynamic
+// messages, for some kinds of nested message fields. And the ExtensionRegistry
+// is for recognizing and parsing extensions fields (for proto2 messages).
 //
 // The dynamic Message supports binary and text marshaling, using protobuf's
 // well-defined binary format and the same text format that protoc-generated

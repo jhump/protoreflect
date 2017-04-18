@@ -48,14 +48,24 @@ func init() {
 	fixed64Types[descriptor.FieldDescriptorProto_TYPE_DOUBLE] = true
 }
 
+// Message is a dynamic protobuf message. Instead of a generated struct,
+// like most protobuf messages, this is a map of field number to values and
+// a message descriptor, which is used to validate the field values and
+// also to de-serialize messages (from the standard binary format, as well
+// as from the text format and from JSON).
 type Message struct {
 	md            *desc.MessageDescriptor
 	er            *ExtensionRegistry
+	mf            *MessageFactory
 	extraFields   map[int32]*desc.FieldDescriptor
 	values        map[int32]interface{}
 	unknownFields map[int32][]UnknownField
 }
 
+// UnknownField represents a field that was parsed from the binary wire
+// format for a message, but was not a recognized field number. Enough
+// information is preserved so that re-serializing the message won't lose
+// any of the unrecognized data.
 type UnknownField struct {
 	// Encoding indicates how the unknown field was encoded on the wire. If it
 	// is proto.WireBytes or proto.WireGroupStart then Contents will be set to
@@ -67,40 +77,22 @@ type UnknownField struct {
 	Value    uint64
 }
 
-func NewMessageWithExtensions(md *desc.MessageDescriptor, exts ...*desc.FieldDescriptor) (*Message, error) {
-	if len(exts) == 0 {
-		return NewMessage(md), nil
-	}
-
-	if !md.IsExtendable() {
-		return nil, fmt.Errorf("Given message is not extendable: %s", md.GetFullyQualifiedName())
-	}
-
-	for _, fd := range exts {
-		if !fd.IsExtension() {
-			return nil, fmt.Errorf("Given field is not an extension: %s", fd.GetFullyQualifiedName())
-		}
-		if fd.GetOwner().GetFullyQualifiedName() != md.GetFullyQualifiedName() {
-			return nil, fmt.Errorf("Given field, %s, extends wrong message type: %s; expecting: %s", fd.GetFullyQualifiedName(), fd.GetOwner().GetFullyQualifiedName(), md.GetFullyQualifiedName())
-		}
-		if !md.IsExtension(fd.GetNumber()) {
-			return nil, fmt.Errorf("Given field, %s, has a tag number, %d, that is outside extendable range of %s: %v", fd.GetFullyQualifiedName(), fd.GetNumber(), fd.GetOwner().GetFullyQualifiedName(), fd.GetOwner().GetExtensionRanges())
-		}
-	}
-
-	er := &ExtensionRegistry{}
-	er.AddExtension(exts...)
-
-	return NewMessageWithExtensionRegistry(md, er), nil
-}
-
+// NewMessage creates a new dynamic message for the type represented by the given
+// message descriptor. During de-serialization, a default MessageFactory is used to
+// instantiate any nested message fields and no extension fields will be parsed. To
+// use a custom MessageFactory or ExtensionRegistry, use MessageFactory.NewMessage.
 func NewMessage(md *desc.MessageDescriptor) *Message {
-	return NewMessageWithExtensionRegistry(md, nil)
+	return newMessageWithMessageFactory(md, nil)
 }
 
-func NewMessageWithExtensionRegistry(md *desc.MessageDescriptor, er *ExtensionRegistry) *Message {
+func newMessageWithMessageFactory(md *desc.MessageDescriptor, mf *MessageFactory) *Message {
+	var er *ExtensionRegistry
+	if mf != nil {
+		er = mf.er
+	}
 	return &Message{
 		md: md,
+		mf: mf,
 		er: er,
 	}
 }
@@ -295,7 +287,7 @@ func (m *Message) doGetField(fd *desc.FieldDescriptor, nilIfAbsent bool) (interf
 				return (*Message)(nil), nil
 			} else {
 				// for proto2, return default instance of message
-				return NewMessageWithExtensionRegistry(md, m.er), nil
+				return m.mf.NewMessage(md), nil
 			}
 		}
 	}
@@ -821,7 +813,7 @@ func (m *Message) parseUnknownField(fd *desc.FieldDescriptor) (interface{}, erro
 	for _, unk := range unks {
 		var val interface{}
 		if unk.Encoding == proto.WireBytes || unk.Encoding == proto.WireStartGroup {
-			val, err = unmarshalLengthDelimitedField(fd, unk.Contents, m.er)
+			val, err = unmarshalLengthDelimitedField(fd, unk.Contents, m.mf)
 		} else {
 			val, err = unmarshalSimpleField(fd, unk.Value)
 		}

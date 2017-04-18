@@ -1,3 +1,6 @@
+// Package grpcdynamic provides a dynamic RPC stub. It can be used to invoke RPC
+// method where only method descriptors are known. The actual request and response
+// messages may be dynamic messages.
 package grpcdynamic
 
 import (
@@ -16,18 +19,18 @@ import (
 // Stub is an RPC client stub, used for dynamically dispatching RPCs to a server.
 type Stub struct {
 	conn *grpc.ClientConn
-	er   *dynamic.ExtensionRegistry
+	mf   *dynamic.MessageFactory
 }
 
 // NewStub creates a new RPC stub that uses the given connection for communicating with a server.
 func NewStub(conn *grpc.ClientConn) Stub {
-	return NewStubWithExtensionRegistry(conn, nil)
+	return NewStubWithMessageFactory(conn, nil)
 }
 
-// NewStub creates a new RPC stub that uses the given connection for communicating with a server and the
-// given ExtensionRegistry when parsing responses.
-func NewStubWithExtensionRegistry(conn *grpc.ClientConn, er *dynamic.ExtensionRegistry) Stub {
-	return Stub{conn, er}
+// NewStubWithMessageFactory creates a new RPC stub that uses the given connection for
+// communicating with a server and the given MessageFactory for creating response messages.
+func NewStubWithMessageFactory(conn *grpc.ClientConn, mf *dynamic.MessageFactory) Stub {
+	return Stub{conn: conn, mf: mf}
 }
 
 func requestMethod(md *desc.MethodDescriptor) string {
@@ -35,14 +38,14 @@ func requestMethod(md *desc.MethodDescriptor) string {
 }
 
 // InvokeRpc sends a unary RPC and returns the response. Use this for unary methods.
-func (s Stub) InvokeRpc(ctx context.Context, method *desc.MethodDescriptor, request proto.Message, opts ...grpc.CallOption) (*dynamic.Message, error) {
+func (s Stub) InvokeRpc(ctx context.Context, method *desc.MethodDescriptor, request proto.Message, opts ...grpc.CallOption) (proto.Message, error) {
 	if method.IsClientStreaming() || method.IsServerStreaming() {
 		return nil, fmt.Errorf("InvokeRpc is for unary methods; %q is %s", method.GetFullyQualifiedName(), methodType(method))
 	}
 	if err := checkMessageType(method.GetInputType(), request); err != nil {
 		return nil, err
 	}
-	resp := dynamic.NewMessageWithExtensionRegistry(method.GetOutputType(), s.er)
+	resp := s.mf.NewMessage(method.GetOutputType())
 	if err := grpc.Invoke(ctx, requestMethod(method), request, resp, s.conn, opts...); err != nil {
 		return nil, err
 	}
@@ -76,7 +79,7 @@ func (s Stub) InvokeRpcServerStream(ctx context.Context, method *desc.MethodDesc
 			cancel()
 			return nil, err
 		}
-		return &ServerStream{cs, method.GetOutputType(), s.er}, nil
+		return &ServerStream{cs, method.GetOutputType(), s.mf}, nil
 	}
 }
 
@@ -95,7 +98,7 @@ func (s Stub) InvokeRpcClientStream(ctx context.Context, method *desc.MethodDesc
 	if cs, err := grpc.NewClientStream(ctx, &sd, s.conn, requestMethod(method), opts...); err != nil {
 		return nil, err
 	} else {
-		return &ClientStream{cs, method, s.er, cancel}, nil
+		return &ClientStream{cs, method, s.mf, cancel}, nil
 	}
 }
 
@@ -113,7 +116,7 @@ func (s Stub) InvokeRpcBidiStream(ctx context.Context, method *desc.MethodDescri
 	if cs, err := grpc.NewClientStream(ctx, &sd, s.conn, requestMethod(method), opts...); err != nil {
 		return nil, err
 	} else {
-		return &BidiStream{cs, method.GetInputType(), method.GetOutputType(), s.er}, nil
+		return &BidiStream{cs, method.GetInputType(), method.GetOutputType(), s.mf}, nil
 	}
 }
 
@@ -147,7 +150,7 @@ func checkMessageType(md *desc.MessageDescriptor, msg proto.Message) error {
 type ServerStream struct {
 	stream   grpc.ClientStream
 	respType *desc.MessageDescriptor
-	er       *dynamic.ExtensionRegistry
+	mf       *dynamic.MessageFactory
 }
 
 // Header returns any header metadata sent by the server (blocks if necessary until headers are
@@ -170,8 +173,8 @@ func (s *ServerStream) Context() context.Context {
 // RecvMsg returns the next message in the response stream or an error. If the stream
 // has completed normally, the error is io.EOF. Otherwise, the error indicates the
 // nature of the abnormal termination of the stream.
-func (s *ServerStream) RecvMsg() (*dynamic.Message, error) {
-	resp := dynamic.NewMessageWithExtensionRegistry(s.respType, s.er)
+func (s *ServerStream) RecvMsg() (proto.Message, error) {
+	resp := s.mf.NewMessage(s.respType)
 	if err := s.stream.RecvMsg(resp); err != nil {
 		return nil, err
 	} else {
@@ -182,7 +185,7 @@ func (s *ServerStream) RecvMsg() (*dynamic.Message, error) {
 type ClientStream struct {
 	stream grpc.ClientStream
 	method *desc.MethodDescriptor
-	er     *dynamic.ExtensionRegistry
+	mf     *dynamic.MessageFactory
 	cancel context.CancelFunc
 }
 
@@ -212,11 +215,11 @@ func (s *ClientStream) SendMsg(m proto.Message) error {
 }
 
 // CloseAndRecvMsg closes the outgoing request stream and then blocks for the server's response.
-func (s *ClientStream) CloseAndReceive() (*dynamic.Message, error) {
+func (s *ClientStream) CloseAndReceive() (proto.Message, error) {
 	if err := s.stream.CloseSend(); err != nil {
 		return nil, err
 	}
-	resp := dynamic.NewMessageWithExtensionRegistry(s.method.GetOutputType(), s.er)
+	resp := s.mf.NewMessage(s.method.GetOutputType())
 	if err := s.stream.RecvMsg(resp); err != nil {
 		return nil, err
 	}
@@ -240,7 +243,7 @@ type BidiStream struct {
 	stream   grpc.ClientStream
 	reqType  *desc.MessageDescriptor
 	respType *desc.MessageDescriptor
-	er       *dynamic.ExtensionRegistry
+	mf       *dynamic.MessageFactory
 }
 
 // Header returns any header metadata sent by the server (blocks if necessary until headers are
@@ -277,8 +280,8 @@ func (s *BidiStream) CloseSend() error {
 // RecvMsg returns the next message in the response stream or an error. If the stream
 // has completed normally, the error is io.EOF. Otherwise, the error indicates the
 // nature of the abnormal termination of the stream.
-func (s *BidiStream) RecvMsg() (*dynamic.Message, error) {
-	resp := dynamic.NewMessageWithExtensionRegistry(s.respType, s.er)
+func (s *BidiStream) RecvMsg() (proto.Message, error) {
+	resp := s.mf.NewMessage(s.respType)
 	if err := s.stream.RecvMsg(resp); err != nil {
 		return nil, err
 	} else {

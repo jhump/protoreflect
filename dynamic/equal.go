@@ -162,7 +162,7 @@ func MessagesEqual(a, b proto.Message) bool {
 		if err != nil {
 			return false
 		}
-		db = NewMessageWithExtensionRegistry(md, da.er)
+		db = newMessageWithMessageFactory(md, da.mf)
 		if db.ConvertFrom(b) != nil {
 			return false
 		}
@@ -172,10 +172,17 @@ func MessagesEqual(a, b proto.Message) bool {
 		if err != nil {
 			return false
 		}
-		da = NewMessageWithExtensionRegistry(md, db.er)
+		da = newMessageWithMessageFactory(md, db.mf)
 		if da.ConvertFrom(a) != nil {
 			return false
 		}
 		return Equal(da, db)
 	}
+}
+
+func MessageName(msg proto.Message) string {
+	if dm, ok := msg.(*Message); ok {
+		return dm.md.GetFullyQualifiedName()
+	}
+	return proto.MessageName(msg)
 }

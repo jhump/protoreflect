@@ -1619,7 +1619,8 @@ type protoMessage interface {
 }
 
 // LoadMessageDescriptor loads descriptor using the encoded descriptor proto returned by
-// Message.Descriptor() for the given message type.
+// Message.Descriptor() for the given message type. If the given type is not recognized,
+// then a nil descriptor is returned.
 func LoadMessageDescriptor(message string) (*MessageDescriptor, error) {
 	m := getMessageFromCache(message)
 	if m != nil {
@@ -1628,7 +1629,7 @@ func LoadMessageDescriptor(message string) (*MessageDescriptor, error) {
 
 	pt := proto.MessageType(message)
 	if pt == nil {
-		return nil, fmt.Errorf("unknown type: %q", message)
+		return nil, nil
 	}
 	msg, err := messageFromType(pt)
 	if err != nil {
@@ -1641,7 +1642,8 @@ func LoadMessageDescriptor(message string) (*MessageDescriptor, error) {
 }
 
 // LoadMessageDescriptorForType loads descriptor using the encoded descriptor proto returned
-// by Message.Descriptor() for the given message type.
+// by Message.Descriptor() for the given message type. If the given type is not recognized,
+// then a nil descriptor is returned.
 func LoadMessageDescriptorForType(messageType reflect.Type) (*MessageDescriptor, error) {
 	m, err := messageFromType(messageType)
 	if err != nil {
@@ -1651,9 +1653,13 @@ func LoadMessageDescriptorForType(messageType reflect.Type) (*MessageDescriptor,
 }
 
 // LoadMessageDescriptorForMessage loads descriptor using the encoded descriptor proto
-// returned by message.Descriptor().
+// returned by message.Descriptor(). If the given type is not recognized, then a nil
+// descriptor is returned.
 func LoadMessageDescriptorForMessage(message proto.Message) (*MessageDescriptor, error) {
 	name := proto.MessageName(message)
+	if name == "" {
+		return nil, nil
+	}
 	m := getMessageFromCache(name)
 	if m != nil {
 		return m, nil
