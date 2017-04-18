@@ -124,12 +124,17 @@ func TestFileContainingExtension(t *testing.T) {
 func TestAllExtensionNumbersForType(t *testing.T) {
 	nums, err := client.AllExtensionNumbersForType("TopLevel")
 	testutil.Ok(t, err)
-	testutil.Eq(t, []int32{100, 104}, nums)
+	inums := make([]int, len(nums))
+	for idx, v := range nums {
+		inums[idx] = int(v)
+	}
+	sort.Ints(inums)
+	testutil.Eq(t, []int{100, 104}, inums)
 
 	nums, err = client.AllExtensionNumbersForType("testprotos.AnotherTestMessage")
 	testutil.Ok(t, err)
 	testutil.Eq(t, 5, len(nums))
-	inums := make([]int, len(nums))
+	inums = make([]int, len(nums))
 	for idx, v := range nums {
 		inums[idx] = int(v)
 	}
