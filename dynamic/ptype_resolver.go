@@ -15,12 +15,17 @@ import (
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"golang.org/x/net/context"
+	"google.golang.org/genproto/protobuf/api"
 	"google.golang.org/genproto/protobuf/ptype"
 
 	"github.com/jhump/protoreflect/desc"
 )
 
-var enumOptionsDesc, enumValueOptionsDesc, msgOptionsDesc, fieldOptionsDesc *desc.MessageDescriptor
+var (
+	enumOptionsDesc, enumValueOptionsDesc *desc.MessageDescriptor
+	msgOptionsDesc, fieldOptionsDesc      *desc.MessageDescriptor
+	svcOptionsDesc, methodOptionsDesc     *desc.MessageDescriptor
+)
 
 func init() {
 	var err error
@@ -39,6 +44,14 @@ func init() {
 	fieldOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.FieldOptions)(nil))
 	if err != nil {
 		panic("Failed to load descriptor for FieldOptions")
+	}
+	svcOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.ServiceOptions)(nil))
+	if err != nil {
+		panic("Failed to load descriptor for ServiceOptions")
+	}
+	methodOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.MethodOptions)(nil))
+	if err != nil {
+		panic("Failed to load descriptor for MethodOptions")
 	}
 }
 
@@ -321,6 +334,42 @@ func (r *typeResolver) resolveUrlToEnumDescriptor(url string) (ed *desc.EnumDesc
 	return
 }
 
+func (r *typeResolver) resolveApiToServiceDescriptor(a *api.Api) (*desc.ServiceDescriptor, error) {
+	rc := newResolutionContext()
+
+	serviceName := base(a.Name)
+	var packageName string
+	if serviceName == a.Name {
+		packageName = ""
+	} else {
+		packageName = a.Name[:len(a.Name)-len(serviceName)-1]
+	}
+
+	var fileName string
+	if a.SourceContext != nil && a.SourceContext.FileName != "" {
+		fileName = a.SourceContext.FileName
+	} else {
+		fileName = "--unknown--.proto"
+	}
+	rc.files[fileName] = &fileEntry{pkgHint: packageName, svc: a, svcName: serviceName}
+
+	for _, m := range a.Methods {
+		if err := rc.addType(m.RequestTypeUrl, r.fetcher, false); err != nil {
+			return nil, err
+		}
+		if err := rc.addType(m.ResponseTypeUrl, r.fetcher, false); err != nil {
+			return nil, err
+		}
+	}
+
+	files, err := rc.toFileDescriptors(r.mr)
+	if err != nil {
+		return nil, err
+	}
+	fd := files[fileName]
+	return fd.FindService(a.Name), nil
+}
+
 type resolutionContext struct {
 	ctx           context.Context
 	cancel        func()
@@ -368,6 +417,9 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 		if fe == nil {
 			fe = &fileEntry{}
 			rc.files[fileName] = fe
+		}
+		if fe.pkgHint != "" && !strings.HasPrefix(e.Name, fe.pkgHint+".") {
+			return fmt.Errorf("File %q should have package %s and is supposed to include incompatible element %s", fileName, fe.pkgHint, e.Name)
 		}
 		fe.types.addType(e.Name, e)
 		if e.Syntax == ptype.Syntax_SYNTAX_PROTO3 {
@@ -449,7 +501,11 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 func (rc *resolutionContext) toFileDescriptors(mr *MessageRegistry) (map[string]*desc.FileDescriptor, error) {
 	fdps := map[string]*descriptor.FileDescriptorProto{}
 	for name, file := range rc.files {
-		fdps[name] = file.toFileDescriptor(name, mr)
+		fdp := file.toFileDescriptor(name, mr)
+		if file.svc != nil {
+			fdp.Service = append(fdp.Service, createServiceDescriptor(file.svc, mr))
+		}
+		fdps[name] = fdp
 	}
 	fds := map[string]*desc.FileDescriptor{}
 	for name, fdp := range fdps {
@@ -486,9 +542,12 @@ func makeFileDesc(fdp *descriptor.FileDescriptorProto, fds map[string]*desc.File
 }
 
 type fileEntry struct {
-	types  typeTrie
-	deps   map[string]struct{}
-	proto3 bool
+	types   typeTrie
+	svc     *api.Api
+	svcName string
+	pkgHint string
+	deps    map[string]struct{}
+	proto3  bool
 }
 
 func (fe fileEntry) toFileDescriptor(name string, mr *MessageRegistry) *descriptor.FileDescriptorProto {
@@ -505,7 +564,7 @@ func (fe fileEntry) toFileDescriptor(name string, mr *MessageRegistry) *descript
 			}
 			pkg.WriteString(last)
 		}
-		if len(tt.children) != 1 {
+		if len(tt.children) != 1 || pkg.Len() == len(fe.pkgHint) {
 			break
 		}
 		for last, tt = range tt.children {
@@ -728,6 +787,48 @@ func createFieldDescriptor(f *ptype.Field, mr *MessageRegistry) *descriptor.Fiel
 		TypeName:     proto.String(typeName),
 		Label:        label.Enum(),
 		Type:         typ.Enum(),
+	}
+}
+
+func createServiceDescriptor(a *api.Api, mr *MessageRegistry) *descriptor.ServiceDescriptorProto {
+	var opts *descriptor.ServiceOptions
+	if len(a.Options) > 0 {
+		dopts := createOptions(a.Options, svcOptionsDesc, mr)
+		dopts.ConvertTo(opts) // ignore any error
+	}
+
+	methods := make([]*descriptor.MethodDescriptorProto, len(a.Methods))
+	for i, m := range a.Methods {
+		methods[i] = createMethodDescriptor(m, mr)
+	}
+
+	return &descriptor.ServiceDescriptorProto{
+		Name:    proto.String(base(a.Name)),
+		Method:  methods,
+		Options: opts,
+	}
+}
+
+func createMethodDescriptor(m *api.Method, mr *MessageRegistry) *descriptor.MethodDescriptorProto {
+	var opts *descriptor.MethodOptions
+	if len(m.Options) > 0 {
+		dopts := createOptions(m.Options, methodOptionsDesc, mr)
+		dopts.ConvertTo(opts) // ignore any error
+	}
+
+	var reqType, respType string
+	pos := strings.LastIndex(m.RequestTypeUrl, "/")
+	reqType = "." + m.RequestTypeUrl[pos+1:]
+	pos = strings.LastIndex(m.ResponseTypeUrl, "/")
+	respType = "." + m.ResponseTypeUrl[pos+1:]
+
+	return &descriptor.MethodDescriptorProto{
+		Name:            proto.String(m.Name),
+		Options:         opts,
+		ClientStreaming: proto.Bool(m.RequestStreaming),
+		ServerStreaming: proto.Bool(m.ResponseStreaming),
+		InputType:       proto.String(reqType),
+		OutputType:      proto.String(respType),
 	}
 }
 
