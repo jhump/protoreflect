@@ -20,7 +20,7 @@ import (
 
 const googleApisDomain = "type.googleapis.com"
 
-// MessageRegistry is a registry that maps URLs to message types. It allows for marsalling
+// MessageRegistry is a registry that maps URLs to message types. It allows for marshalling
 // and unmarshalling Any types to and from dynamic messages.
 type MessageRegistry struct {
 	includeDefault bool
@@ -30,9 +30,15 @@ type MessageRegistry struct {
 	mu             sync.RWMutex
 	messages       map[string]desc.Descriptor
 	domains        map[string]string
-	defaultDomain  string
+	defaultBaseUrl string
 }
 
+// NewMessageRegistryWithDefaults is a registry that includes all "default" message types,
+// which are those that are statically linked into the current program (e.g. registered by
+// protoc-generated code via proto.RegisterType). Note that it cannot resolve "default" enum
+// types since those don't actually get registered by protoc-generated code the same way.
+// Any types explicitly added to the registry will override any default message types with
+// the same URL.
 func NewMessageRegistryWithDefaults() *MessageRegistry {
 	mf := NewMessageFactoryWithDefaults()
 	return &MessageRegistry{
@@ -42,9 +48,11 @@ func NewMessageRegistryWithDefaults() *MessageRegistry {
 	}
 }
 
-// WithFetcher sets the TypeFetcher that this registry uses to resolve unknown
-// URLs. This method is not thread-safe and is intended to be used for one-time
-// initialization of the registry, before it published for use by other threads.
+// WithFetcher sets the TypeFetcher that this registry uses to resolve unknown URLs. If no fetcher
+// is configured for the registry then unknown URLs cannot be resolved. Known URLs are those for
+// explicitly registered types and, if the registry includes "default" types, those for statically
+// linked message types. This method is not thread-safe and is intended to be used for one-time
+// initialization of the registry, before it is published for use by other threads.
 func (r *MessageRegistry) WithFetcher(fetcher TypeFetcher) *MessageRegistry {
 	r.resolver = typeResolver{fetcher: fetcher, mr: r}
 	return r
@@ -52,7 +60,7 @@ func (r *MessageRegistry) WithFetcher(fetcher TypeFetcher) *MessageRegistry {
 
 // WithMessageFactory sets the MessageFactory used to instantiate any messages.
 // This method is not thread-safe and is intended to be used for one-time
-// initialization of the registry, before it published for use by other threads.
+// initialization of the registry, before it is published for use by other threads.
 func (r *MessageRegistry) WithMessageFactory(mf *MessageFactory) *MessageRegistry {
 	r.mf = mf
 	if mf == nil {
@@ -63,25 +71,27 @@ func (r *MessageRegistry) WithMessageFactory(mf *MessageFactory) *MessageRegistr
 	return r
 }
 
-// WithDefaultDomain sets the default domain used when constructing type URLs for
-// marshalling messages as Any types. If unspecified, the default domain is
+// WithDefaultBaseUrl sets the default base URL used when constructing type URLs for
+// marshalling messages as Any types and converting descriptors to well-known type
+// type descriptions (ptypes). If unspecified, the default base URL will be
 // "type.googleapis.com". This method is not thread-safe and is intended to be used
-// for one-time initialization of the registry, before it published for use by other
-// threads.
-func (r *MessageRegistry) WithDefaultDomain(domain string) *MessageRegistry {
-	domain = canonicalizeDomain(domain)
-	r.defaultDomain = domain
+// for one-time initialization of the registry, before it is published for use by
+// other threads.
+func (r *MessageRegistry) WithDefaultBaseUrl(baseUrl string) *MessageRegistry {
+	baseUrl = canonicalizeUrl(baseUrl)
+	r.defaultBaseUrl = baseUrl
 	return r
 }
 
-func canonicalizeDomain(domain string) string {
-	domain = ensureScheme(domain)
-	if domain[len(domain)-1] == '/' {
-		return domain[:len(domain)-1]
+func canonicalizeUrl(url string) string {
+	url = ensureScheme(url)
+	if url[len(url)-1] == '/' {
+		return url[:len(url)-1]
 	}
-	return domain
+	return url
 }
 
+// AddMessage adds the given URL and associated message descriptor to the registry.
 func (r *MessageRegistry) AddMessage(url string, md *desc.MessageDescriptor) error {
 	if !strings.HasSuffix(url, "/"+md.GetFullyQualifiedName()) {
 		return fmt.Errorf("URL %s is invalid: it should end with path element %s", url, md.GetFullyQualifiedName())
@@ -93,6 +103,7 @@ func (r *MessageRegistry) AddMessage(url string, md *desc.MessageDescriptor) err
 	return nil
 }
 
+// AddEnum adds the given URL and associated enum descriptor to the registry.
 func (r *MessageRegistry) AddEnum(url string, ed *desc.EnumDescriptor) error {
 	if !strings.HasSuffix(url, "/"+ed.GetFullyQualifiedName()) {
 		return fmt.Errorf("URL %s is invalid: it should end with path element %s", url, ed.GetFullyQualifiedName())
@@ -104,12 +115,14 @@ func (r *MessageRegistry) AddEnum(url string, ed *desc.EnumDescriptor) error {
 	return nil
 }
 
-func (r *MessageRegistry) AddFile(domain string, fd *desc.FileDescriptor) {
-	domain = canonicalizeDomain(domain)
+// AddFile adds to the registry all message and enum types in the given file. The URL for each type
+// is derived using the given base URL as "baseURL/full.qualified.type.name".
+func (r *MessageRegistry) AddFile(baseUrl string, fd *desc.FileDescriptor) {
+	baseUrl = canonicalizeUrl(baseUrl)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.addEnumTypesLocked(domain, fd.GetEnumTypes())
-	r.addMessageTypesLocked(domain, fd.GetMessageTypes())
+	r.addEnumTypesLocked(baseUrl, fd.GetEnumTypes())
+	r.addMessageTypesLocked(baseUrl, fd.GetMessageTypes())
 }
 
 func (r *MessageRegistry) addEnumTypesLocked(domain string, enums []*desc.EnumDescriptor) {
@@ -126,6 +139,9 @@ func (r *MessageRegistry) addMessageTypesLocked(domain string, msgs []*desc.Mess
 	}
 }
 
+// FindMessageTypeByUrl finds a message descriptor for the type at the given URL. It may
+// return nil if the registry is empty and cannot resolve unknown URLs. If an error occurs
+// while resolving the URL, it is returned.
 func (r *MessageRegistry) FindMessageTypeByUrl(url string) (*desc.MessageDescriptor, error) {
 	if r == nil {
 		return nil, nil
@@ -161,6 +177,9 @@ func (r *MessageRegistry) FindMessageTypeByUrl(url string) (*desc.MessageDescrip
 	}
 }
 
+// FindEnumTypeByUrl finds an enum descriptor for the type at the given URL. It may return nil
+// if the registry is empty and cannot resolve unknown URLs. If an error occurs while resolving
+// the URL, it is returned.
 func (r *MessageRegistry) FindEnumTypeByUrl(url string) (*desc.EnumDescriptor, error) {
 	if r == nil {
 		return nil, nil
@@ -182,13 +201,22 @@ func (r *MessageRegistry) FindEnumTypeByUrl(url string) (*desc.EnumDescriptor, e
 	}
 }
 
+// ResolveApiIntoServiceDescriptor constructs a service descriptor that describes the given API.
+// Note that explicitly registered types and "default" types (those statically linked into the
+// current program) are not used: a TypeFetcher is used to resolve all type URLs for request and
+// response types. If the registry has no TypeFetcher configured, this returns nil.
 func (r *MessageRegistry) ResolveApiIntoServiceDescriptor(a *api.Api) (*desc.ServiceDescriptor, error) {
+	// TODO: Support explicitly registered and "default" message types. Will incur non-trivial
+	// file descriptor re-writing...
 	if r.resolver.fetcher == nil {
 		return nil, nil
 	}
 	return r.resolver.resolveApiToServiceDescriptor(a)
 }
 
+// UnmarshalAny will unmarshal the value embedded in the given Any value. This will use this
+// registry to resolve the given value's type URL. Use this instead of ptypes.UnmarshalAny for
+// cases where the type might not be statically linked into the current program.
 func (r *MessageRegistry) UnmarshalAny(any *any.Any) (proto.Message, error) {
 	return r.unmarshalAny(any, r.FindMessageTypeByUrl)
 }
@@ -229,28 +257,44 @@ func (r *MessageRegistry) unmarshalAny(any *any.Any, fetch func(string) (*desc.M
 	}
 }
 
-func (r *MessageRegistry) AddDomainForElement(domain, packageOrTypeName string) {
-	if domain[len(domain)-1] == '/' {
-		domain = domain[:len(domain)-1]
+// AddBaseUrlForElement adds a base URL for the given package or fully-qualified type name.
+// This is used to construct type URLs for message types. If a given type has an associated
+// base URL, it is used. Otherwise, the base URL for the type's package is used. If that is
+// also absent, the registry's default base URL is used.
+func (r *MessageRegistry) AddBaseUrlForElement(baseUrl, packageOrTypeName string) {
+	if baseUrl[len(baseUrl)-1] == '/' {
+		baseUrl = baseUrl[:len(baseUrl)-1]
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.domains[packageOrTypeName] = domain
+	r.domains[packageOrTypeName] = baseUrl
 }
 
+// MarshalAny wraps the given message in an Any value.
 func (r *MessageRegistry) MarshalAny(m proto.Message) (*any.Any, error) {
-	name := MessageName(m)
-	if name == "" {
-		return nil, fmt.Errorf("could not determine message name for %v", reflect.TypeOf(m))
+	var md *desc.MessageDescriptor
+	if dm, ok := m.(*Message); ok {
+		md = dm.GetMessageDescriptor()
+	} else {
+		var err error
+		md, err = desc.LoadMessageDescriptorForMessage(m)
+		if err != nil {
+			return nil, err
+		}
 	}
+	typeName := md.GetFullyQualifiedName()
+	packageName := md.GetFile().GetPackage()
 
 	if b, err := proto.Marshal(m); err != nil {
 		return nil, err
 	} else {
-		return &any.Any{TypeUrl: r.asUrl(name), Value: b}, nil
+		return &any.Any{TypeUrl: r.asUrl(typeName, packageName), Value: b}, nil
 	}
 }
 
+// MessageAsPType converts the given message descriptor into a ptype.Type. Registered
+// base URLs are used to compute type URLs for any fields that have message or enum
+// types.
 func (r *MessageRegistry) MessageAsPType(md *desc.MessageDescriptor) *ptype.Type {
 	fs := md.GetFields()
 	fields := make([]*ptype.Field, len(fs))
@@ -292,14 +336,18 @@ func (r *MessageRegistry) fieldAsPType(fd *desc.FieldDescriptor) *ptype.Field {
 		card = ptype.Field_CARDINALITY_REQUIRED
 	}
 
+	var url string
 	var kind ptype.Field_Kind
 	switch fd.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_ENUM:
 		kind = ptype.Field_TYPE_ENUM
+		url = r.asUrl(fd.GetEnumType().GetFullyQualifiedName(), fd.GetFile().GetPackage())
 	case descriptor.FieldDescriptorProto_TYPE_GROUP:
 		kind = ptype.Field_TYPE_GROUP
+		url = r.asUrl(fd.GetMessageType().GetFullyQualifiedName(), fd.GetFile().GetPackage())
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 		kind = ptype.Field_TYPE_MESSAGE
+		url = r.asUrl(fd.GetMessageType().GetFullyQualifiedName(), fd.GetFile().GetPackage())
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
 		kind = ptype.Field_TYPE_BYTES
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
@@ -340,12 +388,13 @@ func (r *MessageRegistry) fieldAsPType(fd *desc.FieldDescriptor) *ptype.Field {
 		DefaultValue: fd.AsFieldDescriptorProto().GetDefaultValue(),
 		Options:      opts,
 		Packed:       fd.GetFieldOptions().GetPacked(),
-		TypeUrl:      r.asUrl(fd.GetMessageType().GetFullyQualifiedName()),
+		TypeUrl:      url,
 		Cardinality:  card,
 		Kind:         kind,
 	}
 }
 
+// EnumAsPType converts the given enum descriptor into a ptype.Enum.
 func (r *MessageRegistry) EnumAsPType(ed *desc.EnumDescriptor) *ptype.Enum {
 	vs := ed.GetValues()
 	vals := make([]*ptype.EnumValue, len(vs))
@@ -369,6 +418,7 @@ func (r *MessageRegistry) enumValueAsPType(vd *desc.EnumValueDescriptor) *ptype.
 	}
 }
 
+// ServiceAsApi converts the given service descriptor into a ptype API description.
 func (r *MessageRegistry) ServiceAsApi(sd *desc.ServiceDescriptor) *api.Api {
 	ms := sd.GetMethods()
 	methods := make([]*api.Method, len(ms))
@@ -389,8 +439,8 @@ func (r *MessageRegistry) methodAsApi(md *desc.MethodDescriptor) *api.Method {
 		Name:              md.GetName(),
 		RequestStreaming:  md.IsClientStreaming(),
 		ResponseStreaming: md.IsServerStreaming(),
-		RequestTypeUrl:    r.asUrl(md.GetInputType().GetFullyQualifiedName()),
-		ResponseTypeUrl:   r.asUrl(md.GetOutputType().GetFullyQualifiedName()),
+		RequestTypeUrl:    r.asUrl(md.GetInputType().GetFullyQualifiedName(), md.GetInputType().GetFile().GetPackage()),
+		ResponseTypeUrl:   r.asUrl(md.GetOutputType().GetFullyQualifiedName(), md.GetOutputType().GetFile().GetPackage()),
 		Options:           r.options(md.GetOptions()),
 		Syntax:            syntax(md.GetFile()),
 	}
@@ -478,17 +528,17 @@ func syntax(fd *desc.FileDescriptor) ptype.Syntax {
 	}
 }
 
-func (r *MessageRegistry) asUrl(name string) string {
+func (r *MessageRegistry) asUrl(name, pkgName string) string {
 	r.mu.RLock()
 	domain := r.domains[name]
 	if domain == "" {
 		// lookup domain for the package
-		domain = r.domains[name[strings.LastIndex(name, ".")+1:]]
+		domain = r.domains[pkgName]
 	}
 	r.mu.RUnlock()
 
 	if domain == "" {
-		domain = r.defaultDomain
+		domain = r.defaultBaseUrl
 		if domain == "" {
 			domain = googleApisDomain
 		}

@@ -253,6 +253,8 @@ func (s *semaphore) Release() {
 	s.cond.Signal()
 }
 
+// typeResolver is used by MessageRegistry to resolve message types. It uses a given TypeFetcher
+// to retrieve type definitions and caches resulting descriptor objects.
 type typeResolver struct {
 	fetcher TypeFetcher
 	mr      *MessageRegistry
@@ -260,6 +262,7 @@ type typeResolver struct {
 	cache   map[string]desc.Descriptor
 }
 
+// resolveUrlToMessageDescriptor returns a message descriptor that represents the type at the given URL.
 func (r *typeResolver) resolveUrlToMessageDescriptor(url string) (md *desc.MessageDescriptor, err error) {
 	r.mu.RLock()
 	cached := r.cache[url]
@@ -297,6 +300,7 @@ func (r *typeResolver) resolveUrlToMessageDescriptor(url string) (md *desc.Messa
 	return
 }
 
+// resolveUrlToEnumDescriptor returns an enum descriptor that represents the enum type at the given URL.
 func (r *typeResolver) resolveUrlToEnumDescriptor(url string) (ed *desc.EnumDescriptor, err error) {
 	r.mu.RLock()
 	cached := r.cache[url]
@@ -334,6 +338,9 @@ func (r *typeResolver) resolveUrlToEnumDescriptor(url string) (ed *desc.EnumDesc
 	return
 }
 
+// resolveApiToServiceDescriptor returns a service descriptor that represents the given API. All request
+// and response type URLs indicated in the API definition are resolved via other methods of this same
+// resolver instance.
 func (r *typeResolver) resolveApiToServiceDescriptor(a *api.Api) (*desc.ServiceDescriptor, error) {
 	rc := newResolutionContext()
 
@@ -370,13 +377,22 @@ func (r *typeResolver) resolveApiToServiceDescriptor(a *api.Api) (*desc.ServiceD
 	return fd.FindService(a.Name), nil
 }
 
+// resolutionContext provides the state for a resolution operation, accumulating details about
+// type descriptions and the files that contain them.
 type resolutionContext struct {
-	ctx           context.Context
-	cancel        func()
-	mu            sync.Mutex
-	files         map[string]*fileEntry
+	// The context and cancel function, used to coordinate multiple goroutines when there are multiple
+	// type or enum descriptions to download.
+	ctx    context.Context
+	cancel func()
+
+	mu sync.Mutex
+	// map of file names to details regarding the files' contents
+	files map[string]*fileEntry
+	// map of type URLs to the file name that defines them
 	typeLocations map[string]string
-	unknownCount  int
+	// count of source contexts that do not indicate a file name (used to generate unique file names
+	// when synthesizing file descriptors)
+	unknownCount int
 }
 
 func newResolutionContext() *resolutionContext {
@@ -389,6 +405,9 @@ func newResolutionContext() *resolutionContext {
 	}
 }
 
+// addType adds the type at the given URL to the context, using the given fetcher to download the type's
+// description. This function will recursively add dependencies (e.g. types referenced by the given type's
+// fields if it is a message type), fetching their type descriptions concurrently.
 func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool) error {
 	if err := rc.ctx.Err(); err != nil {
 		return err
@@ -498,6 +517,7 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 	return nil
 }
 
+// toFileDescriptors converts the information in the context into a map of file names to file descriptors.
 func (rc *resolutionContext) toFileDescriptors(mr *MessageRegistry) (map[string]*desc.FileDescriptor, error) {
 	fdps := map[string]*descriptor.FileDescriptorProto{}
 	for name, file := range rc.files {
@@ -541,6 +561,7 @@ func makeFileDesc(fdp *descriptor.FileDescriptorProto, fds map[string]*desc.File
 	}
 }
 
+// fileEntry represents the contents of a single file.
 type fileEntry struct {
 	types   typeTrie
 	svc     *api.Api
@@ -550,6 +571,7 @@ type fileEntry struct {
 	proto3  bool
 }
 
+// toFileDescriptor converts this file entry into a file descriptor proto.
 func (fe fileEntry) toFileDescriptor(name string, mr *MessageRegistry) *descriptor.FileDescriptorProto {
 	var pkg bytes.Buffer
 	tt := &fe.types
@@ -593,11 +615,17 @@ func (fe fileEntry) toFileDescriptor(name string, mr *MessageRegistry) *descript
 	return fd
 }
 
+// typeTrie is a prefix trie where each key component is part of a fully-qualified type name. So key components
+// will either be package name components or element names.
 type typeTrie struct {
+	// successor key components
 	children map[string]*typeTrie
-	typ      proto.Message
+	// if non-nil, the type (a *ptype.Type or *ptype.Enum) whose fully-qualified name is the path from the
+	// trie root to this node
+	typ proto.Message
 }
 
+// addType recursively adds a type (a *ptype.Type or *ptype.Enum) to the trie.
 func (t *typeTrie) addType(key string, typ proto.Message) {
 	if key == "" {
 		t.typ = typ
@@ -615,6 +643,9 @@ func (t *typeTrie) addType(key string, typ proto.Message) {
 	child.addType(rest, typ)
 }
 
+// toDescriptor converts this level of the trie into a message or enum descriptor proto, depending on the
+// kind of value stored in t.typ. If t.typ is nil, a placeholder message (with no fields) is returned that
+// contains the trie's children as nested message and/or enum types.
 func (t *typeTrie) toDescriptor(name string, mr *MessageRegistry) (*descriptor.DescriptorProto, *descriptor.EnumDescriptorProto) {
 	if en, ok := t.typ.(*ptype.Enum); ok {
 		return nil, createEnumDescriptor(en, mr)
