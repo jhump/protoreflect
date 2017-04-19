@@ -22,7 +22,7 @@ var IndexOutOfRangeError = errors.New("Index is out of range")
 var NumericOverflowError = errors.New("Numeric value is out of range")
 
 var typeOfProtoMessage = reflect.TypeOf((*proto.Message)(nil)).Elem()
-var typeOfDynamicMessage = reflect.TypeOf((*Message)(nil)).Elem()
+var typeOfDynamicMessage = reflect.TypeOf((*Message)(nil))
 var typeOfBytes = reflect.TypeOf(([]byte)(nil))
 
 var varintTypes = map[descriptor.FieldDescriptorProto_Type]bool{}
@@ -170,6 +170,10 @@ func (m *Message) Descriptor() ([]byte, []int) {
 	}
 
 	return zippedBytes.Bytes(), path
+}
+
+func (m *Message) XXX_MessageName() string {
+	return m.md.GetFullyQualifiedName()
 }
 
 func (m *Message) FindFieldDescriptor(tagNumber int32) *desc.FieldDescriptor {
