@@ -1430,22 +1430,6 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 		if prop.Tag == 0 {
 			continue // one-of or special field (such as XXX_unrecognized, etc.)
 		}
-		rv := src.FieldByName(prop.Name)
-		var keyProps, valProps *proto.Properties
-		if rv.Kind() == reflect.Map {
-			sfd, ok := src.Type().Elem().FieldByName(prop.Name)
-			if !ok {
-				panic(fmt.Sprintf("Could not get field %q for type %v", prop.Name, src.Type().Elem()))
-			}
-			keyProps = &proto.Properties{}
-			valProps = &proto.Properties{}
-			// NB: Stinks to have re-parse these every time. Would be nicer if proto.Properties exported
-			// its mkeyprop and mvalprop fields!
-			keyProps.Parse(sfd.Tag.Get("protobuf_key"))
-			valProps.Parse(sfd.Tag.Get("protobuf_val"))
-		}
-		v := rv.Interface()
-
 		fd := m.FindFieldDescriptor(int32(prop.Tag))
 		if fd == nil {
 			// Our descriptor has different fields than this message object. So
@@ -1461,6 +1445,11 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 				extraFields = append(extraFields, fd)
 			}
 		}
+		rv := src.FieldByName(prop.Name)
+		if (rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Slice) && rv.IsNil() {
+			continue
+		}
+		v := rv.Interface()
 		if v, err := validFieldValue(fd, v); err != nil {
 			return err
 		} else {

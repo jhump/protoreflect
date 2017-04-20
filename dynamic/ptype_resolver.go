@@ -15,12 +15,17 @@ import (
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"golang.org/x/net/context"
+	"google.golang.org/genproto/protobuf/api"
 	"google.golang.org/genproto/protobuf/ptype"
 
 	"github.com/jhump/protoreflect/desc"
 )
 
-var enumOptionsDesc, enumValueOptionsDesc, msgOptionsDesc, fieldOptionsDesc *desc.MessageDescriptor
+var (
+	enumOptionsDesc, enumValueOptionsDesc *desc.MessageDescriptor
+	msgOptionsDesc, fieldOptionsDesc      *desc.MessageDescriptor
+	svcOptionsDesc, methodOptionsDesc     *desc.MessageDescriptor
+)
 
 func init() {
 	var err error
@@ -39,6 +44,14 @@ func init() {
 	fieldOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.FieldOptions)(nil))
 	if err != nil {
 		panic("Failed to load descriptor for FieldOptions")
+	}
+	svcOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.ServiceOptions)(nil))
+	if err != nil {
+		panic("Failed to load descriptor for ServiceOptions")
+	}
+	methodOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.MethodOptions)(nil))
+	if err != nil {
+		panic("Failed to load descriptor for MethodOptions")
 	}
 }
 
@@ -151,6 +164,10 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 		}
 		defer resp.Body.Close()
 
+		if resp.StatusCode != 200 {
+			return nil, fmt.Errorf("HTTP request returned non-200 status code: %s", resp.Status)
+		}
+
 		if resp.ContentLength > int64(szLimit) {
 			return nil, fmt.Errorf("Type definition size %d is larger than limit of %d", resp.ContentLength, szLimit)
 		}
@@ -166,7 +183,7 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 			}
 			if n > 0 {
 				if b.Len()+n > szLimit {
-					return nil, fmt.Errorf("Type definition size %d is larger than limit of %d", resp.ContentLength, szLimit)
+					return nil, fmt.Errorf("Type definition size %d+ is larger than limit of %d", b.Len()+n, szLimit)
 				}
 				b.Write(buf[:n])
 			}
@@ -240,6 +257,8 @@ func (s *semaphore) Release() {
 	s.cond.Signal()
 }
 
+// typeResolver is used by MessageRegistry to resolve message types. It uses a given TypeFetcher
+// to retrieve type definitions and caches resulting descriptor objects.
 type typeResolver struct {
 	fetcher TypeFetcher
 	mr      *MessageRegistry
@@ -247,6 +266,7 @@ type typeResolver struct {
 	cache   map[string]desc.Descriptor
 }
 
+// resolveUrlToMessageDescriptor returns a message descriptor that represents the type at the given URL.
 func (r *typeResolver) resolveUrlToMessageDescriptor(url string) (md *desc.MessageDescriptor, err error) {
 	r.mu.RLock()
 	cached := r.cache[url]
@@ -284,6 +304,7 @@ func (r *typeResolver) resolveUrlToMessageDescriptor(url string) (md *desc.Messa
 	return
 }
 
+// resolveUrlToEnumDescriptor returns an enum descriptor that represents the enum type at the given URL.
 func (r *typeResolver) resolveUrlToEnumDescriptor(url string) (ed *desc.EnumDescriptor, err error) {
 	r.mu.RLock()
 	cached := r.cache[url]
@@ -321,13 +342,61 @@ func (r *typeResolver) resolveUrlToEnumDescriptor(url string) (ed *desc.EnumDesc
 	return
 }
 
+// resolveApiToServiceDescriptor returns a service descriptor that represents the given API. All request
+// and response type URLs indicated in the API definition are resolved via other methods of this same
+// resolver instance.
+func (r *typeResolver) resolveApiToServiceDescriptor(a *api.Api) (*desc.ServiceDescriptor, error) {
+	rc := newResolutionContext()
+
+	serviceName := base(a.Name)
+	var packageName string
+	if serviceName == a.Name {
+		packageName = ""
+	} else {
+		packageName = a.Name[:len(a.Name)-len(serviceName)-1]
+	}
+
+	var fileName string
+	if a.SourceContext != nil && a.SourceContext.FileName != "" {
+		fileName = a.SourceContext.FileName
+	} else {
+		fileName = "--unknown--.proto"
+	}
+	rc.files[fileName] = &fileEntry{pkgHint: packageName, svc: a, svcName: serviceName}
+
+	for _, m := range a.Methods {
+		if err := rc.addType(m.RequestTypeUrl, r.fetcher, false); err != nil {
+			return nil, err
+		}
+		if err := rc.addType(m.ResponseTypeUrl, r.fetcher, false); err != nil {
+			return nil, err
+		}
+	}
+
+	files, err := rc.toFileDescriptors(r.mr)
+	if err != nil {
+		return nil, err
+	}
+	fd := files[fileName]
+	return fd.FindService(a.Name), nil
+}
+
+// resolutionContext provides the state for a resolution operation, accumulating details about
+// type descriptions and the files that contain them.
 type resolutionContext struct {
-	ctx           context.Context
-	cancel        func()
-	mu            sync.Mutex
-	files         map[string]*fileEntry
+	// The context and cancel function, used to coordinate multiple goroutines when there are multiple
+	// type or enum descriptions to download.
+	ctx    context.Context
+	cancel func()
+
+	mu sync.Mutex
+	// map of file names to details regarding the files' contents
+	files map[string]*fileEntry
+	// map of type URLs to the file name that defines them
 	typeLocations map[string]string
-	unknownCount  int
+	// count of source contexts that do not indicate a file name (used to generate unique file names
+	// when synthesizing file descriptors)
+	unknownCount int
 }
 
 func newResolutionContext() *resolutionContext {
@@ -340,6 +409,9 @@ func newResolutionContext() *resolutionContext {
 	}
 }
 
+// addType adds the type at the given URL to the context, using the given fetcher to download the type's
+// description. This function will recursively add dependencies (e.g. types referenced by the given type's
+// fields if it is a message type), fetching their type descriptions concurrently.
 func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool) error {
 	if err := rc.ctx.Err(); err != nil {
 		return err
@@ -368,6 +440,9 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 		if fe == nil {
 			fe = &fileEntry{}
 			rc.files[fileName] = fe
+		}
+		if fe.pkgHint != "" && !strings.HasPrefix(e.Name, fe.pkgHint+".") {
+			return fmt.Errorf("File %q should have package %s and is supposed to include incompatible element %s", fileName, fe.pkgHint, e.Name)
 		}
 		fe.types.addType(e.Name, e)
 		if e.Syntax == ptype.Syntax_SYNTAX_PROTO3 {
@@ -446,10 +521,15 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 	return nil
 }
 
+// toFileDescriptors converts the information in the context into a map of file names to file descriptors.
 func (rc *resolutionContext) toFileDescriptors(mr *MessageRegistry) (map[string]*desc.FileDescriptor, error) {
 	fdps := map[string]*descriptor.FileDescriptorProto{}
 	for name, file := range rc.files {
-		fdps[name] = file.toFileDescriptor(name, mr)
+		fdp := file.toFileDescriptor(name, mr)
+		if file.svc != nil {
+			fdp.Service = append(fdp.Service, createServiceDescriptor(file.svc, mr))
+		}
+		fdps[name] = fdp
 	}
 	fds := map[string]*desc.FileDescriptor{}
 	for name, fdp := range fdps {
@@ -485,12 +565,17 @@ func makeFileDesc(fdp *descriptor.FileDescriptorProto, fds map[string]*desc.File
 	}
 }
 
+// fileEntry represents the contents of a single file.
 type fileEntry struct {
-	types  typeTrie
-	deps   map[string]struct{}
-	proto3 bool
+	types   typeTrie
+	svc     *api.Api
+	svcName string
+	pkgHint string
+	deps    map[string]struct{}
+	proto3  bool
 }
 
+// toFileDescriptor converts this file entry into a file descriptor proto.
 func (fe fileEntry) toFileDescriptor(name string, mr *MessageRegistry) *descriptor.FileDescriptorProto {
 	var pkg bytes.Buffer
 	tt := &fe.types
@@ -505,7 +590,7 @@ func (fe fileEntry) toFileDescriptor(name string, mr *MessageRegistry) *descript
 			}
 			pkg.WriteString(last)
 		}
-		if len(tt.children) != 1 {
+		if len(tt.children) != 1 || pkg.Len() == len(fe.pkgHint) {
 			break
 		}
 		for last, tt = range tt.children {
@@ -534,11 +619,17 @@ func (fe fileEntry) toFileDescriptor(name string, mr *MessageRegistry) *descript
 	return fd
 }
 
+// typeTrie is a prefix trie where each key component is part of a fully-qualified type name. So key components
+// will either be package name components or element names.
 type typeTrie struct {
+	// successor key components
 	children map[string]*typeTrie
-	typ      proto.Message
+	// if non-nil, the type (a *ptype.Type or *ptype.Enum) whose fully-qualified name is the path from the
+	// trie root to this node
+	typ proto.Message
 }
 
+// addType recursively adds a type (a *ptype.Type or *ptype.Enum) to the trie.
 func (t *typeTrie) addType(key string, typ proto.Message) {
 	if key == "" {
 		t.typ = typ
@@ -556,6 +647,9 @@ func (t *typeTrie) addType(key string, typ proto.Message) {
 	child.addType(rest, typ)
 }
 
+// toDescriptor converts this level of the trie into a message or enum descriptor proto, depending on the
+// kind of value stored in t.typ. If t.typ is nil, a placeholder message (with no fields) is returned that
+// contains the trie's children as nested message and/or enum types.
 func (t *typeTrie) toDescriptor(name string, mr *MessageRegistry) (*descriptor.DescriptorProto, *descriptor.EnumDescriptorProto) {
 	if en, ok := t.typ.(*ptype.Enum); ok {
 		return nil, createEnumDescriptor(en, mr)
@@ -663,6 +757,11 @@ func createFieldDescriptor(f *ptype.Field, mr *MessageRegistry) *descriptor.Fiel
 		}
 	}
 
+	var oneOf *int32
+	if f.OneofIndex > 0 {
+		oneOf = proto.Int32(f.OneofIndex - 1)
+	}
+
 	var typeName string
 	if f.Kind == ptype.Field_TYPE_GROUP || f.Kind == ptype.Field_TYPE_MESSAGE || f.Kind == ptype.Field_TYPE_ENUM {
 		pos := strings.LastIndex(f.TypeUrl, "/")
@@ -724,10 +823,52 @@ func createFieldDescriptor(f *ptype.Field, mr *MessageRegistry) *descriptor.Fiel
 		Number:       proto.Int32(f.Number),
 		DefaultValue: proto.String(f.DefaultValue),
 		JsonName:     proto.String(f.JsonName),
-		OneofIndex:   proto.Int32(f.OneofIndex),
+		OneofIndex:   oneOf,
 		TypeName:     proto.String(typeName),
 		Label:        label.Enum(),
 		Type:         typ.Enum(),
+	}
+}
+
+func createServiceDescriptor(a *api.Api, mr *MessageRegistry) *descriptor.ServiceDescriptorProto {
+	var opts *descriptor.ServiceOptions
+	if len(a.Options) > 0 {
+		dopts := createOptions(a.Options, svcOptionsDesc, mr)
+		dopts.ConvertTo(opts) // ignore any error
+	}
+
+	methods := make([]*descriptor.MethodDescriptorProto, len(a.Methods))
+	for i, m := range a.Methods {
+		methods[i] = createMethodDescriptor(m, mr)
+	}
+
+	return &descriptor.ServiceDescriptorProto{
+		Name:    proto.String(base(a.Name)),
+		Method:  methods,
+		Options: opts,
+	}
+}
+
+func createMethodDescriptor(m *api.Method, mr *MessageRegistry) *descriptor.MethodDescriptorProto {
+	var opts *descriptor.MethodOptions
+	if len(m.Options) > 0 {
+		dopts := createOptions(m.Options, methodOptionsDesc, mr)
+		dopts.ConvertTo(opts) // ignore any error
+	}
+
+	var reqType, respType string
+	pos := strings.LastIndex(m.RequestTypeUrl, "/")
+	reqType = "." + m.RequestTypeUrl[pos+1:]
+	pos = strings.LastIndex(m.ResponseTypeUrl, "/")
+	respType = "." + m.ResponseTypeUrl[pos+1:]
+
+	return &descriptor.MethodDescriptorProto{
+		Name:            proto.String(m.Name),
+		Options:         opts,
+		ClientStreaming: proto.Bool(m.RequestStreaming),
+		ServerStreaming: proto.Bool(m.ResponseStreaming),
+		InputType:       proto.String(reqType),
+		OutputType:      proto.String(respType),
 	}
 }
 

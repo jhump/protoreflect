@@ -18,10 +18,16 @@ type ExtensionRegistry struct {
 	exts           map[string]map[int32]*desc.FieldDescriptor
 }
 
+// NewExtensionRegistryWithDefaults is a registry that includes all "default" extensions,
+// which are those that are statically linked into the current program (e.g. registered by
+// protoc-generated code via proto.RegisterExtension). Extensions explicitly added to the
+// registry will override any default extensions that are for the same extendee and have the
+// same tag number and/or name.
 func NewExtensionRegistryWithDefaults() *ExtensionRegistry {
 	return &ExtensionRegistry{includeDefault: true}
 }
 
+// AddExtensionDesc adds the given extensions to the registry.
 func (r *ExtensionRegistry) AddExtensionDesc(exts ...*proto.ExtensionDesc) error {
 	flds := make([]*desc.FieldDescriptor, len(exts))
 	for i, ext := range exts {
@@ -56,6 +62,7 @@ func asFieldDescriptor(ext *proto.ExtensionDesc) (*desc.FieldDescriptor, error) 
 	return field, nil
 }
 
+// AddExtension adds the given extensions to the registry.
 func (r *ExtensionRegistry) AddExtension(exts ...*desc.FieldDescriptor) error {
 	for _, ext := range exts {
 		if !ext.IsExtension() {
@@ -73,6 +80,7 @@ func (r *ExtensionRegistry) AddExtension(exts ...*desc.FieldDescriptor) error {
 	return nil
 }
 
+// AddExtensionsFromFile adds to the registry all extension fields defined in the given file descriptor.
 func (r *ExtensionRegistry) AddExtensionsFromFile(fd *desc.FileDescriptor) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -106,6 +114,8 @@ func (r *ExtensionRegistry) putExtensionLocked(fd *desc.FieldDescriptor) {
 	m[fd.GetNumber()] = fd
 }
 
+// FindExtension queries for the extension field with the given extendee name (must be a fully-qualified
+// message name) and tag number. If no extension is known, nil is returned.
 func (r *ExtensionRegistry) FindExtension(messageName string, tagNumber int32) *desc.FieldDescriptor {
 	if r == nil {
 		return nil
@@ -122,6 +132,9 @@ func (r *ExtensionRegistry) FindExtension(messageName string, tagNumber int32) *
 	return fd
 }
 
+// FindExtensionByName queries for the extension field with the given extendee name (must be a fully-qualified
+// message name) and field name (must also be a fully-qualified extension name). If no extension is known, nil
+// is returned.
 func (r *ExtensionRegistry) FindExtensionByName(messageName string, fieldName string) *desc.FieldDescriptor {
 	if r == nil {
 		return nil
@@ -153,6 +166,8 @@ func getDefaultExtensions(messageName string) map[int32]*proto.ExtensionDesc {
 	return nil
 }
 
+// AllExtensionsForType returns all known extension fields for the given extendee name (must be a
+// fully-qualified message name).
 func (r *ExtensionRegistry) AllExtensionsForType(messageName string) []*desc.FieldDescriptor {
 	if r == nil {
 		return []*desc.FieldDescriptor(nil)

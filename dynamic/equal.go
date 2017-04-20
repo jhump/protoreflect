@@ -179,10 +179,3 @@ func MessagesEqual(a, b proto.Message) bool {
 		return Equal(da, db)
 	}
 }
-
-func MessageName(msg proto.Message) string {
-	if dm, ok := msg.(*Message); ok {
-		return dm.md.GetFullyQualifiedName()
-	}
-	return proto.MessageName(msg)
-}

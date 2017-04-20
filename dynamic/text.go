@@ -297,7 +297,7 @@ func marshalKnownFieldText(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 				return err
 			}
 		} else {
-			err = proto.MarshalText(b, v.(proto.Message))
+			err = proto.CompactText(b, v.(proto.Message))
 			if err != nil {
 				return err
 			}
