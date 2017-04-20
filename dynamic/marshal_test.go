@@ -174,11 +174,3 @@ func doTranslationParty(t *testing.T, msg proto.Message,
 	testutil.Ceq(t, dm, dm3, eqdm)
 	testutil.Ceq(t, dm, dm4, eqdm)
 }
-
-func eqdm(a, b interface{}) bool {
-	return Equal(a.(*Message), b.(*Message))
-}
-
-func eqpm(a, b interface{}) bool {
-	return proto.Equal(a.(proto.Message), b.(proto.Message))
-}

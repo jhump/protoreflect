@@ -28,8 +28,8 @@ type MessageRegistry struct {
 	mf             *MessageFactory
 	er             *ExtensionRegistry
 	mu             sync.RWMutex
-	messages       map[string]desc.Descriptor
-	domains        map[string]string
+	types          map[string]desc.Descriptor
+	baseUrls       map[string]string
 	defaultBaseUrl string
 }
 
@@ -78,13 +78,12 @@ func (r *MessageRegistry) WithMessageFactory(mf *MessageFactory) *MessageRegistr
 // for one-time initialization of the registry, before it is published for use by
 // other threads.
 func (r *MessageRegistry) WithDefaultBaseUrl(baseUrl string) *MessageRegistry {
-	baseUrl = canonicalizeUrl(baseUrl)
+	baseUrl = stripTrailingSlash(baseUrl)
 	r.defaultBaseUrl = baseUrl
 	return r
 }
 
-func canonicalizeUrl(url string) string {
-	url = ensureScheme(url)
+func stripTrailingSlash(url string) string {
 	if url[len(url)-1] == '/' {
 		return url[:len(url)-1]
 	}
@@ -99,7 +98,10 @@ func (r *MessageRegistry) AddMessage(url string, md *desc.MessageDescriptor) err
 	url = ensureScheme(url)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.messages[url] = md
+	if r.types == nil {
+		r.types = map[string]desc.Descriptor{}
+	}
+	r.types[url] = md
 	return nil
 }
 
@@ -111,29 +113,35 @@ func (r *MessageRegistry) AddEnum(url string, ed *desc.EnumDescriptor) error {
 	url = ensureScheme(url)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.messages[url] = ed
+	if r.types == nil {
+		r.types = map[string]desc.Descriptor{}
+	}
+	r.types[url] = ed
 	return nil
 }
 
 // AddFile adds to the registry all message and enum types in the given file. The URL for each type
 // is derived using the given base URL as "baseURL/full.qualified.type.name".
 func (r *MessageRegistry) AddFile(baseUrl string, fd *desc.FileDescriptor) {
-	baseUrl = canonicalizeUrl(baseUrl)
+	baseUrl = stripTrailingSlash(ensureScheme(baseUrl))
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.types == nil {
+		r.types = map[string]desc.Descriptor{}
+	}
 	r.addEnumTypesLocked(baseUrl, fd.GetEnumTypes())
 	r.addMessageTypesLocked(baseUrl, fd.GetMessageTypes())
 }
 
 func (r *MessageRegistry) addEnumTypesLocked(domain string, enums []*desc.EnumDescriptor) {
 	for _, ed := range enums {
-		r.messages[fmt.Sprintf("%s/%s", domain, ed.GetFullyQualifiedName())] = ed
+		r.types[fmt.Sprintf("%s/%s", domain, ed.GetFullyQualifiedName())] = ed
 	}
 }
 
 func (r *MessageRegistry) addMessageTypesLocked(domain string, msgs []*desc.MessageDescriptor) {
 	for _, md := range msgs {
-		r.messages[fmt.Sprintf("%s/%s", domain, md.GetFullyQualifiedName())] = md
+		r.types[fmt.Sprintf("%s/%s", domain, md.GetFullyQualifiedName())] = md
 		r.addEnumTypesLocked(domain, md.GetNestedEnumTypes())
 		r.addMessageTypesLocked(domain, md.GetNestedMessageTypes())
 	}
@@ -148,10 +156,14 @@ func (r *MessageRegistry) FindMessageTypeByUrl(url string) (*desc.MessageDescrip
 	}
 	url = ensureScheme(url)
 	r.mu.RLock()
-	m := r.messages[url]
+	m := r.types[url]
 	r.mu.RUnlock()
-	if md, ok := m.(*desc.MessageDescriptor); ok {
-		return md, nil
+	if m != nil {
+		if md, ok := m.(*desc.MessageDescriptor); ok {
+			return md, nil
+		} else {
+			return nil, fmt.Errorf("Type for url %v is the wrong type: wanted message, got enum", url)
+		}
 	}
 	if r.includeDefault {
 		pos := strings.LastIndex(url, "/")
@@ -186,10 +198,14 @@ func (r *MessageRegistry) FindEnumTypeByUrl(url string) (*desc.EnumDescriptor, e
 	}
 	url = ensureScheme(url)
 	r.mu.RLock()
-	m := r.messages[url]
+	m := r.types[url]
 	r.mu.RUnlock()
-	if ed, ok := m.(*desc.EnumDescriptor); ok {
-		return ed, nil
+	if m != nil {
+		if ed, ok := m.(*desc.EnumDescriptor); ok {
+			return ed, nil
+		} else {
+			return nil, fmt.Errorf("Type for url %v is the wrong type: wanted enum, got message", url)
+		}
 	}
 	if r.resolver.fetcher == nil {
 		return nil, nil
@@ -267,7 +283,10 @@ func (r *MessageRegistry) AddBaseUrlForElement(baseUrl, packageOrTypeName string
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.domains[packageOrTypeName] = baseUrl
+	if r.baseUrls == nil {
+		r.baseUrls = map[string]string{}
+	}
+	r.baseUrls[packageOrTypeName] = baseUrl
 }
 
 // MarshalAny wraps the given message in an Any value.
@@ -324,6 +343,11 @@ func (r *MessageRegistry) fieldAsPType(fd *desc.FieldDescriptor) *ptype.Field {
 			opts = append(opts[:i], opts[i+1:]...)
 			break
 		}
+	}
+
+	var oneOf int32
+	if fd.AsFieldDescriptorProto().OneofIndex != nil {
+		oneOf = fd.AsFieldDescriptorProto().GetOneofIndex() + 1
 	}
 
 	var card ptype.Field_Cardinality
@@ -384,7 +408,7 @@ func (r *MessageRegistry) fieldAsPType(fd *desc.FieldDescriptor) *ptype.Field {
 		Name:         fd.GetName(),
 		Number:       fd.GetNumber(),
 		JsonName:     fd.AsFieldDescriptorProto().GetJsonName(),
-		OneofIndex:   fd.AsFieldDescriptorProto().GetOneofIndex(),
+		OneofIndex:   oneOf,
 		DefaultValue: fd.AsFieldDescriptorProto().GetDefaultValue(),
 		Options:      opts,
 		Packed:       fd.GetFieldOptions().GetPacked(),
@@ -530,19 +554,19 @@ func syntax(fd *desc.FileDescriptor) ptype.Syntax {
 
 func (r *MessageRegistry) asUrl(name, pkgName string) string {
 	r.mu.RLock()
-	domain := r.domains[name]
-	if domain == "" {
+	baseUrl := r.baseUrls[name]
+	if baseUrl == "" {
 		// lookup domain for the package
-		domain = r.domains[pkgName]
+		baseUrl = r.baseUrls[pkgName]
 	}
 	r.mu.RUnlock()
 
-	if domain == "" {
-		domain = r.defaultBaseUrl
-		if domain == "" {
-			domain = googleApisDomain
+	if baseUrl == "" {
+		baseUrl = r.defaultBaseUrl
+		if baseUrl == "" {
+			baseUrl = googleApisDomain
 		}
 	}
 
-	return fmt.Sprintf("%s/%s", domain, name)
+	return fmt.Sprintf("%s/%s", baseUrl, name)
 }

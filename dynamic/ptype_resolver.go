@@ -164,6 +164,10 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 		}
 		defer resp.Body.Close()
 
+		if resp.StatusCode != 200 {
+			return nil, fmt.Errorf("HTTP request returned non-200 status code: %s", resp.Status)
+		}
+
 		if resp.ContentLength > int64(szLimit) {
 			return nil, fmt.Errorf("Type definition size %d is larger than limit of %d", resp.ContentLength, szLimit)
 		}
@@ -179,7 +183,7 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 			}
 			if n > 0 {
 				if b.Len()+n > szLimit {
-					return nil, fmt.Errorf("Type definition size %d is larger than limit of %d", resp.ContentLength, szLimit)
+					return nil, fmt.Errorf("Type definition size %d+ is larger than limit of %d", b.Len()+n, szLimit)
 				}
 				b.Write(buf[:n])
 			}
@@ -753,6 +757,11 @@ func createFieldDescriptor(f *ptype.Field, mr *MessageRegistry) *descriptor.Fiel
 		}
 	}
 
+	var oneOf *int32
+	if f.OneofIndex > 0 {
+		oneOf = proto.Int32(f.OneofIndex - 1)
+	}
+
 	var typeName string
 	if f.Kind == ptype.Field_TYPE_GROUP || f.Kind == ptype.Field_TYPE_MESSAGE || f.Kind == ptype.Field_TYPE_ENUM {
 		pos := strings.LastIndex(f.TypeUrl, "/")
@@ -814,7 +823,7 @@ func createFieldDescriptor(f *ptype.Field, mr *MessageRegistry) *descriptor.Fiel
 		Number:       proto.Int32(f.Number),
 		DefaultValue: proto.String(f.DefaultValue),
 		JsonName:     proto.String(f.JsonName),
-		OneofIndex:   proto.Int32(f.OneofIndex),
+		OneofIndex:   oneOf,
 		TypeName:     proto.String(typeName),
 		Label:        label.Enum(),
 		Type:         typ.Enum(),
