@@ -359,9 +359,15 @@ func (m *Message) internalSetField(fd *desc.FieldDescriptor, val interface{}) {
 			// can't use == comparison below for map and slices, so just test length
 			// (zero length is same as default)
 			if reflect.ValueOf(val).Len() == 0 {
+				if m.values != nil {
+					delete(m.values, fd.GetNumber())
+				}
 				return
 			}
 		} else if fd.GetDefaultValue() == val {
+			if m.values != nil {
+				delete(m.values, fd.GetNumber())
+			}
 			return
 		}
 	}
