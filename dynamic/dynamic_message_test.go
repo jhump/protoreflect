@@ -249,7 +249,7 @@ func TestGetSetClearMapFields_KeyTypes(t *testing.T) {
 			return v
 		},
 		func(v interface{}) interface{} {
-			// generic slice
+			// generic map
 			return map[interface{}]interface{}{v: "foo"}
 		},
 		func(v interface{}) interface{} {

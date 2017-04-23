@@ -519,11 +519,24 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 	switch fd.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
 		descriptor.FieldDescriptorProto_TYPE_GROUP:
-		// TODO: use mf.NewMessage and, if not a dynamic message, use jsonpb to unmarshal it
 		m := newMessageWithMessageFactory(fd.GetMessageType(), mf)
 		if err := m.unmarshalJson(r); err != nil {
 			return nil, err
 		} else {
+			// TODO: ideally we would use mf.NewMessage and, if not a dynamic message, use
+			// jsonpb to unmarshal it. But the JS parser isn't particularly amenable to that
+			// so we instead convert a dynamic message to a generated one if the known-type
+			// registry knows about the generated type...
+			var ktr *KnownTypeRegistry
+			if mf != nil {
+				ktr = mf.ktr
+			}
+			pm := ktr.CreateIfKnown(fd.GetMessageType().GetFullyQualifiedName())
+			if pm != nil {
+				if err := m.ConvertTo(pm); err != nil {
+					return pm, nil
+				}
+			}
 			return m, nil
 		}
 
