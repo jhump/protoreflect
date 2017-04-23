@@ -151,12 +151,30 @@ func (r *MessageRegistry) addMessageTypesLocked(domain string, msgs []*desc.Mess
 // return nil if the registry is empty and cannot resolve unknown URLs. If an error occurs
 // while resolving the URL, it is returned.
 func (r *MessageRegistry) FindMessageTypeByUrl(url string) (*desc.MessageDescriptor, error) {
+	md, err := r.getRegisteredMessageTypeByUrl(url)
+	if err != nil {
+		return nil, err
+	} else if md != nil {
+		return md, err
+	}
+
+	if r.resolver.fetcher == nil {
+		return nil, nil
+	}
+	if md, err := r.resolver.resolveUrlToMessageDescriptor(url); err != nil {
+		return nil, err
+	} else {
+		return md, nil
+	}
+
+}
+
+func (r *MessageRegistry) getRegisteredMessageTypeByUrl(url string) (*desc.MessageDescriptor, error) {
 	if r == nil {
 		return nil, nil
 	}
-	url = ensureScheme(url)
 	r.mu.RLock()
-	m := r.types[url]
+	m := r.types[ensureScheme(url)]
 	r.mu.RUnlock()
 	if m != nil {
 		if md, ok := m.(*desc.MessageDescriptor); ok {
@@ -179,14 +197,7 @@ func (r *MessageRegistry) FindMessageTypeByUrl(url string) (*desc.MessageDescrip
 			return md, nil
 		}
 	}
-	if r.resolver.fetcher == nil {
-		return nil, nil
-	}
-	if md, err := r.resolver.resolveUrlToMessageDescriptor(url); err != nil {
-		return nil, err
-	} else {
-		return md, nil
-	}
+	return nil, nil
 }
 
 // FindEnumTypeByUrl finds an enum descriptor for the type at the given URL. It may return nil
@@ -196,9 +207,8 @@ func (r *MessageRegistry) FindEnumTypeByUrl(url string) (*desc.EnumDescriptor, e
 	if r == nil {
 		return nil, nil
 	}
-	url = ensureScheme(url)
 	r.mu.RLock()
-	m := r.types[url]
+	m := r.types[ensureScheme(url)]
 	r.mu.RUnlock()
 	if m != nil {
 		if ed, ok := m.(*desc.EnumDescriptor); ok {
@@ -218,16 +228,122 @@ func (r *MessageRegistry) FindEnumTypeByUrl(url string) (*desc.EnumDescriptor, e
 }
 
 // ResolveApiIntoServiceDescriptor constructs a service descriptor that describes the given API.
-// Note that explicitly registered types and "default" types (those statically linked into the
-// current program) are not used: a TypeFetcher is used to resolve all type URLs for request and
-// response types. If the registry has no TypeFetcher configured, this returns nil.
+// If any of the service's request or response type URLs cannot be resolved by this registry, a
+// nil descriptor is returned.
 func (r *MessageRegistry) ResolveApiIntoServiceDescriptor(a *api.Api) (*desc.ServiceDescriptor, error) {
-	// TODO: Support explicitly registered and "default" message types. Will incur non-trivial
-	// file descriptor re-writing...
-	if r.resolver.fetcher == nil {
+	if r == nil {
 		return nil, nil
 	}
-	return r.resolver.resolveApiToServiceDescriptor(a)
+
+	msgs := map[string]*desc.MessageDescriptor{}
+	unresolved := map[string]struct{}{}
+	for _, m := range a.Methods {
+		// request type
+		md, err := r.getRegisteredMessageTypeByUrl(m.RequestTypeUrl)
+		if err != nil {
+			return nil, err
+		} else if md == nil {
+			if r.resolver.fetcher == nil {
+				return nil, nil
+			}
+			unresolved[m.RequestTypeUrl] = struct{}{}
+		} else {
+			msgs[m.RequestTypeUrl] = md
+		}
+		// and response type
+		md, err = r.getRegisteredMessageTypeByUrl(m.ResponseTypeUrl)
+		if err != nil {
+			return nil, err
+		} else if md == nil {
+			if r.resolver.fetcher == nil {
+				return nil, nil
+			}
+			unresolved[m.ResponseTypeUrl] = struct{}{}
+		} else {
+			msgs[m.ResponseTypeUrl] = md
+		}
+	}
+
+	if len(unresolved) > 0 {
+		unresolvedSlice := make([]string, 0, len(unresolved))
+		for k := range unresolved {
+			unresolvedSlice = append(unresolvedSlice, k)
+		}
+		mp, err := r.resolver.resolveUrlsToMessageDescriptors(unresolvedSlice...)
+		if err != nil {
+			return nil, err
+		}
+		for u, md := range mp {
+			msgs[u] = md
+		}
+	}
+
+	var fileName string
+	if a.SourceContext != nil && a.SourceContext.FileName != "" {
+		fileName = a.SourceContext.FileName
+	} else {
+		fileName = "--unknown--.proto"
+	}
+
+	// now we add all types we care about to a typeTrie and use that to generate file descriptors
+	files := map[string]*fileEntry{}
+	fe := &fileEntry{}
+	fe.proto3 = a.Syntax == ptype.Syntax_SYNTAX_PROTO3
+	files[fileName] = fe
+	fe.types.addType(a.Name, createServiceDescriptor(a, r))
+	added := map[string]struct{}{}
+	for _, md := range msgs {
+		addDescriptors(fileName, files, md, msgs, added)
+	}
+
+	// build resulting file descriptor(s) and return the final service descriptor
+	fileDescriptors, err := toFileDescriptors(files, (*typeTrie).rewriteDescriptor)
+	if err != nil {
+		return nil, err
+	}
+	return fileDescriptors[fileName].FindService(a.Name), nil
+}
+
+func addDescriptors(ref string, files map[string]*fileEntry, d desc.Descriptor, msgs map[string]*desc.MessageDescriptor, added map[string]struct{}) {
+	name := d.GetFullyQualifiedName()
+
+	fileName := d.GetFile().GetName()
+	if fileName != ref {
+		dependee := files[ref]
+		if dependee.deps == nil {
+			dependee.deps = map[string]struct{}{}
+		}
+		dependee.deps[fileName] = struct{}{}
+	}
+
+	if _, ok := added[name]; ok {
+		// already added this one
+		return
+	}
+	added[name] = struct{}{}
+
+	fe := files[fileName]
+	if fe == nil {
+		fe = &fileEntry{}
+		fe.proto3 = d.GetFile().IsProto3()
+		files[fileName] = fe
+	}
+	fe.types.addType(name, d.AsProto())
+
+	if md, ok := d.(*desc.MessageDescriptor); ok {
+		for _, fld := range md.GetFields() {
+			if fld.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE || fld.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP {
+				// prefer descriptor in msgs map over what the field descriptor indicates
+				md := msgs[fld.GetMessageType().GetFullyQualifiedName()]
+				if md == nil {
+					md = fld.GetMessageType()
+				}
+				addDescriptors(fileName, files, md, msgs, added)
+			} else if fld.GetType() == descriptor.FieldDescriptorProto_TYPE_ENUM {
+				addDescriptors(fileName, files, fld.GetEnumType(), msgs, added)
+			}
+		}
+	}
 }
 
 // UnmarshalAny will unmarshal the value embedded in the given Any value. This will use this
@@ -479,7 +595,7 @@ func (r *MessageRegistry) options(options proto.Message) []*ptype.Option {
 	for _, p := range proto.GetProperties(rv.Type()).Prop {
 		o := r.option(p.OrigName, rv.FieldByName(p.Name))
 		if o != nil {
-			opts = append(opts, o)
+			opts = append(opts, o...)
 		}
 	}
 	for _, ext := range proto.RegisteredExtensions(options) {
@@ -488,7 +604,7 @@ func (r *MessageRegistry) options(options proto.Message) []*ptype.Option {
 			if err == nil && v != nil {
 				o := r.option(ext.Name, reflect.ValueOf(v))
 				if o != nil {
-					opts = append(opts, o)
+					opts = append(opts, o...)
 				}
 			}
 		}
@@ -496,9 +612,20 @@ func (r *MessageRegistry) options(options proto.Message) []*ptype.Option {
 	return opts
 }
 
-func (r *MessageRegistry) option(name string, value reflect.Value) *ptype.Option {
-	// ignoring unsupported types or values that cannot be marshalled
-	// TODO(jh): error or panic?
+func (r *MessageRegistry) option(name string, value reflect.Value) []*ptype.Option {
+	if value.Kind() == reflect.Slice && value.Type() != typeOfBytes {
+		// repeated field
+		ret := make([]*ptype.Option, value.Len())
+		for i := 0; i < value.Len(); i++ {
+			ret[i] = r.singleOption(name, value.Index(i))
+		}
+		return ret
+	} else {
+		return []*ptype.Option{r.singleOption(name, value)}
+	}
+}
+
+func (r *MessageRegistry) singleOption(name string, value reflect.Value) *ptype.Option {
 	pm := wrap(value)
 	if pm == nil {
 		return nil

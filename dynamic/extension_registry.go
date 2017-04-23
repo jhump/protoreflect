@@ -31,7 +31,7 @@ func NewExtensionRegistryWithDefaults() *ExtensionRegistry {
 func (r *ExtensionRegistry) AddExtensionDesc(exts ...*proto.ExtensionDesc) error {
 	flds := make([]*desc.FieldDescriptor, len(exts))
 	for i, ext := range exts {
-		fd, err := asFieldDescriptor(ext)
+		fd, err := desc.LoadFieldDescriptorForExtension(ext)
 		if err != nil {
 			return err
 		}
@@ -46,20 +46,6 @@ func (r *ExtensionRegistry) AddExtensionDesc(exts ...*proto.ExtensionDesc) error
 		r.putExtensionLocked(fd)
 	}
 	return nil
-}
-
-func asFieldDescriptor(ext *proto.ExtensionDesc) (*desc.FieldDescriptor, error) {
-	file, err := desc.LoadFileDescriptor(ext.Filename)
-	if err != nil {
-		return nil, err
-	}
-	field, ok := file.FindSymbol(ext.Name).(*desc.FieldDescriptor)
-	// make sure descriptor agrees with attributes of the ExtensionDesc
-	if !ok || !field.IsExtension() || field.GetOwner().GetFullyQualifiedName() != proto.MessageName(ext.ExtendedType) ||
-		field.GetNumber() != ext.Field {
-		return nil, fmt.Errorf("File descriptor contained unexpected object with name %s:", ext.Name)
-	}
-	return field, nil
 }
 
 // AddExtension adds the given extensions to the registry.
@@ -126,7 +112,7 @@ func (r *ExtensionRegistry) FindExtension(messageName string, tagNumber int32) *
 	if fd == nil && r.includeDefault {
 		ext := getDefaultExtensions(messageName)[tagNumber]
 		if ext != nil {
-			fd, _ = asFieldDescriptor(ext)
+			fd, _ = desc.LoadFieldDescriptorForExtension(ext)
 		}
 	}
 	return fd
@@ -148,7 +134,7 @@ func (r *ExtensionRegistry) FindExtensionByName(messageName string, fieldName st
 	}
 	if r.includeDefault {
 		for _, ext := range getDefaultExtensions(messageName) {
-			fd, _ := asFieldDescriptor(ext)
+			fd, _ := desc.LoadFieldDescriptorForExtension(ext)
 			if fd.GetFullyQualifiedName() == fieldName {
 				return fd
 			}
@@ -186,7 +172,7 @@ func (r *ExtensionRegistry) AllExtensionsForType(messageName string) []*desc.Fie
 				// skip default extension and use the one explicitly registered instead
 				continue
 			}
-			fd, _ := asFieldDescriptor(ext)
+			fd, _ := desc.LoadFieldDescriptorForExtension(ext)
 			if fd != nil {
 				ret = append(ret, fd)
 			}

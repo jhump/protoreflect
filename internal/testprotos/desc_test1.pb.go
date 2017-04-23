@@ -10,6 +10,7 @@ It is generated from these files:
 	desc_test2.proto
 	desc_test_defaults.proto
 	desc_test_field_types.proto
+	desc_test_options.proto
 	desc_test_proto3.proto
 
 It has these top-level messages:
@@ -27,6 +28,7 @@ It has these top-level messages:
 	RepeatedPackedFields
 	MapKeyFields
 	MapValFields
+	ReallySimpleMessage
 	TestRequest
 	TestResponse
 */

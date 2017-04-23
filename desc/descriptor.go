@@ -655,6 +655,9 @@ func createFieldDescriptor(fd *FileDescriptor, parent Descriptor, enclosing stri
 }
 
 func (fd *FieldDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dpb.SourceCodeInfo_Location, scopes []scope) error {
+	if fd.proto.OneofIndex != nil && fd.oneOf == nil {
+		return fmt.Errorf("Could not link field %s to one-of index %d", fd.fqn, *fd.proto.OneofIndex)
+	}
 	fd.sourceInfo = sourceCodeInfo[pathAsKey(path)]
 	if fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_ENUM {
 		if desc, err := resolve(fd.file, fd.proto.GetTypeName(), scopes); err != nil {
@@ -1705,4 +1708,20 @@ func getMessageFromCache(message string) *MessageDescriptor {
 	cacheMu.RLock()
 	defer cacheMu.RUnlock()
 	return messagesCache[message]
+}
+
+// LoadFieldDescriptorForExtension loads the field descriptor that corresponds to the given
+// extension description.
+func LoadFieldDescriptorForExtension(ext *proto.ExtensionDesc) (*FieldDescriptor, error) {
+	file, err := LoadFileDescriptor(ext.Filename)
+	if err != nil {
+		return nil, err
+	}
+	field, ok := file.FindSymbol(ext.Name).(*FieldDescriptor)
+	// make sure descriptor agrees with attributes of the ExtensionDesc
+	if !ok || !field.IsExtension() || field.GetOwner().GetFullyQualifiedName() != proto.MessageName(ext.ExtendedType) ||
+		field.GetNumber() != ext.Field {
+		return nil, fmt.Errorf("File descriptor contained unexpected object with name %s:", ext.Name)
+	}
+	return field, nil
 }
