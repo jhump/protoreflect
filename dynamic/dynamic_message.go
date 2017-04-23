@@ -1149,6 +1149,9 @@ func (m *Message) mergeInto(pm proto.Message) error {
 	}
 
 	target := reflect.ValueOf(pm)
+	if target.Kind() == reflect.Ptr {
+		target = target.Elem()
+	}
 
 	// track tags for which the dynamic message has data but the given
 	// message doesn't know about it
@@ -1282,10 +1285,13 @@ func (m *Message) mergeInto(pm proto.Message) error {
 }
 
 func canConvert(src reflect.Value, target reflect.Type) bool {
+	if src.Kind() == reflect.Interface {
+		src = reflect.ValueOf(src.Interface())
+	}
 	srcType := src.Type()
-	if target == srcType {
+	if srcType.ConvertibleTo(target) {
 		return true
-	} else if target.Kind() == reflect.Ptr && target.Elem() == srcType {
+	} else if target.Kind() == reflect.Ptr && srcType.ConvertibleTo(target.Elem()) {
 		return true
 	} else if target.Kind() == reflect.Slice {
 		if srcType.Kind() != reflect.Slice {
@@ -1323,18 +1329,26 @@ func canConvert(src reflect.Value, target reflect.Type) bool {
 }
 
 func convert(src, target reflect.Value) {
+	if src.Kind() == reflect.Interface {
+		src = reflect.ValueOf(src.Interface())
+	}
 	srcType := src.Type()
 	targetType := target.Type()
-	if targetType == srcType {
-		target.Set(src)
-	} else if targetType.Kind() == reflect.Ptr && targetType.Elem() == srcType {
-		target.Set(src.Addr())
+	if srcType.ConvertibleTo(targetType) {
+		target.Set(src.Convert(targetType))
+	} else if targetType.Kind() == reflect.Ptr && srcType.ConvertibleTo(targetType.Elem()) {
+		if !src.CanAddr() {
+			target.Set(reflect.New(targetType.Elem()))
+			target.Elem().Set(src.Convert(targetType.Elem()))
+		} else {
+			target.Set(src.Addr().Convert(targetType))
+		}
 	} else if targetType.Kind() == reflect.Slice {
 		l := target.Len()
 		newL := l + src.Len()
 		if target.Cap() < newL {
 			// expand capacity of the slice and copy
-			newSl := reflect.MakeSlice(targetType.Elem(), newL, newL)
+			newSl := reflect.MakeSlice(targetType, newL, newL)
 			for i := 0; i < target.Len(); i++ {
 				newSl.Index(i).Set(target.Index(i))
 			}
@@ -1502,7 +1516,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 				fd := m.er.FindExtension(m.md.GetFullyQualifiedName(), tag)
 				if fd == nil {
 					var err error
-					if fd, err = asFieldDescriptor(ed); err != nil {
+					if fd, err = desc.LoadFieldDescriptorForExtension(ed); err != nil {
 						return err
 					}
 					extraFields = append(extraFields, fd)

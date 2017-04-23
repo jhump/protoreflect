@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -135,12 +136,6 @@ func (c *protoCache) getOrLoad(key string, loader func() (proto.Message, error))
 	return loader()
 }
 
-func (c *protoCache) put(key string, m proto.Message) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.entries[key] = &protoCacheEntry{msg: m}
-}
-
 // HttpTypeFetcher returns a TypeFetcher that uses the given HTTP transport to query and
 // download type definitions. The given szLimit is the maximum response size accepted. If
 // used from multiple goroutines (like when a type's dependency graph is resolved in
@@ -267,32 +262,37 @@ type typeResolver struct {
 }
 
 // resolveUrlToMessageDescriptor returns a message descriptor that represents the type at the given URL.
-func (r *typeResolver) resolveUrlToMessageDescriptor(url string) (md *desc.MessageDescriptor, err error) {
+func (r *typeResolver) resolveUrlToMessageDescriptor(url string) (*desc.MessageDescriptor, error) {
+	url = ensureScheme(url)
 	r.mu.RLock()
 	cached := r.cache[url]
 	r.mu.RUnlock()
 	if cached != nil {
-		var ok bool
-		if md, ok = cached.(*desc.MessageDescriptor); ok {
-			return
+		if md, ok := cached.(*desc.MessageDescriptor); ok {
+			return md, nil
 		} else {
-			err = fmt.Errorf("Type for url %v is the wrong type: wanted message, got enum", url)
-			return
+			return nil, fmt.Errorf("Type for url %v is the wrong type: wanted message, got enum", url)
 		}
 	}
 
 	rc := newResolutionContext()
-	if err = rc.addType(url, r.fetcher, false); err != nil {
-		return
+	if err := rc.addType(url, r.fetcher, false); err != nil {
+		return nil, err
 	}
 
 	var files map[string]*desc.FileDescriptor
-	files, err = rc.toFileDescriptors(r.mr)
+	files, err := rc.toFileDescriptors(r.mr)
 	if err != nil {
-		return
+		return nil, err
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	var md *desc.MessageDescriptor
+	if len(rc.typeLocations) > 0 {
+		if r.cache == nil {
+			r.cache = map[string]desc.Descriptor{}
+		}
+	}
 	for typeUrl, fileName := range rc.typeLocations {
 		fd := files[fileName]
 		sym := fd.FindSymbol(typeName(typeUrl))
@@ -301,36 +301,98 @@ func (r *typeResolver) resolveUrlToMessageDescriptor(url string) (md *desc.Messa
 			md = sym.(*desc.MessageDescriptor)
 		}
 	}
-	return
+	return md, nil
+}
+
+// resolveUrlsToMessageDescriptors returns a map of the given URLs to corresponding
+// message descriptors that represent the types at those URLs.
+func (r *typeResolver) resolveUrlsToMessageDescriptors(urls ...string) (map[string]*desc.MessageDescriptor, error) {
+	ret := map[string]*desc.MessageDescriptor{}
+	var unresolved []string
+	r.mu.RLock()
+	for _, u := range urls {
+		u = ensureScheme(u)
+		cached := r.cache[u]
+		if cached != nil {
+			if md, ok := cached.(*desc.MessageDescriptor); ok {
+				ret[u] = md
+			} else {
+				r.mu.RUnlock()
+				return nil, fmt.Errorf("Type for url %v is the wrong type: wanted message, got enum", u)
+			}
+		} else {
+			ret[u] = nil
+			unresolved = append(unresolved, u)
+		}
+	}
+	r.mu.RUnlock()
+
+	if len(unresolved) == 0 {
+		return ret, nil
+	}
+
+	rc := newResolutionContext()
+	for _, u := range unresolved {
+		if err := rc.addType(u, r.fetcher, false); err != nil {
+			return nil, err
+		}
+	}
+
+	var files map[string]*desc.FileDescriptor
+	files, err := rc.toFileDescriptors(r.mr)
+	if err != nil {
+		return nil, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(rc.typeLocations) > 0 {
+		if r.cache == nil {
+			r.cache = map[string]desc.Descriptor{}
+		}
+	}
+	for typeUrl, fileName := range rc.typeLocations {
+		fd := files[fileName]
+		sym := fd.FindSymbol(typeName(typeUrl))
+		r.cache[typeUrl] = sym
+		if _, ok := ret[typeUrl]; ok {
+			ret[typeUrl] = sym.(*desc.MessageDescriptor)
+		}
+	}
+	return ret, nil
 }
 
 // resolveUrlToEnumDescriptor returns an enum descriptor that represents the enum type at the given URL.
-func (r *typeResolver) resolveUrlToEnumDescriptor(url string) (ed *desc.EnumDescriptor, err error) {
+func (r *typeResolver) resolveUrlToEnumDescriptor(url string) (*desc.EnumDescriptor, error) {
+	url = ensureScheme(url)
 	r.mu.RLock()
 	cached := r.cache[url]
 	r.mu.RUnlock()
 	if cached != nil {
-		var ok bool
-		if ed, ok = cached.(*desc.EnumDescriptor); ok {
-			return
+		if ed, ok := cached.(*desc.EnumDescriptor); ok {
+			return ed, nil
 		} else {
-			err = fmt.Errorf("Type for url %v is the wrong type: wanted enum, got message", url)
-			return
+			return nil, fmt.Errorf("Type for url %v is the wrong type: wanted enum, got message", url)
 		}
 	}
 
 	rc := newResolutionContext()
-	if err = rc.addType(url, r.fetcher, true); err != nil {
-		return
+	if err := rc.addType(url, r.fetcher, true); err != nil {
+		return nil, err
 	}
 
 	var files map[string]*desc.FileDescriptor
-	files, err = rc.toFileDescriptors(r.mr)
+	files, err := rc.toFileDescriptors(r.mr)
 	if err != nil {
-		return
+		return nil, err
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	var ed *desc.EnumDescriptor
+	if len(rc.typeLocations) > 0 {
+		if r.cache == nil {
+			r.cache = map[string]desc.Descriptor{}
+		}
+	}
 	for typeUrl, fileName := range rc.typeLocations {
 		fd := files[fileName]
 		sym := fd.FindSymbol(typeName(typeUrl))
@@ -339,46 +401,7 @@ func (r *typeResolver) resolveUrlToEnumDescriptor(url string) (ed *desc.EnumDesc
 			ed = sym.(*desc.EnumDescriptor)
 		}
 	}
-	return
-}
-
-// resolveApiToServiceDescriptor returns a service descriptor that represents the given API. All request
-// and response type URLs indicated in the API definition are resolved via other methods of this same
-// resolver instance.
-func (r *typeResolver) resolveApiToServiceDescriptor(a *api.Api) (*desc.ServiceDescriptor, error) {
-	rc := newResolutionContext()
-
-	serviceName := base(a.Name)
-	var packageName string
-	if serviceName == a.Name {
-		packageName = ""
-	} else {
-		packageName = a.Name[:len(a.Name)-len(serviceName)-1]
-	}
-
-	var fileName string
-	if a.SourceContext != nil && a.SourceContext.FileName != "" {
-		fileName = a.SourceContext.FileName
-	} else {
-		fileName = "--unknown--.proto"
-	}
-	rc.files[fileName] = &fileEntry{pkgHint: packageName, svc: a, svcName: serviceName}
-
-	for _, m := range a.Methods {
-		if err := rc.addType(m.RequestTypeUrl, r.fetcher, false); err != nil {
-			return nil, err
-		}
-		if err := rc.addType(m.ResponseTypeUrl, r.fetcher, false); err != nil {
-			return nil, err
-		}
-	}
-
-	files, err := rc.toFileDescriptors(r.mr)
-	if err != nil {
-		return nil, err
-	}
-	fd := files[fileName]
-	return fd.FindService(a.Name), nil
+	return ed, nil
 }
 
 // resolutionContext provides the state for a resolution operation, accumulating details about
@@ -419,6 +442,8 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 	m, err := fetcher(url, enum)
 	if err != nil {
 		return err
+	} else if m == nil {
+		return fmt.Errorf("Failed to locate type for %s", url)
 	}
 
 	if enum {
@@ -440,9 +465,6 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 		if fe == nil {
 			fe = &fileEntry{}
 			rc.files[fileName] = fe
-		}
-		if fe.pkgHint != "" && !strings.HasPrefix(e.Name, fe.pkgHint+".") {
-			return fmt.Errorf("File %q should have package %s and is supposed to include incompatible element %s", fileName, fe.pkgHint, e.Name)
 		}
 		fe.types.addType(e.Name, e)
 		if e.Syntax == ptype.Syntax_SYNTAX_PROTO3 {
@@ -523,11 +545,24 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 
 // toFileDescriptors converts the information in the context into a map of file names to file descriptors.
 func (rc *resolutionContext) toFileDescriptors(mr *MessageRegistry) (map[string]*desc.FileDescriptor, error) {
+	return toFileDescriptors(rc.files, func(tt *typeTrie, name string) (proto.Message, error) {
+		mdp, edp := tt.ptypeToDescriptor(name, mr)
+		if mdp != nil {
+			return mdp, nil
+		} else {
+			return edp, nil
+		}
+	})
+}
+
+// converts a map of file entries into a map of file descriptors using the given function to convert
+// each trie node into a descriptor proto.
+func toFileDescriptors(files map[string]*fileEntry, trieFn func(*typeTrie, string) (proto.Message, error)) (map[string]*desc.FileDescriptor, error) {
 	fdps := map[string]*descriptor.FileDescriptorProto{}
-	for name, file := range rc.files {
-		fdp := file.toFileDescriptor(name, mr)
-		if file.svc != nil {
-			fdp.Service = append(fdp.Service, createServiceDescriptor(file.svc, mr))
+	for name, file := range files {
+		fdp, err := file.toFileDescriptor(name, trieFn)
+		if err != nil {
+			return nil, err
 		}
 		fdps[name] = fdp
 	}
@@ -567,16 +602,14 @@ func makeFileDesc(fdp *descriptor.FileDescriptorProto, fds map[string]*desc.File
 
 // fileEntry represents the contents of a single file.
 type fileEntry struct {
-	types   typeTrie
-	svc     *api.Api
-	svcName string
-	pkgHint string
-	deps    map[string]struct{}
-	proto3  bool
+	types  typeTrie
+	deps   map[string]struct{}
+	proto3 bool
 }
 
-// toFileDescriptor converts this file entry into a file descriptor proto.
-func (fe fileEntry) toFileDescriptor(name string, mr *MessageRegistry) *descriptor.FileDescriptorProto {
+// toFileDescriptor converts this file entry into a file descriptor proto. The given function
+// is used to transform nodes in a typeTrie into message and/or enum descriptor protos.
+func (fe fileEntry) toFileDescriptor(name string, trieFn func(*typeTrie, string) (proto.Message, error)) (*descriptor.FileDescriptorProto, error) {
 	var pkg bytes.Buffer
 	tt := &fe.types
 	first := true
@@ -590,7 +623,7 @@ func (fe fileEntry) toFileDescriptor(name string, mr *MessageRegistry) *descript
 			}
 			pkg.WriteString(last)
 		}
-		if len(tt.children) != 1 || pkg.Len() == len(fe.pkgHint) {
+		if len(tt.children) != 1 {
 			break
 		}
 		for last, tt = range tt.children {
@@ -598,25 +631,35 @@ func (fe fileEntry) toFileDescriptor(name string, mr *MessageRegistry) *descript
 	}
 	fd := createFileDescriptor(name, pkg.String(), fe.proto3, fe.deps)
 	if tt.typ != nil {
-		msg, enum := tt.toDescriptor(last, mr)
-		if msg != nil {
-			fd.MessageType = append(fd.MessageType, msg)
+		pm, err := trieFn(tt, last)
+		if err != nil {
+			return nil, err
 		}
-		if enum != nil {
-			fd.EnumType = append(fd.EnumType, enum)
+		if mdp, ok := pm.(*descriptor.DescriptorProto); ok {
+			fd.MessageType = append(fd.MessageType, mdp)
+		} else if edp, ok := pm.(*descriptor.EnumDescriptorProto); ok {
+			fd.EnumType = append(fd.EnumType, edp)
+		} else {
+			sdp := pm.(*descriptor.ServiceDescriptorProto)
+			fd.Service = append(fd.Service, sdp)
 		}
 	} else {
 		for name, nested := range tt.children {
-			msg, enum := nested.toDescriptor(name, mr)
-			if msg != nil {
-				fd.MessageType = append(fd.MessageType, msg)
+			pm, err := trieFn(nested, name)
+			if err != nil {
+				return nil, err
 			}
-			if enum != nil {
-				fd.EnumType = append(fd.EnumType, enum)
+			if mdp, ok := pm.(*descriptor.DescriptorProto); ok {
+				fd.MessageType = append(fd.MessageType, mdp)
+			} else if edp, ok := pm.(*descriptor.EnumDescriptorProto); ok {
+				fd.EnumType = append(fd.EnumType, edp)
+			} else {
+				sdp := pm.(*descriptor.ServiceDescriptorProto)
+				fd.Service = append(fd.Service, sdp)
 			}
 		}
 	}
-	return fd
+	return fd, nil
 }
 
 // typeTrie is a prefix trie where each key component is part of a fully-qualified type name. So key components
@@ -624,12 +667,11 @@ func (fe fileEntry) toFileDescriptor(name string, mr *MessageRegistry) *descript
 type typeTrie struct {
 	// successor key components
 	children map[string]*typeTrie
-	// if non-nil, the type (a *ptype.Type or *ptype.Enum) whose fully-qualified name is the path from the
-	// trie root to this node
+	// if non-nil, the element whose fully-qualified name is the path from the trie root to this node
 	typ proto.Message
 }
 
-// addType recursively adds a type (a *ptype.Type or *ptype.Enum) to the trie.
+// addType recursively adds an element to the trie.
 func (t *typeTrie) addType(key string, typ proto.Message) {
 	if key == "" {
 		t.typ = typ
@@ -647,10 +689,11 @@ func (t *typeTrie) addType(key string, typ proto.Message) {
 	child.addType(rest, typ)
 }
 
-// toDescriptor converts this level of the trie into a message or enum descriptor proto, depending on the
-// kind of value stored in t.typ. If t.typ is nil, a placeholder message (with no fields) is returned that
-// contains the trie's children as nested message and/or enum types.
-func (t *typeTrie) toDescriptor(name string, mr *MessageRegistry) (*descriptor.DescriptorProto, *descriptor.EnumDescriptorProto) {
+// ptypeToDescriptor converts this level of the trie into a message or enum descriptor proto, requiring
+// that the element stored in t.typ is a *ptype.Type or *ptype.Enum. If t.typ is nil, a placeholder
+// message (with no fields) is returned that contains the trie's children as nested message and/or enum
+// types.
+func (t *typeTrie) ptypeToDescriptor(name string, mr *MessageRegistry) (*descriptor.DescriptorProto, *descriptor.EnumDescriptorProto) {
 	if en, ok := t.typ.(*ptype.Enum); ok {
 		return nil, createEnumDescriptor(en, mr)
 	} else {
@@ -660,17 +703,72 @@ func (t *typeTrie) toDescriptor(name string, mr *MessageRegistry) (*descriptor.D
 		} else {
 			msg = createMessageDescriptor(t.typ.(*ptype.Type), mr)
 		}
-		for name, nested := range t.children {
-			msg, enum := nested.toDescriptor(name, mr)
-			if msg != nil {
-				msg.NestedType = append(msg.NestedType, msg)
+		// sort children for deterministic output
+		var keys []string
+		for k := range t.children {
+			keys = append(keys, k)
+		}
+		for _, name := range keys {
+			nested := t.children[name]
+			chMsg, chEnum := nested.ptypeToDescriptor(name, mr)
+			if chMsg != nil {
+				msg.NestedType = append(msg.NestedType, chMsg)
 			}
-			if enum != nil {
-				msg.EnumType = append(msg.EnumType, enum)
+			if chEnum != nil {
+				msg.EnumType = append(msg.EnumType, chEnum)
 			}
 		}
 		return msg, nil
 	}
+}
+
+// rewriteDescriptor converts this level of the trie into a new descriptor proto, requiring that
+// the element stored in t.type is already a servie, message, or enum descriptor proto. If this trie
+// has children then t.typ must be a message descriptor proto. The returned descriptor proto is the
+// same as t.type but with possibly new nested elements to represent this trie node's children.
+func (t *typeTrie) rewriteDescriptor(name string) (proto.Message, error) {
+	if len(t.children) == 0 && t.typ != nil {
+		if mdp, ok := t.typ.(*descriptor.DescriptorProto); ok {
+			if len(mdp.NestedType) == 0 && len(mdp.EnumType) == 0 {
+				return mdp, nil
+			}
+			mdp = proto.Clone(mdp).(*descriptor.DescriptorProto)
+			mdp.NestedType = nil
+			mdp.EnumType = nil
+			return mdp, nil
+		}
+		return t.typ, nil
+	}
+	var mdp *descriptor.DescriptorProto
+	if t.typ == nil {
+		mdp = createIntermediateMessageDescriptor(name)
+	} else {
+		mdp = t.typ.(*descriptor.DescriptorProto)
+		mdp = proto.Clone(mdp).(*descriptor.DescriptorProto)
+		mdp.NestedType = nil
+		mdp.EnumType = nil
+	}
+	// sort children for deterministic output
+	var keys []string
+	for k := range t.children {
+		keys = append(keys, k)
+	}
+	for _, n := range keys {
+		ch := t.children[n]
+		typ, err := ch.rewriteDescriptor(n)
+		if err != nil {
+			return nil, err
+		}
+		switch typ := typ.(type) {
+		case (*descriptor.DescriptorProto):
+			mdp.NestedType = append(mdp.NestedType, typ)
+		case (*descriptor.EnumDescriptorProto):
+			mdp.EnumType = append(mdp.EnumType, typ)
+		default:
+			return nil, fmt.Errorf("Invalid descriptor trie: message cannot have child of type %v", reflect.TypeOf(typ))
+		}
+	}
+	return mdp, nil
 }
 
 func split(s string) (string, string) {
@@ -686,7 +784,8 @@ func createEnumDescriptor(e *ptype.Enum, mr *MessageRegistry) *descriptor.EnumDe
 	var opts *descriptor.EnumOptions
 	if len(e.Options) > 0 {
 		dopts := createOptions(e.Options, enumOptionsDesc, mr)
-		dopts.ConvertTo(opts)
+		opts = &descriptor.EnumOptions{}
+		dopts.ConvertTo(opts) // ignore any error
 	}
 
 	var vals []*descriptor.EnumValueDescriptorProto
@@ -706,7 +805,8 @@ func createEnumValueDescriptor(v *ptype.EnumValue, mr *MessageRegistry) *descrip
 	var opts *descriptor.EnumValueOptions
 	if len(v.Options) > 0 {
 		dopts := createOptions(v.Options, enumValueOptionsDesc, mr)
-		dopts.ConvertTo(opts)
+		opts = &descriptor.EnumValueOptions{}
+		dopts.ConvertTo(opts) // ignore any error
 	}
 
 	return &descriptor.EnumValueDescriptorProto{
@@ -720,6 +820,7 @@ func createMessageDescriptor(m *ptype.Type, mr *MessageRegistry) *descriptor.Des
 	var opts *descriptor.MessageOptions
 	if len(m.Options) > 0 {
 		dopts := createOptions(m.Options, msgOptionsDesc, mr)
+		opts = &descriptor.MessageOptions{}
 		dopts.ConvertTo(opts) // ignore any error
 	}
 
@@ -747,6 +848,7 @@ func createFieldDescriptor(f *ptype.Field, mr *MessageRegistry) *descriptor.Fiel
 	var opts *descriptor.FieldOptions
 	if len(f.Options) > 0 {
 		dopts := createOptions(f.Options, fieldOptionsDesc, mr)
+		opts = &descriptor.FieldOptions{}
 		dopts.ConvertTo(opts) // ignore any error
 	}
 	if f.Packed {
@@ -827,6 +929,7 @@ func createFieldDescriptor(f *ptype.Field, mr *MessageRegistry) *descriptor.Fiel
 		TypeName:     proto.String(typeName),
 		Label:        label.Enum(),
 		Type:         typ.Enum(),
+		Options:      opts,
 	}
 }
 
@@ -834,6 +937,7 @@ func createServiceDescriptor(a *api.Api, mr *MessageRegistry) *descriptor.Servic
 	var opts *descriptor.ServiceOptions
 	if len(a.Options) > 0 {
 		dopts := createOptions(a.Options, svcOptionsDesc, mr)
+		opts = &descriptor.ServiceOptions{}
 		dopts.ConvertTo(opts) // ignore any error
 	}
 
@@ -853,6 +957,7 @@ func createMethodDescriptor(m *api.Method, mr *MessageRegistry) *descriptor.Meth
 	var opts *descriptor.MethodOptions
 	if len(m.Options) > 0 {
 		dopts := createOptions(m.Options, methodOptionsDesc, mr)
+		opts = &descriptor.MethodOptions{}
 		dopts.ConvertTo(opts) // ignore any error
 	}
 
@@ -939,7 +1044,11 @@ func createOptions(options []*ptype.Option, optionsDesc *desc.MessageDescriptor,
 		} else {
 			fv = v
 		}
-		dopts.setField(field, fv) // ignore any error
+		if field.IsRepeated() {
+			dopts.addRepeatedField(field, fv) // ignore any error
+		} else {
+			dopts.setField(field, fv) // ignore any error
+		}
 	}
 	return dopts
 }
