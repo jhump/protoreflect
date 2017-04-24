@@ -116,7 +116,7 @@ func (r *KnownTypeRegistry) CreateIfKnown(messageName string) proto.Message {
 	if r == nil {
 		// a nil registry behaves the same as zero value instance: only know of well-known types
 		t := proto.MessageType(messageName)
-		if t.Implements(typeOfWkt) {
+		if t != nil && t.Implements(typeOfWkt) {
 			msgType = t
 		}
 	} else {
@@ -124,7 +124,7 @@ func (r *KnownTypeRegistry) CreateIfKnown(messageName string) proto.Message {
 			msgType = proto.MessageType(messageName)
 		} else if !r.excludeWkt {
 			t := proto.MessageType(messageName)
-			if t.Implements(typeOfWkt) {
+			if t != nil && t.Implements(typeOfWkt) {
 				msgType = t
 			}
 		}

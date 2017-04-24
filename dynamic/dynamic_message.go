@@ -862,20 +862,31 @@ func (m *Message) parseUnknownField(fd *desc.FieldDescriptor) (interface{}, erro
 }
 
 func validFieldValue(fd *desc.FieldDescriptor, val interface{}) (interface{}, error) {
-	v := reflect.ValueOf(val)
-	if fd.IsMap() && v.Kind() == reflect.Map {
+	return validFieldValueForRv(fd, reflect.ValueOf(val))
+}
+
+func validFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interface{}, error) {
+	if fd.IsMap() && val.Kind() == reflect.Map {
 		// make a defensive copy while we check the contents
 		// (also converts to map[interface{}]interface{} if it's some other type)
 		keyField := fd.GetMessageType().GetFields()[0]
 		valField := fd.GetMessageType().GetFields()[1]
 		m := map[interface{}]interface{}{}
-		for _, k := range v.MapKeys() {
-			v := v.MapIndex(k)
-			kk, err := validFieldValue(keyField, k.Interface())
+		for _, k := range val.MapKeys() {
+			if k.Kind() == reflect.Interface {
+				// unwrap it
+				k = reflect.ValueOf(k.Interface())
+			}
+			kk, err := validFieldValueForRv(keyField, k)
 			if err != nil {
 				return nil, err
 			}
-			vv, err := validFieldValue(valField, v.Interface())
+			v := val.MapIndex(k)
+			if v.Kind() == reflect.Interface {
+				// unwrap it
+				v = reflect.ValueOf(v.Interface())
+			}
+			vv, err := validFieldValueForRv(valField, v)
 			if err != nil {
 				return nil, err
 			}
@@ -885,22 +896,22 @@ func validFieldValue(fd *desc.FieldDescriptor, val interface{}) (interface{}, er
 	}
 
 	if fd.IsRepeated() { // this will also catch map fields where given value was not a map
-		if v.Kind() != reflect.Array && v.Kind() != reflect.Slice {
+		if val.Kind() != reflect.Array && val.Kind() != reflect.Slice {
 			if fd.IsMap() {
-				return nil, fmt.Errorf("Value for map field must be a map; instead was %v", v.Type())
+				return nil, fmt.Errorf("Value for map field must be a map; instead was %v", val.Type())
 			} else {
-				return nil, fmt.Errorf("Value for repeated field must be a slice; instead was %v", v.Type())
+				return nil, fmt.Errorf("Value for repeated field must be a slice; instead was %v", val.Type())
 			}
 		}
 
 		if fd.IsMap() {
 			// value should be a slice of entry messages that we need convert into a map[interface{}]interface{}
 			m := map[interface{}]interface{}{}
-			for i := 0; i < v.Len(); i++ {
-				e := v.Index(i).Interface()
+			for i := 0; i < val.Len(); i++ {
+				e := val.Index(i).Interface()
 				msg, ok := e.(proto.Message)
 				if !ok {
-					return nil, fmt.Errorf("Contents of slice/array for a map field must be map entry messages; instead was %v", v.Index(i).Type())
+					return nil, fmt.Errorf("Contents of slice/array for a map field must be map entry messages; instead was %v", val.Index(i).Type())
 				}
 				dm, err := asDynamicMessage(msg, fd.GetMessageType())
 				if err != nil {
@@ -920,10 +931,14 @@ func validFieldValue(fd *desc.FieldDescriptor, val interface{}) (interface{}, er
 		}
 
 		// make a defensive copy while checking contents (also converts to []interface{})
-		s := make([]interface{}, v.Len())
-		for i := 0; i < v.Len(); i++ {
-			e := v.Index(i).Interface()
-			e, err := validElementFieldValue(fd, e)
+		s := make([]interface{}, val.Len())
+		for i := 0; i < val.Len(); i++ {
+			ev := val.Index(i)
+			if ev.Kind() == reflect.Interface {
+				// unwrap it
+				ev = reflect.ValueOf(ev.Interface())
+			}
+			e, err := validElementFieldValueForRv(fd, ev)
 			if err != nil {
 				return nil, err
 			}
@@ -933,7 +948,7 @@ func validFieldValue(fd *desc.FieldDescriptor, val interface{}) (interface{}, er
 		return s, nil
 	}
 
-	return validElementFieldValue(fd, val)
+	return validElementFieldValueForRv(fd, val)
 }
 
 func asDynamicMessage(m proto.Message, md *desc.MessageDescriptor) (*Message, error) {
@@ -948,7 +963,10 @@ func asDynamicMessage(m proto.Message, md *desc.MessageDescriptor) (*Message, er
 }
 
 func validElementFieldValue(fd *desc.FieldDescriptor, val interface{}) (interface{}, error) {
-	v := reflect.ValueOf(val)
+	return validElementFieldValueForRv(fd, reflect.ValueOf(val))
+}
+
+func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interface{}, error) {
 	t := fd.GetType()
 	typeName := strings.ToLower(t.String())
 	switch t {
@@ -956,39 +974,39 @@ func validElementFieldValue(fd *desc.FieldDescriptor, val interface{}) (interfac
 		descriptor.FieldDescriptorProto_TYPE_INT32,
 		descriptor.FieldDescriptorProto_TYPE_SINT32,
 		descriptor.FieldDescriptorProto_TYPE_ENUM:
-		return toInt32(elem(v), typeName, fd.GetFullyQualifiedName())
+		return toInt32(elem(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_SFIXED64,
 		descriptor.FieldDescriptorProto_TYPE_INT64,
 		descriptor.FieldDescriptorProto_TYPE_SINT64:
-		return toInt64(elem(v), typeName, fd.GetFullyQualifiedName())
+		return toInt64(elem(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
 		descriptor.FieldDescriptorProto_TYPE_UINT32:
-		return toUint32(elem(v), typeName, fd.GetFullyQualifiedName())
+		return toUint32(elem(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
 		descriptor.FieldDescriptorProto_TYPE_UINT64:
-		return toUint64(elem(v), typeName, fd.GetFullyQualifiedName())
+		return toUint64(elem(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		return toFloat32(elem(v), typeName, fd.GetFullyQualifiedName())
+		return toFloat32(elem(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		return toFloat64(elem(v), typeName, fd.GetFullyQualifiedName())
+		return toFloat64(elem(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		return toBool(elem(v), typeName, fd.GetFullyQualifiedName())
+		return toBool(elem(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		return toBytes(elem(v), typeName, fd.GetFullyQualifiedName())
+		return toBytes(elem(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
-		return toString(elem(v), typeName, fd.GetFullyQualifiedName())
+		return toString(elem(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
 		descriptor.FieldDescriptorProto_TYPE_GROUP:
-		m, err := asMessage(v, fd.GetFullyQualifiedName())
+		m, err := asMessage(val, fd.GetFullyQualifiedName())
 		// check that message is correct type
 		if err != nil {
 			return nil, err
@@ -1295,6 +1313,10 @@ func canConvert(src reflect.Value, target reflect.Type) bool {
 		src = reflect.ValueOf(src.Interface())
 	}
 	srcType := src.Type()
+	// we allow convertible types instead of requiring exact types so that calling
+	// code can, for example, assign an enum constant to an enum field. In that case,
+	// one type is the enum type (a sub-type of int32) and the other may be the int32
+	// type. So we automatically do the conversion in that case.
 	if srcType.ConvertibleTo(target) {
 		return true
 	} else if target.Kind() == reflect.Ptr && srcType.ConvertibleTo(target.Elem()) {
@@ -1469,8 +1491,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 		if (rv.Kind() == reflect.Ptr || rv.Kind() == reflect.Slice) && rv.IsNil() {
 			continue
 		}
-		v := rv.Interface()
-		if v, err := validFieldValue(fd, v); err != nil {
+		if v, err := validFieldValueForRv(fd, rv); err != nil {
 			return err
 		} else {
 			values[fd] = v
@@ -1485,7 +1506,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 			continue
 		}
 		prop := oop.Prop
-		v := oov.FieldByName(prop.Name).Interface()
+		rv := oov.FieldByName(prop.Name)
 		fd := m.FindFieldDescriptor(int32(prop.Tag))
 		if fd == nil {
 			// Our descriptor has different fields than this message object. So
@@ -1501,7 +1522,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 				extraFields = append(extraFields, fd)
 			}
 		}
-		if v, err := validFieldValue(fd, v); err != nil {
+		if v, err := validFieldValueForRv(fd, rv); err != nil {
 			return err
 		} else {
 			values[fd] = v

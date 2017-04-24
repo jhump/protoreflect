@@ -698,10 +698,23 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 		expected = fmt.Sprintf("enum %s value", fd.GetEnumType().GetFullyQualifiedName())
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 		if tok.tokTyp == tokenOpenAngle {
-			// TODO: use mf.NewMessage and, if not a dynamic message, use proto.UnmarshalText to unmarshal it
 			dm := newMessageWithMessageFactory(fd.GetMessageType(), m.mf)
 			if err := dm.unmarshalText(tr, tokenCloseAngle); err != nil {
 				return err
+			}
+			// TODO: ideally we would use mf.NewMessage and, if not a dynamic message, use
+			// jsonpb to unmarshal it. But the text parser isn't particularly amenable to that
+			// so we instead convert a dynamic message to a generated one if the known-type
+			// registry knows about the generated type...
+			var ktr *KnownTypeRegistry
+			if m.mf != nil {
+				ktr = m.mf.ktr
+			}
+			pm := ktr.CreateIfKnown(fd.GetMessageType().GetFullyQualifiedName())
+			if pm != nil {
+				if err := dm.ConvertTo(pm); err != nil {
+					return set(m, fd, pm)
+				}
 			}
 			return set(m, fd, dm)
 		}
