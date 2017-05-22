@@ -5,6 +5,7 @@ import (
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
+	"bytes"
 )
 
 func TestUnaryFieldsJSON(t *testing.T) {
@@ -39,31 +40,40 @@ func TestExtensionFieldsJSON(t *testing.T) {
 	// TODO
 }
 
+func TestMarshalJSONEmitDefaults(t *testing.T) {
+	// TODO
+}
+
+func TestMarshalJSONEnumsAsInts(t *testing.T) {
+	// TODO
+}
+
+func TestMarshalJSONOrigName(t *testing.T) {
+	// TODO
+}
+
+func TestMarshalJSONIndent(t *testing.T) {
+	// TODO
+}
+
+func TestUnmarshalJSONAllowUnknownFields(t *testing.T) {
+	// TODO
+}
+
 func jsonTranslationParty(t *testing.T, msg proto.Message) {
 	doTranslationParty(t, msg,
 		func(pm proto.Message) ([]byte, error) {
-			// TODO: jsonpb should handle case where given message implements json.Marshaler
-			// https://github.com/golang/protobuf/pull/325
-			// Remove the following three lines if/when that change is merged
-			if dm, ok := pm.(*Message); ok {
-				return dm.MarshalJSON()
-			}
 			m := jsonpb.Marshaler{}
-			s, err := m.MarshalToString(pm)
+			var b bytes.Buffer
+			err := m.Marshal(&b, pm)
 			if err != nil {
 				return nil, err
 			} else {
-				return []byte(s), nil
+				return b.Bytes(), nil
 			}
 		},
 		func(b []byte, pm proto.Message) error {
-			// TODO: jsonpb should handle case where given message implements json.Marshaler
-			// https://github.com/golang/protobuf/pull/325
-			// Remove the following three lines if/when that change is merged
-			if dm, ok := pm.(*Message); ok {
-				return dm.UnmarshalJSON(b)
-			}
-			return jsonpb.UnmarshalString(string(b), pm)
+			return jsonpb.Unmarshal(bytes.NewReader(b), pm)
 		},
 		(*Message).MarshalJSON, (*Message).UnmarshalJSON)
 }
