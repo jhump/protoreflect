@@ -1,11 +1,14 @@
 package dynamic
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
-	"bytes"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/internal/testprotos"
+	"github.com/jhump/protoreflect/internal/testutil"
 )
 
 func TestUnaryFieldsJSON(t *testing.T) {
@@ -41,11 +44,26 @@ func TestExtensionFieldsJSON(t *testing.T) {
 }
 
 func TestMarshalJSONEmitDefaults(t *testing.T) {
-	// TODO
+	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.ReallySimpleMessage)(nil))
+	testutil.Ok(t, err)
+	dm := NewMessage(md)
+	js, err := dm.MarshalJSON()
+	testutil.Ok(t, err)
+	testutil.Eq(t, `{}`, string(js))
+	jsDefaults, err := dm.MarshalJSONPB(&jsonpb.Marshaler{EmitDefaults: true})
+	testutil.Ok(t, err)
+	testutil.Eq(t, `{"id":0,"name":""}`, string(jsDefaults))
 }
 
 func TestMarshalJSONEnumsAsInts(t *testing.T) {
-	// TODO
+	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.TestRequest)(nil))
+	testutil.Ok(t, err)
+	dm := NewMessage(md)
+	dm.SetFieldByNumber(1, []int32{1})
+	dm.SetFieldByNumber(2, "bedazzle")
+	js, err := dm.MarshalJSONPB(&jsonpb.Marshaler{EnumsAsInts: true})
+	testutil.Ok(t, err)
+	testutil.Eq(t, `{"foo":[1],"bar":"bedazzle"}`, string(js))
 }
 
 func TestMarshalJSONOrigName(t *testing.T) {
@@ -53,7 +71,20 @@ func TestMarshalJSONOrigName(t *testing.T) {
 }
 
 func TestMarshalJSONIndent(t *testing.T) {
-	// TODO
+	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.TestRequest)(nil))
+	testutil.Ok(t, err)
+	dm := NewMessage(md)
+	dm.SetFieldByNumber(1, []int32{1})
+	dm.SetFieldByNumber(2, "bedazzle")
+	js, err := dm.MarshalJSON()
+	testutil.Ok(t, err)
+	testutil.Eq(t, `{"foo":["VALUE1"],"bar":"bedazzle"}`, string(js))
+	jsIndent, err := dm.MarshalJSONIndent()
+	testutil.Ok(t, err)
+	testutil.Eq(t, "{\n  \"foo\": [\n    \"VALUE1\"\n  ],\n  \"bar\": \"bedazzle\"\n}", string(jsIndent))
+	jsIndent, err = dm.MarshalJSONPB(&jsonpb.Marshaler{Indent: "\t"})
+	testutil.Ok(t, err)
+	testutil.Eq(t, "{\n\t\"foo\": [\n\t\t\"VALUE1\"\n\t],\n\t\"bar\": \"bedazzle\"\n}", string(jsIndent))
 }
 
 func TestUnmarshalJSONAllowUnknownFields(t *testing.T) {
