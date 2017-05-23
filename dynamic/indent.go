@@ -4,20 +4,21 @@ import "bytes"
 
 type indentBuffer struct {
 	bytes.Buffer
-	indent int
-	comma  bool
+	indent      string
+	indentCount int
+	comma       bool
 }
 
 func (b *indentBuffer) start() error {
-	if b.indent >= 0 {
-		b.indent++
+	if b.indentCount >= 0 {
+		b.indentCount++
 		return b.newLine(false)
 	}
 	return nil
 }
 
 func (b *indentBuffer) sep() error {
-	if b.indent >= 0 {
+	if b.indentCount >= 0 {
 		_, err := b.WriteString(": ")
 		return err
 	} else {
@@ -26,8 +27,8 @@ func (b *indentBuffer) sep() error {
 }
 
 func (b *indentBuffer) end() error {
-	if b.indent >= 0 {
-		b.indent--
+	if b.indentCount >= 0 {
+		b.indentCount--
 		return b.newLine(false)
 	}
 	return nil
@@ -43,7 +44,7 @@ func (b *indentBuffer) maybeNext(first *bool) error {
 }
 
 func (b *indentBuffer) next() error {
-	if b.indent >= 0 {
+	if b.indentCount >= 0 {
 		return b.newLine(b.comma)
 	} else if b.comma {
 		return b.WriteByte(',')
@@ -65,8 +66,8 @@ func (b *indentBuffer) newLine(comma bool) error {
 		return err
 	}
 
-	for i := 0; i < b.indent; i++ {
-		_, err := b.WriteString("  ")
+	for i := 0; i < b.indentCount; i++ {
+		_, err := b.WriteString(b.indent)
 		if err != nil {
 			return err
 		}

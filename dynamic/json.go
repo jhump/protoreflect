@@ -22,15 +22,11 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
-type MarshalJSONOptions struct {
-	Indent       bool
-	EmitDefaults bool
-}
-
-func (m *Message) MarshalJSONWithOptions(opts MarshalJSONOptions) ([]byte, error) {
+func (m *Message) MarshalJSONPB(opts *jsonpb.Marshaler) ([]byte, error) {
 	var b indentBuffer
-	if !opts.Indent {
-		b.indent = -1
+	b.indent = opts.Indent
+	if len(opts.Indent) == 0 {
+		b.indentCount = -1
 	}
 	b.comma = true
 	if err := m.marshalJSON(&b, opts); err != nil {
@@ -40,16 +36,16 @@ func (m *Message) MarshalJSONWithOptions(opts MarshalJSONOptions) ([]byte, error
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
-	b, err := m.MarshalJSONWithOptions(MarshalJSONOptions{})
+	b, err := m.MarshalJSONPB(&jsonpb.Marshaler{})
 	return b, err
 }
 
 func (m *Message) MarshalJSONIndent() ([]byte, error) {
-	b, err := m.MarshalJSONWithOptions(MarshalJSONOptions{Indent: true})
+	b, err := m.MarshalJSONPB(&jsonpb.Marshaler{Indent: "  "})
 	return b, err
 }
 
-func (m *Message) marshalJSON(b *indentBuffer, opts MarshalJSONOptions) error {
+func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
 	err := b.WriteByte('{')
 	if err != nil {
 		return err
@@ -100,9 +96,9 @@ func (m *Message) marshalJSON(b *indentBuffer, opts MarshalJSONOptions) error {
 	return nil
 }
 
-func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts MarshalJSONOptions) error {
+func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts *jsonpb.Marshaler) error {
 	jsonName := fd.AsFieldDescriptorProto().GetJsonName()
-	if jsonName == "" {
+	if opts.OrigName || jsonName == "" {
 		jsonName = fd.GetName()
 	}
 	err := writeJsonString(b, jsonName)
@@ -206,7 +202,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 	}
 }
 
-func marshalKnownFieldMapEntryJSON(b *indentBuffer, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}, opts MarshalJSONOptions) error {
+func marshalKnownFieldMapEntryJSON(b *indentBuffer, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}, opts *jsonpb.Marshaler) error {
 	rk := reflect.ValueOf(mk)
 	var strkey string
 	switch rk.Kind() {
@@ -232,12 +228,12 @@ func marshalKnownFieldMapEntryJSON(b *indentBuffer, mk interface{}, vfd *desc.Fi
 	return marshalKnownFieldValueJSON(b, vfd, mv, opts)
 }
 
-func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts MarshalJSONOptions) error {
+func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts *jsonpb.Marshaler) error {
 	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
 	case reflect.Int32, reflect.Int64:
 		ed := fd.GetEnumType()
-		if ed != nil {
+		if !opts.EnumsAsInts && ed != nil {
 			n := int32(rv.Int())
 			vd := ed.FindValueByNumber(n)
 			if vd == nil {
@@ -287,19 +283,14 @@ func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v int
 			return dm.marshalJSON(b, opts)
 		} else {
 			var err error
-			if b.indent == -1 {
-				m := jsonpb.Marshaler{}
-				err = m.Marshal(b, v.(proto.Message))
-			} else if b.indent == 0 {
-				m := jsonpb.Marshaler{Indent: "  "}
-				err = m.Marshal(b, v.(proto.Message))
+			if b.indentCount <= 0 || len(b.indent) == 0 {
+				err = opts.Marshal(b, v.(proto.Message))
 			} else {
-				m := jsonpb.Marshaler{Indent: "  "}
-				str, err := m.MarshalToString(v.(proto.Message))
+				str, err := opts.MarshalToString(v.(proto.Message))
 				if err != nil {
 					return err
 				}
-				indent := strings.Repeat("  ", b.indent)
+				indent := strings.Repeat(b.indent, b.indentCount)
 				pos := 0
 				// add indention prefix to each line
 				for pos < len(str) {
@@ -335,7 +326,7 @@ func writeJsonString(b *indentBuffer, s string) error {
 	}
 }
 
-func (m *Message) UnmarshalJSON(js []byte) error {
+func (m *Message) UnmarshalJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
 	m.Reset()
 	if err := m.UnmarshalMergeJSON(js); err != nil {
 		return err
@@ -343,10 +334,14 @@ func (m *Message) UnmarshalJSON(js []byte) error {
 	return m.Validate()
 }
 
-func (m *Message) UnmarshalMergeJSON(js []byte) error {
+func (m *Message) UnmarshalJSON(js []byte) error {
+	return m.UnmarshalJSONPB(&jsonpb.Unmarshaler{}, js)
+}
+
+func (m *Message) UnmarshalMergeJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
 	r := &jsReader{dec: json.NewDecoder(bytes.NewReader(js))}
 	r.dec.UseNumber()
-	err := m.unmarshalJson(r)
+	err := m.unmarshalJson(r, opts)
 	if err != nil {
 		return err
 	}
@@ -358,7 +353,11 @@ func (m *Message) UnmarshalMergeJSON(js []byte) error {
 	return nil
 }
 
-func (m *Message) unmarshalJson(r *jsReader) error {
+func (m *Message) UnmarshalMergeJSON(js []byte) error {
+	return m.UnmarshalMergeJSONPB(&jsonpb.Unmarshaler{}, js)
+}
+
+func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
 	t, err := r.peek()
 	if err != nil {
 		return err
@@ -380,10 +379,13 @@ func (m *Message) unmarshalJson(r *jsReader) error {
 		}
 		fd := m.FindFieldDescriptorByName(f)
 		if fd == nil {
-			r.skip()
-			continue
+			if opts.AllowUnknownFields {
+				r.skip()
+				continue
+			}
+			return fmt.Errorf("Message type %s has no known field named %s", m.md.GetFullyQualifiedName(), f)
 		}
-		v, err := unmarshalJsField(fd, r, m.mf)
+		v, err := unmarshalJsField(fd, r, m.mf, opts)
 		if err != nil {
 			return err
 		}
@@ -401,7 +403,7 @@ func (m *Message) unmarshalJson(r *jsReader) error {
 	return nil
 }
 
-func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory) (interface{}, error) {
+func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory, opts *jsonpb.Unmarshaler) (interface{}, error) {
 	t, err := r.peek()
 	if err != nil {
 		return nil, err
@@ -427,11 +429,11 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory)
 			return nil, err
 		}
 		for r.hasNext() {
-			kk, err := unmarshalJsFieldElement(keyType, r, mf)
+			kk, err := unmarshalJsFieldElement(keyType, r, mf, opts)
 			if err != nil {
 				return nil, err
 			}
-			vv, err := unmarshalJsFieldElement(valueType, r, mf)
+			vv, err := unmarshalJsFieldElement(valueType, r, mf, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -454,7 +456,7 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory)
 		var v interface{}
 		for r.hasNext() {
 			var err error
-			v, err = unmarshalJsFieldElement(fd, r, mf)
+			v, err = unmarshalJsFieldElement(fd, r, mf, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -490,7 +492,7 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory)
 		// binary wire format that supports changing an optional field to repeated and vice versa.
 		// If the field is repeated, we store value as singleton slice of that one value.
 
-		v, err := unmarshalJsFieldElement(fd, r, mf)
+		v, err := unmarshalJsFieldElement(fd, r, mf, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -505,7 +507,7 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory)
 	}
 }
 
-func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory) (interface{}, error) {
+func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory, opts *jsonpb.Unmarshaler) (interface{}, error) {
 	t, err := r.peek()
 	if err != nil {
 		return nil, err
@@ -520,7 +522,7 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
 		descriptor.FieldDescriptorProto_TYPE_GROUP:
 		m := newMessageWithMessageFactory(fd.GetMessageType(), mf)
-		if err := m.unmarshalJson(r); err != nil {
+		if err := m.unmarshalJson(r, opts); err != nil {
 			return nil, err
 		} else {
 			// TODO: ideally we would use mf.NewMessage and, if not a dynamic message, use
@@ -551,8 +553,12 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 				if vd != nil {
 					return vd.GetNumber(), nil
 				} else {
-					// could not find it!
-					return nil, fmt.Errorf("Enum %q does not have value named %q", fd.GetEnumType().GetFullyQualifiedName(), e)
+					// could not find it! treat unknown enum name the same as unknown field
+					if opts.AllowUnknownFields {
+						return nil, nil
+					} else {
+						return nil, fmt.Errorf("Enum %q does not have value named %q", fd.GetEnumType().GetFullyQualifiedName(), e)
+					}
 				}
 			} else if i > math.MaxInt32 || i < math.MinInt32 {
 				return nil, NumericOverflowError

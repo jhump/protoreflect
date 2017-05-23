@@ -22,7 +22,7 @@ import (
 
 func (m *Message) MarshalText() ([]byte, error) {
 	var b indentBuffer
-	b.indent = -1 // no indentation
+	b.indentCount = -1 // no indentation
 	if err := m.marshalText(&b); err != nil {
 		return nil, err
 	}
@@ -31,6 +31,7 @@ func (m *Message) MarshalText() ([]byte, error) {
 
 func (m *Message) MarshalTextIndent() ([]byte, error) {
 	var b indentBuffer
+	b.indent = "  " // TODO: option for indent?
 	if err := m.marshalText(&b); err != nil {
 		return nil, err
 	}
