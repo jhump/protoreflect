@@ -137,17 +137,21 @@ func (m *Message) marshalText(b *indentBuffer) error {
 				if err != nil {
 					return err
 				}
-				continue
 			} else {
 				err = b.sep()
 				if err != nil {
 					return err
 				}
 				if uf.Encoding == proto.WireBytes {
-					return writeString(b, string(uf.Contents))
+					err = writeString(b, string(uf.Contents))
+					if err != nil {
+						return err
+					}
 				} else {
 					_, err = b.WriteString(strconv.FormatUint(uf.Value, 10))
-					return err
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -363,7 +367,7 @@ func marshalUnknownGroupText(b *indentBuffer, in *codedBuffer, topLevel bool) er
 			if topLevel {
 				return nil
 			}
-			// this is a nested message: we are expect an end-group tag, not EOF!
+			// this is a nested message: we are expecting an end-group tag, not EOF!
 			return io.ErrUnexpectedEOF
 		}
 		tag, wireType, err := in.decodeTagAndWireType()
@@ -413,7 +417,10 @@ func marshalUnknownGroupText(b *indentBuffer, in *codedBuffer, topLevel bool) er
 				if err != nil {
 					return err
 				}
-				return writeString(b, string(contents))
+				err = writeString(b, string(contents))
+				if err != nil {
+					return err
+				}
 			} else {
 				var v uint64
 				switch wireType {
@@ -430,7 +437,9 @@ func marshalUnknownGroupText(b *indentBuffer, in *codedBuffer, topLevel bool) er
 					return err
 				}
 				_, err = b.WriteString(strconv.FormatUint(v, 10))
-				return err
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}

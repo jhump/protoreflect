@@ -49,7 +49,7 @@ func (m *Message) marshalKnownFields(b *codedBuffer) error {
 }
 
 func (m *Message) marshalUnknownFields(b *codedBuffer) error {
-	for _, tag := range m.knownFieldTags() {
+	for _, tag := range m.unknownFieldTags() {
 		itag := int32(tag)
 		sl := m.unknownFields[itag]
 		for _, u := range sl {
@@ -370,9 +370,6 @@ func (m *Message) unmarshal(buf *codedBuffer, isGroup bool) error {
 		}
 		fd := m.FindFieldDescriptor(tagNumber)
 		if fd == nil {
-			if m.unknownFields == nil {
-				m.unknownFields = map[int32][]UnknownField{}
-			}
 			err := m.unmarshalUnknownField(tagNumber, wireType, buf)
 			if err != nil {
 				return err
@@ -383,6 +380,9 @@ func (m *Message) unmarshal(buf *codedBuffer, isGroup bool) error {
 				return err
 			}
 		}
+	}
+	if isGroup {
+		return io.ErrUnexpectedEOF
 	}
 	return nil
 }
