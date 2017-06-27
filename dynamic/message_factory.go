@@ -35,7 +35,7 @@ func NewMessageFactoryWithKnownTypeRegistry(ktr *KnownTypeRegistry) *MessageFact
 
 // NewMessageFactoryWithDefaults creates a new message factory where all "default" types
 // (those for which protoc-generated code is statically linked into the Go program) are
-// known types. Is any dynamic messages are produced, they will recognize and parse all
+// known types. If any dynamic messages are produced, they will recognize and parse all
 // "default" extension fields. This is the equivalent of:
 //   NewMessageFactoryWithRegistries(
 //       NewExtensionRegistryWithDefaults(),

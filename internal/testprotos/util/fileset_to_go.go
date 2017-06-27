@@ -2,7 +2,7 @@ package main
 
 // fileset_to_go reads a FileDescriptorSet proto from stdin (in standard proto
 // binary encoding) and writes a Go source file to stdout that lives in the same
-// package as would generated code for the first file in the set and exposes a
+// package as would generated code for the last file in the set and exposes a
 // function named GetDescriptorSet() which loads and decompresses the embedded
 // descriptor set message.
 
@@ -30,7 +30,7 @@ func main() {
 		panic(fmt.Sprintf("Failed to parse descriptor set from stdin: %s", err.Error()))
 	}
 	// and also to extract package for generated file
-	fd := fileset.GetFile()[0]
+	fd := fileset.GetFile()[len(fileset.GetFile())-1]
 	pkg := fd.GetOptions().GetGoPackage()
 	if pkg == "" {
 		pkg = fd.GetPackage()

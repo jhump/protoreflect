@@ -73,10 +73,9 @@ func (r *MessageRegistry) WithMessageFactory(mf *MessageFactory) *MessageRegistr
 
 // WithDefaultBaseUrl sets the default base URL used when constructing type URLs for
 // marshalling messages as Any types and converting descriptors to well-known type
-// type descriptions (ptypes). If unspecified, the default base URL will be
-// "type.googleapis.com". This method is not thread-safe and is intended to be used
-// for one-time initialization of the registry, before it is published for use by
-// other threads.
+// descriptions (ptypes). If unspecified, the default base URL will be "type.googleapis.com".
+// This method is not thread-safe and is intended to be used for one-time initialization
+// of the registry, before it is published for use by other threads.
 func (r *MessageRegistry) WithDefaultBaseUrl(baseUrl string) *MessageRegistry {
 	baseUrl = stripTrailingSlash(baseUrl)
 	r.defaultBaseUrl = baseUrl

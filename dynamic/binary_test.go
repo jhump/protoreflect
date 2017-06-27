@@ -10,20 +10,19 @@ import (
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
-func TestUnaryFields(t *testing.T) {
+func TestBinaryUnaryFields(t *testing.T) {
 	binaryTranslationParty(t, unaryFieldsMsg)
 }
 
-func TestRepeatedFields(t *testing.T) {
+func TestBinaryRepeatedFields(t *testing.T) {
 	binaryTranslationParty(t, repeatedFieldsMsg)
 }
 
-func TestPackedRepeatedFields(t *testing.T) {
+func TestBinaryPackedRepeatedFields(t *testing.T) {
 	binaryTranslationParty(t, repeatedPackedFieldsMsg)
-
 }
 
-func TestMapKeyFields(t *testing.T) {
+func TestBinaryMapKeyFields(t *testing.T) {
 	// translation party wants deterministic marshalling to bytes
 	sort_map_keys = true
 	defer func() {
@@ -33,7 +32,7 @@ func TestMapKeyFields(t *testing.T) {
 	binaryTranslationParty(t, mapKeyFieldsMsg)
 }
 
-func TestMapValueFields(t *testing.T) {
+func TestMarshalMapValueFields(t *testing.T) {
 	// translation party wants deterministic marshalling to bytes
 	sort_map_keys = true
 	defer func() {
@@ -43,7 +42,11 @@ func TestMapValueFields(t *testing.T) {
 	binaryTranslationParty(t, mapValueFieldsMsg)
 }
 
-func TestUnknownFields(t *testing.T) {
+func TestBinaryExtensionFields(t *testing.T) {
+	// TODO
+}
+
+func TestBinaryUnknownFields(t *testing.T) {
 	// create a buffer with both known fields:
 	b, err := proto.Marshal(&testprotos.TestMessage{
 		Nm: &testprotos.TestMessage_NestedMessage{

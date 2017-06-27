@@ -647,34 +647,55 @@ func getApi(t *testing.T) *api.Api {
 	}
 }
 
-func TestMessageRegistry_MarshalAny(t *testing.T) {
+func TestMessageRegistry_MarshalAndUnmarshalAny(t *testing.T) {
 	mr := &MessageRegistry{}
+	mrdef := NewMessageRegistryWithDefaults()
 
 	md, err := desc.LoadMessageDescriptor("google.protobuf.DescriptorProto")
 	testutil.Ok(t, err)
 
-	// default base URL
+	// marshal with default base URL
 	a, err := mr.MarshalAny(md.AsProto())
 	testutil.Ok(t, err)
 	testutil.Eq(t, "type.googleapis.com/google.protobuf.DescriptorProto", a.TypeUrl)
+
+	// check that we can unmarshal it with normal ptypes library
 	var umd descriptor.DescriptorProto
 	err = ptypes.UnmarshalAny(a, &umd)
 	testutil.Ok(t, err)
-	testutil.Ceq(t, md.AsProto(), &umd, eqm)
+	testutil.Ceq(t, md.AsProto(), &umd, eqpm)
 
-	// different default
+	// and that we can unmarshal it with a message registry
+	pm, err := mrdef.UnmarshalAny(a)
+	testutil.Ok(t, err)
+	_, ok := pm.(*descriptor.DescriptorProto)
+	testutil.Require(t, ok)
+	testutil.Ceq(t, md.AsProto(), pm, eqpm)
+
+	// and that we can unmarshal it as a dynamic message, using a
+	// message registry that doesn't know about the generated type
+	mr.AddMessage("type.googleapis.com/google.protobuf.DescriptorProto", md)
+	pm, err = mr.UnmarshalAny(a)
+	testutil.Ok(t, err)
+	dm, ok := pm.(*Message)
+	testutil.Require(t, ok)
+	testutil.Ceq(t, md.AsProto(), dm, eqm)
+
+	// now test generation of type URLs with other settings
+
+	// - different default
 	mr.WithDefaultBaseUrl("foo.com/some/path/")
 	a, err = mr.MarshalAny(md.AsProto())
 	testutil.Ok(t, err)
 	testutil.Eq(t, "foo.com/some/path/google.protobuf.DescriptorProto", a.TypeUrl)
 
-	// custom base URL for package
+	// - custom base URL for package
 	mr.AddBaseUrlForElement("bar.com/other/", "google.protobuf")
 	a, err = mr.MarshalAny(md.AsProto())
 	testutil.Ok(t, err)
 	testutil.Eq(t, "bar.com/other/google.protobuf.DescriptorProto", a.TypeUrl)
 
-	// custom base URL for type
+	// - custom base URL for type
 	mr.AddBaseUrlForElement("http://baz.com/another/", "google.protobuf.DescriptorProto")
 	a, err = mr.MarshalAny(md.AsProto())
 	testutil.Ok(t, err)
