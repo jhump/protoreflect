@@ -24,5 +24,7 @@
 // The dynamic message supports binary and text marshaling, using protobuf's
 // well-defined binary format and the same text format that protoc-generated
 // types use. It also supports JSON serialization/de-serialization by
-// implementing the json.Marshaler and json.Unmarshaler interfaces.
+// implementing the json.Marshaler and json.Unmarshaler interfaces. And dynamic
+// messages can safely be used with the jsonpb package for JSON serialization and
+// de-serialization.
 package dynamic

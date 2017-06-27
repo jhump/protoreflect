@@ -11,15 +11,15 @@ import (
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
-func TestUnaryFieldsJSON(t *testing.T) {
+func TestJSONUnaryFields(t *testing.T) {
 	jsonTranslationParty(t, unaryFieldsMsg)
 }
 
-func TestRepeatedFieldsJSON(t *testing.T) {
+func TestJSONRepeatedFields(t *testing.T) {
 	jsonTranslationParty(t, repeatedFieldsMsg)
 }
 
-func TestMapKeyFieldsJSON(t *testing.T) {
+func TestJSONMapKeyFields(t *testing.T) {
 	// translation party wants deterministic marshalling to bytes
 	sort_map_keys = true
 	defer func() {
@@ -29,7 +29,7 @@ func TestMapKeyFieldsJSON(t *testing.T) {
 	jsonTranslationParty(t, mapKeyFieldsMsg)
 }
 
-func TestMapValueFieldsJSON(t *testing.T) {
+func TestJSONMapValueFields(t *testing.T) {
 	// translation party wants deterministic marshalling to bytes
 	sort_map_keys = true
 	defer func() {
@@ -39,7 +39,7 @@ func TestMapValueFieldsJSON(t *testing.T) {
 	jsonTranslationParty(t, mapValueFieldsMsg)
 }
 
-func TestExtensionFieldsJSON(t *testing.T) {
+func TestJSONExtensionFields(t *testing.T) {
 	// TODO
 }
 

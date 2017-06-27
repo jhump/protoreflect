@@ -10,8 +10,8 @@ import (
 )
 
 // Equal returns true if the given two dynamic messages are equal. Two messages are equal when they
-// have the same fields set to equal values. For proto3 messages, fields set to their zero value are
-// considered unset.
+// have the same message type and same fields set to equal values. For proto3 messages, fields set
+// to their zero value are considered unset.
 func Equal(a, b *Message) bool {
 	if a.md.GetFullyQualifiedName() != b.md.GetFullyQualifiedName() {
 		return false
@@ -144,7 +144,7 @@ func slicesEqual(a, b reflect.Value) bool {
 }
 
 // MessagesEqual returns true if the given two messages are equal. Use this instead of proto.Equal
-// when one or both of the message might be a dynamic message.
+// when one or both of the messages might be a dynamic message.
 func MessagesEqual(a, b proto.Message) bool {
 	da, aok := a.(*Message)
 	db, bok := b.(*Message)

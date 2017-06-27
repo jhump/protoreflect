@@ -458,6 +458,10 @@ func TestGetSetClearMapFields_ValueTypes(t *testing.T) {
 	}
 }
 
+func TestGetSetExtensionFields(t *testing.T) {
+	// TODO
+}
+
 func TestGetSetOneOfFields(t *testing.T) {
 	// TODO
 }
