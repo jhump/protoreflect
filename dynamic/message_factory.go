@@ -9,7 +9,11 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
-// MessageFactory can be used to create new empty message objects.
+// MessageFactory can be used to create new empty message objects. A default instance
+// (without extension registry or known-type registry specified) will always return
+// dynamic messages (e.g. type will be *dynamic.Message) except for "well-known" types.
+// The well-known types include primitive wrapper types and a handful of other special
+// types defined in standard protobuf definitions, like Any, Duration, and Timestamp.
 type MessageFactory struct {
 	er  *ExtensionRegistry
 	ktr *KnownTypeRegistry
@@ -53,10 +57,11 @@ func NewMessageFactoryWithRegistries(er *ExtensionRegistry, ktr *KnownTypeRegist
 // If the given descriptor describes a "known type" then that type is instantiated.
 // Otherwise, an empty dynamic message is returned.
 func (f *MessageFactory) NewMessage(md *desc.MessageDescriptor) proto.Message {
-	if f == nil {
-		return NewMessage(md)
+	var ktr *KnownTypeRegistry
+	if f != nil {
+		ktr = f.ktr
 	}
-	if m := f.ktr.CreateIfKnown(md.GetFullyQualifiedName()); m != nil {
+	if m := ktr.CreateIfKnown(md.GetFullyQualifiedName()); m != nil {
 		return m
 	}
 	return newMessageWithMessageFactory(md, f)

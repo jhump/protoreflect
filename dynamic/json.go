@@ -295,11 +295,11 @@ func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v int
 				// add indention prefix to each line
 				for pos < len(str) {
 					start := pos
-					pos = strings.Index(str[pos:], "\n")
-					if pos == -1 {
+					nextPos := strings.Index(str[pos:], "\n")
+					if nextPos == -1 {
 						pos = len(str)
 					} else {
-						pos++ // include newline
+						pos = pos + nextPos + 1 // include newline
 					}
 					line := str[start:pos]
 					_, err = b.WriteString(indent)
