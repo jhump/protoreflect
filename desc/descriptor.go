@@ -908,6 +908,24 @@ func (fd *FieldDescriptor) IsMap() bool {
 	return fd.isMap
 }
 
+// GetMapKeyType returns the type of the key field if this is a map field. If it is
+// not a map field, nil is returned.
+func (fd *FieldDescriptor) GetMapKeyType() *FieldDescriptor {
+	if fd.isMap {
+		return fd.msgType.FindFieldByNumber(int32(1))
+	}
+	return nil
+}
+
+// GetMapValueType returns the type of the value field if this is a map field. If it
+// is not a map field, nil is returned.
+func (fd *FieldDescriptor) GetMapValueType() *FieldDescriptor {
+	if fd.isMap {
+		return fd.msgType.FindFieldByNumber(int32(2))
+	}
+	return nil
+}
+
 // GetMessageType returns the type of this field if it is a message type. If
 // this field is not a message type, it returns nil.
 func (fd *FieldDescriptor) GetMessageType() *MessageDescriptor {

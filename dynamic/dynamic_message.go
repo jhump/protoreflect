@@ -1531,28 +1531,26 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 
 	// extension fields
 	rexts := proto.RegisteredExtensions(pm)
-	if len(rexts) > 0 {
-		for tag, ed := range rexts {
-			if proto.HasExtension(pm, ed) {
-				v, _ := proto.GetExtension(pm, ed)
-				if v == nil {
-					continue
-				}
-				var prop proto.Properties
-				prop.Parse(ed.Tag)
-				fd := m.er.FindExtension(m.md.GetFullyQualifiedName(), tag)
-				if fd == nil {
-					var err error
-					if fd, err = desc.LoadFieldDescriptorForExtension(ed); err != nil {
-						return err
-					}
-					extraFields = append(extraFields, fd)
-				}
-				if v, err := validFieldValue(fd, v); err != nil {
+	for tag, ed := range rexts {
+		if proto.HasExtension(pm, ed) {
+			v, _ := proto.GetExtension(pm, ed)
+			if v == nil {
+				continue
+			}
+			var prop proto.Properties
+			prop.Parse(ed.Tag)
+			fd := m.er.FindExtension(m.md.GetFullyQualifiedName(), tag)
+			if fd == nil {
+				var err error
+				if fd, err = desc.LoadFieldDescriptorForExtension(ed); err != nil {
 					return err
-				} else {
-					values[fd] = v
 				}
+				extraFields = append(extraFields, fd)
+			}
+			if v, err := validFieldValue(fd, v); err != nil {
+				return err
+			} else {
+				values[fd] = v
 			}
 		}
 	}
@@ -1561,15 +1559,54 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 	for fd, v := range values {
 		m.internalSetField(fd, v)
 	}
-	for _, f := range extraFields {
-		m.extraFields[f.GetNumber()] = f
-	}
 
 	u := src.FieldByName("XXX_unrecognized")
 	if u.IsValid() && u.Type() == typeOfBytes {
 		// ignore any error returned: pulling in unknown fields is best-effort
 		m.UnmarshalMerge(u.Interface().([]byte))
 	}
+
+	// lastly, also extract any unknown extensions the message may have (unknown extensions
+	// are stored with other extensions, not in the XXX_unrecognized field, so we have to do
+	// more than just the step above...)
+	type extendableMessage interface {
+		// this method is generated on extendable messages, so we can use this
+		// to see if the message actually has any extensions
+		ExtensionRangeArray() []proto.ExtensionRange
+	}
+	if _, ok := pm.(extendableMessage); ok {
+		// We are going to make a copy of the message and then clear out all known fields.
+		// When done, we can marshal the copy to bytes, and it will only have unrecognized
+		// extensions. We then unmarshal that into the dynamic message.
+		clone := proto.Clone(pm)
+		cloneRv := reflect.ValueOf(clone).Elem()
+		for _, prop := range props.Prop {
+			if prop.Tag == 0 {
+				continue // one-of or special field (handled below)
+			}
+			// clear out the field
+			rv := cloneRv.FieldByName(prop.Name)
+			rv.Set(reflect.Zero(rv.Type()))
+		}
+		for _, oop := range props.OneofTypes {
+			// clear out the one-of field
+			oov := cloneRv.Field(oop.Field)
+			oov.Set(reflect.Zero(oov.Type()))
+		}
+		for _, ed := range rexts {
+			proto.ClearExtension(clone, ed)
+		}
+		if u.IsValid() && u.Type() == typeOfBytes {
+			// if it had an unrecognized field, remove values from our copy
+			cloneRv.FieldByName("XXX_unrecognized").Set(reflect.ValueOf(([]byte)(nil)))
+		}
+		bb, err := proto.Marshal(clone)
+		// pulling in unknown fields is best-effort, so we just ignore errors
+		if err == nil && len(bb) > 0 {
+			m.UnmarshalMerge(bb)
+		}
+	}
+
 	return nil
 }
 
