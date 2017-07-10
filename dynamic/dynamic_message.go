@@ -276,22 +276,22 @@ func (m *Message) doGetField(fd *desc.FieldDescriptor, nilIfAbsent bool) (interf
 		var err error
 		if res, err = m.parseUnknownField(fd); err != nil {
 			return nil, err
-		} else if res != nil {
-			return res, nil
-		} else if nilIfAbsent {
-			return nil, nil
-		} else {
-			def := fd.GetDefaultValue()
-			if def != nil {
-				return def, nil
-			}
-			// GetDefaultValue only returns nil for message types
-			md := fd.GetMessageType()
-			if md.IsProto3() {
-				return (*Message)(nil), nil
+		} else if res == nil {
+			if nilIfAbsent {
+				return nil, nil
 			} else {
-				// for proto2, return default instance of message
-				return m.mf.NewMessage(md), nil
+				def := fd.GetDefaultValue()
+				if def != nil {
+					return def, nil
+				}
+				// GetDefaultValue only returns nil for message types
+				md := fd.GetMessageType()
+				if md.IsProto3() {
+					return (*Message)(nil), nil
+				} else {
+					// for proto2, return default instance of message
+					return m.mf.NewMessage(md), nil
+				}
 			}
 		}
 	}
@@ -308,12 +308,25 @@ func (m *Message) doGetField(fd *desc.FieldDescriptor, nilIfAbsent bool) (interf
 		// make defensive copies to prevent caller from storing illegal elements
 		sl := res.([]interface{})
 		res := make([]interface{}, len(sl))
-		for i, e := range sl {
-			res[i] = e
-		}
+		copy(res, sl)
 		return res, nil
 	}
 	return res, nil
+}
+
+func (m *Message) HasField(fd *desc.FieldDescriptor) bool {
+	if err := m.checkField(fd); err != nil {
+		return false
+	}
+	return m.HasFieldNumber(int(fd.GetNumber()))
+}
+
+func (m *Message) HasFieldNumber(tagNumber int) bool {
+	if _, ok := m.values[int32(tagNumber)]; ok {
+		return true
+	}
+	_, ok := m.unknownFields[int32(tagNumber)]
+	return ok
 }
 
 func (m *Message) SetField(fd *desc.FieldDescriptor, val interface{}) {
@@ -389,7 +402,7 @@ func (m *Message) internalSetField(fd *desc.FieldDescriptor, val interface{}) {
 		delete(m.unknownFields, fd.GetNumber())
 	}
 	// and add this field if it was previously unknown
-	if fd := m.FindFieldDescriptor(fd.GetNumber()); fd == nil {
+	if existing := m.FindFieldDescriptor(fd.GetNumber()); existing == nil {
 		m.addField(fd)
 	}
 }
@@ -857,7 +870,6 @@ func (m *Message) parseUnknownField(fd *desc.FieldDescriptor) (interface{}, erro
 		}
 	}
 	m.internalSetField(fd, v)
-	m.addField(fd)
 	return v, nil
 }
 
@@ -1458,10 +1470,15 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 		return nil
 	}
 
+	pmrv := reflect.ValueOf(pm)
+	if pmrv.IsNil() {
+		// nil is an empty message, so nothing to do
+		return nil
+	}
+
 	// check that we can successfully do the merge
-	src := reflect.ValueOf(pm).Elem()
+	src := pmrv.Elem()
 	values := map[*desc.FieldDescriptor]interface{}{}
-	var extraFields []*desc.FieldDescriptor
 	props := proto.GetProperties(reflect.TypeOf(pm).Elem())
 	if props == nil {
 		return fmt.Errorf("Could not determine message properties to merge for %v", reflect.TypeOf(pm).Elem())
@@ -1483,8 +1500,6 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 			fd = md.FindFieldByNumber(int32(prop.Tag))
 			if fd == nil {
 				return fmt.Errorf("Message descriptor %q did not contain field for tag %d (%q)", md.GetFullyQualifiedName(), prop.Tag, prop.Name)
-			} else {
-				extraFields = append(extraFields, fd)
 			}
 		}
 		rv := src.FieldByName(prop.Name)
@@ -1518,8 +1533,6 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 			fd = md.FindFieldByNumber(int32(prop.Tag))
 			if fd == nil {
 				return fmt.Errorf("Message descriptor %q did not contain field for tag %d (%q in one-of %q)", md.GetFullyQualifiedName(), prop.Tag, prop.Name, src.Type().Field(oop.Field).Name)
-			} else {
-				extraFields = append(extraFields, fd)
 			}
 		}
 		if v, err := validFieldValueForRv(fd, rv); err != nil {
@@ -1530,28 +1543,28 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 	}
 
 	// extension fields
-	rexts := proto.RegisteredExtensions(pm)
-	for tag, ed := range rexts {
-		if proto.HasExtension(pm, ed) {
-			v, _ := proto.GetExtension(pm, ed)
-			if v == nil {
-				continue
-			}
-			var prop proto.Properties
-			prop.Parse(ed.Tag)
-			fd := m.er.FindExtension(m.md.GetFullyQualifiedName(), tag)
-			if fd == nil {
-				var err error
-				if fd, err = desc.LoadFieldDescriptorForExtension(ed); err != nil {
-					return err
-				}
-				extraFields = append(extraFields, fd)
-			}
-			if v, err := validFieldValue(fd, v); err != nil {
+	rexts, _ := proto.ExtensionDescs(pm)
+	hasUnknownExtensions := false
+	for _, ed := range rexts {
+		if ed.Name == "" {
+			hasUnknownExtensions = true
+			continue
+		}
+		v, _ := proto.GetExtension(pm, ed)
+		if v == nil {
+			continue
+		}
+		fd := m.er.FindExtension(m.md.GetFullyQualifiedName(), ed.Field)
+		if fd == nil {
+			var err error
+			if fd, err = desc.LoadFieldDescriptorForExtension(ed); err != nil {
 				return err
-			} else {
-				values[fd] = v
 			}
+		}
+		if v, err := validFieldValue(fd, v); err != nil {
+			return err
+		} else {
+			values[fd] = v
 		}
 	}
 
@@ -1569,12 +1582,10 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 	// lastly, also extract any unknown extensions the message may have (unknown extensions
 	// are stored with other extensions, not in the XXX_unrecognized field, so we have to do
 	// more than just the step above...)
-	type extendableMessage interface {
-		// this method is generated on extendable messages, so we can use this
-		// to see if the message actually has any extensions
-		ExtensionRangeArray() []proto.ExtensionRange
-	}
-	if _, ok := pm.(extendableMessage); ok {
+	if hasUnknownExtensions {
+		// TODO: this is very inefficient. this could be much cleaner if the proto library
+		// provided access to unknown extensions (https://github.com/golang/protobuf/issues/385)
+
 		// We are going to make a copy of the message and then clear out all known fields.
 		// When done, we can marshal the copy to bytes, and it will only have unrecognized
 		// extensions. We then unmarshal that into the dynamic message.
