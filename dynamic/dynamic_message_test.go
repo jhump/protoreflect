@@ -5,7 +5,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
@@ -459,7 +462,210 @@ func TestGetSetClearMapFields_ValueTypes(t *testing.T) {
 }
 
 func TestGetSetExtensionFields(t *testing.T) {
-	// TODO
+	fd, err := desc.LoadFileDescriptor("desc_test1.proto")
+	testutil.Ok(t, err)
+	md := fd.FindSymbol("testprotos.AnotherTestMessage").(*desc.MessageDescriptor)
+	dm := NewMessage(md)
+
+	inputs := map[reflect.Kind]struct {
+		input interface{}
+		zero  interface{}
+	}{
+		reflect.Ptr: {
+			input: &testprotos.TestMessage{Ne: []testprotos.TestMessage_NestedEnum{testprotos.TestMessage_VALUE1}},
+			zero:  (*testprotos.TestMessage)(nil),
+		},
+		reflect.Int32:  {input: int32(-12), zero: int32(0)},
+		reflect.Uint64: {input: uint64(4567), zero: uint64(0)},
+		reflect.String: {input: "foobar", zero: ""},
+		reflect.Slice:  {input: []bool{true, false, true, false, true}, zero: []bool(nil)}}
+
+	cases := []struct {
+		kind  reflect.Kind
+		extfd *desc.FieldDescriptor
+	}{
+		{kind: reflect.Ptr, extfd: loadExtension(t, testprotos.E_Xtm)},
+		{kind: reflect.Int32, extfd: loadExtension(t, testprotos.E_Xi)},
+		{kind: reflect.Uint64, extfd: loadExtension(t, testprotos.E_Xui)},
+		{kind: reflect.String, extfd: loadExtension(t, testprotos.E_Xs)},
+		{kind: reflect.Slice, extfd: loadExtension(t, testprotos.E_TestMessage_NestedMessage_AnotherNestedMessage_Flags)},
+	}
+
+	for _, c := range cases {
+		zero := inputs[c.kind].zero
+
+		for k, i := range inputs {
+			// First run the case using Try* methods
+
+			v, err := dm.TryGetField(c.extfd)
+			testutil.Ok(t, err)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+
+			err = dm.TrySetField(c.extfd, i.input)
+			if k == c.kind && err != nil {
+				t.Errorf("Not expecting an error assigning a %v to a %v (%v): %s", k, c.kind, c, err.Error())
+			} else if k != c.kind && err == nil {
+				t.Errorf("Expecting an error assigning a %v to a %v", k, c.kind)
+			} else if k == c.kind {
+				// make sure value stuck
+				v, err = dm.TryGetField(c.extfd)
+				testutil.Ok(t, err)
+				testutil.Eq(t, i.input, v)
+			}
+
+			err = dm.TryClearField(c.extfd)
+			testutil.Ok(t, err)
+
+			v, err = dm.TryGetField(c.extfd)
+			testutil.Ok(t, err)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+
+			// Now we do it again using the non-Try* methods (e.g. the ones that panic)
+
+			v = dm.GetField(c.extfd)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+
+			err = catchPanic(func() { dm.SetField(c.extfd, i.input) })
+			if k == c.kind && err != nil {
+				t.Errorf("Not expecting an error assigning a %v to a %v (%v): %s", k, c.kind, c, err.Error())
+			} else if k != c.kind && err == nil {
+				t.Errorf("Expecting an error assigning a %v to a %v", k, c.kind)
+			} else if k == c.kind {
+				// make sure value stuck
+				v = dm.GetField(c.extfd)
+				testutil.Eq(t, i.input, v)
+			}
+
+			dm.ClearField(c.extfd)
+
+			v = dm.GetField(c.extfd)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+		}
+	}
+}
+
+func TestGetSetExtensionFields_ByTagNumber(t *testing.T) {
+	fd, err := desc.LoadFileDescriptor("desc_test1.proto")
+	testutil.Ok(t, err)
+	md := fd.FindSymbol("testprotos.AnotherTestMessage").(*desc.MessageDescriptor)
+	er := NewExtensionRegistryWithDefaults()
+	dm := NewMessageFactoryWithExtensionRegistry(er).NewMessage(md).(*Message)
+
+	inputs := map[reflect.Kind]struct {
+		input interface{}
+		zero  interface{}
+	}{
+		reflect.Ptr: {
+			input: &testprotos.TestMessage{Ne: []testprotos.TestMessage_NestedEnum{testprotos.TestMessage_VALUE1}},
+			zero:  (*testprotos.TestMessage)(nil),
+		},
+		reflect.Int32:  {input: int32(-12), zero: int32(0)},
+		reflect.Uint64: {input: uint64(4567), zero: uint64(0)},
+		reflect.String: {input: "foobar", zero: ""},
+		reflect.Slice:  {input: []bool{true, false, true, false, true}, zero: []bool(nil)}}
+
+	cases := []struct {
+		kind      reflect.Kind
+		tagNumber int
+		fieldName string
+	}{
+		{kind: reflect.Ptr, tagNumber: int(testprotos.E_Xtm.Field), fieldName: testprotos.E_Xtm.Name},
+		{kind: reflect.Int32, tagNumber: int(testprotos.E_Xi.Field), fieldName: testprotos.E_Xi.Name},
+		{kind: reflect.Uint64, tagNumber: int(testprotos.E_Xui.Field), fieldName: testprotos.E_Xui.Name},
+		{kind: reflect.String, tagNumber: int(testprotos.E_Xs.Field), fieldName: testprotos.E_Xs.Name},
+		{kind: reflect.Slice, tagNumber: int(testprotos.E_TestMessage_NestedMessage_AnotherNestedMessage_Flags.Field),
+			fieldName: testprotos.E_TestMessage_NestedMessage_AnotherNestedMessage_Flags.Name},
+	}
+
+	for _, c := range cases {
+		zero := inputs[c.kind].zero
+
+		for k, i := range inputs {
+			// First run the case using Try* methods
+
+			v, err := dm.TryGetFieldByNumber(c.tagNumber)
+			testutil.Ok(t, err)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+
+			err = dm.TrySetFieldByNumber(c.tagNumber, i.input)
+			if k == c.kind && err != nil {
+				t.Errorf("Not expecting an error assigning a %v to a %v (%v): %s", k, c.kind, c, err.Error())
+			} else if k != c.kind && err == nil {
+				t.Errorf("Expecting an error assigning a %v to a %v", k, c.kind)
+			} else if k == c.kind {
+				// make sure value stuck
+				v, err = dm.TryGetFieldByNumber(c.tagNumber)
+				testutil.Ok(t, err)
+				testutil.Eq(t, i.input, v)
+			}
+
+			err = dm.TryClearFieldByNumber(c.tagNumber)
+			testutil.Ok(t, err)
+
+			v, err = dm.TryGetFieldByNumber(c.tagNumber)
+			testutil.Ok(t, err)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+
+			// Now we do it again using the non-Try* methods (e.g. the ones that panic)
+
+			v = dm.GetFieldByNumber(c.tagNumber)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+
+			err = catchPanic(func() { dm.SetFieldByNumber(c.tagNumber, i.input) })
+			if k == c.kind && err != nil {
+				t.Errorf("Not expecting an error assigning a %v to a %v (%v): %s", k, c.kind, c, err.Error())
+			} else if k != c.kind && err == nil {
+				t.Errorf("Expecting an error assigning a %v to a %v", k, c.kind)
+			} else if k == c.kind {
+				// make sure value stuck
+				v = dm.GetFieldByNumber(c.tagNumber)
+				testutil.Eq(t, i.input, v)
+			}
+
+			dm.ClearFieldByNumber(c.tagNumber)
+
+			v = dm.GetFieldByNumber(c.tagNumber)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+		}
+	}
+}
+
+func loadExtension(t *testing.T, ed *proto.ExtensionDesc) *desc.FieldDescriptor {
+	fd, err := desc.LoadFieldDescriptorForExtension(ed)
+	testutil.Ok(t, err, "failed to load descriptor for extension %s (%d)", ed.Name, ed.Field)
+	return fd
 }
 
 func TestGetSetOneOfFields(t *testing.T) {

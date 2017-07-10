@@ -440,7 +440,10 @@ func createMessageDescriptor(fd *FileDescriptor, parent Descriptor, enclosing st
 		ret.oneOfs = append(ret.oneOfs, od)
 	}
 	for _, r := range md.GetExtensionRange() {
-		ret.extRanges = append(ret.extRanges, proto.ExtensionRange{r.GetStart(), r.GetEnd()})
+		// proto.ExtensionRange is inclusive (and that's how extension ranges are defined in code).
+		// but protoc converts range to exclusive end in descriptor, so we must convert back
+		end := r.GetEnd() - 1
+		ret.extRanges = append(ret.extRanges, proto.ExtensionRange{r.GetStart(), end})
 	}
 	sort.Sort(ret.extRanges)
 	ret.isProto3 = fd.isProto3
@@ -593,7 +596,7 @@ func (er extRanges) String() string {
 }
 
 func (er extRanges) IsExtension(tagNumber int32) bool {
-	i := sort.Search(len(er), func(i int) bool { return er[i].Start >= tagNumber })
+	i := sort.Search(len(er), func(i int) bool { return er[i].Start <= tagNumber })
 	return i < len(er) && tagNumber <= er[i].End
 }
 
@@ -602,12 +605,7 @@ func (er extRanges) Len() int {
 }
 
 func (er extRanges) Less(i, j int) bool {
-	if er[i].Start < er[j].Start {
-		return true
-	} else if er[i].Start == er[j].Start && er[i].End < er[j].End {
-		return true
-	}
-	return false
+	return er[i].Start < er[j].Start
 }
 
 func (er extRanges) Swap(i, j int) {
