@@ -209,6 +209,7 @@ func (m *Message) FindFieldDescriptorByName(name string) *desc.FieldDescriptor {
 			// malformed name
 			return nil
 		}
+		mustBeExt = true
 		name = name[1 : len(name)-1]
 	}
 	fd = m.er.FindExtensionByName(m.md.GetFullyQualifiedName(), name)
@@ -222,6 +223,7 @@ func (m *Message) FindFieldDescriptorByName(name string) *desc.FieldDescriptor {
 			return fd
 		}
 	}
+
 	return nil
 }
 
@@ -668,7 +670,7 @@ func (m *Message) TryGetRepeatedFieldByNumber(tagNumber int, index int) (interfa
 }
 
 func (m *Message) getRepeatedField(fd *desc.FieldDescriptor, index int) (interface{}, error) {
-	if !fd.IsRepeated() {
+	if fd.IsMap() || !fd.IsRepeated() {
 		return nil, FieldIsNotRepeatedError
 	}
 	sl := m.values[fd.GetNumber()]
@@ -920,11 +922,11 @@ func validFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interfac
 			// value should be a slice of entry messages that we need convert into a map[interface{}]interface{}
 			m := map[interface{}]interface{}{}
 			for i := 0; i < val.Len(); i++ {
-				e := val.Index(i).Interface()
-				msg, ok := e.(proto.Message)
-				if !ok {
-					return nil, fmt.Errorf("Contents of slice/array for a map field must be map entry messages; instead was %v", val.Index(i).Type())
+				e, err := validElementFieldValue(fd, val.Index(i).Interface())
+				if err != nil {
+					return nil, err
 				}
+				msg := e.(proto.Message)
 				dm, err := asDynamicMessage(msg, fd.GetMessageType())
 				if err != nil {
 					return nil, err
@@ -986,35 +988,35 @@ func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (i
 		descriptor.FieldDescriptorProto_TYPE_INT32,
 		descriptor.FieldDescriptorProto_TYPE_SINT32,
 		descriptor.FieldDescriptorProto_TYPE_ENUM:
-		return toInt32(elem(val), typeName, fd.GetFullyQualifiedName())
+		return toInt32(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_SFIXED64,
 		descriptor.FieldDescriptorProto_TYPE_INT64,
 		descriptor.FieldDescriptorProto_TYPE_SINT64:
-		return toInt64(elem(val), typeName, fd.GetFullyQualifiedName())
+		return toInt64(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
 		descriptor.FieldDescriptorProto_TYPE_UINT32:
-		return toUint32(elem(val), typeName, fd.GetFullyQualifiedName())
+		return toUint32(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
 		descriptor.FieldDescriptorProto_TYPE_UINT64:
-		return toUint64(elem(val), typeName, fd.GetFullyQualifiedName())
+		return toUint64(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		return toFloat32(elem(val), typeName, fd.GetFullyQualifiedName())
+		return toFloat32(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		return toFloat64(elem(val), typeName, fd.GetFullyQualifiedName())
+		return toFloat64(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		return toBool(elem(val), typeName, fd.GetFullyQualifiedName())
+		return toBool(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		return toBytes(elem(val), typeName, fd.GetFullyQualifiedName())
+		return toBytes(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
-		return toString(elem(val), typeName, fd.GetFullyQualifiedName())
+		return toString(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
 
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
 		descriptor.FieldDescriptorProto_TYPE_GROUP:
@@ -1039,13 +1041,6 @@ func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (i
 	}
 }
 
-func elem(v reflect.Value) reflect.Value {
-	if v.Kind() == reflect.Ptr {
-		return v.Elem()
-	}
-	return v
-}
-
 func toInt32(v reflect.Value, what string, fieldName string) (int32, error) {
 	if v.Kind() == reflect.Int32 {
 		return int32(v.Int()), nil
@@ -1068,21 +1063,21 @@ func toFloat32(v reflect.Value, what string, fieldName string) (float32, error) 
 }
 
 func toInt64(v reflect.Value, what string, fieldName string) (int64, error) {
-	if v.Kind() == reflect.Int64 {
+	if v.Kind() == reflect.Int64 || v.Kind() == reflect.Int || v.Kind() == reflect.Int32 {
 		return v.Int(), nil
 	}
 	return 0, fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())
 }
 
 func toUint64(v reflect.Value, what string, fieldName string) (uint64, error) {
-	if v.Kind() == reflect.Uint64 {
+	if v.Kind() == reflect.Uint64 || v.Kind() == reflect.Uint || v.Kind() == reflect.Uint32 {
 		return v.Uint(), nil
 	}
 	return 0, fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())
 }
 
 func toFloat64(v reflect.Value, what string, fieldName string) (float64, error) {
-	if v.Kind() == reflect.Float64 {
+	if v.Kind() == reflect.Float64 || v.Kind() == reflect.Float32 {
 		return v.Float(), nil
 	}
 	return 0, fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())

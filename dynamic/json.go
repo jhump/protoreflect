@@ -64,7 +64,6 @@ func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
 
 	first := true
 
-	// first the known fields
 	for _, tag := range tags {
 		itag := int32(tag)
 		fd := m.FindFieldDescriptor(itag)
@@ -97,9 +96,28 @@ func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
 }
 
 func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts *jsonpb.Marshaler) error {
-	jsonName := fd.AsFieldDescriptorProto().GetJsonName()
-	if opts.OrigName || jsonName == "" {
+	var jsonName string
+	if opts.OrigName {
 		jsonName = fd.GetName()
+	} else {
+		jsonName = fd.AsFieldDescriptorProto().GetJsonName()
+		if jsonName == "" {
+			jsonName = fd.GetName()
+		}
+	}
+	if fd.IsExtension() {
+		var scope string
+		switch parent := fd.GetParent().(type) {
+		case *desc.FileDescriptor:
+			scope = parent.GetPackage()
+		default:
+			scope = parent.GetFullyQualifiedName()
+		}
+		if scope == "" {
+			jsonName = fmt.Sprintf("[%s]", jsonName)
+		} else {
+			jsonName = fmt.Sprintf("[%s.%s]", scope, jsonName)
+		}
 	}
 	err := writeJsonString(b, jsonName)
 	if err != nil {
@@ -377,6 +395,8 @@ func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
 		if err != nil {
 			return err
 		}
+		// TODO: this needs to accept fields' JSON names and probably should also be lenient, like
+		// accepting non-fully-qualified-name for an extension, with or without enclosing brackets
 		fd := m.FindFieldDescriptorByName(f)
 		if fd == nil {
 			if opts.AllowUnknownFields {
@@ -526,7 +546,7 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 			return nil, err
 		} else {
 			// TODO: ideally we would use mf.NewMessage and, if not a dynamic message, use
-			// jsonpb to unmarshal it. But the JS parser isn't particularly amenable to that
+			// jsonpb to unmarshal it. But our jsReader isn't particularly amenable to that
 			// so we instead convert a dynamic message to a generated one if the known-type
 			// registry knows about the generated type...
 			var ktr *KnownTypeRegistry
@@ -553,12 +573,7 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 				if vd != nil {
 					return vd.GetNumber(), nil
 				} else {
-					// could not find it! treat unknown enum name the same as unknown field
-					if opts.AllowUnknownFields {
-						return nil, nil
-					} else {
-						return nil, fmt.Errorf("Enum %q does not have value named %q", fd.GetEnumType().GetFullyQualifiedName(), e)
-					}
+					return nil, fmt.Errorf("Enum %q does not have value named %q", fd.GetEnumType().GetFullyQualifiedName(), e)
 				}
 			} else if i > math.MaxInt32 || i < math.MinInt32 {
 				return nil, NumericOverflowError
