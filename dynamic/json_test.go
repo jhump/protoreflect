@@ -2,7 +2,6 @@ package dynamic
 
 import (
 	"bytes"
-	"reflect"
 	"testing"
 
 	"github.com/golang/protobuf/jsonpb"
@@ -88,29 +87,6 @@ func TestMarshalJSONIndent(t *testing.T) {
 	testutil.Eq(t, "{\n\t\"foo\": [\n\t\t\"VALUE1\"\n\t],\n\t\"bar\": \"bedazzle\"\n}", string(jsIndent))
 }
 
-func TestUnmarshalJSON(t *testing.T) {
-	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.TestRequest)(nil))
-	testutil.Ok(t, err)
-
-	js1 := []byte(`{"foo":["VALUE1"],"bar":"bedazzle"}`)
-	dm1 := NewMessage(md)
-	err = dm1.UnmarshalJSON(js1)
-	testutil.Ok(t, err)
-	foo1 := dm1.GetFieldByNumber(1)
-	bar1 := dm1.GetFieldByNumber(2)
-	testutil.Eq(t, coerceSlice([]int32{1}, reflect.Int32), foo1)
-	testutil.Eq(t, coerceSlice("bedazzle", reflect.String), bar1)
-
-	js2 := []byte("{\n  \"foo\": [\n    \"VALUE1\"\n  ],\n  \"bar\": \"bedazzle\"\n}")
-	dm2 := NewMessage(md)
-	err = dm2.UnmarshalJSON(js2)
-	testutil.Ok(t, err)
-	foo2 := dm2.GetFieldByNumber(1)
-	bar2 := dm2.GetFieldByNumber(2)
-	testutil.Eq(t, coerceSlice([]int32{1}, reflect.Int32), foo2)
-	testutil.Eq(t, coerceSlice("bedazzle", reflect.String), bar2)
-}
-
 func TestUnmarshalJSONAllowUnknownFields(t *testing.T) {
 	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.TestRequest)(nil))
 	testutil.Ok(t, err)
@@ -123,8 +99,8 @@ func TestUnmarshalJSONAllowUnknownFields(t *testing.T) {
 	testutil.Ok(t, err)
 	foo := dm.GetFieldByNumber(1)
 	bar := dm.GetFieldByNumber(2)
-	testutil.Eq(t, coerceSlice([]int32{1}, reflect.Int32), foo)
-	testutil.Eq(t, coerceSlice("bedazzle", reflect.String), bar)
+	testutil.Eq(t, []int32{1}, foo)
+	testutil.Eq(t, "bedazzle", bar)
 }
 
 func jsonTranslationParty(t *testing.T, msg proto.Message) {
