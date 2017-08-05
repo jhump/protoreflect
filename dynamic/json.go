@@ -346,7 +346,7 @@ func writeJsonString(b *indentBuffer, s string) error {
 
 func (m *Message) UnmarshalJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
 	m.Reset()
-	if err := m.UnmarshalMergeJSON(js); err != nil {
+	if err := m.UnmarshalMergeJSONPB(opts, js); err != nil {
 		return err
 	}
 	return m.Validate()
