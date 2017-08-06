@@ -685,10 +685,10 @@ func (fd *FieldDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dpb.
 		}
 	}
 	fd.file.registerField(fd)
-	fd.def = fd.determineDefault()
 	fd.isMap = fd.proto.GetLabel() == dpb.FieldDescriptorProto_LABEL_REPEATED &&
 		fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_MESSAGE &&
 		fd.GetMessageType().IsMapEntry()
+	fd.def = fd.determineDefault()
 	return nil
 }
 
