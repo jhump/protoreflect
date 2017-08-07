@@ -55,6 +55,25 @@ func TestMarshalJSONEmitDefaults(t *testing.T) {
 	testutil.Eq(t, `{"id":0,"name":""}`, string(jsDefaults))
 }
 
+func TestMarshalJSONEmitDefaultsMapKeyFields(t *testing.T) {
+	sort_map_keys = true
+	defer func() {
+		sort_map_keys = false
+	}()
+
+	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.MapKeyFields)(nil))
+	testutil.Ok(t, err)
+	dm := NewMessage(md)
+	m := &jsonpb.Marshaler{EmitDefaults: true}
+	jsDefaults, err := dm.MarshalJSONPB(m)
+	testutil.Ok(t, err)
+	testutil.Eq(t, `{"i":{},"j":{},"k":{},"l":{},"m":{},"n":{},"o":{},"p":{},"q":{},"r":{},"s":{},"t":{}}`, string(jsDefaults))
+
+	jsDefaults2, err := m.MarshalToString(&testprotos.MapKeyFields{})
+	testutil.Ok(t, err)
+	testutil.Eq(t, string(jsDefaults), string(jsDefaults2))
+}
+
 func TestMarshalJSONEnumsAsInts(t *testing.T) {
 	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.TestRequest)(nil))
 	testutil.Ok(t, err)
