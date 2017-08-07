@@ -88,7 +88,19 @@ func TestMarshalJSONIndent(t *testing.T) {
 }
 
 func TestUnmarshalJSONAllowUnknownFields(t *testing.T) {
-	// TODO
+	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.TestRequest)(nil))
+	testutil.Ok(t, err)
+	js := []byte(`{"foo":["VALUE1"],"bar":"bedazzle","xxx": 1}`)
+	dm := NewMessage(md)
+	err = dm.UnmarshalJSON(js)
+	testutil.Nok(t, err)
+	unmarshaler := &jsonpb.Unmarshaler{AllowUnknownFields: true}
+	err = dm.UnmarshalJSONPB(unmarshaler, js)
+	testutil.Ok(t, err)
+	foo := dm.GetFieldByNumber(1)
+	bar := dm.GetFieldByNumber(2)
+	testutil.Eq(t, []int32{1}, foo)
+	testutil.Eq(t, "bedazzle", bar)
 }
 
 func jsonTranslationParty(t *testing.T, msg proto.Message) {
