@@ -227,6 +227,46 @@ func (m *Message) FindFieldDescriptorByName(name string) *desc.FieldDescriptor {
 	return nil
 }
 
+func (m *Message) FindFieldDescriptorByJSONName(name string) *desc.FieldDescriptor {
+	if name == "" {
+		return nil
+	}
+	fd := m.md.FindFieldByJSONName(name)
+	if fd != nil {
+		return fd
+	}
+	mustBeExt := false
+	if name[0] == '(' {
+		if name[len(name)-1] != ')' {
+			// malformed name
+			return nil
+		}
+		mustBeExt = true
+		name = name[1 : len(name)-1]
+	} else if name[0] == '[' {
+		if name[len(name)-1] != ']' {
+			// malformed name
+			return nil
+		}
+		mustBeExt = true
+		name = name[1 : len(name)-1]
+	}
+	fd = m.er.FindExtensionByJSONName(m.md.GetFullyQualifiedName(), name)
+	if fd != nil {
+		return fd
+	}
+	for _, fd := range m.extraFields {
+		if fd.IsExtension() && name == fd.GetFullyQualifiedJSONName() {
+			return fd
+		} else if !mustBeExt && !fd.IsExtension() && name == fd.GetJSONName() {
+			return fd
+		}
+	}
+
+	// try non-JSON names
+	return m.FindFieldDescriptorByName(name)
+}
+
 func (m *Message) checkField(fd *desc.FieldDescriptor) error {
 	if fd.GetOwner().GetFullyQualifiedName() != m.md.GetFullyQualifiedName() {
 		return fmt.Errorf("Given field, %s, is for wrong message type: %s; expecting %s", fd.GetName(), fd.GetOwner().GetFullyQualifiedName(), m.md.GetFullyQualifiedName())

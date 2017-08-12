@@ -50,6 +50,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"unsafe"
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
@@ -409,6 +411,7 @@ type MessageDescriptor struct {
 	sourceInfo *dpb.SourceCodeInfo_Location
 	isProto3   bool
 	isMapEntry bool
+	jsonNames  map[string]*FieldDescriptor // load/store atomically
 }
 
 func createMessageDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, md *dpb.DescriptorProto, symbols map[string]Descriptor) (*MessageDescriptor, string) {
@@ -631,6 +634,41 @@ func (md *MessageDescriptor) FindFieldByNumber(tagNumber int32) *FieldDescriptor
 	} else {
 		return nil
 	}
+}
+
+// FindFieldByJSONName finds the field with the given JSON field name. If no such
+// field exists then nil is returned. Only regular fields are returned, not
+// extensions.
+func (md *MessageDescriptor) FindFieldByJSONName(jsonName string) *FieldDescriptor {
+	// NB: We don't want to eagerly index JSON names because many programs won't use it.
+	// So we want to do it lazily, but also make sure the result is thread-safe. So we
+	// atomically load/store the map as if it were a normal pointer. We don't use other
+	// mechanisms -- like sync.Mutex, sync.RWMutex, sync.Once, or atomic.Value -- to
+	// do this lazily because those types cannot be copied, and we'd rather not induce
+	// 'go vet' errors in programs that use descriptors and try to copy them.
+	// If multiple goroutines try to access the index at the same time, before it is
+	// built, they will all end up computing the index redundantly. Future reads of
+	// the index will use whatever was the "last one stored" by those racing goroutines.
+	// Since building the index is deterministic, this is fine: all indices computed
+	// will be the same.
+	addrOfJsonNames := (*unsafe.Pointer)(unsafe.Pointer(&md.jsonNames))
+	jsonNames := atomic.LoadPointer(addrOfJsonNames)
+	var index map[string]*FieldDescriptor
+	if jsonNames == nil {
+		// slow path: compute the index
+		index = map[string]*FieldDescriptor{}
+		for _, f := range md.fields {
+			jn := f.proto.GetJsonName()
+			if jn == "" {
+				jn = f.proto.GetName()
+			}
+			index[jn] = f
+		}
+		atomic.StorePointer(addrOfJsonNames, *(*unsafe.Pointer)(unsafe.Pointer(&index)))
+	} else {
+		*(*unsafe.Pointer)(unsafe.Pointer(&index)) = jsonNames
+	}
+	return index[jsonName]
 }
 
 // FieldDescriptor describes a field of a protocol buffer message.
@@ -862,6 +900,17 @@ func (fd *FieldDescriptor) AsFieldDescriptorProto() *dpb.FieldDescriptorProto {
 
 func (fd *FieldDescriptor) String() string {
 	return fd.proto.String()
+}
+
+func (fd *FieldDescriptor) GetJSONName() string {
+	if jsonName := fd.proto.GetJsonName(); jsonName != "" {
+		return jsonName
+	}
+	return fd.proto.GetName()
+}
+
+func (fd *FieldDescriptor) GetFullyQualifiedJSONName() string {
+	return fmt.Sprintf("%s.%s", fd.GetParent().GetFullyQualifiedName(), fd.GetJSONName())
 }
 
 // GetOwner returns the message type that this field belongs to. If this is a normal
@@ -1558,6 +1607,23 @@ func LoadFileDescriptor(file string) (*FileDescriptor, error) {
 	return loadFileDescriptorLocked(file)
 }
 
+// These are standard protos included with protoc, but they get registered at runtime
+// using paths relative to where the files are mirrored in GOPATH. To support protos
+// that refer to the standard path instead, we need this mapping.
+var stdFileAliases = map[string]string{
+	"google/protobuf/any.proto":       "github.com/golang/protobuf/ptypes/any/any.proto",
+	"google/protobuf/duration.proto":  "github.com/golang/protobuf/ptypes/duration/duration.proto",
+	"google/protobuf/empty.proto":     "github.com/golang/protobuf/ptypes/empty/empty.proto",
+	"google/protobuf/struct.proto":    "github.com/golang/protobuf/ptypes/struct/struct.proto",
+	"google/protobuf/timestamp.proto": "github.com/golang/protobuf/ptypes/timestamp/timestamp.proto",
+	"google/protobuf/wrappers.proto":  "github.com/golang/protobuf/ptypes/wrappers/wrappers.proto",
+	"google/protobuf/type.proto":      "google.golang.org/genproto/protobuf/ptype/type.proto",
+
+	// (descriptor.proto, api.proto, field_mask.proto, type.proto, source_context.proto, compiler/plugin.go)
+	// Other standard files are not present in GOROOT, so we don't need mappings because they can only
+	// be imported in proto sources from the standard location.
+}
+
 func loadFileDescriptorLocked(file string) (*FileDescriptor, error) {
 	f := filesCache[file]
 	if f != nil {
@@ -1565,13 +1631,29 @@ func loadFileDescriptorLocked(file string) (*FileDescriptor, error) {
 	}
 
 	fdb := proto.FileDescriptor(file)
+	aliased := false
 	if fdb == nil {
-		return nil, fmt.Errorf("No such file: %q", file)
+		var ok bool
+		alias, ok := stdFileAliases[file]
+		if ok {
+			aliased = true
+			if fdb = proto.FileDescriptor(alias); fdb == nil {
+				return nil, fmt.Errorf("No such file: %q", file)
+			}
+		} else {
+			return nil, fmt.Errorf("No such file: %q", file)
+		}
 	}
 
 	fd, err := decodeFileDescriptor(file, fdb)
 	if err != nil {
 		return nil, err
+	}
+
+	if aliased {
+		// the file descriptor will have the alias used to load it, but
+		// we need it to have the specified name in order to link it
+		fd.Name = proto.String(file)
 	}
 
 	f, err = toFileDescriptorLocked(fd)
