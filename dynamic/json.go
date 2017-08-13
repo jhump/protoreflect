@@ -357,14 +357,13 @@ func (m *Message) UnmarshalJSON(js []byte) error {
 }
 
 func (m *Message) UnmarshalMergeJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
-	r := &jsReader{dec: json.NewDecoder(bytes.NewReader(js))}
-	r.dec.UseNumber()
+	r := newJsReader(js)
 	err := m.unmarshalJson(r, opts)
 	if err != nil {
 		return err
 	}
 	if t, err := r.poll(); err != io.EOF {
-		b, _ := ioutil.ReadAll(r.dec.Buffered())
+		b, _ := ioutil.ReadAll(r.unread())
 		s := fmt.Sprintf("%v%s", t, string(b))
 		return fmt.Errorf("Superfluous data found after JSON object: %q", s)
 	}
@@ -395,9 +394,7 @@ func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
 		if err != nil {
 			return err
 		}
-		// TODO: this needs to accept fields' JSON names and probably should also be lenient, like
-		// accepting non-fully-qualified-name for an extension, with or without enclosing brackets
-		fd := m.FindFieldDescriptorByName(f)
+		fd := m.FindFieldDescriptorByJSONName(f)
 		if fd == nil {
 			if opts.AllowUnknownFields {
 				r.skip()
@@ -541,26 +538,24 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 	switch fd.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
 		descriptor.FieldDescriptorProto_TYPE_GROUP:
-		m := newMessageWithMessageFactory(fd.GetMessageType(), mf)
-		if err := m.unmarshalJson(r, opts); err != nil {
-			return nil, err
+		m := mf.NewMessage(fd.GetMessageType())
+		if dm, ok := m.(*Message); ok {
+			if err := dm.unmarshalJson(r, opts); err != nil {
+				return nil, err
+			}
 		} else {
-			// TODO: ideally we would use mf.NewMessage and, if not a dynamic message, use
-			// jsonpb to unmarshal it. But our jsReader isn't particularly amenable to that
-			// so we instead convert a dynamic message to a generated one if the known-type
-			// registry knows about the generated type...
-			var ktr *KnownTypeRegistry
-			if mf != nil {
-				ktr = mf.ktr
+			var msg json.RawMessage
+			if err := json.NewDecoder(r.unread()).Decode(&msg); err != nil {
+				return nil, err
 			}
-			pm := ktr.CreateIfKnown(fd.GetMessageType().GetFullyQualifiedName())
-			if pm != nil {
-				if err := m.ConvertTo(pm); err != nil {
-					return pm, nil
-				}
+			if err := r.skip(); err != nil {
+				return nil, err
 			}
-			return m, nil
+			if err := opts.Unmarshal(bytes.NewReader([]byte(msg)), m); err != nil {
+				return nil, err
+			}
 		}
+		return m, nil
 
 	case descriptor.FieldDescriptorProto_TYPE_ENUM:
 		if e, err := r.nextNumber(); err != nil {
@@ -646,9 +641,36 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 }
 
 type jsReader struct {
+	reader  *bytes.Reader
 	dec     *json.Decoder
 	current json.Token
 	peeked  bool
+}
+
+func newJsReader(b []byte) *jsReader {
+	reader := bytes.NewReader(b)
+	dec := json.NewDecoder(reader)
+	dec.UseNumber()
+	return &jsReader{reader: reader, dec: dec}
+}
+
+func (r *jsReader) unread() io.Reader {
+	bufs := make([]io.Reader, 3)
+	var peeked []byte
+	if r.peeked {
+		if _, ok := r.current.(json.Delim); ok {
+			peeked = []byte(fmt.Sprintf("%v", r.current))
+		} else {
+			peeked, _ = json.Marshal(r.current)
+		}
+	}
+	readerCopy := *r.reader
+	decCopy := *r.dec
+
+	bufs[0] = bytes.NewReader(peeked)
+	bufs[1] = decCopy.Buffered()
+	bufs[2] = &readerCopy
+	return &concatReader{bufs: bufs}
 }
 
 func (r *jsReader) hasNext() bool {
@@ -822,4 +844,26 @@ func (r *jsReader) expect(predicate func(json.Token) bool, ifNil interface{}, ex
 		return t, fmt.Errorf("Bad input. Expecting %s. Instead got: %v.", expected, t)
 	}
 	return t, nil
+}
+
+type concatReader struct {
+	bufs []io.Reader
+	curr int
+}
+
+func (r *concatReader) Read(p []byte) (n int, err error) {
+	for {
+		if r.curr >= len(r.bufs) {
+			err = io.EOF
+			return
+		}
+		var c int
+		c, err = r.bufs[r.curr].Read(p)
+		n += c
+		if err != io.EOF {
+			return
+		}
+		r.curr++
+		p = p[c:]
+	}
 }

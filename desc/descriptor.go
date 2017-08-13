@@ -407,6 +407,7 @@ type MessageDescriptor struct {
 	extRanges  extRanges
 	fqn        string
 	sourceInfo *dpb.SourceCodeInfo_Location
+	jsonNames  jsonNameMap
 	isProto3   bool
 	isMapEntry bool
 }
@@ -862,6 +863,17 @@ func (fd *FieldDescriptor) AsFieldDescriptorProto() *dpb.FieldDescriptorProto {
 
 func (fd *FieldDescriptor) String() string {
 	return fd.proto.String()
+}
+
+func (fd *FieldDescriptor) GetJSONName() string {
+	if jsonName := fd.proto.GetJsonName(); jsonName != "" {
+		return jsonName
+	}
+	return fd.proto.GetName()
+}
+
+func (fd *FieldDescriptor) GetFullyQualifiedJSONName() string {
+	return fmt.Sprintf("%s.%s", fd.GetParent().GetFullyQualifiedName(), fd.GetJSONName())
 }
 
 // GetOwner returns the message type that this field belongs to. If this is a normal
@@ -1558,6 +1570,23 @@ func LoadFileDescriptor(file string) (*FileDescriptor, error) {
 	return loadFileDescriptorLocked(file)
 }
 
+// These are standard protos included with protoc, but they get registered at runtime
+// using paths relative to where the files are mirrored in GOPATH. To support protos
+// that refer to the standard path instead, we need this mapping.
+var stdFileAliases = map[string]string{
+	"google/protobuf/any.proto":       "github.com/golang/protobuf/ptypes/any/any.proto",
+	"google/protobuf/duration.proto":  "github.com/golang/protobuf/ptypes/duration/duration.proto",
+	"google/protobuf/empty.proto":     "github.com/golang/protobuf/ptypes/empty/empty.proto",
+	"google/protobuf/struct.proto":    "github.com/golang/protobuf/ptypes/struct/struct.proto",
+	"google/protobuf/timestamp.proto": "github.com/golang/protobuf/ptypes/timestamp/timestamp.proto",
+	"google/protobuf/wrappers.proto":  "github.com/golang/protobuf/ptypes/wrappers/wrappers.proto",
+	"google/protobuf/type.proto":      "google.golang.org/genproto/protobuf/ptype/type.proto",
+
+	// (descriptor.proto, api.proto, field_mask.proto, type.proto, source_context.proto, compiler/plugin.go)
+	// Other standard files are not present in GOROOT, so we don't need mappings because they can only
+	// be imported in proto sources from the standard location.
+}
+
 func loadFileDescriptorLocked(file string) (*FileDescriptor, error) {
 	f := filesCache[file]
 	if f != nil {
@@ -1565,13 +1594,29 @@ func loadFileDescriptorLocked(file string) (*FileDescriptor, error) {
 	}
 
 	fdb := proto.FileDescriptor(file)
+	aliased := false
 	if fdb == nil {
-		return nil, fmt.Errorf("No such file: %q", file)
+		var ok bool
+		alias, ok := stdFileAliases[file]
+		if ok {
+			aliased = true
+			if fdb = proto.FileDescriptor(alias); fdb == nil {
+				return nil, fmt.Errorf("No such file: %q", file)
+			}
+		} else {
+			return nil, fmt.Errorf("No such file: %q", file)
+		}
 	}
 
 	fd, err := decodeFileDescriptor(file, fdb)
 	if err != nil {
 		return nil, err
+	}
+
+	if aliased {
+		// the file descriptor will have the alias used to load it, but
+		// we need it to have the specified name in order to link it
+		fd.Name = proto.String(file)
 	}
 
 	f, err = toFileDescriptorLocked(fd)

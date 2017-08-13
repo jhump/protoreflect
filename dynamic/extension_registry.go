@@ -143,6 +143,32 @@ func (r *ExtensionRegistry) FindExtensionByName(messageName string, fieldName st
 	return nil
 }
 
+// FindExtensionByJSONName queries for the extension field with the given extendee name (must be a fully-qualified
+// message name) and JSON field name (must also be a fully-qualified name). If no extension is known, nil is returned.
+// The fully-qualified JSON name is the same as the extension's normal fully-qualified name except that the last
+// component uses the field's JSON name (if present).
+func (r *ExtensionRegistry) FindExtensionByJSONName(messageName string, fieldName string) *desc.FieldDescriptor {
+	if r == nil {
+		return nil
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, fd := range r.exts[messageName] {
+		if fd.GetFullyQualifiedJSONName() == fieldName {
+			return fd
+		}
+	}
+	if r.includeDefault {
+		for _, ext := range getDefaultExtensions(messageName) {
+			fd, _ := desc.LoadFieldDescriptorForExtension(ext)
+			if fd.GetFullyQualifiedJSONName() == fieldName {
+				return fd
+			}
+		}
+	}
+	return nil
+}
+
 func getDefaultExtensions(messageName string) map[int32]*proto.ExtensionDesc {
 	t := proto.MessageType(messageName)
 	if t != nil {
