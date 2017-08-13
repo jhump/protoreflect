@@ -50,8 +50,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
-	"unsafe"
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
@@ -409,9 +407,9 @@ type MessageDescriptor struct {
 	extRanges  extRanges
 	fqn        string
 	sourceInfo *dpb.SourceCodeInfo_Location
+	jsonNames  jsonNameMap
 	isProto3   bool
 	isMapEntry bool
-	jsonNames  map[string]*FieldDescriptor // load/store atomically
 }
 
 func createMessageDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, md *dpb.DescriptorProto, symbols map[string]Descriptor) (*MessageDescriptor, string) {
@@ -634,41 +632,6 @@ func (md *MessageDescriptor) FindFieldByNumber(tagNumber int32) *FieldDescriptor
 	} else {
 		return nil
 	}
-}
-
-// FindFieldByJSONName finds the field with the given JSON field name. If no such
-// field exists then nil is returned. Only regular fields are returned, not
-// extensions.
-func (md *MessageDescriptor) FindFieldByJSONName(jsonName string) *FieldDescriptor {
-	// NB: We don't want to eagerly index JSON names because many programs won't use it.
-	// So we want to do it lazily, but also make sure the result is thread-safe. So we
-	// atomically load/store the map as if it were a normal pointer. We don't use other
-	// mechanisms -- like sync.Mutex, sync.RWMutex, sync.Once, or atomic.Value -- to
-	// do this lazily because those types cannot be copied, and we'd rather not induce
-	// 'go vet' errors in programs that use descriptors and try to copy them.
-	// If multiple goroutines try to access the index at the same time, before it is
-	// built, they will all end up computing the index redundantly. Future reads of
-	// the index will use whatever was the "last one stored" by those racing goroutines.
-	// Since building the index is deterministic, this is fine: all indices computed
-	// will be the same.
-	addrOfJsonNames := (*unsafe.Pointer)(unsafe.Pointer(&md.jsonNames))
-	jsonNames := atomic.LoadPointer(addrOfJsonNames)
-	var index map[string]*FieldDescriptor
-	if jsonNames == nil {
-		// slow path: compute the index
-		index = map[string]*FieldDescriptor{}
-		for _, f := range md.fields {
-			jn := f.proto.GetJsonName()
-			if jn == "" {
-				jn = f.proto.GetName()
-			}
-			index[jn] = f
-		}
-		atomic.StorePointer(addrOfJsonNames, *(*unsafe.Pointer)(unsafe.Pointer(&index)))
-	} else {
-		*(*unsafe.Pointer)(unsafe.Pointer(&index)) = jsonNames
-	}
-	return index[jsonName]
 }
 
 // FieldDescriptor describes a field of a protocol buffer message.
