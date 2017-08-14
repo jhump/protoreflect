@@ -11,6 +11,7 @@ It is generated from these files:
 	desc_test_field_types.proto
 	desc_test_options.proto
 	desc_test_proto3.proto
+	desc_test_wellknowntypes.proto
 
 It has these top-level messages:
 	TestMessage
@@ -29,8 +30,8 @@ It has these top-level messages:
 	MapValFields
 	ReallySimpleMessage
 	TestRequest
-	TestWellKnownTypes
 	TestResponse
+	TestWellKnownTypes
 */
 package testprotos
 

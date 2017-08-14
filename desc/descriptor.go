@@ -1570,9 +1570,10 @@ func LoadFileDescriptor(file string) (*FileDescriptor, error) {
 	return loadFileDescriptorLocked(file)
 }
 
-// These are standard protos included with protoc, but they get registered at runtime
-// using paths relative to where the files are mirrored in GOPATH. To support protos
-// that refer to the standard path instead, we need this mapping.
+// These are standard protos included with protoc, but they get registered at
+// runtime using incorrect paths. Files for the github.com/golang/protobuf/ptypes
+// package are registered using the path where the proto files are mirrored (in
+// GOPATH, inside the golang/protobuf repo).
 var stdFileAliases = map[string]string{
 	"google/protobuf/any.proto":       "github.com/golang/protobuf/ptypes/any/any.proto",
 	"google/protobuf/duration.proto":  "github.com/golang/protobuf/ptypes/duration/duration.proto",
@@ -1580,11 +1581,10 @@ var stdFileAliases = map[string]string{
 	"google/protobuf/struct.proto":    "github.com/golang/protobuf/ptypes/struct/struct.proto",
 	"google/protobuf/timestamp.proto": "github.com/golang/protobuf/ptypes/timestamp/timestamp.proto",
 	"google/protobuf/wrappers.proto":  "github.com/golang/protobuf/ptypes/wrappers/wrappers.proto",
-	"google/protobuf/type.proto":      "google.golang.org/genproto/protobuf/ptype/type.proto",
 
-	// (descriptor.proto, api.proto, field_mask.proto, type.proto, source_context.proto, compiler/plugin.go)
-	// Other standard files are not present in GOROOT, so we don't need mappings because they can only
-	// be imported in proto sources from the standard location.
+	// Other standard files (descriptor.proto and compiler/plugin.proto as well as
+	// files in the google.golang.org/genproto/protobuf package) are registered
+	// correctly, so we don't need rules for them here.
 }
 
 func loadFileDescriptorLocked(file string) (*FileDescriptor, error) {
