@@ -1,8 +1,8 @@
-# Protocol Buffer Reflection
+# Protocol Buffer and GRPC Reflection
 [![Build Status](https://travis-ci.org/jhump/protoreflect.svg?branch=master)](https://travis-ci.org/jhump/protoreflect/branches)
 
-This repo provides reflection APIs for protocol buffers (also known as "protobufs" for short).
-The core of reflection in protobufs is the
+This repo provides reflection APIs for protocol buffers (also known as "protobufs" for short)
+and GRPC. The core of reflection in protobufs is the
 [descriptor](https://github.com/google/protobuf/blob/199d82fde1734ab5bc931cd0de93309e50cd7ab9/src/google/protobuf/descriptor.proto).
 A descriptor is itself a protobuf message that describes a `.proto` source file or any element
 therein. So a collection of descriptors can describe an entire schema of protobuf types, including
