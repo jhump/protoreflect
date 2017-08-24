@@ -1,6 +1,7 @@
 package grpcreflect
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -19,14 +20,7 @@ import (
 // ErrFileOrSymbolNotFound is the error returned by reflective operations
 // where the server does not recognize a given file name, symbol name, or
 // extension number.
-const ErrFileOrSymbolNotFound = notFoundError(0)
-
-type notFoundError int32
-
-// Error implements the error interface
-func (_ notFoundError) Error() string {
-	return "File or symbol not found"
-}
+var ErrFileOrSymbolNotFound = errors.New("File or symbol not found")
 
 // ProtocolError is an error returned when the server sends a response of the
 // wrong type.
