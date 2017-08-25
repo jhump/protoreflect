@@ -1,6 +1,7 @@
 package grpcreflect
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -16,17 +17,10 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
-// FileOrSymbolNotFound is the error returned by reflective operations where
-// the server does not recognize a given file name, symbol name, or extension
-// number.
-const FileOrSymbolNotFound = notFoundError(0)
-
-type notFoundError int32
-
-// Error implements the error interface
-func (_ notFoundError) Error() string {
-	return "File or symbol not found"
-}
+// ErrFileOrSymbolNotFound is the error returned by reflective operations
+// where the server does not recognize a given file name, symbol name, or
+// extension number.
+var ErrFileOrSymbolNotFound = errors.New("File or symbol not found")
 
 // ProtocolError is an error returned when the server sends a response of the
 // wrong type.
@@ -324,7 +318,7 @@ func (cr *Client) send(req *rpb.ServerReflectionRequest) (*rpb.ServerReflectionR
 	errResp := resp.GetErrorResponse()
 	if errResp != nil {
 		if errResp.ErrorCode == int32(codes.NotFound) {
-			return nil, FileOrSymbolNotFound
+			return nil, ErrFileOrSymbolNotFound
 		}
 		return nil, grpc.Errorf(codes.Code(errResp.ErrorCode), "%s", errResp.ErrorMessage)
 	}
@@ -404,12 +398,12 @@ func (cr *Client) ResolveService(serviceName string) (*desc.ServiceDescriptor, e
 	}
 	d := file.FindSymbol(serviceName)
 	if d == nil {
-		return nil, FileOrSymbolNotFound
+		return nil, ErrFileOrSymbolNotFound
 	}
 	if s, ok := d.(*desc.ServiceDescriptor); ok {
 		return s, nil
 	} else {
-		return nil, FileOrSymbolNotFound
+		return nil, ErrFileOrSymbolNotFound
 	}
 }
 
@@ -422,12 +416,12 @@ func (cr *Client) ResolveMessage(messageName string) (*desc.MessageDescriptor, e
 	}
 	d := file.FindSymbol(messageName)
 	if d == nil {
-		return nil, FileOrSymbolNotFound
+		return nil, ErrFileOrSymbolNotFound
 	}
 	if s, ok := d.(*desc.MessageDescriptor); ok {
 		return s, nil
 	} else {
-		return nil, FileOrSymbolNotFound
+		return nil, ErrFileOrSymbolNotFound
 	}
 }
 
@@ -440,12 +434,12 @@ func (cr *Client) ResolveEnum(enumName string) (*desc.EnumDescriptor, error) {
 	}
 	d := file.FindSymbol(enumName)
 	if d == nil {
-		return nil, FileOrSymbolNotFound
+		return nil, ErrFileOrSymbolNotFound
 	}
 	if s, ok := d.(*desc.EnumDescriptor); ok {
 		return s, nil
 	} else {
-		return nil, FileOrSymbolNotFound
+		return nil, ErrFileOrSymbolNotFound
 	}
 }
 
@@ -472,7 +466,7 @@ func (cr *Client) ResolveExtension(extendedType string, extensionNumber int32) (
 	}
 	d := findExtension(extendedType, extensionNumber, fileDescriptorExtensions{file})
 	if d == nil {
-		return nil, FileOrSymbolNotFound
+		return nil, ErrFileOrSymbolNotFound
 	} else {
 		return d, nil
 	}
