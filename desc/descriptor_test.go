@@ -15,6 +15,7 @@ import (
 	_ "google.golang.org/genproto/protobuf/ptype"
 	_ "google.golang.org/genproto/protobuf/source_context"
 
+	"github.com/jhump/protoreflect/internal"
 	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
@@ -923,8 +924,21 @@ func TestLoadFileDescriptorForWellKnownProtos(t *testing.T) {
 	}
 
 	for file, types := range wellKnownProtos {
-		// Try one with some imports
 		fd, err := LoadFileDescriptor(file)
+		testutil.Ok(t, err)
+		testutil.Eq(t, file, fd.GetName())
+		for _, typ := range types {
+			d := fd.FindSymbol(typ)
+			testutil.Require(t, d != nil)
+		}
+
+		// also try loading via alternate name
+		file = internal.StdFileAliases[file]
+		if file == "" {
+			// not a file that has a known alternate, so nothing else to check...
+			continue
+		}
+		fd, err = LoadFileDescriptor(file)
 		testutil.Ok(t, err)
 		testutil.Eq(t, file, fd.GetName())
 		for _, typ := range types {

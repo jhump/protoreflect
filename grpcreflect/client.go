@@ -15,11 +15,14 @@ import (
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/internal"
 )
 
 // ErrFileOrSymbolNotFound is the error returned by reflective operations
 // where the server does not recognize a given file name, symbol name, or
 // extension number.
+// TODO: this should be a type that can refer to one or more missing symbols
+// instead of a fixed value that provides no context
 var ErrFileOrSymbolNotFound = errors.New("File or symbol not found")
 
 // ProtocolError is an error returned when the server sends a response of the
@@ -91,7 +94,18 @@ func (cr *Client) FileByFilename(filename string) (*desc.FileDescriptor, error) 
 			FileByFilename: filename,
 		},
 	}
-	return cr.getAndCacheFileDescriptors(req)
+	fd, err := cr.getAndCacheFileDescriptors(req, filename, "")
+	if err == ErrFileOrSymbolNotFound {
+		if alternate, ok := internal.StdFileAliases[filename]; ok {
+			req := &rpb.ServerReflectionRequest{
+				MessageRequest: &rpb.ServerReflectionRequest_FileByFilename{
+					FileByFilename: alternate,
+				},
+			}
+			fd, err = cr.getAndCacheFileDescriptors(req, alternate, filename)
+		}
+	}
+	return fd, err
 }
 
 // FileContainingSymbol asks the server for a file descriptor for the proto file
@@ -110,7 +124,7 @@ func (cr *Client) FileContainingSymbol(symbol string) (*desc.FileDescriptor, err
 			FileContainingSymbol: symbol,
 		},
 	}
-	return cr.getAndCacheFileDescriptors(req)
+	return cr.getAndCacheFileDescriptors(req, "", "")
 }
 
 // FileContainingExtension asks the server for a file descriptor for the proto
@@ -133,10 +147,10 @@ func (cr *Client) FileContainingExtension(extendedMessageName string, extensionN
 			},
 		},
 	}
-	return cr.getAndCacheFileDescriptors(req)
+	return cr.getAndCacheFileDescriptors(req, "", "")
 }
 
-func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest) (*desc.FileDescriptor, error) {
+func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest, expectedName, alias string) (*desc.FileDescriptor, error) {
 	resp, err := cr.send(req)
 	if err != nil {
 		return nil, err
@@ -151,12 +165,19 @@ func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest) (
 	// deps. Furthermore, protocol states that subsequent requests do not need
 	// to send transitive deps that have been sent in prior responses. So we
 	// need to cache all file descriptors and then return the first one (which
-	// should be the answer).
+	// should be the answer). If we're looking for a file by name, we can be
+	// smarter and make sure to grab one by name instead of just grabbing the
+	// first one.
 	var firstFd *dpb.FileDescriptorProto
 	for _, fdBytes := range fdResp.FileDescriptorProto {
 		fd := &dpb.FileDescriptorProto{}
 		if err = proto.Unmarshal(fdBytes, fd); err != nil {
 			return nil, err
+		}
+
+		if expectedName != "" && alias != "" && expectedName != alias && fd.GetName() == expectedName {
+			// we found a file was aliased, so we need to update the proto to reflect that
+			fd.Name = proto.String(alias)
 		}
 
 		cr.cacheMu.Lock()
