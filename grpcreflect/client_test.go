@@ -8,11 +8,18 @@ import (
 	"sync/atomic"
 	"testing"
 
+	_ "github.com/golang/protobuf/protoc-gen-go/plugin"
+	_ "github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/net/context"
+	_ "google.golang.org/genproto/protobuf/api"
+	_ "google.golang.org/genproto/protobuf/field_mask"
+	_ "google.golang.org/genproto/protobuf/ptype"
+	_ "google.golang.org/genproto/protobuf/source_context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 
+	"github.com/jhump/protoreflect/internal"
 	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
@@ -72,6 +79,47 @@ func TestFileByFileName(t *testing.T) {
 
 	_, err = client.FileByFilename("does not exist")
 	testutil.Eq(t, ErrFileOrSymbolNotFound, err)
+}
+
+func TestFileByFileNameForWellKnownProtos(t *testing.T) {
+	wellKnownProtos := map[string][]string{
+		"google/protobuf/any.proto":             {"google.protobuf.Any"},
+		"google/protobuf/api.proto":             {"google.protobuf.Api", "google.protobuf.Method", "google.protobuf.Mixin"},
+		"google/protobuf/descriptor.proto":      {"google.protobuf.FileDescriptorSet", "google.protobuf.DescriptorProto"},
+		"google/protobuf/duration.proto":        {"google.protobuf.Duration"},
+		"google/protobuf/empty.proto":           {"google.protobuf.Empty"},
+		"google/protobuf/field_mask.proto":      {"google.protobuf.FieldMask"},
+		"google/protobuf/source_context.proto":  {"google.protobuf.SourceContext"},
+		"google/protobuf/struct.proto":          {"google.protobuf.Struct", "google.protobuf.Value", "google.protobuf.NullValue"},
+		"google/protobuf/timestamp.proto":       {"google.protobuf.Timestamp"},
+		"google/protobuf/type.proto":            {"google.protobuf.Type", "google.protobuf.Field", "google.protobuf.Syntax"},
+		"google/protobuf/wrappers.proto":        {"google.protobuf.DoubleValue", "google.protobuf.Int32Value", "google.protobuf.StringValue"},
+		"google/protobuf/compiler/plugin.proto": {"google.protobuf.compiler.CodeGeneratorRequest"},
+	}
+
+	for file, types := range wellKnownProtos {
+		fd, err := client.FileByFilename(file)
+		testutil.Ok(t, err)
+		testutil.Eq(t, file, fd.GetName())
+		for _, typ := range types {
+			d := fd.FindSymbol(typ)
+			testutil.Require(t, d != nil)
+		}
+
+		// also try loading via alternate name
+		file = internal.StdFileAliases[file]
+		if file == "" {
+			// not a file that has a known alternate, so nothing else to check...
+			continue
+		}
+		fd, err = client.FileByFilename(file)
+		testutil.Ok(t, err)
+		testutil.Eq(t, file, fd.GetName())
+		for _, typ := range types {
+			d := fd.FindSymbol(typ)
+			testutil.Require(t, d != nil)
+		}
+	}
 }
 
 func TestFileContainingSymbol(t *testing.T) {
