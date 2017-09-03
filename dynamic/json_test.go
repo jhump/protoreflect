@@ -108,8 +108,7 @@ func TestMarshalJSONIndent(t *testing.T) {
 	testutil.Eq(t, `{"foo":["VALUE1"],"bar":"bedazzle"}`, string(js))
 	jsIndent, err := dm.MarshalJSONIndent()
 	testutil.Ok(t, err)
-	testutil.Eq(t,
-`{
+	testutil.Eq(t, `{
   "foo": [
     "VALUE1"
   ],
@@ -117,8 +116,7 @@ func TestMarshalJSONIndent(t *testing.T) {
 }`, string(jsIndent))
 	jsIndent, err = dm.MarshalJSONPB(&jsonpb.Marshaler{Indent: "\t"})
 	testutil.Ok(t, err)
-	testutil.Eq(t,
-`{
+	testutil.Eq(t, `{
 	"foo": [
 		"VALUE1"
 	],
@@ -151,8 +149,7 @@ func TestMarshalJSONIndentEmbedWellKnownTypes(t *testing.T) {
 	testutil.Eq(t, `{"startTime":"2010-03-04T05:06:07.000809Z","extras":[{"@type":"type.googleapis.com/testprotos.TestRequest","bar":"foo"},{"@type":"type.googleapis.com/testprotos.TestRequest","bar":"bar"},{"@type":"type.googleapis.com/testprotos.TestRequest","bar":"baz"}]}`, string(js))
 	jsIndent, err := dm.MarshalJSONIndent()
 	testutil.Ok(t, err)
-	testutil.Eq(t,
-`{
+	testutil.Eq(t, `{
   "startTime": "2010-03-04T05:06:07.000809Z",
   "extras": [
     {
@@ -171,8 +168,7 @@ func TestMarshalJSONIndentEmbedWellKnownTypes(t *testing.T) {
 }`, string(jsIndent))
 	jsIndent, err = dm.MarshalJSONPB(&jsonpb.Marshaler{Indent: "\t"})
 	testutil.Ok(t, err)
-	testutil.Eq(t,
-`{
+	testutil.Eq(t, `{
 	"startTime": "2010-03-04T05:06:07.000809Z",
 	"extras": [
 		{
