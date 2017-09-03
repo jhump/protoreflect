@@ -16,6 +16,7 @@ import (
 	"google.golang.org/genproto/protobuf/source_context"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
 )
 
 const googleApisDomain = "type.googleapis.com"
@@ -25,8 +26,8 @@ const googleApisDomain = "type.googleapis.com"
 type MessageRegistry struct {
 	includeDefault bool
 	resolver       typeResolver
-	mf             *MessageFactory
-	er             *ExtensionRegistry
+	mf             *dynamic.MessageFactory
+	er             *dynamic.ExtensionRegistry
 	mu             sync.RWMutex
 	types          map[string]desc.Descriptor
 	baseUrls       map[string]string
@@ -40,11 +41,11 @@ type MessageRegistry struct {
 // Any types explicitly added to the registry will override any default message types with
 // the same URL.
 func NewMessageRegistryWithDefaults() *MessageRegistry {
-	mf := NewMessageFactoryWithDefaults()
+	mf := dynamic.NewMessageFactoryWithDefaults()
 	return &MessageRegistry{
 		includeDefault: true,
 		mf:             mf,
-		er:             mf.er,
+		er:             mf.GetExtensionRegistry(),
 	}
 }
 
@@ -61,12 +62,12 @@ func (r *MessageRegistry) WithFetcher(fetcher TypeFetcher) *MessageRegistry {
 // WithMessageFactory sets the MessageFactory used to instantiate any messages.
 // This method is not thread-safe and is intended to be used for one-time
 // initialization of the registry, before it is published for use by other threads.
-func (r *MessageRegistry) WithMessageFactory(mf *MessageFactory) *MessageRegistry {
+func (r *MessageRegistry) WithMessageFactory(mf *dynamic.MessageFactory) *MessageRegistry {
 	r.mf = mf
 	if mf == nil {
 		r.er = nil
 	} else {
-		r.er = mf.er
+		r.er = mf.GetExtensionRegistry()
 	}
 	return r
 }
@@ -361,13 +362,13 @@ func (r *MessageRegistry) unmarshalAny(any *any.Any, fetch func(string) (*desc.M
 	var msg proto.Message
 	if r == nil {
 		// a nil registry only knows about well-known types
-		if msg = (*KnownTypeRegistry)(nil).CreateIfKnown(name); msg == nil {
+		if msg = (*dynamic.KnownTypeRegistry)(nil).CreateIfKnown(name); msg == nil {
 			return nil, fmt.Errorf("Unknown message type: %s", any.TypeUrl)
 		}
 	} else {
-		var ktr *KnownTypeRegistry
+		var ktr *dynamic.KnownTypeRegistry
 		if r.mf != nil {
-			ktr = r.mf.ktr
+			ktr = r.mf.GetKnownTypeRegistry()
 		}
 		if msg = ktr.CreateIfKnown(name); msg == nil {
 			if md, err := fetch(any.TypeUrl); err != nil {
@@ -375,7 +376,7 @@ func (r *MessageRegistry) unmarshalAny(any *any.Any, fetch func(string) (*desc.M
 			} else if md == nil {
 				return nil, fmt.Errorf("Unknown message type: %s", any.TypeUrl)
 			} else {
-				msg = newMessageWithMessageFactory(md, r.mf)
+				msg = r.mf.NewDynamicMessage(md)
 			}
 		}
 	}
@@ -407,7 +408,7 @@ func (r *MessageRegistry) AddBaseUrlForElement(baseUrl, packageOrTypeName string
 // MarshalAny wraps the given message in an Any value.
 func (r *MessageRegistry) MarshalAny(m proto.Message) (*any.Any, error) {
 	var md *desc.MessageDescriptor
-	if dm, ok := m.(*Message); ok {
+	if dm, ok := m.(*dynamic.Message); ok {
 		md = dm.GetMessageDescriptor()
 	} else {
 		var err error
@@ -610,6 +611,8 @@ func (r *MessageRegistry) options(options proto.Message) []*ptype.Option {
 	}
 	return opts
 }
+
+var typeOfBytes = reflect.TypeOf([]byte(nil))
 
 func (r *MessageRegistry) option(name string, value reflect.Value) []*ptype.Option {
 	if value.Kind() == reflect.Slice && value.Type() != typeOfBytes {
