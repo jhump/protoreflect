@@ -3,6 +3,7 @@ package dynamic
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
@@ -107,10 +108,83 @@ func TestMarshalJSONIndent(t *testing.T) {
 	testutil.Eq(t, `{"foo":["VALUE1"],"bar":"bedazzle"}`, string(js))
 	jsIndent, err := dm.MarshalJSONIndent()
 	testutil.Ok(t, err)
-	testutil.Eq(t, "{\n  \"foo\": [\n    \"VALUE1\"\n  ],\n  \"bar\": \"bedazzle\"\n}", string(jsIndent))
+	testutil.Eq(t, `{
+  "foo": [
+    "VALUE1"
+  ],
+  "bar": "bedazzle"
+}`, string(jsIndent))
 	jsIndent, err = dm.MarshalJSONPB(&jsonpb.Marshaler{Indent: "\t"})
 	testutil.Ok(t, err)
-	testutil.Eq(t, "{\n\t\"foo\": [\n\t\t\"VALUE1\"\n\t],\n\t\"bar\": \"bedazzle\"\n}", string(jsIndent))
+	testutil.Eq(t, `{
+	"foo": [
+		"VALUE1"
+	],
+	"bar": "bedazzle"
+}`, string(jsIndent))
+}
+
+func TestMarshalJSONIndentEmbedWellKnownTypes(t *testing.T) {
+	// testing the formatting of dynamic message that embeds non-dynamic message,
+	// both those w/ special/simple JSON encoding (like timestamp) and those with
+	// more structure (Any).
+	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.TestWellKnownTypes)(nil))
+	testutil.Ok(t, err)
+	dm := NewMessage(md)
+
+	ts, err := ptypes.TimestampProto(time.Date(2010, 3, 4, 5, 6, 7, 809000, time.UTC))
+	testutil.Ok(t, err)
+	dm.SetFieldByNumber(1, ts)
+
+	anys := make([]*any.Any, 3)
+	anys[0], err = ptypes.MarshalAny(&testprotos.TestRequest{Bar: "foo"})
+	testutil.Ok(t, err)
+	anys[1], err = ptypes.MarshalAny(&testprotos.TestRequest{Bar: "bar"})
+	testutil.Ok(t, err)
+	anys[2], err = ptypes.MarshalAny(&testprotos.TestRequest{Bar: "baz"})
+	dm.SetFieldByNumber(13, anys)
+
+	js, err := dm.MarshalJSON()
+	testutil.Ok(t, err)
+	testutil.Eq(t, `{"startTime":"2010-03-04T05:06:07.000809Z","extras":[{"@type":"type.googleapis.com/testprotos.TestRequest","bar":"foo"},{"@type":"type.googleapis.com/testprotos.TestRequest","bar":"bar"},{"@type":"type.googleapis.com/testprotos.TestRequest","bar":"baz"}]}`, string(js))
+	jsIndent, err := dm.MarshalJSONIndent()
+	testutil.Ok(t, err)
+	testutil.Eq(t, `{
+  "startTime": "2010-03-04T05:06:07.000809Z",
+  "extras": [
+    {
+      "@type": "type.googleapis.com/testprotos.TestRequest",
+      "bar": "foo"
+    },
+    {
+      "@type": "type.googleapis.com/testprotos.TestRequest",
+      "bar": "bar"
+    },
+    {
+      "@type": "type.googleapis.com/testprotos.TestRequest",
+      "bar": "baz"
+    }
+  ]
+}`, string(jsIndent))
+	jsIndent, err = dm.MarshalJSONPB(&jsonpb.Marshaler{Indent: "\t"})
+	testutil.Ok(t, err)
+	testutil.Eq(t, `{
+	"startTime": "2010-03-04T05:06:07.000809Z",
+	"extras": [
+		{
+			"@type": "type.googleapis.com/testprotos.TestRequest",
+			"bar": "foo"
+		},
+		{
+			"@type": "type.googleapis.com/testprotos.TestRequest",
+			"bar": "bar"
+		},
+		{
+			"@type": "type.googleapis.com/testprotos.TestRequest",
+			"bar": "baz"
+		}
+	]
+}`, string(jsIndent))
 }
 
 func TestUnmarshalJSONAllowUnknownFields(t *testing.T) {

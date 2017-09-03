@@ -315,19 +315,22 @@ func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v int
 					start := pos
 					nextPos := strings.Index(str[pos:], "\n")
 					if nextPos == -1 {
-						pos = len(str)
+						nextPos = len(str)
 					} else {
-						pos = pos + nextPos + 1 // include newline
+						nextPos = pos + nextPos + 1 // include newline
 					}
-					line := str[start:pos]
-					_, err = b.WriteString(indent)
-					if err != nil {
-						return err
+					line := str[start:nextPos]
+					if pos > 0 {
+						_, err = b.WriteString(indent)
+						if err != nil {
+							return err
+						}
 					}
 					_, err = b.WriteString(line)
 					if err != nil {
 						return err
 					}
+					pos = nextPos
 				}
 			}
 			return err
