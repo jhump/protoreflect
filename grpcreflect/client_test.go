@@ -78,7 +78,7 @@ func TestFileByFileName(t *testing.T) {
 	testutil.Eq(t, "DeeplyNestedEnum", ed.GetName())
 
 	_, err = client.FileByFilename("does not exist")
-	testutil.Eq(t, ErrFileOrSymbolNotFound, err)
+	testutil.Require(t, IsElementNotFoundError(err))
 }
 
 func TestFileByFileNameForWellKnownProtos(t *testing.T) {
@@ -144,7 +144,7 @@ func TestFileContainingSymbol(t *testing.T) {
 	testutil.Eq(t, "t", md.GetFields()[11].GetName())
 
 	_, err = client.FileContainingSymbol("does not exist")
-	testutil.Eq(t, ErrFileOrSymbolNotFound, err)
+	testutil.Require(t, IsElementNotFoundError(err))
 }
 
 func TestFileContainingExtension(t *testing.T) {
@@ -164,9 +164,9 @@ func TestFileContainingExtension(t *testing.T) {
 	testutil.Eq(t, "nopkg/desc_test_nopkg.proto", fd.GetDependencies()[2].GetName())
 
 	_, err = client.FileContainingExtension("does not exist", 100)
-	testutil.Eq(t, ErrFileOrSymbolNotFound, err)
+	testutil.Require(t, IsElementNotFoundError(err))
 	_, err = client.FileContainingExtension("TopLevel", -9)
-	testutil.Eq(t, ErrFileOrSymbolNotFound, err)
+	testutil.Require(t, IsElementNotFoundError(err))
 }
 
 func TestAllExtensionNumbersForType(t *testing.T) {
@@ -190,7 +190,7 @@ func TestAllExtensionNumbersForType(t *testing.T) {
 	testutil.Eq(t, []int{100, 101, 102, 103, 200}, inums)
 
 	_, err = client.AllExtensionNumbersForType("does not exist")
-	testutil.Eq(t, ErrFileOrSymbolNotFound, err)
+	testutil.Require(t, IsElementNotFoundError(err))
 }
 
 func TestListServices(t *testing.T) {
@@ -198,8 +198,7 @@ func TestListServices(t *testing.T) {
 	testutil.Ok(t, err)
 
 	sort.Strings(s)
-	testutil.Eq(t, "grpc.reflection.v1alpha.ServerReflection", s[0])
-	testutil.Eq(t, "testprotos.TestService", s[1])
+	testutil.Eq(t, []string{"grpc.reflection.v1alpha.ServerReflection", "testprotos.TestService"}, s)
 }
 
 func TestReset(t *testing.T) {

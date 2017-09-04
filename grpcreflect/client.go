@@ -1,7 +1,7 @@
 package grpcreflect
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -10,9 +10,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
+	"google.golang.org/grpc/status"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal"
@@ -21,9 +21,74 @@ import (
 // ErrFileOrSymbolNotFound is the error returned by reflective operations
 // where the server does not recognize a given file name, symbol name, or
 // extension number.
-// TODO: this should be a type that can refer to one or more missing symbols
-// instead of a fixed value that provides no context
-var ErrFileOrSymbolNotFound = errors.New("File or symbol not found")
+type elementNotFoundError struct {
+	name    string
+	kind    elementKind
+	symType symbolType // only used when kind == elementKindSymbol
+	tag     int32      // only used when kind == elementKindExtension
+
+	// only errors with a kind of elementKindFile will have a cause, which means
+	// the named file count not be resolved because of a dependency that could
+	// not be found where cause describes the missing dependency
+	cause *elementNotFoundError
+}
+
+type elementKind int
+
+const (
+	elementKindSymbol elementKind = iota
+	elementKindFile
+	elementKindExtension
+)
+
+type symbolType string
+
+const (
+	symbolTypeService = "Service"
+	symbolTypeMessage = "Message"
+	symbolTypeEnum    = "Enum"
+	symbolTypeUnknown = "Symbol"
+)
+
+func symbolNotFound(symbol string, symType symbolType, cause *elementNotFoundError) error {
+	return &elementNotFoundError{name: symbol, symType: symType, kind: elementKindSymbol, cause: cause}
+}
+
+func extensionNotFound(extendee string, tag int32, cause *elementNotFoundError) error {
+	return &elementNotFoundError{name: extendee, tag: tag, kind: elementKindExtension, cause: cause}
+}
+
+func fileNotFound(file string, cause *elementNotFoundError) error {
+	return &elementNotFoundError{name: file, kind: elementKindFile, cause: cause}
+}
+
+func (e *elementNotFoundError) Error() string {
+	first := true
+	var b bytes.Buffer
+	for ; e != nil; e = e.cause {
+		if first {
+			first = false
+		} else {
+			fmt.Fprint(&b, "\ncaused by: ")
+		}
+		switch e.kind {
+		case elementKindSymbol:
+			fmt.Fprintf(&b, "%s not found: %s", e.symType, e.name)
+		case elementKindExtension:
+			fmt.Fprintf(&b, "Extension not found: tag %d for %s", e.tag, e.name)
+		default:
+			fmt.Fprintf(&b, "File not found: %s", e.name)
+		}
+	}
+	return b.String()
+}
+
+// IsElementNotFoundError determines if the given error indicates that a file
+// name, symbol name, or extension field was could not be found by the server.
+func IsElementNotFoundError(err error) bool {
+	_, ok := err.(*elementNotFoundError)
+	return ok
+}
 
 // ProtocolError is an error returned when the server sends a response of the
 // wrong type.
@@ -95,7 +160,8 @@ func (cr *Client) FileByFilename(filename string) (*desc.FileDescriptor, error) 
 		},
 	}
 	fd, err := cr.getAndCacheFileDescriptors(req, filename, "")
-	if err == ErrFileOrSymbolNotFound {
+	if isNotFound(err) {
+		// file not found? see if we can look up via alternate name
 		if alternate, ok := internal.StdFileAliases[filename]; ok {
 			req := &rpb.ServerReflectionRequest{
 				MessageRequest: &rpb.ServerReflectionRequest_FileByFilename{
@@ -103,7 +169,14 @@ func (cr *Client) FileByFilename(filename string) (*desc.FileDescriptor, error) 
 				},
 			}
 			fd, err = cr.getAndCacheFileDescriptors(req, alternate, filename)
+			if isNotFound(err) {
+				err = fileNotFound(filename, nil)
+			}
+		} else {
+			err = fileNotFound(filename, nil)
 		}
+	} else if e, ok := err.(*elementNotFoundError); ok {
+		err = fileNotFound(filename, e)
 	}
 	return fd, err
 }
@@ -124,7 +197,13 @@ func (cr *Client) FileContainingSymbol(symbol string) (*desc.FileDescriptor, err
 			FileContainingSymbol: symbol,
 		},
 	}
-	return cr.getAndCacheFileDescriptors(req, "", "")
+	fd, err := cr.getAndCacheFileDescriptors(req, "", "")
+	if isNotFound(err) {
+		err = symbolNotFound(symbol, symbolTypeUnknown, nil)
+	} else if e, ok := err.(*elementNotFoundError); ok {
+		err = symbolNotFound(symbol, symbolTypeUnknown, e)
+	}
+	return fd, err
 }
 
 // FileContainingExtension asks the server for a file descriptor for the proto
@@ -147,7 +226,13 @@ func (cr *Client) FileContainingExtension(extendedMessageName string, extensionN
 			},
 		},
 	}
-	return cr.getAndCacheFileDescriptors(req, "", "")
+	fd, err := cr.getAndCacheFileDescriptors(req, "", "")
+	if isNotFound(err) {
+		err = extensionNotFound(extendedMessageName, extensionNumber, nil)
+	} else if e, ok := err.(*elementNotFoundError); ok {
+		err = extensionNotFound(extendedMessageName, extensionNumber, e)
+	}
+	return fd, err
 }
 
 func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest, expectedName, alias string) (*desc.FileDescriptor, error) {
@@ -291,6 +376,9 @@ func (cr *Client) AllExtensionNumbersForType(extendedMessageName string) ([]int3
 	}
 	resp, err := cr.send(req)
 	if err != nil {
+		if isNotFound(err) {
+			return nil, symbolNotFound(extendedMessageName, symbolTypeMessage, nil)
+		}
 		return nil, err
 	}
 
@@ -338,13 +426,18 @@ func (cr *Client) send(req *rpb.ServerReflectionRequest) (*rpb.ServerReflectionR
 	// convert error response messages into errors
 	errResp := resp.GetErrorResponse()
 	if errResp != nil {
-		if errResp.ErrorCode == int32(codes.NotFound) {
-			return nil, ErrFileOrSymbolNotFound
-		}
-		return nil, grpc.Errorf(codes.Code(errResp.ErrorCode), "%s", errResp.ErrorMessage)
+		return nil, status.Errorf(codes.Code(errResp.ErrorCode), "%s", errResp.ErrorMessage)
 	}
 
 	return resp, nil
+}
+
+func isNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	s, ok := status.FromError(err)
+	return ok && s.Code() == codes.NotFound
 }
 
 func (cr *Client) doSend(retry bool, req *rpb.ServerReflectionRequest) (*rpb.ServerReflectionResponse, error) {
@@ -415,16 +508,16 @@ func (cr *Client) resetLocked() {
 func (cr *Client) ResolveService(serviceName string) (*desc.ServiceDescriptor, error) {
 	file, err := cr.FileContainingSymbol(serviceName)
 	if err != nil {
-		return nil, err
+		return nil, setSymbolType(err, serviceName, symbolTypeService)
 	}
 	d := file.FindSymbol(serviceName)
 	if d == nil {
-		return nil, ErrFileOrSymbolNotFound
+		return nil, symbolNotFound(serviceName, symbolTypeService, nil)
 	}
 	if s, ok := d.(*desc.ServiceDescriptor); ok {
 		return s, nil
 	} else {
-		return nil, ErrFileOrSymbolNotFound
+		return nil, symbolNotFound(serviceName, symbolTypeService, nil)
 	}
 }
 
@@ -433,16 +526,16 @@ func (cr *Client) ResolveService(serviceName string) (*desc.ServiceDescriptor, e
 func (cr *Client) ResolveMessage(messageName string) (*desc.MessageDescriptor, error) {
 	file, err := cr.FileContainingSymbol(messageName)
 	if err != nil {
-		return nil, err
+		return nil, setSymbolType(err, messageName, symbolTypeMessage)
 	}
 	d := file.FindSymbol(messageName)
 	if d == nil {
-		return nil, ErrFileOrSymbolNotFound
+		return nil, symbolNotFound(messageName, symbolTypeMessage, nil)
 	}
 	if s, ok := d.(*desc.MessageDescriptor); ok {
 		return s, nil
 	} else {
-		return nil, ErrFileOrSymbolNotFound
+		return nil, symbolNotFound(messageName, symbolTypeMessage, nil)
 	}
 }
 
@@ -451,17 +544,26 @@ func (cr *Client) ResolveMessage(messageName string) (*desc.MessageDescriptor, e
 func (cr *Client) ResolveEnum(enumName string) (*desc.EnumDescriptor, error) {
 	file, err := cr.FileContainingSymbol(enumName)
 	if err != nil {
-		return nil, err
+		return nil, setSymbolType(err, enumName, symbolTypeEnum)
 	}
 	d := file.FindSymbol(enumName)
 	if d == nil {
-		return nil, ErrFileOrSymbolNotFound
+		return nil, symbolNotFound(enumName, symbolTypeEnum, nil)
 	}
 	if s, ok := d.(*desc.EnumDescriptor); ok {
 		return s, nil
 	} else {
-		return nil, ErrFileOrSymbolNotFound
+		return nil, symbolNotFound(enumName, symbolTypeEnum, nil)
 	}
+}
+
+func setSymbolType(err error, name string, symType symbolType) error {
+	if e, ok := err.(*elementNotFoundError); ok {
+		if e.kind == elementKindSymbol && e.name == name && e.symType == symbolTypeUnknown {
+			e.symType = symType
+		}
+	}
+	return err
 }
 
 // ResolveEnumValues asks the server to resolve the given fully-qualified enum
@@ -487,7 +589,7 @@ func (cr *Client) ResolveExtension(extendedType string, extensionNumber int32) (
 	}
 	d := findExtension(extendedType, extensionNumber, fileDescriptorExtensions{file})
 	if d == nil {
-		return nil, ErrFileOrSymbolNotFound
+		return nil, extensionNotFound(extendedType, extensionNumber, nil)
 	} else {
 		return d, nil
 	}
