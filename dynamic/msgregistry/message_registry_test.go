@@ -17,6 +17,7 @@ import (
 	"google.golang.org/genproto/protobuf/source_context"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
@@ -65,7 +66,7 @@ func TestMessageRegistry_LookupTypes(t *testing.T) {
 	testutil.Ceq(t, md.AsProto(), pm, eqm)
 	// we didn't configure the registry with a message factory, so it would have
 	// produced a dynamic message instead of a generated message
-	testutil.Eq(t, typeOfDynamicMessage, reflect.TypeOf(pm))
+	testutil.Eq(t, reflect.TypeOf((*dynamic.Message)(nil)), reflect.TypeOf(pm))
 
 	// by default, message registry knows about well-known types
 	dur := &duration.Duration{Nanos: 100, Seconds: 1000}
@@ -121,7 +122,7 @@ func TestMessageRegistry_FindMessage_WithFetcher(t *testing.T) {
 	tf := createFetcher(t)
 	// we want "defaults" for the message factory so that we can properly process
 	// known extensions (which the type fetcher puts into the descriptor options)
-	mr := (&MessageRegistry{}).WithFetcher(tf).WithMessageFactory(NewMessageFactoryWithDefaults())
+	mr := (&MessageRegistry{}).WithFetcher(tf).WithMessageFactory(dynamic.NewMessageFactoryWithDefaults())
 
 	md, err := mr.FindMessageTypeByUrl("foo.bar/some.Type")
 	testutil.Ok(t, err)
@@ -219,7 +220,7 @@ func TestMessageRegistry_FindEnum_WithFetcher(t *testing.T) {
 	tf := createFetcher(t)
 	// we want "defaults" for the message factory so that we can properly process
 	// known extensions (which the type fetcher puts into the descriptor options)
-	mr := (&MessageRegistry{}).WithFetcher(tf).WithMessageFactory(NewMessageFactoryWithDefaults())
+	mr := (&MessageRegistry{}).WithFetcher(tf).WithMessageFactory(dynamic.NewMessageFactoryWithDefaults())
 
 	ed, err := mr.FindEnumTypeByUrl("foo.bar/some.Enum")
 	testutil.Ok(t, err)
@@ -485,7 +486,7 @@ func TestMessageRegistry_ResolveApiIntoServiceDescriptor(t *testing.T) {
 	tf := createFetcher(t)
 	// we want "defaults" for the message factory so that we can properly process
 	// known extensions (which the type fetcher puts into the descriptor options)
-	mr := (&MessageRegistry{}).WithFetcher(tf).WithMessageFactory(NewMessageFactoryWithDefaults())
+	mr := (&MessageRegistry{}).WithFetcher(tf).WithMessageFactory(dynamic.NewMessageFactoryWithDefaults())
 
 	sd, err := mr.ResolveApiIntoServiceDescriptor(getApi(t))
 	testutil.Ok(t, err)
@@ -677,7 +678,7 @@ func TestMessageRegistry_MarshalAndUnmarshalAny(t *testing.T) {
 	mr.AddMessage("type.googleapis.com/google.protobuf.DescriptorProto", md)
 	pm, err = mr.UnmarshalAny(a)
 	testutil.Ok(t, err)
-	dm, ok := pm.(*Message)
+	dm, ok := pm.(*dynamic.Message)
 	testutil.Require(t, ok)
 	testutil.Ceq(t, md.AsProto(), dm, eqm)
 
@@ -712,4 +713,12 @@ func TestMessageRegistry_EnumDescriptorToPType(t *testing.T) {
 
 func TestMessageRegistry_ServiceDescriptorToApi(t *testing.T) {
 	// TODO
+}
+
+func eqm(a, b interface{}) bool {
+	return dynamic.MessagesEqual(a.(proto.Message), b.(proto.Message))
+}
+
+func eqpm(a, b interface{}) bool {
+	return proto.Equal(a.(proto.Message), b.(proto.Message))
 }

@@ -67,6 +67,36 @@ func (f *MessageFactory) NewMessage(md *desc.MessageDescriptor) proto.Message {
 	return newMessageWithMessageFactory(md, f)
 }
 
+// NewDynamicMessage creates a new empty dynamic message that corresponds to the given
+// descriptor. This is like f.NewMessage(md) except the known type registry is not
+// consulted so the return value is always a dynamic message.
+//
+// This is also like dynamic.NewMessage(md) except that the returned message will use
+// this factory when creating other messages, like during de-serialization of fields
+// that are themselves message types.
+func (f *MessageFactory) NewDynamicMessage(md *desc.MessageDescriptor) *Message {
+	return newMessageWithMessageFactory(md, f)
+}
+
+// GetKnownTypeRegistry returns the known type registry that this factory uses to
+// instantiate known (e.g. generated) message types.
+func (f *MessageFactory) GetKnownTypeRegistry() *KnownTypeRegistry {
+	if f == nil {
+		return nil
+	}
+	return f.ktr
+}
+
+// GetExtensionRegistry returns the extension registry that this factory uses to
+// create dynamic messages. The registry is used by dynamic messages to recognize
+// and parse extension fields during de-serialization.
+func (f *MessageFactory) GetExtensionRegistry() *ExtensionRegistry {
+	if f == nil {
+		return nil
+	}
+	return f.er
+}
+
 type wkt interface {
 	XXX_WellKnownType() string
 }

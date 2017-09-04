@@ -20,6 +20,7 @@ import (
 	"google.golang.org/genproto/protobuf/ptype"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
 )
 
 var (
@@ -1003,10 +1004,10 @@ func createFileDescriptor(name, pkg string, proto3 bool, deps map[string]struct{
 	}
 }
 
-func createOptions(options []*ptype.Option, optionsDesc *desc.MessageDescriptor, mr *MessageRegistry) *Message {
+func createOptions(options []*ptype.Option, optionsDesc *desc.MessageDescriptor, mr *MessageRegistry) *dynamic.Message {
 	// these are created "best effort" so entries which are unresolvable
 	// (or seemingly invalid) are simply ignored...
-	dopts := newMessageWithMessageFactory(optionsDesc, mr.mf)
+	dopts := mr.mf.NewDynamicMessage(optionsDesc)
 	for _, o := range options {
 		field := optionsDesc.FindFieldByName(o.Name)
 		if field == nil {
@@ -1045,9 +1046,9 @@ func createOptions(options []*ptype.Option, optionsDesc *desc.MessageDescriptor,
 			fv = v
 		}
 		if field.IsRepeated() {
-			dopts.addRepeatedField(field, fv) // ignore any error
+			dopts.TryAddRepeatedField(field, fv) // ignore any error
 		} else {
-			dopts.setField(field, fv) // ignore any error
+			dopts.TrySetField(field, fv) // ignore any error
 		}
 	}
 	return dopts
