@@ -4,6 +4,7 @@
 package desc
 
 type jsonNameMap struct{}
+type memoizedDefault struct{}
 
 // FindFieldByJSONName finds the field with the given JSON field name. If no such
 // field exists then nil is returned. Only regular fields are returned, not
@@ -22,4 +23,8 @@ func (md *MessageDescriptor) FindFieldByJSONName(jsonName string) *FieldDescript
 		}
 	}
 	return nil
+}
+
+func (fd *FieldDescriptor) getDefaultValue() interface{} {
+	return fd.determineDefault()
 }

@@ -22,6 +22,7 @@ message TestRequest {
 
 message TestResponse {
 	AnotherTestMessage atm = 1;
+	repeated int32 vs = 2;
 }
 
 service TestService {

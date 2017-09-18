@@ -78,11 +78,11 @@ message AnotherTestMessage {
 	// Comment for RockNRoll
 	optional group RockNRoll = 6 {
 		// Comment for beatles
-		optional string beatles = 7;
+		optional string beatles = 1;
 		// Comment for stones
-		optional string stones = 8;
+		optional string stones = 2;
 		// Comment for doors
-		optional string doors = 9;
+		optional string doors = 3;
 	}
 
 	extensions 100 to 200;

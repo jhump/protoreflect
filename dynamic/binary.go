@@ -139,7 +139,7 @@ func marshalField(tag int32, fd *desc.FieldDescriptor, val interface{}, b *coded
 		if err != nil {
 			return err
 		}
-		if fd.AsFieldDescriptorProto().GetOptions().GetPacked() && len(sl) > 1 &&
+		if isPacked(fd) && len(sl) > 1 &&
 			(wt == proto.WireVarint || wt == proto.WireFixed32 || wt == proto.WireFixed64) {
 			// packed repeated field
 			var packedBuffer codedBuffer
@@ -164,6 +164,16 @@ func marshalField(tag int32, fd *desc.FieldDescriptor, val interface{}, b *coded
 	} else {
 		return marshalFieldElement(tag, fd, val, b)
 	}
+}
+
+func isPacked(fd *desc.FieldDescriptor) bool {
+	opts := fd.AsFieldDescriptorProto().GetOptions()
+	// if set, use that value
+	if opts != nil && opts.Packed != nil {
+		return opts.GetPacked()
+	}
+	// if unset: proto2 defaults to false, proto3 to true
+	return fd.GetFile().IsProto3()
 }
 
 // sortable is used to sort map keys. Values will be integers (int32, int64, uint32, and uint64),

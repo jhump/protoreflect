@@ -9,6 +9,7 @@ import (
 )
 
 type jsonNameMap map[string]*FieldDescriptor // loaded/stored atomically via atomic+unsafe
+type memoizedDefault *interface{}            // loaded/stored atomically via atomic+unsafe
 
 // FindFieldByJSONName finds the field with the given JSON field name. If no such
 // field exists then nil is returned. Only regular fields are returned, not
@@ -43,4 +44,16 @@ func (md *MessageDescriptor) FindFieldByJSONName(jsonName string) *FieldDescript
 		*(*unsafe.Pointer)(unsafe.Pointer(&index)) = jsonNames
 	}
 	return index[jsonName]
+}
+
+func (fd *FieldDescriptor) getDefaultValue() interface{} {
+	addrOfDef := (*unsafe.Pointer)(unsafe.Pointer(&fd.def))
+	def := atomic.LoadPointer(addrOfDef)
+	if def != nil {
+		return *(*interface{})(def)
+	}
+	// slow path: compute the default, potentially involves decoding value
+	d := fd.determineDefault()
+	atomic.StorePointer(addrOfDef, (unsafe.Pointer(&d)))
+	return d
 }

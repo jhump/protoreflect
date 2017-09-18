@@ -83,13 +83,19 @@ func GetDescriptorSet() *descriptor.FileDescriptorSet {
 }
 
 // compressed form of file descriptor set
-var descriptorSet = []byte {
+var descriptorSet = []byte{
 `, pkg, fd.GetName())
 
 	i := 0
 	for i < len(compressedBytes) {
-		fmt.Print(`	`)
+		fmt.Print("\t")
+		first := true
 		for j := 0; j < 20; j++ {
+			if first {
+				first = false
+			} else {
+				fmt.Print(" ")
+			}
 			fmt.Printf("0x%02x,", compressedBytes[i])
 			i++
 			if i >= len(compressedBytes) {

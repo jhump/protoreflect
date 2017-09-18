@@ -1,0 +1,72 @@
+syntax = "proto2";
+
+package foo.bar;
+
+option go_package = "github.com/jhump/protoreflect/desc/protoparse";
+
+import "google/protobuf/descriptor.proto";
+
+message Simple {
+	optional string name = 1;
+	optional uint64 id = 2;
+}
+
+message Test {
+	optional string foo = 1 [json_name = "|foo|"];
+	repeated int32 array = 2;
+	optional Simple s = 3;
+	repeated Simple r = 4;
+	map<string, int32> m = 5;
+
+	optional bytes b = 6 [default = "\0\1\2\3\4\5\6\7fubar!"];
+
+	extensions 100 to 200;
+
+	message Nested {
+		extend google.protobuf.MessageOptions {
+			optional int32 fooblez = 20003;
+		}
+		message _NestedNested {
+			enum EEE {
+				OK = 0;
+				V1 = 1;
+				V2 = 2;
+				V3 = 3;
+				V4 = 4;
+				V5 = 5;
+				V6 = 6;
+			}
+			option (fooblez) = 10101;
+			extend Test {
+				optional string _garblez = 100;
+			}
+			option (rept) = { foo: "goo" [foo.bar.Test.Nested._NestedNested._garblez]: "boo" };
+			message NestedNestedNested {
+				option (rept) = { foo: "hoo" [Test.Nested._NestedNested._garblez]: "spoo" };
+			}
+		}
+	}
+}
+
+extend google.protobuf.MessageOptions {
+	repeated Test rept = 20002;
+	optional Test.Nested._NestedNested.EEE eee = 20010;
+	optional Another a = 20020;
+}
+
+message Another {
+    option (.foo.bar.rept) = { foo: "abc" s < name: "foo", id: 123 >, array: [1, 2 ,3], r:[<name:"f">, {name:"s"}, {id:456} ]};
+    option (foo.bar.rept) = { foo: "def" s { name: "bar", id: 321 }, array: [3, 2 ,1], r:{name:"g"} r:{name:"s"}};
+    option (rept) = { foo: "def" };
+    option (eee) = V1;
+	option (a) = { fff: OK };
+	option (a).test = { m { key: "foo" value: 100 } m { key: "bar" value: 200 }};
+	option (a).test.foo = "m&m";
+	option (a).test.s.name = "yolo";
+    option (a).test.s.id = 98765;
+    option (a).test.array = 1;
+    option (a).test.array = 2;
+
+    optional Test test = 1;
+    optional Test.Nested._NestedNested.EEE fff = 2 [default = V1];
+}
