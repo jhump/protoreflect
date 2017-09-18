@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"reflect"
 	"runtime"
@@ -162,6 +163,16 @@ func eqscalar(expected, actual interface{}) bool {
 		a, ok := actual.([]byte)
 		return ok && string(e) == string(a)
 	}
+	// and special-cases to handle NaN
+	if e, ok := expected.(float32); ok && math.IsNaN(float64(e)) {
+		a, ok := actual.(float32)
+		return ok && math.IsNaN(float64(a))
+	}
+	if e, ok := expected.(float64); ok && math.IsNaN(e) {
+		a, ok := actual.(float64)
+		return ok && math.IsNaN(a)
+	}
+	// simple logic for everything else
 	return expected == actual
 }
 

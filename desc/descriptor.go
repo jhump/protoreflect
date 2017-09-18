@@ -41,15 +41,14 @@ package desc
 
 import (
 	"bytes"
-	"compress/gzip"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
@@ -599,8 +598,8 @@ func (er extRanges) String() string {
 }
 
 func (er extRanges) IsExtension(tagNumber int32) bool {
-	i := sort.Search(len(er), func(i int) bool { return er[i].Start <= tagNumber })
-	return i < len(er) && tagNumber <= er[i].End
+	i := sort.Search(len(er), func(i int) bool { return er[i].End >= tagNumber })
+	return i < len(er) && tagNumber >= er[i].Start
 }
 
 func (er extRanges) Len() int {
@@ -647,7 +646,7 @@ type FieldDescriptor struct {
 	enumType   *EnumDescriptor
 	fqn        string
 	sourceInfo *dpb.SourceCodeInfo_Location
-	def        interface{}
+	def        memoizedDefault
 	isMap      bool
 }
 
@@ -691,7 +690,6 @@ func (fd *FieldDescriptor) resolve(path []int32, sourceCodeInfo map[string]*dpb.
 	fd.isMap = fd.proto.GetLabel() == dpb.FieldDescriptorProto_LABEL_REPEATED &&
 		fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_MESSAGE &&
 		fd.GetMessageType().IsMapEntry()
-	fd.def = fd.determineDefault()
 	return nil
 }
 
@@ -772,7 +770,7 @@ func parseDefaultValue(fd *FieldDescriptor, val string) interface{} {
 		}
 		return nil
 	case dpb.FieldDescriptorProto_TYPE_BYTES:
-		return []byte(val)
+		return []byte(unescape(val))
 	case dpb.FieldDescriptorProto_TYPE_STRING:
 		return val
 	case dpb.FieldDescriptorProto_TYPE_FLOAT:
@@ -820,6 +818,125 @@ func parseDefaultValue(fd *FieldDescriptor, val string) interface{} {
 	default:
 		return nil
 	}
+}
+
+func unescape(s string) string {
+	// protoc encodes default values for 'bytes' fields using C escaping,
+	// so this function reverses that escaping
+	out := make([]byte, 0, len(s))
+	var buf [4]byte
+	for len(s) > 0 {
+		if s[0] != '\\' || len(s) < 2 {
+			// not escape sequence, or too short to be well-formed escape
+			out = append(out, s[0])
+			s = s[1:]
+		} else if s[1] == 'x' || s[1] == 'X' {
+			n := matchPrefix(s[2:], 2, isHex)
+			if n == 0 {
+				// bad escape
+				out = append(out, s[:2]...)
+				s = s[2:]
+			} else {
+				c, err := strconv.ParseUint(s[2:2+n], 16, 8)
+				if err != nil {
+					// shouldn't really happen...
+					out = append(out, s[:2+n]...)
+				} else {
+					out = append(out, byte(c))
+				}
+				s = s[2+n:]
+			}
+		} else if s[1] >= '0' && s[1] <= '7' {
+			n := 1 + matchPrefix(s[2:], 2, isOctal)
+			c, err := strconv.ParseUint(s[1:1+n], 8, 8)
+			if err != nil || c > 0xff {
+				out = append(out, s[:1+n]...)
+			} else {
+				out = append(out, byte(c))
+			}
+			s = s[1+n:]
+		} else if s[1] == 'u' {
+			if len(s) < 6 {
+				// bad escape
+				out = append(out, s...)
+				s = s[len(s):]
+			} else {
+				c, err := strconv.ParseUint(s[2:6], 16, 16)
+				if err != nil {
+					// bad escape
+					out = append(out, s[:6]...)
+				} else {
+					w := utf8.EncodeRune(buf[:], rune(c))
+					out = append(out, buf[:w]...)
+				}
+				s = s[6:]
+			}
+		} else if s[1] == 'U' {
+			if len(s) < 10 {
+				// bad escape
+				out = append(out, s...)
+				s = s[len(s):]
+			} else {
+				c, err := strconv.ParseUint(s[2:10], 16, 32)
+				if err != nil || c > 0x10ffff {
+					// bad escape
+					out = append(out, s[:10]...)
+				} else {
+					w := utf8.EncodeRune(buf[:], rune(c))
+					out = append(out, buf[:w]...)
+				}
+				s = s[10:]
+			}
+		} else {
+			switch s[1] {
+			case 'a':
+				out = append(out, '\a')
+			case 'b':
+				out = append(out, '\b')
+			case 'f':
+				out = append(out, '\f')
+			case 'n':
+				out = append(out, '\n')
+			case 'r':
+				out = append(out, '\r')
+			case 't':
+				out = append(out, '\t')
+			case 'v':
+				out = append(out, '\v')
+			case '\\':
+				out = append(out, '\\')
+			case '\'':
+				out = append(out, '\'')
+			case '"':
+				out = append(out, '"')
+			case '?':
+				out = append(out, '?')
+			default:
+				// invalid escape, just copy it as-is
+				out = append(out, s[:2]...)
+			}
+			s = s[2:]
+		}
+	}
+	return string(out)
+}
+
+func isOctal(b byte) bool { return b >= '0' && b <= '7' }
+func isHex(b byte) bool {
+	return (b >= '0' && b <= '9') || (b >= 'a' && b <= 'f') || (b >= 'A' && b <= 'F')
+}
+func matchPrefix(s string, limit int, fn func(byte) bool) int {
+	l := len(s)
+	if l > limit {
+		l = limit
+	}
+	i := 0
+	for ; i < l; i++ {
+		if !fn(s[i]) {
+			return i
+		}
+	}
+	return i
 }
 
 func (fd *FieldDescriptor) GetName() string {
@@ -995,7 +1112,7 @@ func (fd *FieldDescriptor) GetEnumType() *EnumDescriptor {
 //   | string        | string  |
 //   |-------------------------|
 func (fd *FieldDescriptor) GetDefaultValue() interface{} {
-	return fd.def
+	return fd.getDefaultValue()
 }
 
 // EnumDescriptor describes an enum declared in a proto file.
@@ -1469,26 +1586,15 @@ func fileScope(fd *FileDescriptor) scope {
 	// we search symbols in this file, but also symbols in other files
 	// that have the same package as this file
 	pkg := fd.proto.GetPackage()
-	fds := collectFilesInPackage(pkg, fd.deps, []*FileDescriptor{fd})
 	return func(name string) Descriptor {
 		n := merge(pkg, name)
-		for _, fd := range fds {
-			if d, ok := fd.symbols[n]; ok {
-				return d
-			}
+		d := findSymbol(fd, n, false)
+		if d == nil {
+			// maybe name is already fully-qualified, just without a leading dot
+			d = findSymbol(fd, name, false)
 		}
-		return nil
+		return d
 	}
-}
-
-func collectFilesInPackage(pkg string, fds []*FileDescriptor, results []*FileDescriptor) []*FileDescriptor {
-	for _, fd := range fds {
-		if fd.proto.GetPackage() == pkg {
-			results = append(results, fd)
-		}
-		results = collectFilesInPackage(pkg, fd.publicDeps, results)
-	}
-	return results
 }
 
 func messageScope(md *MessageDescriptor) scope {
@@ -1577,31 +1683,9 @@ func loadFileDescriptorLocked(file string) (*FileDescriptor, error) {
 	if f != nil {
 		return f, nil
 	}
-
-	fdb := proto.FileDescriptor(file)
-	aliased := false
-	if fdb == nil {
-		var ok bool
-		alias, ok := internal.StdFileAliases[file]
-		if ok {
-			aliased = true
-			if fdb = proto.FileDescriptor(alias); fdb == nil {
-				return nil, fmt.Errorf("No such file: %q", file)
-			}
-		} else {
-			return nil, fmt.Errorf("No such file: %q", file)
-		}
-	}
-
-	fd, err := decodeFileDescriptor(file, fdb)
+	fd, err := internal.LoadFileDescriptor(file)
 	if err != nil {
 		return nil, err
-	}
-
-	if aliased {
-		// the file descriptor will have the alias used to load it, but
-		// we need it to have the specified name in order to link it
-		fd.Name = proto.String(file)
 	}
 
 	f, err = toFileDescriptorLocked(fd)
@@ -1622,30 +1706,6 @@ func toFileDescriptorLocked(fd *dpb.FileDescriptorProto) (*FileDescriptor, error
 		}
 	}
 	return CreateFileDescriptor(fd, deps...)
-}
-
-func decodeFileDescriptor(file string, fdb []byte) (*dpb.FileDescriptorProto, error) {
-	raw, err := decompress(fdb)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decompress %q descriptor: %v", file, err)
-	}
-	fd := dpb.FileDescriptorProto{}
-	if err := proto.Unmarshal(raw, &fd); err != nil {
-		return nil, fmt.Errorf("bad descriptor for %q: %v", file, err)
-	}
-	return &fd, nil
-}
-
-func decompress(b []byte) ([]byte, error) {
-	r, err := gzip.NewReader(bytes.NewReader(b))
-	if err != nil {
-		return nil, fmt.Errorf("bad gzipped descriptor: %v", err)
-	}
-	out, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("bad gzipped descriptor: %v", err)
-	}
-	return out, nil
 }
 
 func getFileFromCache(file string) *FileDescriptor {
@@ -1743,7 +1803,7 @@ func loadMessageDescriptorForTypeLocked(name string, message protoMessage) (*Mes
 	}
 
 	fdb, _ := message.Descriptor()
-	fd, err := decodeFileDescriptor(name, fdb)
+	fd, err := internal.DecodeFileDescriptor(name, fdb)
 	if err != nil {
 		return nil, err
 	}

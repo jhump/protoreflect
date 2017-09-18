@@ -1405,7 +1405,7 @@ func canConvert(src reflect.Value, target reflect.Type) bool {
 
 func convert(src, target reflect.Value) {
 	if src.Kind() == reflect.Interface {
-		src = reflect.ValueOf(src.Interface())
+		src = src.Elem()
 	}
 	srcType := src.Type()
 	targetType := target.Type()
@@ -1432,7 +1432,11 @@ func convert(src, target reflect.Value) {
 			target.SetLen(newL)
 		}
 		for i := 0; i < src.Len(); i++ {
-			convert(src.Index(i), target.Index(l+i))
+			dest := target.Index(l + i)
+			if dest.Kind() == reflect.Ptr {
+				dest.Set(reflect.New(dest.Type().Elem()))
+			}
+			convert(src.Index(i), dest)
 		}
 	} else if targetType.Kind() == reflect.Map {
 		tkt := targetType.Key()
@@ -1458,10 +1462,16 @@ func convert(src, target reflect.Value) {
 				nv = reflect.New(tvt).Elem()
 				convert(v, nv)
 			}
+			if target.IsNil() {
+				target.Set(reflect.MakeMap(targetType))
+			}
 			target.SetMapIndex(nk, nv)
 		}
 	} else if srcType == typeOfDynamicMessage && targetType.Implements(typeOfProtoMessage) {
 		dm := src.Interface().(*Message)
+		if target.IsNil() {
+			target.Set(reflect.New(targetType.Elem()))
+		}
 		m := target.Interface().(proto.Message)
 		dm.ConvertTo(m)
 	} else {

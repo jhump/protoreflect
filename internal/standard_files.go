@@ -2,6 +2,16 @@
 // be shared across more than one of the protoreflect sub-packages.
 package internal
 
+import (
+	"bytes"
+	"compress/gzip"
+	"fmt"
+	"io/ioutil"
+
+	"github.com/golang/protobuf/proto"
+	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+)
+
 // These are standard protos included with protoc, but older versions of their
 // respective packages registered them using incorrect paths.
 var StdFileAliases = map[string]string{
@@ -44,4 +54,66 @@ func init() {
 		alias := StdFileAliases[k]
 		StdFileAliases[alias] = k
 	}
+}
+
+// LoadFileDescriptor loads a registered descriptor and decodes it. If the given
+// name cannot be loaded but is a known standard name, an alias will be tried,
+// so the standard files can be loaded even if linked against older "known bad"
+// versions of packages.
+func LoadFileDescriptor(file string) (*dpb.FileDescriptorProto, error) {
+	fdb := proto.FileDescriptor(file)
+	aliased := false
+	if fdb == nil {
+		var ok bool
+		alias, ok := StdFileAliases[file]
+		if ok {
+			aliased = true
+			if fdb = proto.FileDescriptor(alias); fdb == nil {
+				return nil, fmt.Errorf("No such file: %q", file)
+			}
+		} else {
+			return nil, fmt.Errorf("No such file: %q", file)
+		}
+	}
+
+	fd, err := DecodeFileDescriptor(file, fdb)
+	if err != nil {
+		return nil, err
+	}
+
+	if aliased {
+		// the file descriptor will have the alias used to load it, but
+		// we need it to have the specified name in order to link it
+		fd.Name = proto.String(file)
+	}
+
+	return fd, nil
+}
+
+// DecodeFileDescriptor decodes the bytes of a registered file descriptor.
+// Registered file descriptors are first "proto encoded" (e.g. binary format
+// for the descriptor protos) and then gzipped. So this function gunzips and
+// then unmarshals into a descriptor proto.
+func DecodeFileDescriptor(file string, fdb []byte) (*dpb.FileDescriptorProto, error) {
+	raw, err := decompress(fdb)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decompress %q descriptor: %v", file, err)
+	}
+	fd := dpb.FileDescriptorProto{}
+	if err := proto.Unmarshal(raw, &fd); err != nil {
+		return nil, fmt.Errorf("bad descriptor for %q: %v", file, err)
+	}
+	return &fd, nil
+}
+
+func decompress(b []byte) ([]byte, error) {
+	r, err := gzip.NewReader(bytes.NewReader(b))
+	if err != nil {
+		return nil, fmt.Errorf("bad gzipped descriptor: %v", err)
+	}
+	out, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("bad gzipped descriptor: %v", err)
+	}
+	return out, nil
 }

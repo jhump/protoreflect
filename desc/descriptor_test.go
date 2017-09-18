@@ -2,6 +2,7 @@ package desc
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -386,8 +387,7 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 								references: map[string]childCases{
 									"fields": {(*MessageDescriptor).GetFields, []descCase{
 										{
-											name:   "testprotos.AnotherTestMessage.RockNRoll.beatles",
-											number: 7,
+											name: "testprotos.AnotherTestMessage.RockNRoll.beatles",
 											references: map[string]childCases{
 												"message type": {(*FieldDescriptor).GetMessageType, nil},
 												"enum type":    {(*FieldDescriptor).GetEnumType, nil},
@@ -395,8 +395,7 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 											},
 										},
 										{
-											name:   "testprotos.AnotherTestMessage.RockNRoll.stones",
-											number: 8,
+											name: "testprotos.AnotherTestMessage.RockNRoll.stones",
 											references: map[string]childCases{
 												"message type": {(*FieldDescriptor).GetMessageType, nil},
 												"enum type":    {(*FieldDescriptor).GetEnumType, nil},
@@ -404,8 +403,7 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 											},
 										},
 										{
-											name:   "testprotos.AnotherTestMessage.RockNRoll.doors",
-											number: 9,
+											name: "testprotos.AnotherTestMessage.RockNRoll.doors",
 											references: map[string]childCases{
 												"message type": {(*FieldDescriptor).GetMessageType, nil},
 												"enum type":    {(*FieldDescriptor).GetEnumType, nil},
@@ -944,6 +942,142 @@ func TestLoadFileDescriptorForWellKnownProtos(t *testing.T) {
 		for _, typ := range types {
 			d := fd.FindSymbol(typ)
 			testutil.Require(t, d != nil)
+		}
+	}
+}
+
+func TestDefaultValues(t *testing.T) {
+	fd, err := LoadFileDescriptor("desc_test_defaults.proto")
+	testutil.Ok(t, err)
+
+	testCases := []struct {
+		message, field string
+		defaultVal     interface{}
+	}{
+		{"testprotos.PrimitiveDefaults", "fl32", float32(3.14159)},
+		{"testprotos.PrimitiveDefaults", "fl64", 3.14159},
+		{"testprotos.PrimitiveDefaults", "fl32d", float32(6.022140857e23)},
+		{"testprotos.PrimitiveDefaults", "fl64d", 6.022140857e23},
+		{"testprotos.PrimitiveDefaults", "fl32inf", float32(math.Inf(1))},
+		{"testprotos.PrimitiveDefaults", "fl64inf", math.Inf(1)},
+		{"testprotos.PrimitiveDefaults", "fl32negInf", float32(math.Inf(-1))},
+		{"testprotos.PrimitiveDefaults", "fl64negInf", math.Inf(-1)},
+		{"testprotos.PrimitiveDefaults", "fl32nan", float32(math.NaN())},
+		{"testprotos.PrimitiveDefaults", "fl64nan", math.NaN()},
+		{"testprotos.PrimitiveDefaults", "bl1", true},
+		{"testprotos.PrimitiveDefaults", "bl2", false},
+		{"testprotos.PrimitiveDefaults", "i32", int32(10101)},
+		{"testprotos.PrimitiveDefaults", "i32n", int32(-10101)},
+		{"testprotos.PrimitiveDefaults", "i32x", int32(0x20202)},
+		{"testprotos.PrimitiveDefaults", "i32xn", int32(-0x20202)},
+		{"testprotos.PrimitiveDefaults", "i64", int64(10101)},
+		{"testprotos.PrimitiveDefaults", "i64n", int64(-10101)},
+		{"testprotos.PrimitiveDefaults", "i64x", int64(0x20202)},
+		{"testprotos.PrimitiveDefaults", "i64xn", int64(-0x20202)},
+		{"testprotos.PrimitiveDefaults", "i32s", int32(10101)},
+		{"testprotos.PrimitiveDefaults", "i32sn", int32(-10101)},
+		{"testprotos.PrimitiveDefaults", "i32sx", int32(0x20202)},
+		{"testprotos.PrimitiveDefaults", "i32sxn", int32(-0x20202)},
+		{"testprotos.PrimitiveDefaults", "i64s", int64(10101)},
+		{"testprotos.PrimitiveDefaults", "i64sn", int64(-10101)},
+		{"testprotos.PrimitiveDefaults", "i64sx", int64(0x20202)},
+		{"testprotos.PrimitiveDefaults", "i64sxn", int64(-0x20202)},
+		{"testprotos.PrimitiveDefaults", "i32f", int32(10101)},
+		{"testprotos.PrimitiveDefaults", "i32fn", int32(-10101)},
+		{"testprotos.PrimitiveDefaults", "i32fx", int32(0x20202)},
+		{"testprotos.PrimitiveDefaults", "i32fxn", int32(-0x20202)},
+		{"testprotos.PrimitiveDefaults", "i64f", int64(10101)},
+		{"testprotos.PrimitiveDefaults", "i64fn", int64(-10101)},
+		{"testprotos.PrimitiveDefaults", "i64fx", int64(0x20202)},
+		{"testprotos.PrimitiveDefaults", "i64fxn", int64(-0x20202)},
+		{"testprotos.PrimitiveDefaults", "u32", uint32(10101)},
+		{"testprotos.PrimitiveDefaults", "u32x", uint32(0x20202)},
+		{"testprotos.PrimitiveDefaults", "u64", uint64(10101)},
+		{"testprotos.PrimitiveDefaults", "u64x", uint64(0x20202)},
+		{"testprotos.PrimitiveDefaults", "u32f", uint32(10101)},
+		{"testprotos.PrimitiveDefaults", "u32fx", uint32(0x20202)},
+		{"testprotos.PrimitiveDefaults", "u64f", uint64(10101)},
+		{"testprotos.PrimitiveDefaults", "u64fx", uint64(0x20202)},
+
+		{"testprotos.StringAndBytesDefaults", "dq", "this is a string with \"nested quotes\""},
+		{"testprotos.StringAndBytesDefaults", "sq", "this is a string with \"nested quotes\""},
+		{"testprotos.StringAndBytesDefaults", "escaped_bytes", []byte("\000\001\a\b\f\n\r\t\v\\'\"\xfe")},
+		{"testprotos.StringAndBytesDefaults", "utf8_string", "\341\210\264"},
+		{"testprotos.StringAndBytesDefaults", "string_with_zero", "hel\000lo"},
+		{"testprotos.StringAndBytesDefaults", "bytes_with_zero", []byte("wor\000ld")},
+
+		{"testprotos.EnumDefaults", "red", int32(0)},
+		{"testprotos.EnumDefaults", "green", int32(1)},
+		{"testprotos.EnumDefaults", "blue", int32(2)},
+		{"testprotos.EnumDefaults", "zero", int32(0)},
+		{"testprotos.EnumDefaults", "zed", int32(0)},
+		{"testprotos.EnumDefaults", "one", int32(1)},
+		{"testprotos.EnumDefaults", "dos", int32(2)},
+	}
+	for i, tc := range testCases {
+		def := fd.FindMessage(tc.message).FindFieldByName(tc.field).GetDefaultValue()
+		testutil.Eq(t, tc.defaultVal, def, "wrong default value for case %d: %s.%s", i, tc.message, tc.field)
+	}
+}
+
+func TestUnescape(t *testing.T) {
+	testCases := []struct {
+		in, out string
+	}{
+		// EOF, bad escapes
+		{"\\", "\\"},
+		{"\\y", "\\y"},
+		// octal escapes
+		{"\\0", "\000"},
+		{"\\7", "\007"},
+		{"\\07", "\007"},
+		{"\\77", "\077"},
+		{"\\78", "\0078"},
+		{"\\077", "\077"},
+		{"\\377", "\377"},
+		{"\\128", "\0128"},
+		{"\\0001", "\0001"},
+		{"\\0008", "\0008"},
+		// bad octal escape
+		{"\\8", "\\8"},
+		// hex escapes
+		{"\\x0", "\x00"},
+		{"\\x7", "\x07"},
+		{"\\x07", "\x07"},
+		{"\\x77", "\x77"},
+		{"\\x7g", "\x07g"},
+		{"\\xcc", "\xcc"},
+		{"\\xfff", "\xfff"},
+		// bad hex escape
+		{"\\xg7", "\\xg7"},
+		{"\\x", "\\x"},
+		// short unicode escapes
+		{"\\u0020", "\u0020"},
+		{"\\u007e", "\u007e"},
+		{"\\u1234", "\u1234"},
+		{"\\uffff", "\uffff"},
+		// long unicode escapes
+		{"\\U00000024", "\U00000024"},
+		{"\\U00000076", "\U00000076"},
+		{"\\U00001234", "\U00001234"},
+		{"\\U0010FFFF", "\U0010FFFF"},
+		// bad unicode escapes
+		{"\\u12", "\\u12"},
+		{"\\ug1232", "\\ug1232"},
+		{"\\u", "\\u"},
+		{"\\U1234567", "\\U1234567"},
+		{"\\U12345678", "\\U12345678"},
+		{"\\U0010Fghi", "\\U0010Fghi"},
+		{"\\U", "\\U"},
+	}
+	for _, tc := range testCases {
+		for _, p := range []string{"", "prefix"} {
+			for _, s := range []string{"", "suffix"} {
+				i := p + tc.in + s
+				o := p + tc.out + s
+				u := unescape(i)
+				testutil.Eq(t, o, u, "unescaped %q into %q, but should have been %q", i, u, o)
+			}
 		}
 	}
 }
