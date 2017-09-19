@@ -39,15 +39,17 @@ type FileAccessor func(filename string) (io.ReadCloser, error)
 // with the descriptors in the same order (e.g. first filename given will be the
 // first returned descriptor, and so on).
 //
-// The given filenames are opened using os.Open, so relative paths are assumed
-// relative to the process's current working directory.
+// The given filenames as well as any imports are opened using os.Open, so
+// relative paths are assumed relative to the process's current working
+// directory.
 //
-// The set of filenames must include all dependencies (including transitive
-// dependencies) for all named files or a link error will occur. The exception
-// to this rule is that files can import standard "google/protobuf/*.proto"
-// files without needing to supply paths to these files. Like protoc, this
-// parser has a built-in version of these files it can use if they aren't
-// explicitly supplied.
+// All dependencies for all specified files (including transitive dependencies)
+// should be provided or accessible via os.Open using the name and path as it
+// appears in import statements or a link error will occur. The exception to
+// this rule is that files can import standard "google/protobuf/*.proto" files
+// without needing to supply paths to these files. Like protoc, this parser has
+// a built-in version of these files it can use if they aren't explicitly
+// supplied.
 //
 // In order to link the files, this function will try to guess the "proto paths"
 // to use so that import statements match up with filenames given. To avoid
@@ -67,12 +69,13 @@ func ParseProtoFilesByName(filenames ...string) ([]*desc.FileDescriptor, error) 
 // in the same order (e.g. first filename given will be the first returned
 // descriptor, and so on).
 //
-// The set of filenames must include all dependencies (including transitive
-// dependencies) for all named files or a link error will occur. The exception
-// to this rule is that files can import standard "google/protobuf/*.proto"
-// files without needing to supply paths to these files. Like protoc, this
-// parser has a built-in version of these files it can use if they aren't
-// explicitly supplied.
+// All dependencies for all specified files (including transitive dependencies)
+// should be provided or accessible via os.Open using the name and path as it
+// appears in import statements or a link error will occur. The exception to
+// this rule is that files can import standard "google/protobuf/*.proto" files
+// without needing to supply paths to these files. Like protoc, this parser has
+// a built-in version of these files it can use if they aren't explicitly
+// supplied.
 //
 // In order to link the files, this function will try to guess the "proto paths"
 // to use so that import statements match up with filenames given. To avoid
@@ -210,8 +213,9 @@ func fixupFilenames(protos map[string]*dpb.FileDescriptorProto) map[string]*dpb.
 // given import paths as search directories to find and load any imported
 // files.
 //
-// The given filenames are opened using os.Open, so relative paths are assumed
-// relative to the process's current working directory.
+// The given filenames as well as any imports are opened using os.Open, so
+// relative paths are assumed relative to the process's current working
+// directory.
 //
 // All imported paths must be found in one of the given import paths or a link
 // error will occur. The exception to this rule is that files can import
