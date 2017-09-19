@@ -131,7 +131,7 @@ func (l *protoLex) Lex(lval *protoSymType) (code int) {
 			return _ERROR
 		}
 
-		if c == '\n' {
+		if c == '\n' || c == '\r' {
 			l.colNo = 0
 			l.lineNo++
 			continue
