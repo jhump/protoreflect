@@ -227,7 +227,7 @@ intLit : _INT_LIT
 
 negIntLit : '-' _INT_LIT {
 		if $2 > math.MaxInt64 + 1 {
-			protolex.Error(fmt.Sprintf("numeric constant %d would underflow (allowed range is %d to %d)", $2, math.MinInt64, math.MaxInt64))
+			protolex.Error(fmt.Sprintf("numeric constant %d would underflow (allowed range is %d to %d)", $2, int64(math.MinInt64), int64(math.MaxInt64)))
 		}
 		$$ = -int64($2)
 	}
