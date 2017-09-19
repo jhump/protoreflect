@@ -22,6 +22,16 @@ that make them *much* more useful and easier to use.
 
 ----
 ```
+import "github.com/jhump/protoreflect/desc/protoparse"
+```
+
+The `protoparse` package allows for parsing of `.proto` source files into rich descriptors. Without
+this package, you must invoke `protoc` to either generate a file descriptor set file or to generate
+Go code (which has descriptor information embedded in it). This package allows reading the source
+directly without having to invoke `protoc`.
+
+----
+```
 import "github.com/jhump/protoreflect/grpcreflect"
 ```
 
