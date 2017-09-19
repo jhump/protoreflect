@@ -202,28 +202,57 @@ func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) 
 	return ret, nil
 }
 
+// CreateFileDescriptors constructs a set of descriptors, one for each of the
+// given descriptor protos. The given set of descriptor protos must include all
+// transitive dependencies for every file.
+func CreateFileDescriptors(fds []*dpb.FileDescriptorProto) (map[string]*FileDescriptor, error) {
+	if len(fds) == 0 {
+		return nil, nil
+	}
+	files := map[string]*dpb.FileDescriptorProto{}
+	resolved := map[string]*FileDescriptor{}
+	var name string
+	for _, fd := range fds {
+		name = fd.GetName()
+		files[name] = fd
+	}
+	for _, fd := range fds {
+		_, err := createFromSet(fd.GetName(), nil, files, resolved)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return resolved, nil
+}
+
 // CreateFileDescriptorFromSet creates a descriptor from the given file descriptor set. The
 // set's *last* file will be the returned descriptor. The set's remaining files must comprise
 // the full set of transitive dependencies of that last file. This is the same format and
 // order used by protoc when emitting a FileDescriptorSet file with an invocation like so:
 //    protoc --descriptor_set_out=./test.protoset --include_imports -I. test.proto
 func CreateFileDescriptorFromSet(fds *dpb.FileDescriptorSet) (*FileDescriptor, error) {
-	if len(fds.GetFile()) == 0 {
+	files := fds.GetFile()
+	if len(files) == 0 {
 		return nil, errors.New("file descriptor set is empty")
 	}
-	files := map[string]*dpb.FileDescriptorProto{}
-	resolved := map[string]*FileDescriptor{}
-	var name string
-	for _, fd := range fds.GetFile() {
-		name = fd.GetName()
-		files[name] = fd
+	resolved, err := CreateFileDescriptors(files)
+	if err != nil {
+		return nil, err
 	}
-	return createFromSet(name, files, resolved)
+	lastFilename := files[len(files)-1].GetName()
+	return resolved[lastFilename], nil
 }
 
 // createFromSet creates a descriptor for the given filename. It recursively
 // creates descriptors for the given file's dependencies.
-func createFromSet(filename string, files map[string]*dpb.FileDescriptorProto, resolved map[string]*FileDescriptor) (*FileDescriptor, error) {
+func createFromSet(filename string, seen []string, files map[string]*dpb.FileDescriptorProto, resolved map[string]*FileDescriptor) (*FileDescriptor, error) {
+	for _, s := range seen {
+		if filename == s {
+			return nil, fmt.Errorf("cycle in imports: %s", strings.Join(append(seen, filename), " -> "))
+		}
+	}
+	seen = append(seen, filename)
+
 	if d, ok := resolved[filename]; ok {
 		return d, nil
 	}
@@ -233,13 +262,18 @@ func createFromSet(filename string, files map[string]*dpb.FileDescriptorProto, r
 	}
 	deps := make([]*FileDescriptor, len(fdp.GetDependency()))
 	for i, depName := range fdp.GetDependency() {
-		if dep, err := createFromSet(depName, files, resolved); err != nil {
+		if dep, err := createFromSet(depName, seen, files, resolved); err != nil {
 			return nil, err
 		} else {
 			deps[i] = dep
 		}
 	}
-	return CreateFileDescriptor(fdp, deps...)
+	d, err := CreateFileDescriptor(fdp, deps...)
+	if err != nil {
+		return nil, err
+	}
+	resolved[filename] = d
+	return d, nil
 }
 
 func (fd *FileDescriptor) registerField(field *FieldDescriptor) {
