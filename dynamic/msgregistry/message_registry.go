@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/golang/protobuf/ptypes"
@@ -699,3 +700,17 @@ func (r *MessageRegistry) asUrl(name, pkgName string) string {
 
 	return fmt.Sprintf("%s/%s", baseUrl, name)
 }
+
+// Resolve resolves the given type URL into an instance of a message. This
+// implements the jsonpb.AnyResolver interface, for use with marshaling and
+// unmarshaling Any messages to/from JSON.
+func (r *MessageRegistry) Resolve(typeUrl string) (proto.Message, error) {
+	mr := (*MessageRegistry)(r)
+	md, err := mr.FindMessageTypeByUrl(typeUrl)
+	if err != nil {
+		return nil, err
+	}
+	return mr.mf.NewMessage(md), nil
+}
+
+var _ jsonpb.AnyResolver = (*MessageRegistry)(nil)

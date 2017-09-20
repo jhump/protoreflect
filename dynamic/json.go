@@ -46,6 +46,12 @@ func (m *Message) MarshalJSONIndent() ([]byte, error) {
 }
 
 func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
+	if r, changed := wrapResolver(opts.AnyResolver, m.mf, m.md.GetFile()); changed {
+		newOpts := *opts
+		newOpts.AnyResolver = r
+		opts = &newOpts
+	}
+
 	err := b.WriteByte('{')
 	if err != nil {
 		return err
@@ -378,6 +384,12 @@ func (m *Message) UnmarshalMergeJSON(js []byte) error {
 }
 
 func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
+	if r, changed := wrapResolver(opts.AnyResolver, m.mf, m.md.GetFile()); changed {
+		newOpts := *opts
+		newOpts.AnyResolver = r
+		opts = &newOpts
+	}
+
 	t, err := r.peek()
 	if err != nil {
 		return err
@@ -870,3 +882,125 @@ func (r *concatReader) Read(p []byte) (n int, err error) {
 		p = p[c:]
 	}
 }
+
+// AnyResolver returns a jsonpb.AnyResolver that uses the given file descriptors
+// to resolve message names. It uses the given factory, which may be nil, to
+// instantiate messages. The messages that it returns when resolving a type name
+// will often be dynamic messages.
+func AnyResolver(mf *MessageFactory, files ...*desc.FileDescriptor) jsonpb.AnyResolver {
+	return &anyResolver{mf: mf, files: files}
+}
+
+type anyResolver struct {
+	mf      *MessageFactory
+	files   []*desc.FileDescriptor
+	ignored map[*desc.FileDescriptor]struct{}
+	other   jsonpb.AnyResolver
+}
+
+func wrapResolver(r jsonpb.AnyResolver, mf *MessageFactory, f *desc.FileDescriptor) (jsonpb.AnyResolver, bool) {
+	if r, ok := r.(*anyResolver); ok {
+		if _, ok := r.ignored[f]; ok {
+			// if the current resolver is ignoring this file, it's because another
+			// (upstream) resolver is already handling it, so nothing to do
+			return r, false
+		}
+		for _, file := range r.files {
+			if file == f {
+				// no need to wrap!
+				return r, false
+			}
+		}
+		// ignore files that will be checked by the resolver we're wrapping
+		// (we'll just delegate and let it search those files)
+		ignored := map[*desc.FileDescriptor]struct{}{}
+		for i := range r.ignored {
+			ignored[i] = struct{}{}
+		}
+		ignore(r.files, ignored)
+		return &anyResolver{mf: mf, files: []*desc.FileDescriptor{f}, ignored: ignored, other: r}, true
+	}
+	return &anyResolver{mf: mf, files: []*desc.FileDescriptor{f}, other: r}, true
+}
+
+func ignore(files []*desc.FileDescriptor, ignored map[*desc.FileDescriptor]struct{}) {
+	for _, f := range files {
+		if _, ok := ignored[f]; ok {
+			continue
+		}
+		ignored[f] = struct{}{}
+		ignore(f.GetDependencies(), ignored)
+	}
+}
+
+func (r *anyResolver) Resolve(typeUrl string) (proto.Message, error) {
+	mname := typeUrl
+	if slash := strings.LastIndex(mname, "/"); slash >= 0 {
+		mname = mname[slash+1:]
+	}
+
+	// see if the user-specified resolver is able to do the job
+	if r.other != nil {
+		msg, err := r.other.Resolve(typeUrl)
+		if err == nil {
+			return msg, nil
+		}
+	}
+
+	// try to find the message in our known set of files
+	checked := map[*desc.FileDescriptor]struct{}{}
+	for _, f := range r.files {
+		md := r.findMessage(f, mname, checked)
+		if md != nil {
+			return r.mf.NewMessage(md), nil
+		}
+	}
+	// failing that, see if the message factory knows about this type
+	var ktr *KnownTypeRegistry
+	if r.mf != nil {
+		ktr = r.mf.ktr
+	} else {
+		ktr = (*KnownTypeRegistry)(nil)
+	}
+	m := ktr.CreateIfKnown(mname)
+	if m != nil {
+		return m, nil
+	}
+
+	// no other resolver to fallback to? mimic default behavior
+	mt := proto.MessageType(mname)
+	if mt == nil {
+		return nil, fmt.Errorf("unknown message type %q", mname)
+	}
+	return reflect.New(mt.Elem()).Interface().(proto.Message), nil
+}
+
+func (r *anyResolver) findMessage(fd *desc.FileDescriptor, msgName string, checked map[*desc.FileDescriptor]struct{}) *desc.MessageDescriptor {
+	// if this is an ignored descriptor, skip
+	if _, ok := r.ignored[fd]; ok {
+		return nil
+	}
+
+	// bail if we've already checked this file
+	if _, ok := checked[fd]; ok {
+		return nil
+	}
+	checked[fd] = struct{}{}
+
+	// see if this file has the message
+	md := fd.FindMessage(msgName)
+	if md != nil {
+		return md
+	}
+
+	// if not, recursively search the file's imports
+	for _, dep := range fd.GetDependencies() {
+		md = r.findMessage(dep, msgName, checked)
+		if md != nil {
+			return md
+		}
+	}
+	return nil
+}
+
+var _ jsonpb.AnyResolver = (*anyResolver)(nil)

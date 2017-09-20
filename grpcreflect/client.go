@@ -18,9 +18,8 @@ import (
 	"github.com/jhump/protoreflect/internal"
 )
 
-// ErrFileOrSymbolNotFound is the error returned by reflective operations
-// where the server does not recognize a given file name, symbol name, or
-// extension number.
+// elementNotFoundError is the error returned by reflective operations where the
+// server does not recognize a given file name, symbol name, or extension.
 type elementNotFoundError struct {
 	name    string
 	kind    elementKind

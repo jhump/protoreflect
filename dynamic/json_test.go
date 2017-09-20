@@ -2,11 +2,14 @@ package dynamic
 
 import (
 	"bytes"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/duration"
@@ -49,6 +52,112 @@ func TestJSONMapValueFields(t *testing.T) {
 
 func TestJSONExtensionFields(t *testing.T) {
 	// TODO
+}
+
+func createTestFileDescriptor(t *testing.T, packageName string) *desc.FileDescriptor {
+	// Create a new type that could only be resolved via custom resolver
+	// because it does not exist in compiled form
+	fdp := descriptor.FileDescriptorProto{
+		Name:       proto.String(fmt.Sprintf("%s.proto", packageName)),
+		Dependency: []string{"google/protobuf/any.proto"},
+		Package:    proto.String(packageName),
+		MessageType: []*descriptor.DescriptorProto{
+			{
+				Name: proto.String("MyMessage"),
+				Field: []*descriptor.FieldDescriptorProto{
+					{
+						Name:   proto.String("abc"),
+						Number: proto.Int(1),
+						Label:  descriptor.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+						Type:   descriptor.FieldDescriptorProto_TYPE_STRING.Enum(),
+					},
+					{
+						Name:   proto.String("def"),
+						Number: proto.Int(2),
+						Label:  descriptor.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+						Type:   descriptor.FieldDescriptorProto_TYPE_INT32.Enum(),
+					},
+					{
+						Name:     proto.String("ghi"),
+						Number:   proto.Int(3),
+						Label:    descriptor.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+						Type:     descriptor.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+						TypeName: proto.String(".google.protobuf.Any"),
+					},
+				},
+			},
+		},
+	}
+	anyfd, err := desc.LoadFileDescriptor("google/protobuf/any.proto")
+	testutil.Ok(t, err)
+	fd, err := desc.CreateFileDescriptor(&fdp, anyfd)
+	testutil.Ok(t, err)
+	return fd
+}
+
+func TestJSONAnyResolver(t *testing.T) {
+	fd1 := createTestFileDescriptor(t, "foobar")
+	fd2 := createTestFileDescriptor(t, "snafu")
+	md := fd1.FindMessage("foobar.MyMessage")
+	dm := NewMessage(md)
+	dm.SetFieldByNumber(1, "fubar")
+	dm.SetFieldByNumber(2, int32(123))
+	a1, err := ptypes.MarshalAny(dm)
+	testutil.Ok(t, err)
+	md = fd2.FindMessage("snafu.MyMessage")
+	dm = NewMessage(md)
+	dm.SetFieldByNumber(1, "snafu")
+	dm.SetFieldByNumber(2, int32(456))
+	a2, err := ptypes.MarshalAny(dm)
+	testutil.Ok(t, err)
+
+	msg := &testprotos.TestWellKnownTypes{Extras: []*any.Any{a1, a2}}
+	resolver := AnyResolver(nil, fd1, fd2)
+
+	jsm := jsonpb.Marshaler{AnyResolver: resolver}
+	js, err := jsm.MarshalToString(msg)
+	testutil.Ok(t, err)
+	expected := `{"extras":[{"@type":"type.googleapis.com/foobar.MyMessage","abc":"fubar","def":123},{"@type":"type.googleapis.com/snafu.MyMessage","abc":"snafu","def":456}]}`
+	testutil.Eq(t, expected, js)
+
+	jsu := jsonpb.Unmarshaler{AnyResolver: resolver}
+	msg2 := &testprotos.TestWellKnownTypes{}
+	err = jsu.Unmarshal(strings.NewReader(js), msg2)
+	testutil.Ok(t, err)
+
+	testutil.Ceq(t, msg, msg2, eqpm)
+}
+
+func TestJSONAnyResolver_AutomaticForDynamicMessage(t *testing.T) {
+	// marshaling and unmarshaling a dynamic message automatically enables
+	// resolving Any messages for known types (a known type is one that is
+	// in the dynamic message's file descriptor or that file's transitive
+	// dependencies)
+	fd := createTestFileDescriptor(t, "foobar")
+	md := fd.FindMessage("foobar.MyMessage")
+	dm := NewMessageFactoryWithDefaults().NewMessage(md).(*Message)
+	dm.SetFieldByNumber(1, "fubar")
+	dm.SetFieldByNumber(2, int32(123))
+	a1, err := ptypes.MarshalAny(dm)
+	testutil.Ok(t, err)
+	dm.SetFieldByNumber(1, "snafu")
+	dm.SetFieldByNumber(2, int32(456))
+	a2, err := ptypes.MarshalAny(dm)
+	testutil.Ok(t, err)
+	dm.SetFieldByNumber(1, "xyz")
+	dm.SetFieldByNumber(2, int32(-987))
+	dm.SetFieldByNumber(3, []*any.Any{a1, a2})
+
+	js, err := dm.MarshalJSON()
+	testutil.Ok(t, err)
+	expected := `{"abc":"xyz","def":-987,"ghi":[{"@type":"type.googleapis.com/foobar.MyMessage","abc":"fubar","def":123},{"@type":"type.googleapis.com/foobar.MyMessage","abc":"snafu","def":456}]}`
+	testutil.Eq(t, expected, string(js))
+
+	dm2 := NewMessageFactoryWithDefaults().NewMessage(md).(*Message)
+	err = dm2.UnmarshalJSON(js)
+	testutil.Ok(t, err)
+
+	testutil.Ceq(t, dm, dm2, eqdm)
 }
 
 func TestMarshalJSONEmitDefaults(t *testing.T) {
