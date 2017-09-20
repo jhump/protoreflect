@@ -148,25 +148,16 @@
 //
 // Registries
 //
-// This package also contains several registries, for managing known types and
-// descriptors.
-//
-// The MessageRegistry is used for interacting with Any messages where the
-// actual embedded value may be a dynamic message. There is also functionality
-// for resolving type URLs into descriptors, which supports dynamically loading
-// type descriptions (represented using the well-known types: Api, Method, Type,
-// Field, Enum, and EnumValue) and converting them to descriptors. This allows
-// for using these dynamically loaded schemas using dynamic messages. The
-// registry also exposes related functionality for inter-op between descriptors
-// and the proto well-known types that model APIs and types.
+// This package also contains a couple of registries, for managing known types
+// and descriptors.
 //
 // The KnownTypeRegistry allows de-serialization of a dynamic message to use
 // generated message types, instead of dynamic messages, for some kinds of
-// nested message fields. This is particularly useful for working proto
+// nested message fields. This is particularly useful for working with proto
 // messages that have special encodings as JSON (e.g. the well-known types),
 // since the dynamic message does not try to handle these special cases in its
 // JSON marshaling facilities.
 //
-// Last but not least is the ExtensionRegistry, which allows for recognizing and
-// parsing extensions fields (for proto2 messages).
+// The ExtensionRegistry allows for recognizing and parsing extensions fields
+// (for proto2 messages).
 package dynamic
