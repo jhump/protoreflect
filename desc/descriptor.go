@@ -1697,6 +1697,7 @@ var (
 	cacheMu       sync.RWMutex
 	filesCache    = map[string]*FileDescriptor{}
 	messagesCache = map[string]*MessageDescriptor{}
+	enumCache     = map[reflect.Type]*EnumDescriptor{}
 )
 
 // LoadFileDescriptor creates a file descriptor using the bytes returned by
@@ -1791,7 +1792,7 @@ func LoadMessageDescriptor(message string) (*MessageDescriptor, error) {
 }
 
 // LoadMessageDescriptorForType loads descriptor using the encoded descriptor proto returned
-// by Message.Descriptor() for the given message type. If the given type is not recognized,
+// by message.Descriptor() for the given message type. If the given type is not recognized,
 // then a nil descriptor is returned.
 func LoadMessageDescriptorForType(messageType reflect.Type) (*MessageDescriptor, error) {
 	m, err := messageFromType(messageType)
@@ -1854,6 +1855,114 @@ func getMessageFromCache(message string) *MessageDescriptor {
 	cacheMu.RLock()
 	defer cacheMu.RUnlock()
 	return messagesCache[message]
+}
+
+// interface implemented by all generated enums
+type protoEnum interface {
+	EnumDescriptor() ([]byte, []int)
+}
+
+// NB: There is no LoadEnumDescriptor that takes a fully-qualified enum name because
+// it is not useful since protoc-gen-go does not expose the name anywhere in generated
+// code or register it in a way that is it accessible for reflection code. This also
+// means we have to cache enum descriptors differently -- we can only cache them as
+// they are requested, as opposed to caching all enum types whenever a file descriptor
+// is cached. This is because we need to know the generated type of the enums, and we
+// don't know that at the time of caching file descriptors.
+
+// LoadEnumDescriptorForType loads descriptor using the encoded descriptor proto returned
+// by enum.EnumDescriptor() for the given enum type.
+func LoadEnumDescriptorForType(enumType reflect.Type) (*EnumDescriptor, error) {
+	// we cache descriptors using non-pointer type
+	if enumType.Kind() == reflect.Ptr {
+		enumType = enumType.Elem()
+	}
+	e := getEnumFromCache(enumType)
+	if e != nil {
+		return e, nil
+	}
+	enum, err := enumFromType(enumType)
+	if err != nil {
+		return nil, err
+	}
+
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	return loadEnumDescriptorForTypeLocked(enumType, enum)
+}
+
+// LoadEnumDescriptorForEnum loads descriptor using the encoded descriptor proto
+// returned by enum.EnumDescriptor().
+func LoadEnumDescriptorForEnum(enum protoEnum) (*EnumDescriptor, error) {
+	et := reflect.TypeOf(enum)
+	// we cache descriptors using non-pointer type
+	if et.Kind() == reflect.Ptr {
+		et = et.Elem()
+		enum = reflect.Zero(et).Interface().(protoEnum)
+	}
+	e := getEnumFromCache(et)
+	if e != nil {
+		return e, nil
+	}
+
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	return loadEnumDescriptorForTypeLocked(et, enum)
+}
+
+func enumFromType(et reflect.Type) (protoEnum, error) {
+	if et.Kind() != reflect.Int32 {
+		et = reflect.PtrTo(et)
+	}
+	e, ok := reflect.Zero(et).Interface().(protoEnum)
+	if !ok {
+		return nil, fmt.Errorf("failed to create enum from type: %v", et)
+	}
+	return e, nil
+}
+
+func loadEnumDescriptorForTypeLocked(et reflect.Type, enum protoEnum) (*EnumDescriptor, error) {
+	e := enumCache[et]
+	if e != nil {
+		return e, nil
+	}
+
+	fdb, path := enum.EnumDescriptor()
+	name := fmt.Sprintf("%v", et)
+	fd, err := internal.DecodeFileDescriptor(name, fdb)
+	if err != nil {
+		return nil, err
+	}
+	// see if we already have cached "rich" descriptor
+	f, ok := filesCache[fd.GetName()]
+	if !ok {
+		f, err = toFileDescriptorLocked(fd)
+		if err != nil {
+			return nil, err
+		}
+		putCacheLocked(fd.GetName(), f)
+	}
+
+	ed := findEnum(f, path)
+	enumCache[et] = ed
+	return ed, nil
+}
+
+func getEnumFromCache(et reflect.Type) *EnumDescriptor {
+	cacheMu.RLock()
+	defer cacheMu.RUnlock()
+	return enumCache[et]
+}
+
+func findEnum(fd *FileDescriptor, path []int) *EnumDescriptor {
+	if len(path) == 1 {
+		return fd.GetEnumTypes()[path[0]]
+	}
+	md := fd.GetMessageTypes()[path[0]]
+	for _, i := range path[1 : len(path)-1] {
+		md = md.GetNestedMessageTypes()[i]
+	}
+	return md.GetNestedEnumTypes()[path[len(path)-1]]
 }
 
 // LoadFieldDescriptorForExtension loads the field descriptor that corresponds to the given

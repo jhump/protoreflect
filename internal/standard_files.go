@@ -94,14 +94,14 @@ func LoadFileDescriptor(file string) (*dpb.FileDescriptorProto, error) {
 // Registered file descriptors are first "proto encoded" (e.g. binary format
 // for the descriptor protos) and then gzipped. So this function gunzips and
 // then unmarshals into a descriptor proto.
-func DecodeFileDescriptor(file string, fdb []byte) (*dpb.FileDescriptorProto, error) {
+func DecodeFileDescriptor(element string, fdb []byte) (*dpb.FileDescriptorProto, error) {
 	raw, err := decompress(fdb)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decompress %q descriptor: %v", file, err)
+		return nil, fmt.Errorf("failed to decompress %q descriptor: %v", element, err)
 	}
 	fd := dpb.FileDescriptorProto{}
 	if err := proto.Unmarshal(raw, &fd); err != nil {
-		return nil, fmt.Errorf("bad descriptor for %q: %v", file, err)
+		return nil, fmt.Errorf("bad descriptor for %q: %v", element, err)
 	}
 	return &fd, nil
 }
