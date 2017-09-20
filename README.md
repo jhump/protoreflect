@@ -8,7 +8,7 @@ A descriptor is itself a protobuf message that describes a `.proto` source file 
 therein. So a collection of descriptors can describe an entire schema of protobuf types, including
 RPC services.
 
-*Go doc: https://godoc.org/github.com/jhump/protoreflect*
+[![GoDoc](https://godoc.org/github.com/jhump/protoreflect?status.svg)](https://godoc.org/github.com/jhump/protoreflect)
 
 ----
 ```
