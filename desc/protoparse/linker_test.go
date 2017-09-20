@@ -19,7 +19,7 @@ import (
 //go:generate bash -c "protoc test.proto -o ./test.protoset --go_out=../../../../.. && mv test.pb.go test_pb_test.go"
 
 func TestSimpleLink(t *testing.T) {
-	fd, err := ParseProtoFileByName("test.proto")
+	fds, err := Parser{}.ParseFiles("test.proto")
 	testutil.Ok(t, err)
 
 	b, err := ioutil.ReadFile("test.protoset")
@@ -33,18 +33,18 @@ func TestSimpleLink(t *testing.T) {
 	if files.File[0].Syntax == nil {
 		files.File[0].Syntax = proto.String("proto2")
 	}
-	testutil.Require(t, proto.Equal(files.File[0], fd.AsProto()), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(files.File[0]), toString(fd.AsProto()))
+	testutil.Require(t, proto.Equal(files.File[0], fds[0].AsProto()), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(files.File[0]), toString(fds[0].AsProto()))
 }
 
 func TestMultiFileLink(t *testing.T) {
 	for _, name := range []string{"desc_test2.proto", "desc_test_defaults.proto", "desc_test_field_types.proto", "desc_test_options.proto", "desc_test_proto3.proto", "desc_test_wellknowntypes.proto"} {
-		fd, err := ParseProtoFileByName(name, "../../internal/testprotos")
+		fds, err := Parser{ImportPaths: []string{"../../internal/testprotos"}}.ParseFiles(name)
 		testutil.Ok(t, err)
 
 		exp, err := desc.LoadFileDescriptor(name)
 		testutil.Ok(t, err)
 
-		checkFiles(t, fd, exp, map[string]struct{}{})
+		checkFiles(t, fds[0], exp, map[string]struct{}{})
 	}
 }
 
@@ -322,7 +322,7 @@ func TestLinkerValidation(t *testing.T) {
 		for k := range tc.input {
 			names = append(names, k)
 		}
-		_, err := ParseProtoFiles(acc, names...)
+		_, err := Parser{Accessor: acc}.ParseFiles(names...)
 		if err == nil || !strings.Contains(err.Error(), tc.errMsg) {
 			t.Errorf("case %d: expecting validation error %q; instead got: %v", i, tc.errMsg, err)
 		}

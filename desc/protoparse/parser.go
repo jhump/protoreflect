@@ -34,62 +34,71 @@ func init() {
 // name of the file to open and returns either the input reader or an error.
 type FileAccessor func(filename string) (io.ReadCloser, error)
 
-// ParseProtoFilesByName parses the named files into file descriptors. The
-// returned slice has the same number of elements as the input slice of names
-// with the descriptors in the same order (e.g. first filename given will be the
-// first returned descriptor, and so on).
-//
-// The given filenames as well as any imports are opened using os.Open, so
-// relative paths are assumed relative to the process's current working
-// directory.
-//
-// All dependencies for all specified files (including transitive dependencies)
-// should be provided or accessible via os.Open using the name and path as it
-// appears in import statements or a link error will occur. The exception to
-// this rule is that files can import standard "google/protobuf/*.proto" files
-// without needing to supply paths to these files. Like protoc, this parser has
-// a built-in version of these files it can use if they aren't explicitly
-// supplied.
-//
-// In order to link the files, this function will try to guess the "proto paths"
-// to use so that import statements match up with filenames given. To avoid
-// possible errors in this step, organize all proto files under a single proto
-// path (so that all import statements use paths relative to the one proto path)
-// and specify the same relative paths to this function as are used in import
-// statements.
-func ParseProtoFilesByName(filenames ...string) ([]*desc.FileDescriptor, error) {
-	return ParseProtoFiles(func(name string) (io.ReadCloser, error) {
-		return os.Open(name)
-	}, filenames...)
+// Parser parses proto source into descriptors.
+type Parser struct {
+	// The paths used to search for dependencies that are referenced in import
+	// statements in proto source files. If no import paths are provided then
+	// "." (current directory) is assumed to be the only import path.
+	ImportPaths []string
+
+	// If true, the supplied file names/paths need not necessarily match how the
+	// files are referenced in import statements. The parser will attempt to
+	// match import statements to supplied paths, "guessing" the import paths
+	// for the files. Note that this inference is not perfect and link errors
+	// could result. It works best when all proto files are organized such that
+	// a single import path can be inferred (e.g. all files under a single tree
+	// with import statements all being relative to the root of this tree).
+	InferImportPaths bool
+
+	// Used to create a reader for a given filename, when loading proto source
+	// file contents. If unset, os.Open is used, and relative paths are thus
+	// relative to the process's current working directory.
+	Accessor FileAccessor
 }
 
-// ParseProtoFiles parses the named files into file descriptors using the given
-// file accessor to construct a reader for each filename. The returned slice has
-// the same number of elements as the input slice of names with the descriptors
-// in the same order (e.g. first filename given will be the first returned
-// descriptor, and so on).
+// ParseFiles parses the named files into descriptors. The returned slice has
+// the same number of entries as the give filenames, in the same order. So the
+// first returned descriptor corresponds to the first given name, and so on.
 //
 // All dependencies for all specified files (including transitive dependencies)
-// should be provided or accessible via os.Open using the name and path as it
-// appears in import statements or a link error will occur. The exception to
-// this rule is that files can import standard "google/protobuf/*.proto" files
-// without needing to supply paths to these files. Like protoc, this parser has
-// a built-in version of these files it can use if they aren't explicitly
-// supplied.
-//
-// In order to link the files, this function will try to guess the "proto paths"
-// to use so that import statements match up with filenames given. To avoid
-// possible errors in this step, specify the same relative paths to this
-// function as are used in import statements and use a file accessor that can
-// correctly load the sources using these paths.
-func ParseProtoFiles(acc FileAccessor, filenames ...string) ([]*desc.FileDescriptor, error) {
+// must be accessible via the parser's Accessor or a link error will occur. The
+// exception to this rule is that files can import standard "google/protobuf/*.proto"
+// files without needing to supply sources for these files. Like protoc, this
+// parser has a built-in version of these files it can use if they aren't
+// explicitly supplied.
+func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) {
+	accessor := p.Accessor
+	if accessor == nil {
+		accessor = func(name string) (io.ReadCloser, error) {
+			return os.Open(name)
+		}
+	}
+	paths := p.ImportPaths
+	if len(paths) > 0 {
+		acc := accessor
+		accessor = func(name string) (io.ReadCloser, error) {
+			var ret error
+			for _, path := range paths {
+				f, err := acc(filepath.Join(path, name))
+				if err != nil && ret == nil {
+					ret = err
+					continue
+				}
+				return f, nil
+			}
+			return nil, ret
+		}
+	}
+
 	protos := map[string]*dpb.FileDescriptorProto{}
 	aggregates := map[string][]*aggregate{}
-	err := parseProtoFiles(acc, filenames, protos, aggregates)
+	err := parseProtoFiles(accessor, filenames, protos, aggregates)
 	if err != nil {
 		return nil, err
 	}
-	protos = fixupFilenames(protos)
+	if p.InferImportPaths {
+		protos = fixupFilenames(protos)
+	}
 	linkedProtos, err := newLinker(protos, aggregates).linkFiles()
 	if err != nil {
 		return nil, err
@@ -207,61 +216,6 @@ func fixupFilenames(protos map[string]*dpb.FileDescriptorProto) map[string]*dpb.
 	}
 
 	return revisedProtos
-}
-
-// ParseProtoFileByName parses the named file into a descriptor and uses the
-// given import paths as search directories to find and load any imported
-// files.
-//
-// The given filenames as well as any imports are opened using os.Open, so
-// relative paths are assumed relative to the process's current working
-// directory.
-//
-// All imported paths must be found in one of the given import paths or a link
-// error will occur. The exception to this rule is that files can import
-// standard "google/protobuf/*.proto" files without them being present in the
-// import paths. Like protoc, this parser has a built-in version of these files
-// it can use if they aren't found.
-func ParseProtoFileByName(filename string, importPaths ...string) (*desc.FileDescriptor, error) {
-	acc := func(name string) (io.ReadCloser, error) {
-		if len(importPaths) == 0 {
-			return os.Open(name)
-		}
-		var ret error
-		for _, path := range importPaths {
-			f, err := os.Open(filepath.Join(path, name))
-			if err != nil && ret == nil {
-				ret = err
-				continue
-			}
-			return f, nil
-		}
-		return nil, ret
-	}
-	return ParseProtoFile(acc, filename)
-}
-
-// ParseProtoFile parses the named file into a descriptor and uses the given
-// file accessor to construct a reader for the filename as well as for any
-// imported files.
-//
-// All imported paths must be accessible via the given accessor or a link error
-// will occur. The exception to this rule is that files can import standard
-// "google/protobuf/*.proto" files without them being accessible. Like protoc,
-// this parser has a built-in version of these files it can use if they aren't
-// found.
-func ParseProtoFile(acc FileAccessor, filename string) (*desc.FileDescriptor, error) {
-	protos := map[string]*dpb.FileDescriptorProto{}
-	aggregates := map[string][]*aggregate{}
-	err := parseProtoFiles(acc, []string{filename}, protos, aggregates)
-	if err != nil {
-		return nil, err
-	}
-	linkedProtos, err := newLinker(protos, aggregates).linkFiles()
-	if err != nil {
-		return nil, err
-	}
-	return linkedProtos[filename], nil
 }
 
 func parseProtoFiles(acc FileAccessor, filenames []string, parsed map[string]*dpb.FileDescriptorProto, aggregates map[string][]*aggregate) error {
