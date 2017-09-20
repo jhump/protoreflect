@@ -879,6 +879,38 @@ func TestLoadMessageDescriptor(t *testing.T) {
 	testutil.Eq(t, md, md3)
 }
 
+func TestLoadEnumDescriptor(t *testing.T) {
+	ed, err := LoadEnumDescriptorForEnum(testprotos.TestMessage_NestedMessage_AnotherNestedMessage_YetAnotherNestedMessage_DeeplyNestedEnum(0))
+	testutil.Ok(t, err)
+	testutil.Eq(t, "DeeplyNestedEnum", ed.GetName())
+	testutil.Eq(t, "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum", ed.GetFullyQualifiedName())
+	fd := ed.GetFile()
+	testutil.Eq(t, "desc_test1.proto", fd.GetName())
+	ofd, err := LoadFileDescriptor("desc_test1.proto")
+	testutil.Ok(t, err)
+	testutil.Eq(t, ofd, fd)
+
+	ed2, err := LoadEnumDescriptorForEnum((*testprotos.TestEnum)(nil)) // pointer type for interface
+	testutil.Ok(t, err)
+	testutil.Eq(t, "TestEnum", ed2.GetName())
+	testutil.Eq(t, "testprotos.TestEnum", ed2.GetFullyQualifiedName())
+	fd = ed2.GetFile()
+	testutil.Eq(t, "desc_test_field_types.proto", fd.GetName())
+	ofd, err = LoadFileDescriptor("desc_test_field_types.proto")
+	testutil.Ok(t, err)
+	testutil.Eq(t, ofd, fd)
+	testutil.Eq(t, fd, ed2.GetParent())
+
+	// now use the APIs that take reflect.Type
+	ed3, err := LoadEnumDescriptorForType(reflect.TypeOf((*testprotos.TestMessage_NestedMessage_AnotherNestedMessage_YetAnotherNestedMessage_DeeplyNestedEnum)(nil)))
+	testutil.Ok(t, err)
+	testutil.Eq(t, ed, ed3)
+
+	ed4, err := LoadEnumDescriptorForType(reflect.TypeOf(testprotos.TestEnum_FIRST))
+	testutil.Ok(t, err)
+	testutil.Eq(t, ed2, ed4)
+}
+
 func TestLoadFileDescriptorWithDeps(t *testing.T) {
 	// Try one with some imports
 	fd, err := LoadFileDescriptor("desc_test2.proto")
