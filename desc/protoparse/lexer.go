@@ -135,6 +135,8 @@ func (l *protoLex) Lex(lval *protoSymType) (code int) {
 			l.colNo = 0
 			l.lineNo++
 			continue
+		} else if c == '\r' {
+			continue
 		}
 		l.colNo++
 		if c == ' ' || c == '\t' {
