@@ -1107,7 +1107,7 @@ protodefault:
 		//line proto.y:228
 		{
 			if protoDollar[2].ui > math.MaxInt64+1 {
-				protolex.Error(fmt.Sprintf("numeric constant %d would underflow (allowed range is %d to %d)", protoDollar[2].ui, math.MinInt64, math.MaxInt64))
+				protolex.Error(fmt.Sprintf("numeric constant %d would underflow (allowed range is %d to %d)", protoDollar[2].ui, int64(math.MinInt64), int64(math.MaxInt64)))
 			}
 			protoVAL.i = -int64(protoDollar[2].ui)
 		}
