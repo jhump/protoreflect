@@ -501,9 +501,9 @@ func asExtensionRanges(ranges []tagRange, opts []*dpb.UninterpretedOption) []*dp
 	ers := make([]*dpb.DescriptorProto_ExtensionRange, len(ranges))
 	for i, r := range ranges {
 		ers[i] = &dpb.DescriptorProto_ExtensionRange{Start: proto.Int32(r.Start), End: proto.Int32(r.End)}
-		//if len(opts) > 0 {
-		//	ers[i].options = &dpb.ExtensionRangeOptions{ UninterpretedOption: opts }
-		//}
+		if len(opts) > 0 {
+			ers[i].Options = &dpb.ExtensionRangeOptions{UninterpretedOption: opts}
+		}
 	}
 	return ers
 }

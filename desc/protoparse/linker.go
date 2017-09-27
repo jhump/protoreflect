@@ -197,6 +197,8 @@ func descriptorType(m proto.Message) string {
 	switch m := m.(type) {
 	case *dpb.DescriptorProto:
 		return "message"
+	case *dpb.DescriptorProto_ExtensionRange:
+		return "extension range"
 	case *dpb.FieldDescriptorProto:
 		if m.GetExtendee() == "" {
 			return "field"
@@ -294,13 +296,14 @@ func (l *linker) resolveMessageTypes(fd *dpb.FileDescriptorProto, prefix string,
 			return err
 		}
 	}
-	//for _, er := range md.ExtensionRange {
-	//	if er.ExtensionRangeOptions != nil {
-	//		if err := l.resolveOptions(fd, proto.MessageName(er.ExtensionRangeOptions), er.ExtensionRangeOptions.UninterpretedOption, scopes); err != nil {
-	//			return err
-	//		}
-	//	}
-	//}
+	for _, er := range md.ExtensionRange {
+		if er.Options != nil {
+			erName := fmt.Sprintf("%s:%d-%d", fqn, er.GetStart(), er.GetEnd()-1)
+			if err := l.resolveOptions(fd, "extension range", erName, proto.MessageName(er.Options), er.Options.UninterpretedOption, scopes); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -661,16 +664,18 @@ func (l *linker) interpretMessageOptions(md *desc.MessageDescriptor) error {
 			return err
 		}
 	}
-	//for _, er := range md.AsDescriptorProto().GetExtensionRange() {
-	//	opts := er.GetExtensionRangeOptions()
-	//	if opts != nil && len(opts.UninterpretedOption) > 0 {
-	//		uo := opts.UninterpretedOption
-	//		opts.UninterpretedOption = nil
-	//		if err := l.interpretOptions(md.GetFile(), opts, uo); err != nil {
-	//			return err
-	//		}
-	//	}
-	//}
+	for _, er := range md.AsDescriptorProto().GetExtensionRange() {
+		opts := er.Options
+		if opts != nil {
+			if len(opts.UninterpretedOption) > 0 {
+				d := extRangeDescriptorish{md: md, er: er}
+				if err := l.interpretOptions(d, opts, opts.UninterpretedOption); err != nil {
+					return err
+				}
+			}
+			opts.UninterpretedOption = nil
+		}
+	}
 	for _, nmd := range md.GetNestedMessageTypes() {
 		if err := l.interpretMessageOptions(nmd); err != nil {
 			return err
@@ -682,6 +687,23 @@ func (l *linker) interpretMessageOptions(md *desc.MessageDescriptor) error {
 		}
 	}
 	return nil
+}
+
+type extRangeDescriptorish struct {
+	md *desc.MessageDescriptor
+	er *dpb.DescriptorProto_ExtensionRange
+}
+
+func (er extRangeDescriptorish) GetFile() *desc.FileDescriptor {
+	return er.md.GetFile()
+}
+
+func (er extRangeDescriptorish) GetName() string {
+	return fmt.Sprintf("%s:%d-%d", er.md.GetName(), er.er.GetStart(), er.er.GetEnd()-1)
+}
+
+func (er extRangeDescriptorish) AsProto() proto.Message {
+	return er.er
 }
 
 var emptyFieldOptions dpb.FieldOptions
@@ -825,7 +847,13 @@ func (l *linker) interpretEnumOptions(ed *desc.EnumDescriptor) error {
 	return nil
 }
 
-func (l *linker) interpretOptions(element desc.Descriptor, opts proto.Message, uninterpreted []*dpb.UninterpretedOption) error {
+type descriptorish interface {
+	GetFile() *desc.FileDescriptor
+	GetName() string
+	AsProto() proto.Message
+}
+
+func (l *linker) interpretOptions(element descriptorish, opts proto.Message, uninterpreted []*dpb.UninterpretedOption) error {
 	optsd, err := desc.LoadMessageDescriptorForMessage(opts)
 	if err != nil {
 		return err
@@ -852,7 +880,7 @@ func (l *linker) interpretOptions(element desc.Descriptor, opts proto.Message, u
 	return dm.ConvertTo(opts)
 }
 
-func (l *linker) interpretField(mc *messageContext, element desc.Descriptor, dm *dynamic.Message, opt *dpb.UninterpretedOption, nameIndex int) error {
+func (l *linker) interpretField(mc *messageContext, element descriptorish, dm *dynamic.Message, opt *dpb.UninterpretedOption, nameIndex int) error {
 	// TODO: better error messages: accumulate full path during recursion so message includes more comprehensible context
 	var fld *desc.FieldDescriptor
 	nm := opt.GetName()[nameIndex]
