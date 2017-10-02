@@ -470,7 +470,10 @@ func asFieldDescriptor(label *dpb.FieldDescriptorProto_Label, typ, name string, 
 	return fd
 }
 
-func asGroupDescriptor(label dpb.FieldDescriptorProto_Label, name string, tag int32, body []*msgDecl) *groupDesc {
+func asGroupDescriptor(lex protoLexer, label dpb.FieldDescriptorProto_Label, name string, tag int32, body []*msgDecl) *groupDesc {
+	if !unicode.IsUpper(rune(name[0])) {
+		lex.Error(fmt.Sprintf("group %s should have a name that starts with a capital letter", name))
+	}
 	fieldName := strings.ToLower(name)
 	fd := &dpb.FieldDescriptorProto{
 		Name:     proto.String(fieldName),

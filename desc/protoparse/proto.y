@@ -348,15 +348,15 @@ fieldOption: optionName '=' constant {
 
 group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageBody '}' {
 		checkTag(protolex, $5)
-		$$ = asGroupDescriptor(dpb.FieldDescriptorProto_LABEL_REQUIRED, $3, int32($5), $7)
+		$$ = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_REQUIRED, $3, int32($5), $7)
 	}
 	| _OPTIONAL _GROUP name '=' _INT_LIT '{' messageBody '}' {
 		checkTag(protolex, $5)
-		$$ = asGroupDescriptor(dpb.FieldDescriptorProto_LABEL_OPTIONAL, $3, int32($5), $7)
+		$$ = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_OPTIONAL, $3, int32($5), $7)
 	}
 	| _REPEATED _GROUP name '=' _INT_LIT '{' messageBody '}' {
 		checkTag(protolex, $5)
-		$$ = asGroupDescriptor(dpb.FieldDescriptorProto_LABEL_REPEATED, $3, int32($5), $7)
+		$$ = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_REPEATED, $3, int32($5), $7)
 	}
 
 oneof : _ONEOF name '{' oneofBody '}' {

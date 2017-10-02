@@ -1304,21 +1304,21 @@ protodefault:
 		//line proto.y:349
 		{
 			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.grpd = asGroupDescriptor(dpb.FieldDescriptorProto_LABEL_REQUIRED, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].msgDecs)
+			protoVAL.grpd = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_REQUIRED, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].msgDecs)
 		}
 	case 77:
 		protoDollar = protoS[protopt-8 : protopt+1]
 		//line proto.y:353
 		{
 			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.grpd = asGroupDescriptor(dpb.FieldDescriptorProto_LABEL_OPTIONAL, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].msgDecs)
+			protoVAL.grpd = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_OPTIONAL, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].msgDecs)
 		}
 	case 78:
 		protoDollar = protoS[protopt-8 : protopt+1]
 		//line proto.y:357
 		{
 			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.grpd = asGroupDescriptor(dpb.FieldDescriptorProto_LABEL_REPEATED, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].msgDecs)
+			protoVAL.grpd = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_REPEATED, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].msgDecs)
 		}
 	case 79:
 		protoDollar = protoS[protopt-5 : protopt+1]
