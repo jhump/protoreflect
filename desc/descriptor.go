@@ -81,7 +81,8 @@ type Descriptor interface {
 	GetName() string
 	// GetFullyQualifiedName returns the fully-qualified name of the object described by
 	// the descriptor. This will include the package name and any enclosing message names.
-	// For file descriptors, this indicates the package that is declared by the file.
+	// For file descriptors, this returns the path and name to the described file (same as
+	// GetName).
 	GetFullyQualifiedName() string
 	// GetParent returns the enclosing element in a proto source file. If the described
 	// object is a top-level object, this returns the file descriptor. Otherwise, it returns
