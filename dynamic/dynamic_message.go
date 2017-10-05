@@ -16,6 +16,7 @@ import (
 )
 
 var UnknownTagNumberError = errors.New("Unknown tag number")
+var UnknownFieldNameError = errors.New("Unknown field name")
 var FieldIsNotMapError = errors.New("Field is not a map type")
 var FieldIsNotRepeatedError = errors.New("Field is not repeated")
 var IndexOutOfRangeError = errors.New("Index is out of range")
@@ -292,6 +293,22 @@ func (m *Message) TryGetField(fd *desc.FieldDescriptor) (interface{}, error) {
 	return m.getField(fd)
 }
 
+func (m *Message) GetFieldByName(name string) interface{} {
+	if v, err := m.TryGetFieldByName(name); err != nil {
+		panic(err.Error())
+	} else {
+		return v
+	}
+}
+
+func (m *Message) TryGetFieldByName(name string) (interface{}, error) {
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return nil, UnknownFieldNameError
+	}
+	return m.getField(fd)
+}
+
 func (m *Message) GetFieldByNumber(tagNumber int) interface{} {
 	if v, err := m.TryGetFieldByNumber(tagNumber); err != nil {
 		panic(err.Error())
@@ -363,6 +380,14 @@ func (m *Message) HasField(fd *desc.FieldDescriptor) bool {
 	return m.HasFieldNumber(int(fd.GetNumber()))
 }
 
+func (m *Message) HasFieldName(name string) bool {
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return false
+	}
+	return m.HasFieldNumber(int(fd.GetNumber()))
+}
+
 func (m *Message) HasFieldNumber(tagNumber int) bool {
 	if _, ok := m.values[int32(tagNumber)]; ok {
 		return true
@@ -380,6 +405,20 @@ func (m *Message) SetField(fd *desc.FieldDescriptor, val interface{}) {
 func (m *Message) TrySetField(fd *desc.FieldDescriptor, val interface{}) error {
 	if err := m.checkField(fd); err != nil {
 		return err
+	}
+	return m.setField(fd, val)
+}
+
+func (m *Message) SetFieldByName(name string, val interface{}) {
+	if err := m.TrySetFieldByName(name, val); err != nil {
+		panic(err.Error())
+	}
+}
+
+func (m *Message) TrySetFieldByName(name string, val interface{}) error {
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return UnknownFieldNameError
 	}
 	return m.setField(fd, val)
 }
@@ -470,6 +509,21 @@ func (m *Message) TryClearField(fd *desc.FieldDescriptor) error {
 	return nil
 }
 
+func (m *Message) ClearFieldByName(name string) {
+	if err := m.TryClearFieldByName(name); err != nil {
+		panic(err.Error())
+	}
+}
+
+func (m *Message) TryClearFieldByName(name string) error {
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return UnknownFieldNameError
+	}
+	m.clearField(fd)
+	return nil
+}
+
 func (m *Message) ClearFieldByNumber(tagNumber int) {
 	if err := m.TryClearFieldByNumber(tagNumber); err != nil {
 		panic(err.Error())
@@ -530,6 +584,22 @@ func (m *Message) TryGetMapField(fd *desc.FieldDescriptor, key interface{}) (int
 	return m.getMapField(fd, key)
 }
 
+func (m *Message) GetMapFieldByName(name string, key interface{}) interface{} {
+	if v, err := m.TryGetMapFieldByName(name, key); err != nil {
+		panic(err.Error())
+	} else {
+		return v
+	}
+}
+
+func (m *Message) TryGetMapFieldByName(name string, key interface{}) (interface{}, error) {
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return nil, UnknownFieldNameError
+	}
+	return m.getMapField(fd, key)
+}
+
 func (m *Message) GetMapFieldByNumber(tagNumber int, key interface{}) interface{} {
 	if v, err := m.TryGetMapFieldByNumber(tagNumber, key); err != nil {
 		panic(err.Error())
@@ -575,6 +645,20 @@ func (m *Message) PutMapField(fd *desc.FieldDescriptor, key interface{}, val int
 func (m *Message) TryPutMapField(fd *desc.FieldDescriptor, key interface{}, val interface{}) error {
 	if err := m.checkField(fd); err != nil {
 		return err
+	}
+	return m.putMapField(fd, key, val)
+}
+
+func (m *Message) PutMapFieldByName(name string, key interface{}, val interface{}) {
+	if err := m.TryPutMapFieldByName(name, key, val); err != nil {
+		panic(err.Error())
+	}
+}
+
+func (m *Message) TryPutMapFieldByName(name string, key interface{}, val interface{}) error {
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return UnknownFieldNameError
 	}
 	return m.putMapField(fd, key, val)
 }
@@ -629,6 +713,20 @@ func (m *Message) RemoveMapField(fd *desc.FieldDescriptor, key interface{}) {
 func (m *Message) TryRemoveMapField(fd *desc.FieldDescriptor, key interface{}) error {
 	if err := m.checkField(fd); err != nil {
 		return err
+	}
+	return m.removeMapField(fd, key)
+}
+
+func (m *Message) RemoveMapFieldByName(name string, key interface{}) {
+	if err := m.TryRemoveMapFieldByName(name, key); err != nil {
+		panic(err.Error())
+	}
+}
+
+func (m *Message) TryRemoveMapFieldByName(name string, key interface{}) error {
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return UnknownFieldNameError
 	}
 	return m.removeMapField(fd, key)
 }
@@ -690,6 +788,25 @@ func (m *Message) TryGetRepeatedField(fd *desc.FieldDescriptor, index int) (inte
 	return m.getRepeatedField(fd, index)
 }
 
+func (m *Message) GetRepeatedFieldByName(name string, index int) interface{} {
+	if v, err := m.TryGetRepeatedFieldByName(name, index); err != nil {
+		panic(err.Error())
+	} else {
+		return v
+	}
+}
+
+func (m *Message) TryGetRepeatedFieldByName(name string, index int) (interface{}, error) {
+	if index < 0 {
+		return nil, IndexOutOfRangeError
+	}
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return nil, UnknownFieldNameError
+	}
+	return m.getRepeatedField(fd, index)
+}
+
 func (m *Message) GetRepeatedFieldByNumber(tagNumber int, index int) interface{} {
 	if v, err := m.TryGetRepeatedFieldByNumber(tagNumber, index); err != nil {
 		panic(err.Error())
@@ -738,6 +855,20 @@ func (m *Message) AddRepeatedField(fd *desc.FieldDescriptor, val interface{}) {
 func (m *Message) TryAddRepeatedField(fd *desc.FieldDescriptor, val interface{}) error {
 	if err := m.checkField(fd); err != nil {
 		return err
+	}
+	return m.addRepeatedField(fd, val)
+}
+
+func (m *Message) AddRepeatedFieldByName(name string, val interface{}) {
+	if err := m.TryAddRepeatedFieldByName(name, val); err != nil {
+		panic(err.Error())
+	}
+}
+
+func (m *Message) TryAddRepeatedFieldByName(name string, val interface{}) error {
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return UnknownFieldNameError
 	}
 	return m.addRepeatedField(fd, val)
 }
@@ -810,6 +941,23 @@ func (m *Message) TrySetRepeatedField(fd *desc.FieldDescriptor, index int, val i
 	}
 	if err := m.checkField(fd); err != nil {
 		return err
+	}
+	return m.setRepeatedField(fd, index, val)
+}
+
+func (m *Message) SetRepeatedFieldByName(name string, index int, val interface{}) {
+	if err := m.TrySetRepeatedFieldByName(name, index, val); err != nil {
+		panic(err.Error())
+	}
+}
+
+func (m *Message) TrySetRepeatedFieldByName(name string, index int, val interface{}) error {
+	if index < 0 {
+		return IndexOutOfRangeError
+	}
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return UnknownFieldNameError
 	}
 	return m.setRepeatedField(fd, index, val)
 }
