@@ -85,17 +85,33 @@ func TestGetSetClearScalarFields(t *testing.T) {
 			v, err := dm.TryGetFieldByNumber(c.tagNumber)
 			testutil.Ok(t, err)
 			testutil.Eq(t, zero, v)
+			v, err = dm.TryGetFieldByName(c.fieldName)
+			testutil.Ok(t, err)
+			testutil.Eq(t, zero, v)
 
 			v, err = dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
 			testutil.Eq(t, FieldIsNotRepeatedError, err)
+			v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
+			testutil.Eq(t, FieldIsNotRepeatedError, err)
+
 			err = dm.TrySetRepeatedFieldByNumber(c.tagNumber, 0, i.input)
+			testutil.Eq(t, FieldIsNotRepeatedError, err)
+			err = dm.TrySetRepeatedFieldByName(c.fieldName, 0, i.input)
 			testutil.Eq(t, FieldIsNotRepeatedError, err)
 
 			v, err = dm.TryGetMapFieldByNumber(c.tagNumber, "foo")
 			testutil.Eq(t, FieldIsNotMapError, err)
+			v, err = dm.TryGetMapFieldByName(c.fieldName, "foo")
+			testutil.Eq(t, FieldIsNotMapError, err)
+
 			err = dm.TryPutMapFieldByNumber(c.tagNumber, "foo", i.input)
 			testutil.Eq(t, FieldIsNotMapError, err)
+			err = dm.TryPutMapFieldByName(c.fieldName, "foo", i.input)
+			testutil.Eq(t, FieldIsNotMapError, err)
+
 			err = dm.TryRemoveMapFieldByNumber(c.tagNumber, "foo")
+			testutil.Eq(t, FieldIsNotMapError, err)
+			err = dm.TryRemoveMapFieldByName(c.fieldName, "foo")
 			testutil.Eq(t, FieldIsNotMapError, err)
 
 			err = dm.TrySetFieldByNumber(c.tagNumber, i.input)
@@ -106,12 +122,26 @@ func TestGetSetClearScalarFields(t *testing.T) {
 				testutil.Eq(t, coerce(i.input, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 			}
+			err = dm.TrySetFieldByName(c.fieldName, i.input)
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v, err = dm.TryGetFieldByName(c.fieldName)
+				testutil.Ok(t, err)
+				testutil.Eq(t, coerce(i.input, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
 
 			err = dm.TryClearFieldByNumber(c.tagNumber)
 			testutil.Ok(t, err)
 			testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
+			err = dm.TryClearFieldByName(c.fieldName)
+			testutil.Ok(t, err)
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
 
 			v, err = dm.TryGetFieldByNumber(c.tagNumber)
+			testutil.Ok(t, err)
+			testutil.Eq(t, zero, v)
+			v, err = dm.TryGetFieldByName(c.fieldName)
 			testutil.Ok(t, err)
 			testutil.Eq(t, zero, v)
 
@@ -119,17 +149,32 @@ func TestGetSetClearScalarFields(t *testing.T) {
 
 			v = dm.GetFieldByNumber(c.tagNumber)
 			testutil.Eq(t, zero, v)
+			v = dm.GetFieldByName(c.fieldName)
+			testutil.Eq(t, zero, v)
 
 			err = catchPanic(func() { dm.GetRepeatedFieldByNumber(c.tagNumber, 0) })
 			testutil.Eq(t, FieldIsNotRepeatedError.Error(), err.(panicError).panic)
+			err = catchPanic(func() { dm.GetRepeatedFieldByName(c.fieldName, 0) })
+			testutil.Eq(t, FieldIsNotRepeatedError.Error(), err.(panicError).panic)
+
 			err = catchPanic(func() { dm.SetRepeatedFieldByNumber(c.tagNumber, 0, i.input) })
+			testutil.Eq(t, FieldIsNotRepeatedError.Error(), err.(panicError).panic)
+			err = catchPanic(func() { dm.SetRepeatedFieldByName(c.fieldName, 0, i.input) })
 			testutil.Eq(t, FieldIsNotRepeatedError.Error(), err.(panicError).panic)
 
 			err = catchPanic(func() { dm.GetMapFieldByNumber(c.tagNumber, "foo") })
 			testutil.Eq(t, FieldIsNotMapError.Error(), err.(panicError).panic)
+			err = catchPanic(func() { dm.GetMapFieldByName(c.fieldName, "foo") })
+			testutil.Eq(t, FieldIsNotMapError.Error(), err.(panicError).panic)
+
 			err = catchPanic(func() { dm.PutMapFieldByNumber(c.tagNumber, "foo", i.input) })
 			testutil.Eq(t, FieldIsNotMapError.Error(), err.(panicError).panic)
+			err = catchPanic(func() { dm.PutMapFieldByName(c.fieldName, "foo", i.input) })
+			testutil.Eq(t, FieldIsNotMapError.Error(), err.(panicError).panic)
+
 			err = catchPanic(func() { dm.RemoveMapFieldByNumber(c.tagNumber, "foo") })
+			testutil.Eq(t, FieldIsNotMapError.Error(), err.(panicError).panic)
+			err = catchPanic(func() { dm.RemoveMapFieldByName(c.fieldName, "foo") })
 			testutil.Eq(t, FieldIsNotMapError.Error(), err.(panicError).panic)
 
 			err = catchPanic(func() { dm.SetFieldByNumber(c.tagNumber, i.input) })
@@ -139,11 +184,22 @@ func TestGetSetClearScalarFields(t *testing.T) {
 				testutil.Eq(t, coerce(i.input, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 			}
-
 			dm.ClearFieldByNumber(c.tagNumber)
 			testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
 
+			err = catchPanic(func() { dm.SetFieldByName(c.fieldName, i.input) })
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v = dm.GetFieldByName(c.fieldName)
+				testutil.Eq(t, coerce(i.input, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+			dm.ClearFieldByName(c.fieldName)
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
+
 			v = dm.GetFieldByNumber(c.tagNumber)
+			testutil.Eq(t, zero, v)
+			v = dm.GetFieldByName(c.fieldName)
 			testutil.Eq(t, zero, v)
 		}
 	}
@@ -219,8 +275,12 @@ func TestGetSetClearRepeatedFields(t *testing.T) {
 				// First run the case using Try* methods
 
 				testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
+				testutil.Require(t, !dm.HasFieldName(c.fieldName))
 
 				v, err := dm.TryGetFieldByNumber(c.tagNumber)
+				testutil.Ok(t, err)
+				testutil.Eq(t, zero, v)
+				v, err = dm.TryGetFieldByName(c.fieldName)
 				testutil.Ok(t, err)
 				testutil.Eq(t, zero, v)
 
@@ -234,18 +294,34 @@ func TestGetSetClearRepeatedFields(t *testing.T) {
 					testutil.Eq(t, coerceSlice(input, c.kind), v)
 					testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 				}
-
 				err = dm.TryClearFieldByNumber(c.tagNumber)
 				testutil.Ok(t, err)
 				testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
 
+				err = dm.TrySetFieldByName(c.fieldName, input)
+				if shouldTestValue(t, err, j != 0 && allowed, k, c.kind, idx) {
+					// make sure value stuck
+					v, err = dm.TryGetFieldByName(c.fieldName)
+					testutil.Ok(t, err)
+					testutil.Eq(t, typeOfGenericSlice, reflect.TypeOf(v))
+					testutil.Eq(t, coerceSlice(input, c.kind), v)
+					testutil.Require(t, dm.HasFieldName(c.fieldName))
+				}
+				err = dm.TryClearFieldByName(c.fieldName)
+				testutil.Ok(t, err)
+				testutil.Require(t, !dm.HasFieldName(c.fieldName))
+
 				v, err = dm.TryGetFieldByNumber(c.tagNumber)
 				testutil.Ok(t, err)
 				testutil.Eq(t, zero, v)
-
+				v, err = dm.TryGetFieldByName(c.fieldName)
+				testutil.Ok(t, err)
+				testutil.Eq(t, zero, v)
 				// Now we do it again using the non-Try* methods (e.g. the ones that panic)
 
 				v = dm.GetFieldByNumber(c.tagNumber)
+				testutil.Eq(t, zero, v)
+				v = dm.GetFieldByName(c.fieldName)
 				testutil.Eq(t, zero, v)
 
 				err = catchPanic(func() { dm.SetFieldByNumber(c.tagNumber, input) })
@@ -256,11 +332,23 @@ func TestGetSetClearRepeatedFields(t *testing.T) {
 					testutil.Eq(t, coerceSlice(input, c.kind), v)
 					testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 				}
-
 				dm.ClearFieldByNumber(c.tagNumber)
 				testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
 
+				err = catchPanic(func() { dm.SetFieldByName(c.fieldName, input) })
+				if shouldTestValue(t, err, j != 0 && allowed, k, c.kind, idx) {
+					// make sure value stuck
+					v = dm.GetFieldByName(c.fieldName)
+					testutil.Eq(t, typeOfGenericSlice, reflect.TypeOf(v))
+					testutil.Eq(t, coerceSlice(input, c.kind), v)
+					testutil.Require(t, dm.HasFieldName(c.fieldName))
+				}
+				dm.ClearFieldByName(c.fieldName)
+				testutil.Require(t, !dm.HasFieldName(c.fieldName))
+
 				v = dm.GetFieldByNumber(c.tagNumber)
+				testutil.Eq(t, zero, v)
+				v = dm.GetFieldByName(c.fieldName)
 				testutil.Eq(t, zero, v)
 			}
 		}
@@ -323,6 +411,8 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 
 			v, err := dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
 			testutil.Eq(t, IndexOutOfRangeError, err)
+			v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
+			testutil.Eq(t, IndexOutOfRangeError, err)
 
 			err = dm.TryAddRepeatedFieldByNumber(c.tagNumber, i.input1)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
@@ -382,6 +472,63 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			testutil.Ok(t, err)
 			testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
 
+			// Now we do it again for the ByName methods
+			err = dm.TryAddRepeatedFieldByName(c.fieldName, i.input1)
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
+				testutil.Ok(t, err)
+				testutil.Eq(t, coerce(i.input1, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+			err = dm.TryAddRepeatedFieldByName(c.fieldName, i.input2)
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 1)
+				testutil.Ok(t, err)
+				testutil.Eq(t, coerce(i.input2, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			if !allowed {
+				// adds above failed (because wrong kind), so go ahead and add
+				// correct values so we can test Set* methods
+				e1, e2 = zero, zero
+				dm.AddRepeatedFieldByName(c.fieldName, e1)
+				dm.AddRepeatedFieldByName(c.fieldName, e2)
+			} else {
+				e1, e2 = coerce(i.input1, c.kind), coerce(i.input2, c.kind)
+			}
+			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
+
+			err = dm.TrySetRepeatedFieldByName(c.fieldName, 2, zero)
+			testutil.Eq(t, IndexOutOfRangeError, err)
+			err = dm.TrySetRepeatedFieldByName(c.fieldName, 0, i.input2)
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
+				testutil.Ok(t, err)
+				testutil.Eq(t, coerce(i.input2, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+				// and value at other index is unchanged
+				v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 1)
+				testutil.Ok(t, err)
+				testutil.Eq(t, e2, v)
+			}
+
+			err = dm.TrySetRepeatedFieldByName(c.fieldName, 1, i.input1)
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 1)
+				testutil.Ok(t, err)
+				testutil.Eq(t, coerce(i.input1, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			err = dm.TryClearFieldByName(c.fieldName)
+			testutil.Ok(t, err)
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
+
 			// Now we do it again using the non-Try* methods (e.g. the ones that panic)
 
 			err = catchPanic(func() { dm.GetRepeatedFieldByNumber(c.tagNumber, 0) })
@@ -436,6 +583,61 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 
 			dm.ClearFieldByNumber(c.tagNumber)
 			testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
+
+			// Again - Non Try methds by Name
+			err = catchPanic(func() { dm.GetRepeatedFieldByName(c.fieldName, 0) })
+			testutil.Require(t, err != nil)
+			testutil.Eq(t, IndexOutOfRangeError.Error(), err.(panicError).panic)
+
+			err = catchPanic(func() { dm.AddRepeatedFieldByName(c.fieldName, i.input1) })
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v = dm.GetRepeatedFieldByName(c.fieldName, 0)
+				testutil.Eq(t, coerce(i.input1, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			err = catchPanic(func() { dm.AddRepeatedFieldByName(c.fieldName, i.input2) })
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v = dm.GetRepeatedFieldByName(c.fieldName, 1)
+				testutil.Eq(t, coerce(i.input2, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			if !allowed {
+				// adds above failed (because wrong kind), so go ahead and add
+				// correct values so we can test Set* methods
+				dm.AddRepeatedFieldByName(c.fieldName, e1)
+				dm.AddRepeatedFieldByName(c.fieldName, e2)
+			}
+			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
+
+			err = catchPanic(func() { dm.SetRepeatedFieldByName(c.fieldName, 2, zero) })
+			testutil.Require(t, err != nil)
+			testutil.Eq(t, IndexOutOfRangeError.Error(), err.(panicError).panic)
+			err = catchPanic(func() { dm.SetRepeatedFieldByName(c.fieldName, 0, i.input2) })
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v = dm.GetRepeatedFieldByName(c.fieldName, 0)
+				testutil.Eq(t, coerce(i.input2, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+				// and value at other index is unchanged
+				v = dm.GetRepeatedFieldByName(c.fieldName, 1)
+				testutil.Eq(t, e2, v)
+			}
+
+			err = catchPanic(func() { dm.SetRepeatedFieldByName(c.fieldName, 1, i.input1) })
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v = dm.GetRepeatedFieldByName(c.fieldName, 1)
+				testutil.Eq(t, coerce(i.input1, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			dm.ClearFieldByName(c.fieldName)
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
+
 		}
 	}
 }
@@ -505,6 +707,9 @@ func TestGetSetClearMapFields_KeyTypes(t *testing.T) {
 				v, err := dm.TryGetFieldByNumber(c.tagNumber)
 				testutil.Ok(t, err)
 				testutil.Eq(t, zero, v)
+				v, err = dm.TryGetFieldByName(c.fieldName)
+				testutil.Ok(t, err)
+				testutil.Eq(t, zero, v)
 
 				input := mk(i)
 				err = dm.TrySetFieldByNumber(c.tagNumber, input)
@@ -516,18 +721,34 @@ func TestGetSetClearMapFields_KeyTypes(t *testing.T) {
 					testutil.Eq(t, coerceMapKeys(input, c.kind), v)
 					testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 				}
-
 				err = dm.TryClearFieldByNumber(c.tagNumber)
 				testutil.Ok(t, err)
 				testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
-
 				v, err = dm.TryGetFieldByNumber(c.tagNumber)
+				testutil.Ok(t, err)
+				testutil.Eq(t, zero, v)
+
+				err = dm.TrySetFieldByName(c.fieldName, input)
+				if shouldTestValue(t, err, j != 0 && allowed, k, c.kind, idx) {
+					// make sure value stuck
+					v, err = dm.TryGetFieldByName(c.fieldName)
+					testutil.Ok(t, err)
+					testutil.Eq(t, typeOfGenericMap, reflect.TypeOf(v))
+					testutil.Eq(t, coerceMapKeys(input, c.kind), v)
+					testutil.Require(t, dm.HasFieldName(c.fieldName))
+				}
+				err = dm.TryClearFieldByName(c.fieldName)
+				testutil.Ok(t, err)
+				testutil.Require(t, !dm.HasFieldName(c.fieldName))
+				v, err = dm.TryGetFieldByName(c.fieldName)
 				testutil.Ok(t, err)
 				testutil.Eq(t, zero, v)
 
 				// Now we do it again using the non-Try* methods (e.g. the ones that panic)
 
 				v = dm.GetFieldByNumber(c.tagNumber)
+				testutil.Eq(t, zero, v)
+				v = dm.GetFieldByName(c.fieldName)
 				testutil.Eq(t, zero, v)
 
 				err = catchPanic(func() { dm.SetFieldByNumber(c.tagNumber, input) })
@@ -538,11 +759,22 @@ func TestGetSetClearMapFields_KeyTypes(t *testing.T) {
 					testutil.Eq(t, coerceMapKeys(input, c.kind), v)
 					testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 				}
-
 				dm.ClearFieldByNumber(c.tagNumber)
 				testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
-
 				v = dm.GetFieldByNumber(c.tagNumber)
+				testutil.Eq(t, zero, v)
+
+				err = catchPanic(func() { dm.SetFieldByName(c.fieldName, input) })
+				if shouldTestValue(t, err, j != 0 && allowed, k, c.kind, idx) {
+					// make sure value stuck
+					v = dm.GetFieldByNumber(c.tagNumber)
+					testutil.Eq(t, typeOfGenericMap, reflect.TypeOf(v))
+					testutil.Eq(t, coerceMapKeys(input, c.kind), v)
+					testutil.Require(t, dm.HasFieldName(c.fieldName))
+				}
+				dm.ClearFieldByName(c.fieldName)
+				testutil.Require(t, !dm.HasFieldName(c.fieldName))
+				v = dm.GetFieldByName(c.fieldName)
 				testutil.Eq(t, zero, v)
 			}
 		}
@@ -620,6 +852,9 @@ func TestGetSetClearMapFields_ValueTypes(t *testing.T) {
 				v, err := dm.TryGetFieldByNumber(c.tagNumber)
 				testutil.Ok(t, err)
 				testutil.Eq(t, zero, v)
+				v, err = dm.TryGetFieldByName(c.fieldName)
+				testutil.Ok(t, err)
+				testutil.Eq(t, zero, v)
 
 				input := mk(i)
 				err = dm.TrySetFieldByNumber(c.tagNumber, input)
@@ -638,9 +873,26 @@ func TestGetSetClearMapFields_ValueTypes(t *testing.T) {
 				testutil.Ok(t, err)
 				testutil.Eq(t, zero, v)
 
+				err = dm.TrySetFieldByName(c.fieldName, input)
+				if shouldTestValue(t, err, j != 0 && allowed, k, c.kind, idx) {
+					// make sure value stuck
+					v, err = dm.TryGetFieldByName(c.fieldName)
+					testutil.Ok(t, err)
+					testutil.Eq(t, typeOfGenericMap, reflect.TypeOf(v))
+					testutil.Eq(t, coerceMapVals(input, c.kind), v)
+				}
+
+				err = dm.TryClearFieldByName(c.fieldName)
+				testutil.Ok(t, err)
+
+				v, err = dm.TryGetFieldByName(c.fieldName)
+				testutil.Ok(t, err)
+				testutil.Eq(t, zero, v)
 				// Now we do it again using the non-Try* methods (e.g. the ones that panic)
 
 				v = dm.GetFieldByNumber(c.tagNumber)
+				testutil.Eq(t, zero, v)
+				v = dm.GetFieldByName(c.fieldName)
 				testutil.Eq(t, zero, v)
 
 				err = catchPanic(func() { dm.SetFieldByNumber(c.tagNumber, input) })
@@ -650,10 +902,19 @@ func TestGetSetClearMapFields_ValueTypes(t *testing.T) {
 					testutil.Eq(t, typeOfGenericMap, reflect.TypeOf(v))
 					testutil.Eq(t, coerceMapVals(input, c.kind), v)
 				}
-
 				dm.ClearFieldByNumber(c.tagNumber)
-
 				v = dm.GetFieldByNumber(c.tagNumber)
+				testutil.Eq(t, zero, v)
+
+				err = catchPanic(func() { dm.SetFieldByName(c.fieldName, input) })
+				if shouldTestValue(t, err, j != 0 && allowed, k, c.kind, idx) {
+					// make sure value stuck
+					v = dm.GetFieldByName(c.fieldName)
+					testutil.Eq(t, typeOfGenericMap, reflect.TypeOf(v))
+					testutil.Eq(t, coerceMapVals(input, c.kind), v)
+				}
+				dm.ClearFieldByName(c.fieldName)
+				v = dm.GetFieldByName(c.fieldName)
 				testutil.Eq(t, zero, v)
 			}
 		}
@@ -769,6 +1030,63 @@ func TestGetPutDeleteMapFields(t *testing.T) {
 			testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
 			testutil.Eq(t, 0, reflect.ValueOf(dm.GetFieldByNumber(c.tagNumber)).Len())
 
+			// Now run the try methods using ByName methods
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
+
+			v, err = dm.TryGetMapFieldByName(c.fieldName, "foo")
+			testutil.Ok(t, err)
+			testutil.Require(t, v == nil)
+
+			err = dm.TryPutMapFieldByName(c.fieldName, "foo", i.input1)
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v, err = dm.TryGetMapFieldByName(c.fieldName, "foo")
+				testutil.Ok(t, err)
+				testutil.Eq(t, coerce(i.input1, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			err = dm.TryPutMapFieldByName(c.fieldName, "bar", i.input2)
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v, err = dm.TryGetMapFieldByName(c.fieldName, "bar")
+				testutil.Ok(t, err)
+				testutil.Eq(t, coerce(i.input2, c.kind), v)
+			}
+
+			if !allowed {
+				// adds above failed (because wrong kind), so go ahead and add
+				// correct values so we can test Set* methods
+				e1, e2 = zero, zero
+				dm.PutMapFieldByName(c.fieldName, "foo", e1)
+				dm.PutMapFieldByName(c.fieldName, "bar", e2)
+			} else {
+				e1, e2 = coerce(i.input1, c.kind), coerce(i.input2, c.kind)
+			}
+			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
+
+			// removing missing key is not an error
+			err = dm.TryRemoveMapFieldByName(c.fieldName, "baz")
+			testutil.Ok(t, err)
+			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
+
+			err = dm.TryRemoveMapFieldByName(c.fieldName, "foo")
+			testutil.Ok(t, err)
+			testutil.Eq(t, 1, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
+			// value has been deleted
+			v, err = dm.TryGetMapFieldByName(c.fieldName, "foo")
+			testutil.Ok(t, err)
+			testutil.Require(t, v == nil)
+			// other key not affected
+			v, err = dm.TryGetMapFieldByName(c.fieldName, "bar")
+			testutil.Ok(t, err)
+			testutil.Eq(t, e2, v)
+
+			err = dm.TryRemoveMapFieldByName(c.fieldName, "bar")
+			testutil.Ok(t, err)
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
+			testutil.Eq(t, 0, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
+
 			// Now we do it again using the non-Try* methods (e.g. the ones that panic)
 
 			v = dm.GetMapFieldByNumber(c.tagNumber, "foo")
@@ -816,6 +1134,54 @@ func TestGetPutDeleteMapFields(t *testing.T) {
 			testutil.Ok(t, err)
 			testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
 			testutil.Eq(t, 0, reflect.ValueOf(dm.GetFieldByNumber(c.tagNumber)).Len())
+
+			// Now run the non-try methods using byName methods
+			v = dm.GetMapFieldByName(c.fieldName, "foo")
+			testutil.Require(t, v == nil)
+
+			err = catchPanic(func() { dm.PutMapFieldByName(c.fieldName, "foo", i.input1) })
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v = dm.GetMapFieldByName(c.fieldName, "foo")
+				testutil.Eq(t, coerce(i.input1, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			err = catchPanic(func() { dm.PutMapFieldByName(c.fieldName, "bar", i.input2) })
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v = dm.GetMapFieldByName(c.fieldName, "bar")
+				testutil.Eq(t, coerce(i.input2, c.kind), v)
+			}
+
+			if !allowed {
+				// adds above failed (because wrong kind), so go ahead and add
+				// correct values so we can test Set* methods
+				dm.PutMapFieldByName(c.fieldName, "foo", e1)
+				dm.PutMapFieldByName(c.fieldName, "bar", e2)
+			}
+			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
+
+			// removing missing key does not panic
+			err = catchPanic(func() { dm.RemoveMapFieldByName(c.fieldName, "baz") })
+			testutil.Ok(t, err)
+			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
+
+			err = catchPanic(func() { dm.RemoveMapFieldByName(c.fieldName, "foo") })
+			testutil.Ok(t, err)
+			testutil.Eq(t, 1, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
+			// value has been deleted
+			v = dm.GetMapFieldByName(c.fieldName, "foo")
+			testutil.Require(t, v == nil)
+			// other key not affected
+			v = dm.GetMapFieldByName(c.fieldName, "bar")
+			testutil.Eq(t, e2, v)
+
+			err = catchPanic(func() { dm.RemoveMapFieldByName(c.fieldName, "bar") })
+			testutil.Ok(t, err)
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
+			testutil.Eq(t, 0, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
+
 		}
 	}
 }
@@ -943,6 +1309,53 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			testutil.Ok(t, err)
 			testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
 
+			// Now use the try ByName methods
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
+
+			v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
+			testutil.Eq(t, FieldIsNotRepeatedError, err)
+
+			err = dm.TryAddRepeatedFieldByName(c.fieldName, input1)
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v, err = dm.TryGetMapFieldByName(c.fieldName, "foo")
+				testutil.Ok(t, err)
+				testutil.Eq(t, coerce(i.input1, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			err = dm.TryAddRepeatedFieldByName(c.fieldName, input2)
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v, err = dm.TryGetMapFieldByName(c.fieldName, "bar")
+				testutil.Ok(t, err)
+				testutil.Eq(t, coerce(i.input2, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			err = dm.TrySetRepeatedFieldByName(c.fieldName, 0, input2)
+			testutil.Eq(t, FieldIsNotRepeatedError, err)
+
+			err = dm.TryClearFieldByName(c.fieldName)
+			testutil.Ok(t, err)
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
+
+			err = dm.TrySetFieldByName(c.fieldName, []interface{}{input1, input2})
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure values stuck
+				v, err = dm.TryGetMapFieldByName(c.fieldName, "foo")
+				testutil.Ok(t, err)
+				testutil.Eq(t, coerce(i.input1, c.kind), v)
+				v, err = dm.TryGetMapFieldByName(c.fieldName, "bar")
+				testutil.Ok(t, err)
+				testutil.Eq(t, coerce(i.input2, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			err = dm.TryClearFieldByName(c.fieldName)
+			testutil.Ok(t, err)
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
+
 			// Now we do it again using the non-Try* methods (e.g. the ones that panic)
 
 			err = catchPanic(func() { dm.GetRepeatedFieldByNumber(c.tagNumber, 0) })
@@ -982,6 +1395,46 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 
 			dm.ClearFieldByNumber(c.tagNumber)
 			testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
+
+			// Now the non-try ByName methods
+			err = catchPanic(func() { dm.GetRepeatedFieldByName(c.fieldName, 0) })
+			testutil.Eq(t, FieldIsNotRepeatedError.Error(), err.(panicError).panic)
+
+			err = catchPanic(func() { dm.AddRepeatedFieldByName(c.fieldName, input1) })
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v = dm.GetMapFieldByName(c.fieldName, "foo")
+				testutil.Eq(t, coerce(i.input1, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			err = catchPanic(func() { dm.AddRepeatedFieldByName(c.fieldName, input2) })
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure value stuck
+				v = dm.GetMapFieldByName(c.fieldName, "bar")
+				testutil.Eq(t, coerce(i.input2, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			err = catchPanic(func() { dm.SetRepeatedFieldByName(c.fieldName, 0, input2) })
+			testutil.Eq(t, FieldIsNotRepeatedError.Error(), err.(panicError).panic)
+
+			dm.ClearFieldByName(c.fieldName)
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
+
+			err = catchPanic(func() { dm.SetFieldByName(c.fieldName, []interface{}{input1, input2}) })
+			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
+				// make sure values stuck
+				v = dm.GetMapFieldByName(c.fieldName, "foo")
+				testutil.Eq(t, coerce(i.input1, c.kind), v)
+				v = dm.GetMapFieldByName(c.fieldName, "bar")
+				testutil.Eq(t, coerce(i.input2, c.kind), v)
+				testutil.Require(t, dm.HasFieldName(c.fieldName))
+			}
+
+			dm.ClearFieldByNumber(c.tagNumber)
+			testutil.Require(t, !dm.HasFieldName(c.fieldName))
+
 		}
 	}
 }
@@ -1292,6 +1745,108 @@ func TestGetSetExtensionFields_ByTagNumber(t *testing.T) {
 			dm.ClearFieldByNumber(c.tagNumber)
 
 			v = dm.GetFieldByNumber(c.tagNumber)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+		}
+	}
+}
+
+func TestGetSetExtensionFields_ByName(t *testing.T) {
+	fd, err := desc.LoadFileDescriptor("desc_test1.proto")
+	testutil.Ok(t, err)
+	md := fd.FindSymbol("testprotos.AnotherTestMessage").(*desc.MessageDescriptor)
+	er := NewExtensionRegistryWithDefaults()
+	dm := NewMessageFactoryWithExtensionRegistry(er).NewMessage(md).(*Message)
+
+	inputs := map[reflect.Kind]struct {
+		input interface{}
+		zero  interface{}
+	}{
+		reflect.Ptr: {
+			input: &testprotos.TestMessage{Ne: []testprotos.TestMessage_NestedEnum{testprotos.TestMessage_VALUE1}},
+			zero:  (*testprotos.TestMessage)(nil),
+		},
+		reflect.Int32:  {input: int32(-12), zero: int32(0)},
+		reflect.Uint64: {input: uint64(4567), zero: uint64(0)},
+		reflect.String: {input: "foobar", zero: ""},
+		reflect.Slice:  {input: []bool{true, false, true, false, true}, zero: []bool(nil)}}
+
+	cases := []struct {
+		kind      reflect.Kind
+		tagNumber int
+		fieldName string
+	}{
+		{kind: reflect.Ptr, tagNumber: int(testprotos.E_Xtm.Field), fieldName: testprotos.E_Xtm.Name},
+		{kind: reflect.Int32, tagNumber: int(testprotos.E_Xi.Field), fieldName: testprotos.E_Xi.Name},
+		{kind: reflect.Uint64, tagNumber: int(testprotos.E_Xui.Field), fieldName: testprotos.E_Xui.Name},
+		{kind: reflect.String, tagNumber: int(testprotos.E_Xs.Field), fieldName: testprotos.E_Xs.Name},
+		{kind: reflect.Slice, tagNumber: int(testprotos.E_TestMessage_NestedMessage_AnotherNestedMessage_Flags.Field),
+			fieldName: testprotos.E_TestMessage_NestedMessage_AnotherNestedMessage_Flags.Name},
+	}
+
+	for _, c := range cases {
+		zero := inputs[c.kind].zero
+
+		for k, i := range inputs {
+			// First run the case using Try* methods
+
+			v, err := dm.TryGetFieldByName(c.fieldName)
+			testutil.Ok(t, err)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+
+			err = dm.TrySetFieldByName(c.fieldName, i.input)
+			if k == c.kind && err != nil {
+				t.Errorf("Not expecting an error assigning a %v to a %v (%v): %s", k, c.kind, c, err.Error())
+			} else if k != c.kind && err == nil {
+				t.Errorf("Expecting an error assigning a %v to a %v", k, c.kind)
+			} else if k == c.kind {
+				// make sure value stuck
+				v, err = dm.TryGetFieldByName(c.fieldName)
+				testutil.Ok(t, err)
+				testutil.Eq(t, i.input, v)
+			}
+
+			err = dm.TryClearFieldByName(c.fieldName)
+			testutil.Ok(t, err)
+
+			v, err = dm.TryGetFieldByName(c.fieldName)
+			testutil.Ok(t, err)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+
+			// Now we do it again using the non-Try* methods (e.g. the ones that panic)
+
+			v = dm.GetFieldByName(c.fieldName)
+			if c.kind == reflect.Ptr {
+				testutil.Ceq(t, zero, v, eqm)
+			} else {
+				testutil.Eq(t, zero, v)
+			}
+
+			err = catchPanic(func() { dm.SetFieldByName(c.fieldName, i.input) })
+			if k == c.kind && err != nil {
+				t.Errorf("Not expecting an error assigning a %v to a %v (%v): %s", k, c.kind, c, err.Error())
+			} else if k != c.kind && err == nil {
+				t.Errorf("Expecting an error assigning a %v to a %v", k, c.kind)
+			} else if k == c.kind {
+				// make sure value stuck
+				v = dm.GetFieldByName(c.fieldName)
+				testutil.Eq(t, i.input, v)
+			}
+
+			dm.ClearFieldByName(c.fieldName)
+
+			v = dm.GetFieldByName(c.fieldName)
 			if c.kind == reflect.Ptr {
 				testutil.Ceq(t, zero, v, eqm)
 			} else {
