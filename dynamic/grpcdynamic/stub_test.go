@@ -67,7 +67,7 @@ func TestMain(m *testing.M) {
 }
 
 var payload = &grpc_testing.Payload{
-	Type: grpc_testing.PayloadType_RANDOM.Enum(),
+	Type: grpc_testing.PayloadType_RANDOM,
 	Body: []byte{3, 14, 159, 2, 65, 35, 9},
 }
 

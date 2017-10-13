@@ -81,7 +81,7 @@
 // namespace, they must be added to a file that has the right package name.
 //
 //
-// Builder Pattern, Method Chaining
+// Builder Pattern and Method Chaining
 //
 // Each descriptor has some special fields that can only be updated via a Set*
 // method. They also all have some exported fields that can be updated by just
@@ -105,7 +105,7 @@
 // used with inputs that fail validation, the Set* method will panic.
 //
 //
-// Type References and "Imported Types"
+// Type References and Imported Types
 //
 // When defining fields whose type is a message or enum and when defining
 // methods (whose request and response type are a message), the type can be set
@@ -129,7 +129,7 @@
 // explicitly assigned to a file, but not both to the same file.
 //
 //
-// Validations, Caveats
+// Validations and Caveats
 //
 // Descriptors that are attained from a builder do not necessarily represent a
 // valid construct in the proto source language. There are some validations

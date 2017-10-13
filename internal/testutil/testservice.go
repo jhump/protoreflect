@@ -3,7 +3,6 @@ package testutil
 import (
 	"io"
 
-	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/test/grpc_testing"
 )
@@ -43,7 +42,7 @@ func (_ TestService) StreamingInputCall(ss grpc_testing.TestService_StreamingInp
 		sz += len(req.Payload.GetBody())
 	}
 	return ss.SendAndClose(&grpc_testing.StreamingInputCallResponse{
-		AggregatedPayloadSize: proto.Int(sz),
+		AggregatedPayloadSize: int32(sz),
 	})
 }
 
