@@ -106,12 +106,27 @@ func (m *Message) GetKnownFields() []*desc.FieldDescriptor {
 	if len(m.extraFields) == 0 {
 		return m.md.GetFields()
 	}
-	flds := make([]*desc.FieldDescriptor, len(m.md.GetFields())+len(m.extraFields))
+	flds := make([]*desc.FieldDescriptor, len(m.md.GetFields()), len(m.md.GetFields())+len(m.extraFields))
 	copy(flds, m.md.GetFields())
 	for _, fld := range m.extraFields {
-		flds = append(flds, fld)
+		if !fld.IsExtension() {
+			flds = append(flds, fld)
+		}
 	}
 	return flds
+}
+
+func (m *Message) GetKnownExtensions() []*desc.FieldDescriptor {
+	if !m.md.IsExtendable() {
+		return nil
+	}
+	exts := m.er.AllExtensionsForType(m.md.GetFullyQualifiedName())
+	for _, fld := range m.extraFields {
+		if fld.IsExtension() {
+			exts = append(exts, fld)
+		}
+	}
+	return exts
 }
 
 func (m *Message) GetUnknownFields() []int32 {
@@ -458,11 +473,20 @@ func (m *Message) internalSetField(fd *desc.FieldDescriptor, val interface{}) {
 				}
 				return
 			}
-		} else if fd.GetDefaultValue() == val {
-			if m.values != nil {
-				delete(m.values, fd.GetNumber())
+		} else {
+			// can't compare slices, so we have to special-case []byte values
+			var equal bool
+			if b, ok := val.([]byte); ok {
+				equal = ok && bytes.Equal(b, fd.GetDefaultValue().([]byte))
+			} else {
+				equal = fd.GetDefaultValue() == val
 			}
-			return
+			if equal {
+				if m.values != nil {
+					delete(m.values, fd.GetNumber())
+				}
+				return
+			}
 		}
 	}
 	if m.values == nil {
@@ -1847,18 +1871,29 @@ func (m *Message) knownFieldTags() []int {
 	return keys
 }
 
-// allKnownFieldTags return tags of present and recognized fields, including those that are unset, in sorted order.
+// allKnownFieldTags return tags of present and recognized fields, including
+// those that are unset, in sorted order. This only includes extensions that are
+// present. Known but not-present extensions are not included in the returned
+// set of tags.
 func (m *Message) allKnownFieldTags() []int {
 	fds := m.md.GetFields()
-	keys := make([]int, len(fds))
+	keys := make([]int, 0, len(fds)+len(m.extraFields))
 
-	for i, fd := range fds {
-		keys[i] = int(fd.GetNumber())
+	for k := range m.values {
+		keys = append(keys, int(k))
 	}
 
-	for _, fd := range m.extraFields {
-		if !fd.IsExtension() {
+	// also include known fields that are not present
+	for _, fd := range fds {
+		if _, ok := m.values[fd.GetNumber()]; !ok {
 			keys = append(keys, int(fd.GetNumber()))
+		}
+	}
+	for _, fd := range m.extraFields {
+		if !fd.IsExtension() { // skip extensions that are not present
+			if _, ok := m.values[fd.GetNumber()]; !ok {
+				keys = append(keys, int(fd.GetNumber()))
+			}
 		}
 	}
 

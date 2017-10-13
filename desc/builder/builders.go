@@ -50,7 +50,7 @@ type Builder interface {
 	// return all of its top-level messages, enums, extensions, and services. A
 	// message will return all of its fields as well as nested messages, enums,
 	// and extensions, etc. Children will generally be grouped by type and,
-	// within a group, in the same order as the children were adde to their
+	// within a group, in the same order as the children were added to their
 	// parent.
 	GetChildren() []Builder
 
@@ -468,6 +468,9 @@ func (fb *FileBuilder) GetName() string {
 	return fb.name
 }
 
+// SetName changes this file's name, returning the file for method chaining. If
+// there is an error that prevents the rename from succeeding, this method will
+// panic.
 func (fb *FileBuilder) SetName(newName string) *FileBuilder {
 	fb.name = newName
 	return fb
@@ -488,6 +491,7 @@ func (fb *FileBuilder) setParent(parent Builder) {
 	}
 }
 
+// GetFile implements the Builder interface and always returns this file.
 func (fb *FileBuilder) GetFile() *FileBuilder {
 	return fb
 }
@@ -580,12 +584,15 @@ func (fb *FileBuilder) GetMessage(name string) *MessageBuilder {
 }
 
 // RemoveMessage removes the top-level message with the given name. If no such
-// message exists in the file, this is a no-op.
+// message exists in the file, this is a no-op. This returns the file builder,
+// for method chaining.
 func (fb *FileBuilder) RemoveMessage(name string) *FileBuilder {
 	fb.TryRemoveMessage(name)
 	return fb
 }
 
+// TryRemoveMessage removes the top-level message with the given name and
+// returns false if the file has no such message.
 func (fb *FileBuilder) TryRemoveMessage(name string) bool {
 	b := fb.symbols[name]
 	if mb, ok := b.(*MessageBuilder); ok {
@@ -595,7 +602,9 @@ func (fb *FileBuilder) TryRemoveMessage(name string) bool {
 	return false
 }
 
-// AddMessage adds the given message to this file.
+// AddMessage adds the given message to this file. If an error prevents the
+// message from being added, this method panics. This returns the file builder,
+// for method chaining.
 func (fb *FileBuilder) AddMessage(mb *MessageBuilder) *FileBuilder {
 	if err := fb.TryAddMessage(mb); err != nil {
 		panic(err)
@@ -603,6 +612,9 @@ func (fb *FileBuilder) AddMessage(mb *MessageBuilder) *FileBuilder {
 	return fb
 }
 
+// TryAddMessage adds the given message to this file, returning any error that
+// prevents the message from being added (such as a name collision with another
+// element already added to the file).
 func (fb *FileBuilder) TryAddMessage(mb *MessageBuilder) error {
 	if err := fb.addSymbol(mb); err != nil {
 		return err
@@ -613,6 +625,8 @@ func (fb *FileBuilder) TryAddMessage(mb *MessageBuilder) error {
 	return nil
 }
 
+// GetExtension returns the top-level extension with the given name. If no such
+// extension exists in the file, nil is returned.
 func (fb *FileBuilder) GetExtension(name string) *FieldBuilder {
 	b := fb.symbols[name]
 	if exb, ok := b.(*FieldBuilder); ok {
@@ -622,11 +636,16 @@ func (fb *FileBuilder) GetExtension(name string) *FieldBuilder {
 	}
 }
 
+// RemoveExtension removes the top-level extension with the given name. If no
+// such extension exists in the file, this is a no-op. This returns the file
+// builder, for method chaining.
 func (fb *FileBuilder) RemoveExtension(name string) *FileBuilder {
 	fb.TryRemoveExtension(name)
 	return fb
 }
 
+// TryRemoveExtension removes the top-level extension with the given name and
+// returns false if the file has no such extension.
 func (fb *FileBuilder) TryRemoveExtension(name string) bool {
 	b := fb.symbols[name]
 	if exb, ok := b.(*FieldBuilder); ok {
@@ -636,6 +655,9 @@ func (fb *FileBuilder) TryRemoveExtension(name string) bool {
 	return false
 }
 
+// AddExtension adds the given extension to this file. If an error prevents the
+// extension from being added, this method panics. This returns the file
+// builder, for method chaining.
 func (fb *FileBuilder) AddExtension(exb *FieldBuilder) *FileBuilder {
 	if err := fb.TryAddExtension(exb); err != nil {
 		panic(err)
@@ -643,6 +665,9 @@ func (fb *FileBuilder) AddExtension(exb *FieldBuilder) *FileBuilder {
 	return fb
 }
 
+// TryAddExtension adds the given extension to this file, returning any error
+// that prevents the extension from being added (such as a name collision with
+// another element already added to the file).
 func (fb *FileBuilder) TryAddExtension(exb *FieldBuilder) error {
 	if !exb.IsExtension() {
 		return fmt.Errorf("field %s is not an extension", exb.GetName())
@@ -656,6 +681,8 @@ func (fb *FileBuilder) TryAddExtension(exb *FieldBuilder) error {
 	return nil
 }
 
+// GetEnum returns the top-level enum with the given name. If no such enum
+// exists in the file, nil is returned.
 func (fb *FileBuilder) GetEnum(name string) *EnumBuilder {
 	b := fb.symbols[name]
 	if eb, ok := b.(*EnumBuilder); ok {
@@ -665,11 +692,16 @@ func (fb *FileBuilder) GetEnum(name string) *EnumBuilder {
 	}
 }
 
+// RemoveEnum removes the top-level enum with the given name. If no such enum
+// exists in the file, this is a no-op. This returns the file builder, for
+// method chaining.
 func (fb *FileBuilder) RemoveEnum(name string) *FileBuilder {
 	fb.TryRemoveEnum(name)
 	return fb
 }
 
+// TryRemoveEnum removes the top-level enum with the given name and returns
+// false if the file has no such enum.
 func (fb *FileBuilder) TryRemoveEnum(name string) bool {
 	b := fb.symbols[name]
 	if eb, ok := b.(*EnumBuilder); ok {
@@ -679,6 +711,9 @@ func (fb *FileBuilder) TryRemoveEnum(name string) bool {
 	return false
 }
 
+// AddEnum adds the given enum to this file. If an error prevents the enum from
+// being added, this method panics. This returns the file builder, for method
+// chaining.
 func (fb *FileBuilder) AddEnum(eb *EnumBuilder) *FileBuilder {
 	if err := fb.TryAddEnum(eb); err != nil {
 		panic(err)
@@ -686,6 +721,9 @@ func (fb *FileBuilder) AddEnum(eb *EnumBuilder) *FileBuilder {
 	return fb
 }
 
+// TryAddEnum adds the given enum to this file, returning any error that
+// prevents the enum from being added (such as a name collision with another
+// element already added to the file).
 func (fb *FileBuilder) TryAddEnum(eb *EnumBuilder) error {
 	if err := fb.addSymbol(eb); err != nil {
 		return err
@@ -696,6 +734,8 @@ func (fb *FileBuilder) TryAddEnum(eb *EnumBuilder) error {
 	return nil
 }
 
+// GetService returns the top-level service with the given name. If no such
+// service exists in the file, nil is returned.
 func (fb *FileBuilder) GetService(name string) *ServiceBuilder {
 	b := fb.symbols[name]
 	if sb, ok := b.(*ServiceBuilder); ok {
@@ -705,11 +745,16 @@ func (fb *FileBuilder) GetService(name string) *ServiceBuilder {
 	}
 }
 
+// RemoveService removes the top-level service with the given name. If no such
+// service exists in the file, this is a no-op. This returns the file builder,
+// for method chaining.
 func (fb *FileBuilder) RemoveService(name string) *FileBuilder {
 	fb.TryRemoveService(name)
 	return fb
 }
 
+// TryRemoveService removes the top-level service with the given name and
+// returns false if the file has no such service.
 func (fb *FileBuilder) TryRemoveService(name string) bool {
 	b := fb.symbols[name]
 	if sb, ok := b.(*ServiceBuilder); ok {
@@ -719,6 +764,9 @@ func (fb *FileBuilder) TryRemoveService(name string) bool {
 	return false
 }
 
+// AddService adds the given service to this file. If an error prevents the
+// service from being added, this method panics. This returns the file builder,
+// for method chaining.
 func (fb *FileBuilder) AddService(sb *ServiceBuilder) *FileBuilder {
 	if err := fb.TryAddService(sb); err != nil {
 		panic(err)
@@ -726,6 +774,9 @@ func (fb *FileBuilder) AddService(sb *ServiceBuilder) *FileBuilder {
 	return fb
 }
 
+// TryAddService adds the given service to this file, returning any error that
+// prevents the service from being added (such as a name collision with another
+// element already added to the file).
 func (fb *FileBuilder) TryAddService(sb *ServiceBuilder) error {
 	if err := fb.addSymbol(sb); err != nil {
 		return err
@@ -736,16 +787,22 @@ func (fb *FileBuilder) TryAddService(sb *ServiceBuilder) error {
 	return nil
 }
 
+// SetOptions sets the file options for this file and returns the file, for
+// method chaining.
 func (fb *FileBuilder) SetOptions(options *dpb.FileOptions) *FileBuilder {
 	fb.Options = options
 	return fb
 }
 
+// SetPackageName sets the name of the package for this file and returns the
+// file, for method chaining.
 func (fb *FileBuilder) SetPackageName(pkg string) *FileBuilder {
 	fb.Package = pkg
 	return fb
 }
 
+// SetProto3 sets whether this file is declared to use "proto3" syntax or not
+// and returns the file, for method chaining.
 func (fb *FileBuilder) SetProto3(isProto3 bool) *FileBuilder {
 	fb.IsProto3 = isProto3
 	return fb
@@ -813,7 +870,10 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 	}, nil
 }
 
-// Build contructs a file descriptor based on the contents of this file builder.
+// Build constructs a file descriptor based on the contents of this file
+// builder. If there are any problems constructing the descriptor, including
+// resolving symbols referenced by the builder or failing to meet certain
+// validation rules, an error is returned.
 func (fb *FileBuilder) Build() (*desc.FileDescriptor, error) {
 	return newResolver().resolveElement(fb, nil)
 }
@@ -840,10 +900,10 @@ type MessageBuilder struct {
 	symbols          map[string]Builder
 }
 
-// NewMessage creates a new MessageBuilder for a message with the given
-// name. Since the new message has no parent element, it also has no package
-// name (e.g. it is in the unnamed package, until it is assigned to a file
-// builder that defines a package name).
+// NewMessage creates a new MessageBuilder for a message with the given name.
+// Since the new message has no parent element, it also has no package name
+// (e.g. it is in the unnamed package, until it is assigned to a file builder
+// that defines a package name).
 func NewMessage(name string) *MessageBuilder {
 	return &MessageBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -852,10 +912,10 @@ func NewMessage(name string) *MessageBuilder {
 	}
 }
 
-// FromMessage returns a MessageBuilder that is effectively a copy of the
-// given descriptor.
+// FromMessage returns a MessageBuilder that is effectively a copy of the given
+// descriptor.
 //
-// Note that is is not just the given message that is copied but its entire
+// Note that it is not just the given message that is copied but its entire
 // file. So the caller can get the parent element of the returned builder and
 // the result would be a builder that is effectively a copy of the message
 // descriptor's parent.
@@ -938,6 +998,9 @@ func fromMessage(md *desc.MessageDescriptor,
 	return mb, nil
 }
 
+// SetName changes this message's name, returning the message for method
+// chaining. If there is an error that prevents the rename from succeeding, this
+// method will panic.
 func (mb *MessageBuilder) SetName(newName string) *MessageBuilder {
 	if err := mb.TrySetName(newName); err != nil {
 		panic(err)
@@ -1063,6 +1126,9 @@ func (mb *MessageBuilder) registerField(flb *FieldBuilder) error {
 	return nil
 }
 
+// GetField returns the field with the given name. If no such field exists in
+// the message, nil is returned. The field does not have to be an immediate
+// child of this message but could instead be an indirect child via a one-of.
 func (mb *MessageBuilder) GetField(name string) *FieldBuilder {
 	b := mb.symbols[name]
 	if flb, ok := b.(*FieldBuilder); ok && !flb.IsExtension() {
@@ -1072,11 +1138,18 @@ func (mb *MessageBuilder) GetField(name string) *FieldBuilder {
 	}
 }
 
+// RemoveField removes the field with the given name. If no such field exists in
+// the message, this is a no-op. If the field is part of a one-of, the one-of
+// remains assigned to this message and the field is removed from it. This
+// returns the message builder, for method chaining.
 func (mb *MessageBuilder) RemoveField(name string) *MessageBuilder {
 	mb.TryRemoveField(name)
 	return mb
 }
 
+// TryRemoveField removes the field with the given name and returns false if the
+// message has no such field. If the field is part of a one-of, the one-of
+// remains assigned to this message and the field is removed from it.
 func (mb *MessageBuilder) TryRemoveField(name string) bool {
 	b := mb.symbols[name]
 	if flb, ok := b.(*FieldBuilder); ok && !flb.IsExtension() {
@@ -1087,6 +1160,9 @@ func (mb *MessageBuilder) TryRemoveField(name string) bool {
 	return false
 }
 
+// AddField adds the given field to this message. If an error prevents the field
+// from being added, this method panics. If the given field is an extension,
+// this method panics. This returns the message builder, for method chaining.
 func (mb *MessageBuilder) AddField(flb *FieldBuilder) *MessageBuilder {
 	if err := mb.TryAddField(flb); err != nil {
 		panic(err)
@@ -1094,6 +1170,10 @@ func (mb *MessageBuilder) AddField(flb *FieldBuilder) *MessageBuilder {
 	return mb
 }
 
+// TryAddField adds the given field to this message, returning any error that
+// prevents the field from being added (such as a name collision with another
+// element already added to the message). An error is returned if the given
+// field is an extension field.
 func (mb *MessageBuilder) TryAddField(flb *FieldBuilder) error {
 	if flb.IsExtension() {
 		return fmt.Errorf("field %s is an extension, not a regular field", flb.GetName())
@@ -1118,6 +1198,8 @@ func (mb *MessageBuilder) TryAddField(flb *FieldBuilder) error {
 	return nil
 }
 
+// GetOneOf returns the one-of with the given name. If no such one-of exists in
+// the message, nil is returned.
 func (mb *MessageBuilder) GetOneOf(name string) *OneOfBuilder {
 	b := mb.symbols[name]
 	if oob, ok := b.(*OneOfBuilder); ok {
@@ -1127,11 +1209,16 @@ func (mb *MessageBuilder) GetOneOf(name string) *OneOfBuilder {
 	}
 }
 
+// RemoveOneOf removes the one-of with the given name. If no such one-of exists
+// in the message, this is a no-op. This returns the message builder, for method
+// chaining.
 func (mb *MessageBuilder) RemoveOneOf(name string) *MessageBuilder {
 	mb.TryRemoveOneOf(name)
 	return mb
 }
 
+// TryRemoveOneOf removes the one-of with the given name and returns false if
+// the message has no such one-of.
 func (mb *MessageBuilder) TryRemoveOneOf(name string) bool {
 	b := mb.symbols[name]
 	if oob, ok := b.(*OneOfBuilder); ok {
@@ -1141,6 +1228,9 @@ func (mb *MessageBuilder) TryRemoveOneOf(name string) bool {
 	return false
 }
 
+// AddOneOf adds the given one-of to this message. If an error prevents the
+// one-of from being added, this method panics. This returns the message
+// builder, for method chaining.
 func (mb *MessageBuilder) AddOneOf(oob *OneOfBuilder) *MessageBuilder {
 	if err := mb.TryAddOneOf(oob); err != nil {
 		panic(err)
@@ -1148,6 +1238,9 @@ func (mb *MessageBuilder) AddOneOf(oob *OneOfBuilder) *MessageBuilder {
 	return mb
 }
 
+// TryAddOneOf adds the given one-of to this message, returning any error that
+// prevents the one-of from being added (such as a name collision with another
+// element already added to the message).
 func (mb *MessageBuilder) TryAddOneOf(oob *OneOfBuilder) error {
 	if err := mb.addSymbol(oob); err != nil {
 		return err
@@ -1172,6 +1265,12 @@ func (mb *MessageBuilder) TryAddOneOf(oob *OneOfBuilder) error {
 	return nil
 }
 
+// GetNestedMessage returns the nested message with the given name. If no such
+// message exists, nil is returned. The named message must be in this message's
+// scope. If the message is nested more deeply, this will return nil. This means
+// the message must be a direct child of this message or a child of one of this
+// message's fields (e.g. the group type for a group field or a map entry for a
+// map field).
 func (mb *MessageBuilder) GetNestedMessage(name string) *MessageBuilder {
 	b := mb.symbols[name]
 	if nmb, ok := b.(*MessageBuilder); ok {
@@ -1181,20 +1280,33 @@ func (mb *MessageBuilder) GetNestedMessage(name string) *MessageBuilder {
 	}
 }
 
+// RemoveNestedMessage removes the nested message with the given name. If no
+// such message exists, this is a no-op. This returns the message builder, for
+// method chaining.
 func (mb *MessageBuilder) RemoveNestedMessage(name string) *MessageBuilder {
 	mb.TryRemoveNestedMessage(name)
 	return mb
 }
 
+// TryRemoveNestedMessage removes the nested message with the given name and
+// returns false if this message has no nested message with that name. If the
+// named message is a child of a field (e.g. the group type for a group field or
+// the map entry for a map field), it is removed from that field and thus
+// removed from this message's scope.
 func (mb *MessageBuilder) TryRemoveNestedMessage(name string) bool {
 	b := mb.symbols[name]
 	if nmb, ok := b.(*MessageBuilder); ok {
-		mb.removeChild(nmb)
+		// parent could be mb, but could also be a field (if the message
+		// is the field's group or map entry type)
+		nmb.GetParent().removeChild(nmb)
 		return true
 	}
 	return false
 }
 
+// AddNestedMessage adds the given message as nested child of this message. If
+// an error prevents the message from being added, this method panics. This
+// returns the message builder, for method chaining.
 func (mb *MessageBuilder) AddNestedMessage(nmb *MessageBuilder) *MessageBuilder {
 	if err := mb.TryAddNestedMessage(nmb); err != nil {
 		panic(err)
@@ -1202,6 +1314,9 @@ func (mb *MessageBuilder) AddNestedMessage(nmb *MessageBuilder) *MessageBuilder 
 	return mb
 }
 
+// TryAddNestedMessage adds the given message as a nested child of this message,
+// returning any error that prevents the message from being added (such as a
+// name collision with another element already added to the message).
 func (mb *MessageBuilder) TryAddNestedMessage(nmb *MessageBuilder) error {
 	// If we are moving nested message from field (map entry or group type)
 	// directly to this message, we have to use different order of operations
@@ -1320,10 +1435,16 @@ func (mb *MessageBuilder) SetOptions(options *dpb.MessageOptions) *MessageBuilde
 	return mb
 }
 
+// AddExtensionRange adds the given extension range to this message. The range
+// is inclusive of both the start and end, just like defining a range in proto
+// IDL source. This returns the message, for method chaining.
 func (mb *MessageBuilder) AddExtensionRange(start, end int32) *MessageBuilder {
 	return mb.AddExtensionRangeWithOptions(start, end, nil)
 }
 
+// AddExtensionRangeWithOptions adds the given extension range to this message.
+// The range is inclusive of both the start and end, just like defining a range
+// in proto IDL source. This returns the message, for method chaining.
 func (mb *MessageBuilder) AddExtensionRangeWithOptions(start, end int32, options *dpb.ExtensionRangeOptions) *MessageBuilder {
 	er := &dpb.DescriptorProto_ExtensionRange{
 		Start:   proto.Int32(start),
@@ -1334,11 +1455,19 @@ func (mb *MessageBuilder) AddExtensionRangeWithOptions(start, end int32, options
 	return mb
 }
 
+// SetExtensionRanges replaces all of this message's extension ranges with the
+// given slice of ranges. Unlike AddExtensionRange and unlike the way ranges are
+// defined in proto IDL source, a DescriptorProto_ExtensionRange struct treats
+// the end of the range as *exclusive*. So the range is inclusive of the start
+// but exclusive of the end. This returns the message, for method chaining.
 func (mb *MessageBuilder) SetExtensionRanges(ranges []*dpb.DescriptorProto_ExtensionRange) *MessageBuilder {
 	mb.ExtensionRanges = ranges
 	return mb
 }
 
+// AddReservedRange adds the given reserved range to this message. The range is
+// inclusive of both the start and end, just like defining a range in proto IDL
+// source. This returns the message, for method chaining.
 func (mb *MessageBuilder) AddReservedRange(start, end int32) *MessageBuilder {
 	rr := &dpb.DescriptorProto_ReservedRange{
 		Start: proto.Int32(start),
@@ -1348,16 +1477,25 @@ func (mb *MessageBuilder) AddReservedRange(start, end int32) *MessageBuilder {
 	return mb
 }
 
+// SetReservedRanges replaces all of this message's reserved ranges with the
+// given slice of ranges. Unlike AddReservedRange and unlike the way ranges are
+// defined in proto IDL source, a DescriptorProto_ReservedRange struct treats
+// the end of the range as *exclusive*. So the range is inclusive of the start
+// but exclusive of the end. This returns the message, for method chaining.
 func (mb *MessageBuilder) SetReservedRanges(ranges []*dpb.DescriptorProto_ReservedRange) *MessageBuilder {
 	mb.ReservedRanges = ranges
 	return mb
 }
 
+// AddReservedName adds the given name to the list of reserved field names for
+// this message. This returns the message, for method chaining.
 func (mb *MessageBuilder) AddReservedName(name string) *MessageBuilder {
 	mb.ReservedNames = append(mb.ReservedNames, name)
 	return mb
 }
 
+// SetReservedNames replaces all of this message's reserved field names with the
+// given slice of names. This returns the message, for method chaining.
 func (mb *MessageBuilder) SetReservedNames(names []string) *MessageBuilder {
 	mb.ReservedNames = names
 	return mb
@@ -1474,6 +1612,10 @@ func (mb *MessageBuilder) buildProto() (*dpb.DescriptorProto, error) {
 	}, nil
 }
 
+// Build constructs a message descriptor based on the contents of this message
+// builder. If there are any problems constructing the descriptor, including
+// resolving symbols referenced by the builder or failing to meet certain
+// validation rules, an error is returned.
 func (mb *MessageBuilder) Build() (*desc.MessageDescriptor, error) {
 	d, err := doBuild(mb)
 	if err != nil {
