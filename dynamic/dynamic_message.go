@@ -434,11 +434,20 @@ func (m *Message) internalSetField(fd *desc.FieldDescriptor, val interface{}) {
 				}
 				return
 			}
-		} else if fd.GetDefaultValue() == val {
-			if m.values != nil {
-				delete(m.values, fd.GetNumber())
+		} else {
+			// can't compare slices, so we have to special-case []byte values
+			var equal bool
+			if b, ok := val.([]byte); ok {
+				equal = ok && bytes.Equal(b, fd.GetDefaultValue().([]byte))
+			} else {
+				equal = fd.GetDefaultValue() == val
 			}
-			return
+			if equal {
+				if m.values != nil {
+					delete(m.values, fd.GetNumber())
+				}
+				return
+			}
 		}
 	}
 	if m.values == nil {
