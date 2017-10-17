@@ -721,7 +721,8 @@ func (m *Message) putMapField(fd *desc.FieldDescriptor, key interface{}, val int
 			return err
 		} else if mp == nil {
 			mp = map[interface{}]interface{}{}
-			m.internalSetField(fd, mp)
+			m.internalSetField(fd, map[interface{}]interface{}{ki: vi})
+			return nil
 		}
 	}
 	mp.(map[interface{}]interface{})[ki] = vi
