@@ -488,8 +488,8 @@ func asGroupDescriptor(lex protoLexer, label dpb.FieldDescriptorProto_Label, nam
 }
 
 func asMapField(keyType, valType, name string, tag int32, opts []*dpb.UninterpretedOption) *groupDesc {
-	keyFd := asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), keyType, "key", 1, nil)
-	valFd := asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), valType, "value", 2, nil)
+	keyFd := asFieldDescriptor(nil, keyType, "key", 1, nil)
+	valFd := asFieldDescriptor(nil, valType, "value", 2, nil)
 	entryName := initCap(jsonName(name)) + "Entry"
 	fd := asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), entryName, name, tag, opts)
 	md := &dpb.DescriptorProto{
@@ -769,6 +769,16 @@ func basicValidate(fd *dpb.FileDescriptorProto) error {
 
 func validateMessage(fd *dpb.FileDescriptorProto, isProto3 bool, prefix string, md *dpb.DescriptorProto) error {
 	nextPrefix := md.GetName() + "."
+
+	if md.GetOptions().GetMapEntry() && !isProto3 {
+		// we build map fields without a label, but it should
+		// instead be "optional" for proto2 messages
+		for _, fld := range md.Field {
+			if fld.Label == nil {
+				fld.Label = dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
+			}
+		}
+	}
 
 	for _, fld := range md.Field {
 		if err := validateField(fd, isProto3, nextPrefix, fld); err != nil {
