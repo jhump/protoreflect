@@ -127,12 +127,14 @@ func TestLexer(t *testing.T) {
 		}
 		var val interface{}
 		switch tok {
-		case _SYNTAX, _OPTION, _INT32, _SERVICE, _RPC, _MESSAGE, _TYPENAME, _NAME, _FQNAME, _STRING_LIT:
-			val = sym.str
+		case _SYNTAX, _OPTION, _INT32, _SERVICE, _RPC, _MESSAGE, _TYPENAME, _NAME, _FQNAME:
+			val = sym.id.val
+		case _STRING_LIT:
+			val = sym.str.val
 		case _INT_LIT:
-			val = sym.ui
+			val = sym.ui.val
 		case _FLOAT_LIT:
-			val = sym.f
+			val = sym.f.val
 		default:
 			val = nil
 		}
@@ -165,8 +167,7 @@ func TestLexerErrors(t *testing.T) {
 		var sym protoSymType
 		tok := l.Lex(&sym)
 		testutil.Eq(t, _ERROR, tok)
-		err, ok := sym.u.(error)
-		testutil.Require(t, ok)
-		testutil.Require(t, strings.Contains(err.Error(), tc.errMsg), "case %d: expected message to contain %q but does not: %q", i, tc.errMsg, err.Error())
+		testutil.Require(t, sym.err != nil)
+		testutil.Require(t, strings.Contains(sym.err.Error(), tc.errMsg), "case %d: expected message to contain %q but does not: %q", i, tc.errMsg, sym.err.Error())
 	}
 }

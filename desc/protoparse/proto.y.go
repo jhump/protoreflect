@@ -7,100 +7,112 @@ import __yyfmt__ "fmt"
 import (
 	"fmt"
 	"math"
-
-	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"unicode"
 )
 
-//line proto.y:17
+//line proto.y:15
 type protoSymType struct {
-	yys      int
-	str      string
-	b        bool
-	i        int64
-	ui       uint64
-	f        float64
-	u        interface{}
-	sl       []interface{}
-	names    []string
-	agg      []*aggregate
-	fd       *dpb.FileDescriptorProto
-	msgd     *dpb.DescriptorProto
-	fldd     *dpb.FieldDescriptorProto
-	end      *dpb.EnumDescriptorProto
-	envd     *dpb.EnumValueDescriptorProto
-	sd       *dpb.ServiceDescriptorProto
-	mtd      *dpb.MethodDescriptorProto
-	opts     []*dpb.UninterpretedOption
-	optNm    []*dpb.UninterpretedOption_NamePart
-	imprt    *importSpec
-	extend   *extendBlock
-	grpd     *groupDesc
-	ood      *oneofDesc
-	fileDecs []*fileDecl
-	msgDecs  []*msgDecl
-	enDecs   []*enumDecl
-	svcDecs  []*serviceDecl
-	rpcType  *rpcType
-	resvd    *reservedFields
-	rngs     []tagRange
-	extRngs  []*dpb.DescriptorProto_ExtensionRange
+	yys       int
+	file      *fileNode
+	fileDecls []*fileElement
+	syn       *syntaxNode
+	pkg       *packageNode
+	imprt     *importNode
+	msg       *messageNode
+	msgDecls  []*messageElement
+	fld       *fieldNode
+	mapFld    *mapFieldNode
+	grp       *groupNode
+	oo        *oneOfNode
+	ooDecls   []*oneOfElement
+	ext       *extensionRangeNode
+	resvd     *reservedNode
+	en        *enumNode
+	enDecls   []*enumElement
+	env       *enumValueNode
+	extend    *extendNode
+	extDecls  []*extendElement
+	svc       *serviceNode
+	svcDecls  []*serviceElement
+	mtd       *methodNode
+	rpcType   *rpcTypeNode
+	opts      []*optionNode
+	optNm     []*optionNamePartNode
+	rngs      []*rangeNode
+	names     []*stringLiteralNode
+	sl        []valueNode
+	agg       []*aggregateEntryNode
+	aggName   *aggregateNameNode
+	v         valueNode
+	str       *stringLiteralNode
+	i         *negativeIntLiteralNode
+	ui        *intLiteralNode
+	f         *floatLiteralNode
+	id        *identNode
+	b         *basicNode
+	err       error
 }
 
-const _SYNTAX = 57346
-const _IMPORT = 57347
-const _WEAK = 57348
-const _PUBLIC = 57349
-const _PACKAGE = 57350
-const _OPTION = 57351
-const _TRUE = 57352
-const _FALSE = 57353
-const _INF = 57354
-const _NAN = 57355
-const _REPEATED = 57356
-const _OPTIONAL = 57357
-const _REQUIRED = 57358
-const _DOUBLE = 57359
-const _FLOAT = 57360
-const _INT32 = 57361
-const _INT64 = 57362
-const _UINT32 = 57363
-const _UINT64 = 57364
-const _SINT32 = 57365
-const _SINT64 = 57366
-const _FIXED32 = 57367
-const _FIXED64 = 57368
-const _SFIXED32 = 57369
-const _SFIXED64 = 57370
-const _BOOL = 57371
-const _STRING = 57372
-const _BYTES = 57373
-const _GROUP = 57374
-const _ONEOF = 57375
-const _MAP = 57376
-const _EXTENSIONS = 57377
-const _TO = 57378
-const _MAX = 57379
-const _RESERVED = 57380
-const _ENUM = 57381
-const _MESSAGE = 57382
-const _EXTEND = 57383
-const _SERVICE = 57384
-const _RPC = 57385
-const _STREAM = 57386
-const _RETURNS = 57387
-const _NAME = 57388
-const _FQNAME = 57389
-const _TYPENAME = 57390
-const _STRING_LIT = 57391
-const _INT_LIT = 57392
-const _FLOAT_LIT = 57393
+const _STRING_LIT = 57346
+const _INT_LIT = 57347
+const _FLOAT_LIT = 57348
+const _NAME = 57349
+const _FQNAME = 57350
+const _TYPENAME = 57351
+const _SYNTAX = 57352
+const _IMPORT = 57353
+const _WEAK = 57354
+const _PUBLIC = 57355
+const _PACKAGE = 57356
+const _OPTION = 57357
+const _TRUE = 57358
+const _FALSE = 57359
+const _INF = 57360
+const _NAN = 57361
+const _REPEATED = 57362
+const _OPTIONAL = 57363
+const _REQUIRED = 57364
+const _DOUBLE = 57365
+const _FLOAT = 57366
+const _INT32 = 57367
+const _INT64 = 57368
+const _UINT32 = 57369
+const _UINT64 = 57370
+const _SINT32 = 57371
+const _SINT64 = 57372
+const _FIXED32 = 57373
+const _FIXED64 = 57374
+const _SFIXED32 = 57375
+const _SFIXED64 = 57376
+const _BOOL = 57377
+const _STRING = 57378
+const _BYTES = 57379
+const _GROUP = 57380
+const _ONEOF = 57381
+const _MAP = 57382
+const _EXTENSIONS = 57383
+const _TO = 57384
+const _MAX = 57385
+const _RESERVED = 57386
+const _ENUM = 57387
+const _MESSAGE = 57388
+const _EXTEND = 57389
+const _SERVICE = 57390
+const _RPC = 57391
+const _STREAM = 57392
+const _RETURNS = 57393
 const _ERROR = 57394
 
 var protoToknames = [...]string{
 	"$end",
 	"error",
 	"$unk",
+	"_STRING_LIT",
+	"_INT_LIT",
+	"_FLOAT_LIT",
+	"_NAME",
+	"_FQNAME",
+	"_TYPENAME",
 	"_SYNTAX",
 	"_IMPORT",
 	"_WEAK",
@@ -143,28 +155,35 @@ var protoToknames = [...]string{
 	"_RPC",
 	"_STREAM",
 	"_RETURNS",
-	"_NAME",
-	"_FQNAME",
-	"_TYPENAME",
-	"_STRING_LIT",
-	"_INT_LIT",
-	"_FLOAT_LIT",
 	"_ERROR",
-	"';'",
 	"'='",
-	"'('",
-	"')'",
-	"'.'",
-	"'+'",
-	"'-'",
+	"';'",
+	"':'",
 	"'{'",
 	"'}'",
+	"'\\\\'",
+	"'/'",
+	"'?'",
+	"'.'",
 	"','",
-	"':'",
+	"'>'",
+	"'<'",
+	"'+'",
+	"'-'",
+	"'('",
+	"')'",
 	"'['",
 	"']'",
-	"'<'",
-	"'>'",
+	"'*'",
+	"'&'",
+	"'^'",
+	"'%'",
+	"'$'",
+	"'#'",
+	"'@'",
+	"'!'",
+	"'~'",
+	"'`'",
 }
 var protoStatenames = [...]string{}
 
@@ -172,7 +191,7 @@ const protoEofCode = 1
 const protoErrCode = 2
 const protoInitialStackSize = 16
 
-//line proto.y:706
+//line proto.y:847
 
 //line yacctab:1
 var protoExca = [...]int{
@@ -183,243 +202,238 @@ var protoExca = [...]int{
 
 const protoPrivate = 57344
 
-const protoLast = 1595
+const protoLast = 1545
 
 var protoAct = [...]int{
 
 	118, 8, 268, 8, 8, 361, 250, 79, 126, 111,
 	251, 257, 178, 110, 98, 28, 97, 100, 101, 154,
 	117, 147, 8, 27, 74, 136, 153, 164, 78, 96,
-	112, 177, 142, 76, 77, 156, 81, 252, 104, 156,
-	315, 196, 286, 156, 198, 364, 286, 156, 181, 353,
-	241, 195, 262, 157, 73, 195, 346, 157, 156, 195,
-	321, 157, 228, 195, 300, 157, 286, 286, 276, 339,
-	337, 229, 286, 193, 195, 335, 157, 286, 286, 286,
-	328, 317, 316, 298, 88, 286, 297, 209, 287, 354,
-	342, 137, 156, 148, 307, 309, 211, 304, 210, 306,
-	355, 343, 301, 103, 284, 308, 140, 266, 305, 356,
-	157, 16, 144, 302, 264, 285, 357, 227, 267, 303,
-	169, 105, 143, 213, 333, 265, 211, 16, 92, 232,
-	233, 234, 170, 172, 174, 91, 137, 90, 78, 74,
-	89, 352, 176, 77, 76, 151, 14, 148, 180, 15,
-	16, 140, 295, 277, 109, 150, 201, 16, 16, 344,
-	314, 186, 144, 190, 288, 199, 182, 192, 191, 73,
-	197, 363, 143, 194, 189, 166, 248, 247, 246, 365,
-	18, 17, 19, 20, 167, 245, 202, 203, 204, 205,
-	206, 207, 151, 200, 13, 4, 14, 244, 243, 15,
-	16, 363, 150, 318, 208, 230, 231, 187, 87, 23,
-	242, 238, 103, 236, 258, 235, 367, 358, 74, 349,
-	348, 347, 261, 341, 253, 240, 332, 331, 312, 152,
-	18, 17, 19, 20, 95, 94, 93, 86, 83, 255,
-	351, 163, 329, 270, 13, 160, 184, 179, 25, 26,
-	283, 282, 254, 103, 281, 280, 279, 258, 278, 161,
-	194, 158, 179, 249, 263, 261, 275, 273, 290, 85,
-	84, 292, 293, 74, 294, 74, 82, 291, 296, 161,
-	162, 212, 116, 158, 159, 115, 11, 3, 11, 11,
-	21, 24, 310, 74, 74, 194, 121, 311, 146, 113,
-	10, 299, 10, 10, 103, 135, 256, 11, 141, 322,
-	74, 119, 324, 74, 103, 326, 74, 323, 313, 194,
-	325, 10, 120, 327, 6, 165, 114, 9, 319, 9,
-	9, 330, 360, 169, 5, 169, 345, 169, 22, 149,
-	12, 138, 270, 259, 1, 183, 272, 334, 9, 102,
-	350, 74, 155, 214, 194, 7, 22, 2, 362, 0,
-	0, 362, 359, 74, 0, 0, 366, 31, 32, 33,
-	34, 35, 36, 37, 38, 39, 40, 41, 42, 43,
-	44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
-	54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
-	64, 65, 66, 67, 68, 69, 70, 71, 72, 30,
-	0, 0, 99, 105, 108, 0, 0, 0, 0, 0,
-	0, 106, 107, 104, 0, 0, 0, 0, 271, 274,
+	112, 177, 142, 76, 77, 286, 81, 252, 286, 156,
+	286, 286, 156, 364, 241, 286, 353, 354, 339, 337,
+	286, 286, 156, 335, 73, 156, 286, 298, 328, 317,
+	286, 209, 355, 156, 316, 297, 342, 156, 287, 211,
+	307, 304, 301, 284, 266, 264, 210, 352, 295, 277,
+	105, 343, 109, 309, 88, 308, 305, 302, 285, 267,
+	265, 137, 333, 148, 195, 346, 234, 195, 321, 315,
+	201, 157, 181, 103, 157, 262, 140, 195, 300, 306,
+	195, 276, 144, 193, 157, 228, 227, 157, 195, 166,
+	169, 303, 143, 229, 211, 157, 196, 104, 356, 157,
+	357, 367, 170, 172, 174, 198, 137, 16, 78, 74,
+	232, 233, 176, 77, 76, 213, 16, 148, 180, 92,
+	91, 140, 90, 89, 358, 349, 348, 347, 341, 4,
+	14, 186, 144, 15, 16, 199, 182, 192, 191, 73,
+	197, 167, 143, 194, 189, 332, 363, 16, 331, 365,
+	151, 312, 152, 95, 94, 150, 202, 203, 204, 205,
+	206, 207, 93, 200, 18, 17, 19, 20, 14, 86,
+	83, 15, 16, 13, 344, 230, 231, 314, 16, 288,
+	242, 238, 103, 236, 258, 235, 363, 248, 74, 247,
+	246, 245, 261, 244, 253, 240, 243, 208, 187, 87,
+	23, 318, 18, 17, 19, 20, 212, 351, 254, 329,
+	5, 13, 151, 270, 22, 161, 162, 150, 115, 11,
+	190, 11, 11, 103, 283, 24, 263, 258, 163, 85,
+	194, 282, 22, 25, 26, 261, 275, 273, 290, 281,
+	11, 292, 293, 74, 294, 74, 255, 291, 296, 215,
+	216, 217, 218, 219, 220, 221, 222, 223, 224, 225,
+	226, 280, 310, 74, 74, 194, 279, 311, 278, 113,
+	10, 299, 10, 10, 103, 184, 179, 161, 158, 322,
+	74, 179, 324, 74, 103, 326, 74, 323, 313, 194,
+	325, 10, 249, 327, 84, 82, 114, 9, 319, 9,
+	9, 330, 149, 169, 146, 169, 345, 169, 3, 158,
+	159, 21, 270, 12, 141, 138, 135, 334, 9, 116,
+	350, 74, 160, 121, 194, 183, 256, 120, 362, 119,
+	259, 362, 359, 74, 272, 102, 366, 99, 105, 108,
+	30, 155, 214, 31, 32, 33, 34, 35, 36, 37,
+	38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+	48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+	58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+	68, 69, 70, 71, 72, 165, 360, 7, 6, 104,
+	2, 1, 0, 0, 0, 0, 0, 274, 106, 107,
+	0, 0, 0, 271, 99, 105, 108, 30, 0, 0,
 	31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
 	41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
 	51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
 	61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
-	71, 72, 30, 0, 0, 99, 105, 108, 0, 0,
-	0, 0, 0, 0, 106, 107, 104, 0, 0, 0,
-	237, 0, 239, 31, 32, 33, 34, 35, 36, 37,
-	38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
-	48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
-	58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
-	68, 69, 70, 71, 72, 30, 0, 0, 99, 105,
-	108, 0, 0, 0, 0, 0, 0, 106, 107, 104,
-	0, 0, 0, 0, 0, 320, 31, 32, 33, 34,
+	71, 72, 0, 0, 0, 0, 104, 0, 0, 0,
+	0, 0, 0, 0, 239, 106, 107, 0, 0, 237,
+	99, 105, 108, 30, 0, 0, 31, 32, 33, 34,
 	35, 36, 37, 38, 39, 40, 41, 42, 43, 44,
 	45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
 	55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
-	65, 66, 67, 68, 69, 70, 71, 72, 30, 0,
-	0, 99, 105, 108, 0, 0, 0, 0, 0, 0,
-	106, 107, 104, 31, 32, 33, 34, 35, 131, 37,
-	38, 39, 40, 125, 124, 123, 44, 45, 46, 47,
-	48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
-	58, 59, 132, 133, 130, 63, 64, 134, 127, 128,
-	129, 69, 70, 71, 72, 30, 29, 80, 0, 0,
-	0, 0, 122, 0, 0, 0, 0, 0, 0, 0,
-	340, 31, 32, 33, 34, 35, 131, 37, 38, 39,
-	40, 125, 124, 123, 44, 45, 46, 47, 48, 49,
-	50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
-	132, 133, 130, 63, 64, 134, 127, 128, 129, 69,
-	70, 71, 72, 30, 29, 80, 0, 0, 0, 0,
-	122, 0, 0, 0, 0, 0, 0, 0, 338, 31,
-	32, 33, 34, 35, 131, 37, 38, 39, 40, 125,
-	124, 123, 44, 45, 46, 47, 48, 49, 50, 51,
-	52, 53, 54, 55, 56, 57, 58, 59, 132, 133,
-	130, 63, 64, 134, 127, 128, 129, 69, 70, 71,
-	72, 30, 29, 80, 0, 0, 0, 0, 122, 0,
-	0, 0, 0, 0, 0, 0, 336, 31, 32, 33,
-	34, 35, 131, 37, 38, 39, 40, 41, 42, 43,
-	44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
-	54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
-	64, 65, 66, 67, 68, 69, 70, 71, 72, 30,
-	29, 80, 0, 0, 0, 0, 260, 0, 0, 0,
-	0, 0, 0, 0, 289, 31, 32, 33, 34, 35,
-	36, 37, 38, 39, 40, 125, 124, 123, 44, 45,
-	46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
-	56, 57, 58, 59, 60, 61, 62, 63, 64, 65,
-	66, 67, 68, 69, 70, 71, 72, 30, 29, 80,
-	0, 0, 0, 0, 145, 0, 0, 0, 0, 0,
-	0, 0, 188, 31, 32, 33, 34, 35, 131, 37,
-	38, 39, 40, 125, 124, 123, 44, 45, 46, 47,
-	48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
-	58, 59, 132, 133, 130, 63, 64, 134, 127, 128,
-	129, 69, 70, 71, 72, 30, 29, 80, 0, 0,
-	0, 0, 122, 0, 0, 0, 0, 0, 0, 0,
-	168, 31, 32, 33, 34, 35, 131, 37, 38, 39,
-	40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
-	50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
-	60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
-	70, 71, 72, 30, 0, 0, 0, 0, 0, 0,
-	139, 0, 0, 0, 0, 0, 0, 0, 185, 31,
+	65, 66, 67, 68, 69, 70, 71, 72, 0, 0,
+	0, 0, 104, 0, 0, 0, 0, 0, 0, 0,
+	320, 106, 107, 99, 105, 108, 30, 0, 0, 31,
 	32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
 	42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
 	52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
 	62, 63, 64, 65, 66, 67, 68, 69, 70, 71,
-	72, 30, 29, 0, 0, 0, 0, 0, 0, 0,
-	75, 31, 32, 33, 34, 35, 131, 37, 38, 39,
+	72, 0, 0, 0, 0, 104, 0, 0, 0, 0,
+	0, 0, 0, 0, 106, 107, 30, 29, 0, 31,
+	32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
+	42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
+	52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
+	62, 63, 64, 65, 66, 67, 68, 69, 70, 71,
+	72, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 75, 30, 29, 80,
+	31, 32, 33, 34, 35, 131, 37, 38, 39, 40,
+	125, 124, 123, 44, 45, 46, 47, 48, 49, 50,
+	51, 52, 53, 54, 55, 56, 57, 58, 59, 132,
+	133, 130, 63, 64, 134, 127, 128, 129, 69, 70,
+	71, 72, 0, 0, 122, 0, 0, 340, 30, 29,
+	80, 31, 32, 33, 34, 35, 131, 37, 38, 39,
 	40, 125, 124, 123, 44, 45, 46, 47, 48, 49,
 	50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
 	132, 133, 130, 63, 64, 134, 127, 128, 129, 69,
-	70, 71, 72, 30, 29, 80, 0, 0, 0, 0,
-	122, 31, 32, 33, 34, 35, 131, 37, 38, 39,
-	40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
-	50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
-	60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
-	70, 71, 72, 30, 29, 80, 0, 0, 0, 0,
-	260, 31, 32, 33, 34, 35, 36, 37, 38, 39,
-	40, 125, 124, 123, 44, 45, 46, 47, 48, 49,
-	50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
-	60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
-	70, 71, 72, 30, 29, 80, 0, 0, 0, 0,
-	145, 31, 32, 33, 34, 35, 131, 37, 38, 39,
-	40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
-	50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
-	60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
-	70, 71, 72, 30, 0, 0, 0, 0, 0, 0,
-	139, 31, 32, 33, 34, 35, 36, 37, 38, 39,
-	40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
-	50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
-	60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
-	70, 269, 72, 30, 29, 80, 31, 32, 33, 34,
-	35, 36, 37, 38, 39, 40, 41, 42, 43, 44,
-	45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
-	55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
-	65, 66, 67, 68, 69, 70, 71, 72, 30, 29,
-	80, 31, 32, 33, 34, 35, 36, 37, 38, 39,
-	40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
-	50, 51, 52, 53, 54, 55, 56, 57, 58, 175,
-	60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
-	70, 71, 72, 30, 29, 80, 31, 32, 33, 34,
-	35, 36, 37, 38, 39, 40, 41, 42, 43, 44,
-	45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
-	55, 56, 57, 58, 173, 60, 61, 62, 63, 64,
-	65, 66, 67, 68, 69, 70, 71, 72, 30, 29,
-	80, 31, 32, 33, 34, 35, 36, 37, 38, 39,
-	40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
-	50, 51, 52, 53, 54, 55, 56, 57, 58, 171,
-	60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
-	70, 71, 72, 30, 29, 80, 31, 32, 33, 34,
-	35, 36, 37, 38, 39, 40, 41, 42, 43, 44,
-	45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
-	55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
-	65, 66, 67, 68, 69, 70, 71, 72, 30, 29,
+	70, 71, 72, 0, 0, 122, 0, 0, 338, 30,
+	29, 80, 31, 32, 33, 34, 35, 131, 37, 38,
+	39, 40, 125, 124, 123, 44, 45, 46, 47, 48,
+	49, 50, 51, 52, 53, 54, 55, 56, 57, 58,
+	59, 132, 133, 130, 63, 64, 134, 127, 128, 129,
+	69, 70, 71, 72, 0, 0, 122, 0, 0, 336,
+	30, 29, 80, 31, 32, 33, 34, 35, 131, 37,
+	38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+	48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+	58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+	68, 69, 70, 71, 72, 0, 0, 260, 0, 0,
+	289, 30, 29, 80, 31, 32, 33, 34, 35, 36,
+	37, 38, 39, 40, 125, 124, 123, 44, 45, 46,
+	47, 48, 49, 50, 51, 52, 53, 54, 55, 56,
+	57, 58, 59, 60, 61, 62, 63, 64, 65, 66,
+	67, 68, 69, 70, 71, 72, 0, 0, 145, 0,
+	0, 188, 30, 29, 80, 31, 32, 33, 34, 35,
+	131, 37, 38, 39, 40, 125, 124, 123, 44, 45,
+	46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
+	56, 57, 58, 59, 132, 133, 130, 63, 64, 134,
+	127, 128, 129, 69, 70, 71, 72, 0, 0, 122,
+	30, 0, 168, 31, 32, 33, 34, 35, 131, 37,
+	38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+	48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+	58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+	68, 69, 70, 71, 72, 0, 0, 139, 0, 0,
+	185, 30, 29, 80, 31, 32, 33, 34, 35, 131,
+	37, 38, 39, 40, 125, 124, 123, 44, 45, 46,
+	47, 48, 49, 50, 51, 52, 53, 54, 55, 56,
+	57, 58, 59, 132, 133, 130, 63, 64, 134, 127,
+	128, 129, 69, 70, 71, 72, 0, 0, 122, 30,
+	29, 80, 31, 32, 33, 34, 35, 131, 37, 38,
+	39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
+	49, 50, 51, 52, 53, 54, 55, 56, 57, 58,
+	59, 60, 61, 62, 63, 64, 65, 66, 67, 68,
+	69, 70, 71, 72, 0, 0, 260, 30, 29, 80,
 	31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-	41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+	125, 124, 123, 44, 45, 46, 47, 48, 49, 50,
 	51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
 	61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
-	71, 72, 30, 215, 216, 217, 218, 219, 220, 221,
-	222, 223, 224, 225, 226,
+	71, 72, 30, 0, 145, 31, 32, 33, 34, 35,
+	131, 37, 38, 39, 40, 41, 42, 43, 44, 45,
+	46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
+	56, 57, 58, 59, 60, 61, 62, 63, 64, 65,
+	66, 67, 68, 69, 70, 71, 72, 0, 0, 139,
+	30, 29, 80, 31, 32, 33, 34, 35, 36, 37,
+	38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+	48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+	58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+	68, 69, 70, 269, 72, 30, 29, 80, 31, 32,
+	33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
+	43, 44, 45, 46, 47, 48, 49, 50, 51, 52,
+	53, 54, 55, 56, 57, 58, 59, 60, 61, 62,
+	63, 64, 65, 66, 67, 68, 69, 70, 71, 72,
+	30, 29, 80, 31, 32, 33, 34, 35, 36, 37,
+	38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+	48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+	58, 175, 60, 61, 62, 63, 64, 65, 66, 67,
+	68, 69, 70, 71, 72, 30, 29, 80, 31, 32,
+	33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
+	43, 44, 45, 46, 47, 48, 49, 50, 51, 52,
+	53, 54, 55, 56, 57, 58, 173, 60, 61, 62,
+	63, 64, 65, 66, 67, 68, 69, 70, 71, 72,
+	30, 29, 80, 31, 32, 33, 34, 35, 36, 37,
+	38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+	48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+	58, 171, 60, 61, 62, 63, 64, 65, 66, 67,
+	68, 69, 70, 71, 72, 30, 29, 0, 31, 32,
+	33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
+	43, 44, 45, 46, 47, 48, 49, 50, 51, 52,
+	53, 54, 55, 56, 57, 58, 59, 60, 61, 62,
+	63, 64, 65, 66, 67, 68, 69, 70, 71, 72,
+	30, 0, 0, 31, 32, 33, 34, 35, 36, 37,
+	38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+	48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
+	58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+	68, 69, 70, 71, 72,
 }
 var protoPact = [...]int{
 
-	191, -1000, 141, 141, 155, -1000, -1000, -1000, -1000, -1000,
-	-1000, -1000, -1000, -1000, 242, 1492, 1015, 1536, 1536, 1312,
-	1536, 141, -1000, 227, 185, 221, 220, 184, -1000, -1000,
+	149, -1000, 187, 187, 177, -1000, -1000, -1000, -1000, -1000,
+	-1000, -1000, -1000, -1000, 251, 1448, 619, 1493, 1493, 1268,
+	1493, 187, -1000, 321, 146, 320, 255, 145, -1000, -1000,
 	-1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000,
 	-1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000,
 	-1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000,
 	-1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000,
-	-1000, -1000, -1000, 154, -1000, 1312, 80, 77, 75, -1000,
-	-1000, 68, 183, -1000, 182, 181, -1000, 552, 98, 1067,
-	1217, 1167, 149, -1000, -1000, -1000, 176, -1000, -1000, -1000,
-	-1000, -1000, -1000, -1000, 46, -1000, 233, 229, -1000, 127,
-	899, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000,
-	-1000, -1000, -1000, 1447, 1402, 1357, 1536, 1536, 1536, 1312,
-	212, 1015, 1536, -18, 197, 957, -1000, -1000, -1000, -1000,
-	153, 841, -1000, -1000, -1000, -1000, 102, -1000, -1000, -1000,
-	-1000, 1536, -1000, 12, -1000, -22, -1000, 1492, -1000, -1000,
-	-1000, -1000, -1000, -1000, -1000, 127, -1000, 101, -1000, -1000,
-	1536, 1536, 1536, 1536, 1536, 1536, 150, 34, -1000, 245,
-	63, 1564, 64, 9, -1000, -1000, -1000, 71, -1000, -1000,
-	-1000, -1000, 76, -1000, -1000, 46, 426, -1000, 46, -15,
-	-1000, 1312, 144, 143, 131, 124, 123, 122, 213, -1000,
-	1015, 212, 202, 1117, -10, -1000, -1000, -1000, -1000, -1000,
-	-1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, 215,
-	61, 54, 211, 209, 1267, -1000, -1000, 363, -1000, 46,
-	1, -1000, 97, 208, 206, 205, 204, 201, 200, 51,
-	23, -1000, 110, -1000, -1000, -1000, 783, -1000, -1000, -1000,
-	-1000, 1536, 1312, -1000, -1000, 1015, -1000, 1015, 96, 1312,
-	-1000, -1000, 21, -1000, 46, -3, -1000, -1000, 49, 59,
-	44, 39, 41, 35, -1000, 1015, 1015, 175, 552, -1000,
-	-1000, 106, -27, 17, 16, 158, -1000, -1000, 489, -7,
-	-1000, -1000, 1015, 1067, -1000, 1015, 1067, -1000, 1015, 1067,
-	15, -1000, -1000, -1000, 192, 1536, 174, 173, 69, -1000,
-	46, -1000, 10, 725, 5, 667, 4, 609, 170, 37,
-	105, -1000, -1000, 1267, -11, 168, -1000, 167, -1000, 166,
-	-1000, -1000, -1000, 1015, 190, 85, -1000, -1000, -1000, -1000,
-	-16, 36, 56, 164, -1000, 1015, -1000, 148, -1000, -20,
-	118, -1000, -1000, -1000, 163, -1000, -1000, -1000,
+	-1000, -1000, -1000, 176, -1000, 1268, 97, 96, 94, -1000,
+	-1000, 93, 138, -1000, 130, 129, -1000, 559, 14, 1034,
+	1175, 1130, 131, -1000, -1000, -1000, 128, -1000, -1000, -1000,
+	-1000, -1000, -1000, -1000, 60, -1000, 334, 240, -1000, 110,
+	935, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000,
+	-1000, -1000, -1000, 1403, 1358, 1313, 1493, 1493, 1493, 1268,
+	306, 619, 1493, 38, 301, 983, -1000, -1000, -1000, -1000,
+	175, 884, -1000, -1000, -1000, -1000, 193, -1000, -1000, -1000,
+	-1000, 1493, -1000, 56, -1000, 71, -1000, 1448, -1000, -1000,
+	-1000, -1000, -1000, -1000, -1000, 110, -1000, 33, -1000, -1000,
+	1493, 1493, 1493, 1493, 1493, 1493, 174, 7, -1000, 194,
+	89, 254, 62, 61, -1000, -1000, -1000, 75, -1000, -1000,
+	-1000, -1000, 29, -1000, -1000, 60, 430, -1000, 60, -26,
+	-1000, 1268, 173, 170, 168, 167, 166, 164, 317, -1000,
+	619, 306, 233, 1082, 43, -1000, -1000, -1000, -1000, -1000,
+	-1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, 252,
+	21, 20, 303, 302, 1223, -1000, -1000, 363, -1000, 60,
+	48, -1000, 11, 293, 291, 286, 264, 256, 249, 19,
+	-2, -1000, 156, -1000, -1000, -1000, 833, -1000, -1000, -1000,
+	-1000, 1493, 1268, -1000, -1000, 619, -1000, 619, 10, 1268,
+	-1000, -1000, -5, -1000, 60, 45, -1000, -1000, 18, 65,
+	17, 53, 16, 27, -1000, 619, 619, 127, 559, -1000,
+	-1000, 154, 36, -6, -11, 180, -1000, -1000, 496, 35,
+	-1000, -1000, 619, 1034, -1000, 619, 1034, -1000, 619, 1034,
+	-12, -1000, -1000, -1000, 234, 1493, 124, 121, 25, -1000,
+	60, -1000, -17, 782, -21, 731, -22, 680, 104, 12,
+	151, -1000, -1000, 1223, 32, 103, -1000, 102, -1000, 101,
+	-1000, -1000, -1000, 619, 232, 9, -1000, -1000, -1000, -1000,
+	-24, -7, 74, 100, -1000, 619, -1000, 162, -1000, -27,
+	122, -1000, -1000, -1000, 77, -1000, -1000, -1000,
 }
 var protoPgo = [...]int{
 
-	0, 15, 357, 355, 7, 8, 353, 352, 18, 17,
-	349, 29, 16, 346, 345, 14, 26, 19, 344, 326,
-	30, 343, 299, 341, 340, 339, 0, 10, 6, 5,
-	332, 37, 27, 325, 324, 285, 20, 322, 311, 334,
-	287, 9, 13, 32, 308, 11, 306, 25, 305, 21,
-	298, 2, 296, 12, 31, 282,
+	0, 421, 420, 240, 338, 418, 417, 0, 10, 6,
+	5, 416, 37, 27, 415, 29, 16, 14, 15, 7,
+	8, 372, 371, 18, 17, 365, 364, 26, 19, 30,
+	360, 359, 20, 357, 326, 9, 13, 11, 356, 355,
+	353, 12, 31, 349, 299, 25, 346, 345, 248, 32,
+	344, 343, 21, 334, 332, 2,
 }
 var protoR1 = [...]int{
 
-	0, 18, 18, 18, 18, 40, 40, 39, 39, 39,
-	39, 39, 39, 39, 39, 2, 34, 34, 34, 3,
-	4, 4, 26, 31, 31, 31, 32, 32, 33, 33,
-	11, 11, 12, 12, 12, 12, 12, 9, 9, 8,
-	10, 10, 10, 10, 10, 15, 16, 16, 16, 16,
-	17, 17, 17, 17, 17, 17, 17, 7, 7, 13,
-	13, 13, 13, 5, 5, 20, 20, 20, 20, 20,
-	20, 20, 20, 28, 28, 27, 36, 36, 36, 38,
-	46, 46, 46, 45, 45, 45, 21, 21, 37, 37,
-	6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
-	6, 6, 55, 55, 54, 54, 53, 53, 53, 52,
-	52, 14, 14, 22, 48, 48, 48, 47, 47, 47,
-	23, 23, 23, 23, 19, 42, 42, 42, 41, 41,
-	41, 41, 41, 41, 41, 41, 41, 41, 41, 35,
-	44, 44, 44, 43, 43, 43, 24, 50, 50, 50,
-	49, 49, 49, 25, 25, 51, 51, 30, 30, 30,
-	29, 29, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1,
+	0, 1, 1, 1, 1, 4, 4, 3, 3, 3,
+	3, 3, 3, 3, 3, 2, 5, 5, 5, 6,
+	19, 19, 7, 12, 12, 12, 13, 13, 14, 14,
+	15, 15, 16, 16, 16, 16, 16, 24, 24, 23,
+	25, 25, 25, 25, 25, 17, 27, 27, 27, 27,
+	28, 28, 28, 28, 28, 28, 28, 22, 22, 26,
+	26, 26, 26, 20, 20, 29, 29, 29, 29, 29,
+	29, 29, 29, 9, 9, 8, 32, 32, 32, 31,
+	38, 38, 38, 37, 37, 37, 30, 30, 33, 33,
+	21, 21, 21, 21, 21, 21, 21, 21, 21, 21,
+	21, 21, 43, 43, 42, 42, 41, 41, 41, 40,
+	40, 39, 39, 44, 46, 46, 46, 45, 45, 45,
+	47, 47, 47, 47, 34, 36, 36, 36, 35, 35,
+	35, 35, 35, 35, 35, 35, 35, 35, 35, 48,
+	50, 50, 50, 49, 49, 49, 51, 53, 53, 53,
+	52, 52, 52, 54, 54, 55, 55, 11, 11, 11,
+	10, 10, 18, 18, 18, 18, 18, 18, 18, 18,
+	18, 18, 18, 18, 18, 18, 18, 18, 18, 18,
+	18, 18, 18, 18, 18, 18, 18, 18, 18, 18,
+	18, 18, 18, 18, 18, 18, 18, 18, 18, 18,
+	18, 18, 18, 18, 18,
 }
 var protoR2 = [...]int{
 
@@ -447,43 +461,43 @@ var protoR2 = [...]int{
 }
 var protoChk = [...]int{
 
-	-1000, -18, -2, -40, 4, -39, -34, -3, -26, -19,
-	-22, -35, -24, 53, 5, 8, 9, 40, 39, 41,
-	42, -40, -39, 54, 49, 6, 7, -4, -1, 47,
-	46, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-	13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
-	23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
-	33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
-	43, 44, 45, -31, -4, 55, -1, -1, -5, -4,
-	48, -1, 49, 53, 49, 49, 53, 54, -5, 60,
-	60, 60, 60, 53, 53, 53, -11, -12, -15, 49,
-	-9, -8, -10, -1, 60, 50, 58, 59, 51, 56,
-	-42, -41, -20, -22, -19, -35, -55, -36, -26, -38,
-	-37, -52, 53, 16, 15, 14, -5, 39, 40, 41,
-	35, 9, 33, 34, 38, -48, -47, -26, -23, 53,
-	-1, -44, -43, -20, -36, 53, -50, -49, -26, -25,
-	53, 43, 53, -16, -17, -7, 46, 64, 50, 51,
-	12, 50, 51, 12, -32, -33, 48, 57, 61, -41,
-	-5, 32, -5, 32, -5, 32, -1, -54, -53, 50,
-	-1, 66, -54, -14, 49, 61, -47, 54, 61, -43,
-	61, -49, -1, 61, -17, 62, 63, -15, 66, -4,
-	-32, 55, -1, -1, -1, -1, -1, -1, 54, 53,
-	64, 62, 36, 60, -6, 19, 20, 21, 22, 23,
-	24, 25, 26, 27, 28, 29, 30, 53, 53, 62,
-	-9, -8, 58, 59, 55, -17, -12, 64, -15, 66,
-	-16, 65, -5, 54, 54, 54, 54, 54, 54, 50,
-	-28, -27, -31, -53, 50, 37, -46, -45, -26, -21,
-	53, -5, 62, 49, 53, 64, 53, 64, -51, 44,
-	-5, 65, -13, -11, 66, -16, 67, 56, 50, 50,
-	50, 50, 50, 50, 53, 64, 62, 65, 54, 61,
-	-45, -1, -5, -28, -28, 56, -5, 65, 62, -16,
-	67, 53, 64, 60, 53, 64, 60, 53, 64, 60,
-	-28, -27, 53, -11, 54, 67, 65, 65, 45, -11,
-	66, 67, -28, -42, -28, -42, -28, -42, 65, 50,
-	-1, 53, 53, 55, -16, 65, 61, 65, 61, 65,
-	61, 53, 53, 64, 54, -51, 67, 53, 53, 53,
-	-28, 50, 56, 65, 53, 64, 53, 60, 53, -28,
-	-30, -29, -26, 53, 65, 61, -29, 53,
+	-1000, -1, -2, -4, 10, -3, -5, -6, -7, -34,
+	-44, -48, -51, 54, 11, 14, 15, 46, 45, 47,
+	48, -4, -3, 53, 4, 12, 13, -19, -18, 8,
+	7, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+	19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
+	29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
+	39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
+	49, 50, 51, -12, -19, 67, -18, -18, -20, -19,
+	9, -18, 4, 54, 4, 4, 54, 53, -20, 56,
+	56, 56, 56, 54, 54, 54, -15, -16, -17, 4,
+	-24, -23, -25, -18, 56, 5, 65, 66, 6, 68,
+	-36, -35, -29, -44, -34, -48, -43, -32, -7, -31,
+	-33, -40, 54, 22, 21, 20, -20, 45, 46, 47,
+	41, 15, 39, 40, 44, -46, -45, -7, -47, 54,
+	-18, -50, -49, -29, -32, 54, -53, -52, -7, -54,
+	54, 49, 54, -27, -28, -22, 7, 69, 5, 6,
+	18, 5, 6, 18, -13, -14, 9, 61, 57, -35,
+	-20, 38, -20, 38, -20, 38, -18, -42, -41, 5,
+	-18, 64, -42, -39, 4, 57, -45, 53, 57, -49,
+	57, -52, -18, 57, -28, 62, 55, -17, 64, -19,
+	-13, 67, -18, -18, -18, -18, -18, -18, 53, 54,
+	69, 62, 42, 56, -21, 25, 26, 27, 28, 29,
+	30, 31, 32, 33, 34, 35, 36, 54, 54, 62,
+	-24, -23, 65, 66, 67, -28, -16, 69, -17, 64,
+	-27, 70, -20, 53, 53, 53, 53, 53, 53, 5,
+	-9, -8, -12, -41, 5, 43, -38, -37, -7, -30,
+	54, -20, 62, 4, 54, 69, 54, 69, -55, 50,
+	-20, 70, -26, -15, 64, -27, 63, 68, 5, 5,
+	5, 5, 5, 5, 54, 69, 62, 70, 53, 57,
+	-37, -18, -20, -9, -9, 68, -20, 70, 62, -27,
+	63, 54, 69, 56, 54, 69, 56, 54, 69, 56,
+	-9, -8, 54, -15, 53, 63, 70, 70, 51, -15,
+	64, 63, -9, -36, -9, -36, -9, -36, 70, 5,
+	-18, 54, 54, 67, -27, 70, 57, 70, 57, 70,
+	57, 54, 54, 69, 53, -55, 63, 54, 54, 54,
+	-9, 5, 68, 70, 54, 69, 54, 56, 54, -9,
+	-11, -10, -7, 54, 70, 57, -10, 54,
 }
 var protoDef = [...]int{
 
@@ -530,16 +544,16 @@ var protoTok1 = [...]int{
 	1, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-	55, 56, 3, 58, 62, 59, 57, 3, 3, 3,
-	3, 3, 3, 3, 3, 3, 3, 3, 63, 53,
-	66, 54, 67, 3, 3, 3, 3, 3, 3, 3,
-	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-	3, 64, 3, 65, 3, 3, 3, 3, 3, 3,
+	3, 3, 3, 78, 3, 76, 75, 74, 72, 3,
+	67, 68, 71, 65, 62, 66, 61, 59, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 55, 54,
+	64, 53, 63, 60, 77, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-	3, 3, 3, 60, 3, 61,
+	3, 69, 58, 70, 73, 3, 80, 3, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+	3, 3, 3, 56, 3, 57, 79,
 }
 var protoTok2 = [...]int{
 
@@ -893,872 +907,996 @@ protodefault:
 
 	case 1:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:93
+		//line proto.y:110
 		{
-			protoVAL.fd = &dpb.FileDescriptorProto{}
-			protoVAL.fd.Syntax = proto.String(protoDollar[1].str)
-			protolex.(*protoLex).res = protoVAL.fd
+			protoVAL.file = &fileNode{syntax: protoDollar[1].syn}
+			protoVAL.file.setRange(protoDollar[1].syn, protoDollar[1].syn)
+			protolex.(*protoLex).res = protoVAL.file
 		}
 	case 2:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:98
+		//line proto.y:115
 		{
-			protoVAL.fd = fileDeclsToProto(protoDollar[1].fileDecs)
-			protolex.(*protoLex).res = protoVAL.fd
+			protoVAL.file = &fileNode{decls: protoDollar[1].fileDecls}
+			if len(protoDollar[1].fileDecls) > 0 {
+				protoVAL.file.setRange(protoDollar[1].fileDecls[0], protoDollar[1].fileDecls[len(protoDollar[1].fileDecls)-1])
+			}
+			protolex.(*protoLex).res = protoVAL.file
 		}
 	case 3:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:102
+		//line proto.y:122
 		{
-			protoVAL.fd = fileDeclsToProto(protoDollar[2].fileDecs)
-			protoVAL.fd.Syntax = proto.String(protoDollar[1].str)
-			protolex.(*protoLex).res = protoVAL.fd
+			protoVAL.file = &fileNode{syntax: protoDollar[1].syn, decls: protoDollar[2].fileDecls}
+			var end node
+			if len(protoDollar[2].fileDecls) > 0 {
+				end = protoDollar[2].fileDecls[len(protoDollar[2].fileDecls)-1]
+			} else {
+				end = protoDollar[1].syn
+			}
+			protoVAL.file.setRange(protoDollar[1].syn, end)
+			protolex.(*protoLex).res = protoVAL.file
 		}
 	case 4:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:107
+		//line proto.y:133
 		{
-			protoVAL.fd = &dpb.FileDescriptorProto{}
 		}
 	case 5:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:111
+		//line proto.y:136
 		{
-			protoVAL.fileDecs = append(protoDollar[1].fileDecs, protoDollar[2].fileDecs...)
+			protoVAL.fileDecls = append(protoDollar[1].fileDecls, protoDollar[2].fileDecls...)
 		}
 	case 7:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:116
+		//line proto.y:141
 		{
-			protoVAL.fileDecs = []*fileDecl{{importSpec: protoDollar[1].imprt}}
+			protoVAL.fileDecls = []*fileElement{{imp: protoDollar[1].imprt}}
 		}
 	case 8:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:119
+		//line proto.y:144
 		{
-			protoVAL.fileDecs = []*fileDecl{{packageName: protoDollar[1].str}}
+			protoVAL.fileDecls = []*fileElement{{pkg: protoDollar[1].pkg}}
 		}
 	case 9:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:122
+		//line proto.y:147
 		{
-			protoVAL.fileDecs = []*fileDecl{{option: protoDollar[1].opts[0]}}
+			protoVAL.fileDecls = []*fileElement{{option: protoDollar[1].opts[0]}}
 		}
 	case 10:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:125
+		//line proto.y:150
 		{
-			protoVAL.fileDecs = []*fileDecl{{message: protoDollar[1].msgd}}
+			protoVAL.fileDecls = []*fileElement{{message: protoDollar[1].msg}}
 		}
 	case 11:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:128
+		//line proto.y:153
 		{
-			protoVAL.fileDecs = []*fileDecl{{enum: protoDollar[1].end}}
+			protoVAL.fileDecls = []*fileElement{{enum: protoDollar[1].en}}
 		}
 	case 12:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:131
+		//line proto.y:156
 		{
-			protoVAL.fileDecs = []*fileDecl{{extend: protoDollar[1].extend}}
+			protoVAL.fileDecls = []*fileElement{{extend: protoDollar[1].extend}}
 		}
 	case 13:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:134
+		//line proto.y:159
 		{
-			protoVAL.fileDecs = []*fileDecl{{service: protoDollar[1].sd}}
+			protoVAL.fileDecls = []*fileElement{{service: protoDollar[1].svc}}
 		}
 	case 14:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:137
+		//line proto.y:162
 		{
-			protoVAL.fileDecs = nil
+			protoVAL.fileDecls = []*fileElement{{empty: protoDollar[1].b}}
 		}
 	case 15:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:141
+		//line proto.y:166
 		{
-			if protoDollar[3].str != "proto2" && protoDollar[3].str != "proto3" {
-				protolex.Error("syntax value must be 'proto2' or 'proto3'")
+			if protoDollar[3].str.val != "proto2" && protoDollar[3].str.val != "proto3" {
+				lexError(protolex, protoDollar[3].str.start(), "syntax value must be 'proto2' or 'proto3'")
 			}
-			protoVAL.str = protoDollar[3].str
+			protoVAL.syn = &syntaxNode{syntax: protoDollar[3].str}
+			protoVAL.syn.setRange(protoDollar[1].id, protoDollar[4].b)
 		}
 	case 16:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:148
+		//line proto.y:174
 		{
-			protoVAL.imprt = &importSpec{name: protoDollar[2].str}
+			protoVAL.imprt = &importNode{name: protoDollar[2].str}
+			protoVAL.imprt.setRange(protoDollar[1].id, protoDollar[3].b)
 		}
 	case 17:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:151
+		//line proto.y:178
 		{
-			protoVAL.imprt = &importSpec{name: protoDollar[3].str, weak: true}
+			protoVAL.imprt = &importNode{name: protoDollar[3].str, weak: true}
+			protoVAL.imprt.setRange(protoDollar[1].id, protoDollar[4].b)
 		}
 	case 18:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:154
+		//line proto.y:182
 		{
-			protoVAL.imprt = &importSpec{name: protoDollar[3].str, public: true}
+			protoVAL.imprt = &importNode{name: protoDollar[3].str, public: true}
+			protoVAL.imprt.setRange(protoDollar[1].id, protoDollar[4].b)
 		}
 	case 19:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:158
+		//line proto.y:187
 		{
-			protoVAL.str = protoDollar[2].str
+			protoVAL.pkg = &packageNode{name: protoDollar[2].id}
+			protoVAL.pkg.setRange(protoDollar[1].id, protoDollar[3].b)
 		}
 	case 22:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:165
+		//line proto.y:195
 		{
-			protoVAL.opts = []*dpb.UninterpretedOption{asOption(protolex.(*protoLex), protoDollar[2].optNm, protoDollar[4].u)}
+			n := &optionNameNode{parts: protoDollar[2].optNm}
+			n.setRange(protoDollar[2].optNm[0], protoDollar[2].optNm[len(protoDollar[2].optNm)-1])
+			o := &optionNode{name: n, val: protoDollar[4].v}
+			o.setRange(protoDollar[1].id, protoDollar[5].b)
+			protoVAL.opts = []*optionNode{o}
 		}
 	case 23:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:169
+		//line proto.y:203
 		{
-			protoVAL.optNm = toNameParts(protoDollar[1].str)
+			protoVAL.optNm = toNameParts(protoDollar[1].id, 0)
 		}
 	case 24:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:172
+		//line proto.y:206
 		{
-			protoVAL.optNm = []*dpb.UninterpretedOption_NamePart{{NamePart: proto.String(protoDollar[2].str), IsExtension: proto.Bool(true)}}
+			p := &optionNamePartNode{text: protoDollar[2].id, isExtension: true}
+			p.setRange(protoDollar[1].b, protoDollar[3].b)
+			protoVAL.optNm = []*optionNamePartNode{p}
 		}
 	case 25:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:175
+		//line proto.y:211
 		{
-			on := []*dpb.UninterpretedOption_NamePart{{NamePart: proto.String(protoDollar[2].str), IsExtension: proto.Bool(true)}}
-			protoVAL.optNm = append(on, protoDollar[4].optNm...)
+			p := &optionNamePartNode{text: protoDollar[2].id, isExtension: true}
+			p.setRange(protoDollar[1].b, protoDollar[3].b)
+			ps := make([]*optionNamePartNode, 1, len(protoDollar[4].optNm)+1)
+			ps[0] = p
+			protoVAL.optNm = append(ps, protoDollar[4].optNm...)
 		}
 	case 27:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:181
+		//line proto.y:220
 		{
 			protoVAL.optNm = append(protoDollar[1].optNm, protoDollar[2].optNm...)
 		}
 	case 28:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:185
+		//line proto.y:224
 		{
-			protoVAL.optNm = toNameParts(protoDollar[1].str[1:] /* exclude leading dot */)
+			protoVAL.optNm = toNameParts(protoDollar[1].id, 1 /* exclude leading dot */)
 		}
 	case 29:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:188
+		//line proto.y:227
 		{
-			protoVAL.optNm = []*dpb.UninterpretedOption_NamePart{{NamePart: proto.String(protoDollar[3].str), IsExtension: proto.Bool(true)}}
-		}
-	case 31:
-		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:193
-		{
-			protoVAL.u = protoDollar[1].agg
+			p := &optionNamePartNode{text: protoDollar[3].id, isExtension: true}
+			p.setRange(protoDollar[2].b, protoDollar[4].b)
+			protoVAL.optNm = []*optionNamePartNode{p}
 		}
 	case 32:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:197
+		//line proto.y:236
 		{
-			protoVAL.u = protoDollar[1].str
+			protoVAL.v = protoDollar[1].str
 		}
 	case 33:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:200
+		//line proto.y:239
 		{
-			protoVAL.u = protoDollar[1].ui
+			protoVAL.v = protoDollar[1].ui
 		}
 	case 34:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:203
+		//line proto.y:242
 		{
-			protoVAL.u = protoDollar[1].i
+			protoVAL.v = protoDollar[1].i
 		}
 	case 35:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:206
+		//line proto.y:245
 		{
-			protoVAL.u = protoDollar[1].f
+			protoVAL.v = protoDollar[1].f
 		}
 	case 36:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:209
+		//line proto.y:248
 		{
-			if protoDollar[1].str == "true" {
-				protoVAL.u = true
-			} else if protoDollar[1].str == "false" {
-				protoVAL.u = false
-			} else if protoDollar[1].str == "inf" {
-				protoVAL.u = math.Inf(1)
-			} else if protoDollar[1].str == "nan" {
-				protoVAL.u = math.NaN()
+			if protoDollar[1].id.val == "true" {
+				protoVAL.v = &boolLiteralNode{basicNode: protoDollar[1].id.basicNode, val: true}
+			} else if protoDollar[1].id.val == "false" {
+				protoVAL.v = &boolLiteralNode{basicNode: protoDollar[1].id.basicNode, val: false}
+			} else if protoDollar[1].id.val == "inf" {
+				f := &floatLiteralNode{val: math.Inf(1)}
+				f.setRange(protoDollar[1].id, protoDollar[1].id)
+				protoVAL.v = f
+			} else if protoDollar[1].id.val == "nan" {
+				f := &floatLiteralNode{val: math.NaN()}
+				f.setRange(protoDollar[1].id, protoDollar[1].id)
+				protoVAL.v = f
 			} else {
-				protoVAL.u = identifier(protoDollar[1].str)
+				protoVAL.v = protoDollar[1].id
 			}
 		}
 	case 38:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:224
+		//line proto.y:267
 		{
 			protoVAL.ui = protoDollar[2].ui
 		}
 	case 39:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:228
+		//line proto.y:271
 		{
-			if protoDollar[2].ui > math.MaxInt64+1 {
-				protolex.Error(fmt.Sprintf("numeric constant %d would underflow (allowed range is %d to %d)", protoDollar[2].ui, int64(math.MinInt64), int64(math.MaxInt64)))
+			if protoDollar[2].ui.val > math.MaxInt64+1 {
+				lexError(protolex, protoDollar[2].ui.start(), fmt.Sprintf("numeric constant %d would underflow (allowed range is %d to %d)", protoDollar[2].ui.val, int64(math.MinInt64), int64(math.MaxInt64)))
 			}
-			protoVAL.i = -int64(protoDollar[2].ui)
+			protoVAL.i = &negativeIntLiteralNode{val: -int64(protoDollar[2].ui.val)}
+			protoVAL.i.setRange(protoDollar[1].b, protoDollar[2].ui)
 		}
 	case 41:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:236
+		//line proto.y:280
 		{
-			protoVAL.f = -protoDollar[2].f
+			protoVAL.f = &floatLiteralNode{val: -protoDollar[2].f.val}
+			protoVAL.f.setRange(protoDollar[1].b, protoDollar[2].f)
 		}
 	case 42:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:239
+		//line proto.y:284
 		{
-			protoVAL.f = protoDollar[2].f
+			protoVAL.f = &floatLiteralNode{val: protoDollar[2].f.val}
+			protoVAL.f.setRange(protoDollar[1].b, protoDollar[2].f)
 		}
 	case 43:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:242
+		//line proto.y:288
 		{
-			protoVAL.f = math.Inf(1)
+			protoVAL.f = &floatLiteralNode{val: math.Inf(1)}
+			protoVAL.f.setRange(protoDollar[1].b, protoDollar[2].id)
 		}
 	case 44:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:245
+		//line proto.y:292
 		{
-			protoVAL.f = math.Inf(-1)
+			protoVAL.f = &floatLiteralNode{val: math.Inf(-1)}
+			protoVAL.f.setRange(protoDollar[1].b, protoDollar[2].id)
 		}
 	case 45:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:249
+		//line proto.y:297
 		{
-			protoVAL.agg = protoDollar[2].agg
+			a := &aggregateLiteralNode{elements: protoDollar[2].agg}
+			a.setRange(protoDollar[1].b, protoDollar[3].b)
+			protoVAL.v = a
 		}
 	case 47:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:254
+		//line proto.y:304
 		{
 			protoVAL.agg = append(protoDollar[1].agg, protoDollar[2].agg...)
 		}
 	case 48:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:257
+		//line proto.y:307
 		{
 			protoVAL.agg = append(protoDollar[1].agg, protoDollar[3].agg...)
 		}
 	case 49:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:260
+		//line proto.y:310
 		{
 			protoVAL.agg = nil
 		}
 	case 50:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:264
+		//line proto.y:314
 		{
-			protoVAL.agg = []*aggregate{{name: protoDollar[1].str, val: protoDollar[3].u}}
+			a := &aggregateEntryNode{name: protoDollar[1].aggName, val: protoDollar[3].v}
+			a.setRange(protoDollar[1].aggName, protoDollar[3].v)
+			protoVAL.agg = []*aggregateEntryNode{a}
 		}
 	case 51:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:267
+		//line proto.y:319
 		{
-			protoVAL.agg = []*aggregate{{name: protoDollar[1].str, val: []interface{}(nil)}}
+			s := &sliceLiteralNode{}
+			s.setRange(protoDollar[3].b, protoDollar[4].b)
+			a := &aggregateEntryNode{name: protoDollar[1].aggName, val: s}
+			a.setRange(protoDollar[1].aggName, protoDollar[4].b)
+			protoVAL.agg = []*aggregateEntryNode{a}
 		}
 	case 52:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:270
+		//line proto.y:326
 		{
-			protoVAL.agg = []*aggregate{{name: protoDollar[1].str, val: protoDollar[4].sl}}
+			s := &sliceLiteralNode{elements: protoDollar[4].sl}
+			s.setRange(protoDollar[3].b, protoDollar[5].b)
+			a := &aggregateEntryNode{name: protoDollar[1].aggName, val: s}
+			a.setRange(protoDollar[1].aggName, protoDollar[5].b)
+			protoVAL.agg = []*aggregateEntryNode{a}
 		}
 	case 53:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:273
+		//line proto.y:333
 		{
-			protoVAL.agg = []*aggregate{{name: protoDollar[1].str, val: protoDollar[3].agg}}
+			a := &aggregateEntryNode{name: protoDollar[1].aggName, val: protoDollar[3].v}
+			a.setRange(protoDollar[1].aggName, protoDollar[3].v)
+			protoVAL.agg = []*aggregateEntryNode{a}
 		}
 	case 54:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:276
+		//line proto.y:338
 		{
-			protoVAL.agg = []*aggregate{{name: protoDollar[1].str, val: protoDollar[2].agg}}
+			a := &aggregateEntryNode{name: protoDollar[1].aggName, val: protoDollar[2].v}
+			a.setRange(protoDollar[1].aggName, protoDollar[2].v)
+			protoVAL.agg = []*aggregateEntryNode{a}
 		}
 	case 55:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:279
+		//line proto.y:343
 		{
-			protoVAL.agg = []*aggregate{{name: protoDollar[1].str, val: protoDollar[4].agg}}
+			s := &aggregateLiteralNode{elements: protoDollar[4].agg}
+			s.setRange(protoDollar[3].b, protoDollar[5].b)
+			a := &aggregateEntryNode{name: protoDollar[1].aggName, val: s}
+			a.setRange(protoDollar[1].aggName, protoDollar[5].b)
+			protoVAL.agg = []*aggregateEntryNode{a}
 		}
 	case 56:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:282
+		//line proto.y:350
 		{
-			protoVAL.agg = []*aggregate{{name: protoDollar[1].str, val: protoDollar[3].agg}}
+			s := &aggregateLiteralNode{elements: protoDollar[3].agg}
+			s.setRange(protoDollar[2].b, protoDollar[4].b)
+			a := &aggregateEntryNode{name: protoDollar[1].aggName, val: s}
+			a.setRange(protoDollar[1].aggName, protoDollar[4].b)
+			protoVAL.agg = []*aggregateEntryNode{a}
+		}
+	case 57:
+		protoDollar = protoS[protopt-1 : protopt+1]
+		//line proto.y:358
+		{
+			protoVAL.aggName = &aggregateNameNode{name: protoDollar[1].id}
+			protoVAL.aggName.setRange(protoDollar[1].id, protoDollar[1].id)
 		}
 	case 58:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:287
+		//line proto.y:362
 		{
-			protoVAL.str = "[" + protoDollar[2].str + "]"
+			protoVAL.aggName = &aggregateNameNode{name: protoDollar[2].id, isExtension: true}
+			protoVAL.aggName.setRange(protoDollar[1].b, protoDollar[3].b)
 		}
 	case 59:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:291
+		//line proto.y:367
 		{
-			protoVAL.sl = []interface{}{protoDollar[1].u}
+			protoVAL.sl = []valueNode{protoDollar[1].v}
 		}
 	case 60:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:294
+		//line proto.y:370
 		{
-			protoVAL.sl = append(protoDollar[1].sl, protoDollar[3].u)
+			protoVAL.sl = append(protoDollar[1].sl, protoDollar[3].v)
 		}
 	case 61:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:297
+		//line proto.y:373
 		{
-			protoVAL.sl = []interface{}{protoDollar[2].agg}
+			s := &aggregateLiteralNode{elements: protoDollar[2].agg}
+			s.setRange(protoDollar[1].b, protoDollar[3].b)
+			protoVAL.sl = []valueNode{s}
 		}
 	case 62:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:300
+		//line proto.y:378
 		{
-			protoVAL.sl = append(protoDollar[1].sl, protoDollar[4].agg)
+			s := &aggregateLiteralNode{elements: protoDollar[4].agg}
+			s.setRange(protoDollar[3].b, protoDollar[5].b)
+			protoVAL.sl = append(protoDollar[1].sl, s)
 		}
 	case 65:
 		protoDollar = protoS[protopt-6 : protopt+1]
-		//line proto.y:307
+		//line proto.y:387
 		{
-			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.fldd = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_REQUIRED.Enum(), protoDollar[2].str, protoDollar[3].str, int32(protoDollar[5].ui), nil)
+			checkTag(protolex, protoDollar[5].ui.val)
+			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, required: true}
+			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui}
+			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[6].b)
 		}
 	case 66:
 		protoDollar = protoS[protopt-6 : protopt+1]
-		//line proto.y:311
+		//line proto.y:393
 		{
-			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.fldd = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), protoDollar[2].str, protoDollar[3].str, int32(protoDollar[5].ui), nil)
+			checkTag(protolex, protoDollar[5].ui.val)
+			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode}
+			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui}
+			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[6].b)
 		}
 	case 67:
 		protoDollar = protoS[protopt-6 : protopt+1]
-		//line proto.y:315
+		//line proto.y:399
 		{
-			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.fldd = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), protoDollar[2].str, protoDollar[3].str, int32(protoDollar[5].ui), nil)
+			checkTag(protolex, protoDollar[5].ui.val)
+			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, repeated: true}
+			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui}
+			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[6].b)
 		}
 	case 68:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:319
+		//line proto.y:405
 		{
-			checkTag(protolex, protoDollar[4].ui)
-			protoVAL.fldd = asFieldDescriptor(nil, protoDollar[1].str, protoDollar[2].str, int32(protoDollar[4].ui), nil)
+			checkTag(protolex, protoDollar[4].ui.val)
+			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui}
+			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
 	case 69:
 		protoDollar = protoS[protopt-9 : protopt+1]
-		//line proto.y:323
+		//line proto.y:410
 		{
-			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.fldd = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_REQUIRED.Enum(), protoDollar[2].str, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].opts)
+			checkTag(protolex, protoDollar[5].ui.val)
+			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, required: true}
+			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui, options: protoDollar[7].opts}
+			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[9].b)
 		}
 	case 70:
 		protoDollar = protoS[protopt-9 : protopt+1]
-		//line proto.y:327
+		//line proto.y:416
 		{
-			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.fldd = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), protoDollar[2].str, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].opts)
+			checkTag(protolex, protoDollar[5].ui.val)
+			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode}
+			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui, options: protoDollar[7].opts}
+			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[9].b)
 		}
 	case 71:
 		protoDollar = protoS[protopt-9 : protopt+1]
-		//line proto.y:331
+		//line proto.y:422
 		{
-			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.fldd = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), protoDollar[2].str, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].opts)
+			checkTag(protolex, protoDollar[5].ui.val)
+			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, repeated: true}
+			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui, options: protoDollar[7].opts}
+			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[9].b)
 		}
 	case 72:
 		protoDollar = protoS[protopt-8 : protopt+1]
-		//line proto.y:335
+		//line proto.y:428
 		{
-			checkTag(protolex, protoDollar[4].ui)
-			protoVAL.fldd = asFieldDescriptor(nil, protoDollar[1].str, protoDollar[2].str, int32(protoDollar[4].ui), protoDollar[6].opts)
+			checkTag(protolex, protoDollar[4].ui.val)
+			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui, options: protoDollar[6].opts}
+			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
 	case 73:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:340
+		//line proto.y:434
 		{
 			protoVAL.opts = append(protoDollar[1].opts, protoDollar[3].opts...)
 		}
 	case 75:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:345
+		//line proto.y:439
 		{
-			protoVAL.opts = []*dpb.UninterpretedOption{asOption(protolex.(*protoLex), protoDollar[1].optNm, protoDollar[3].u)}
+			n := &optionNameNode{parts: protoDollar[1].optNm}
+			n.setRange(protoDollar[1].optNm[0], protoDollar[1].optNm[len(protoDollar[1].optNm)-1])
+			o := &optionNode{name: n, val: protoDollar[3].v}
+			o.setRange(protoDollar[1].optNm[0], protoDollar[3].v)
+			protoVAL.opts = []*optionNode{o}
 		}
 	case 76:
 		protoDollar = protoS[protopt-8 : protopt+1]
-		//line proto.y:349
+		//line proto.y:447
 		{
-			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.grpd = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_REQUIRED, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].msgDecs)
+			checkTag(protolex, protoDollar[5].ui.val)
+			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
+				lexError(protolex, protoDollar[3].id.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", protoDollar[3].id.val))
+			}
+			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, required: true}
+			protoVAL.grp = &groupNode{label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
+			protoVAL.grp.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
 	case 77:
 		protoDollar = protoS[protopt-8 : protopt+1]
-		//line proto.y:353
+		//line proto.y:456
 		{
-			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.grpd = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_OPTIONAL, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].msgDecs)
+			checkTag(protolex, protoDollar[5].ui.val)
+			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
+				lexError(protolex, protoDollar[3].id.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", protoDollar[3].id.val))
+			}
+			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode}
+			protoVAL.grp = &groupNode{label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
+			protoVAL.grp.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
 	case 78:
 		protoDollar = protoS[protopt-8 : protopt+1]
-		//line proto.y:357
+		//line proto.y:465
 		{
-			checkTag(protolex, protoDollar[5].ui)
-			protoVAL.grpd = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_REPEATED, protoDollar[3].str, int32(protoDollar[5].ui), protoDollar[7].msgDecs)
+			checkTag(protolex, protoDollar[5].ui.val)
+			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
+				lexError(protolex, protoDollar[3].id.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", protoDollar[3].id.val))
+			}
+			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, repeated: true}
+			protoVAL.grp = &groupNode{label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
+			protoVAL.grp.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
 	case 79:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:362
+		//line proto.y:475
 		{
-			if len(protoDollar[4].msgDecs) == 0 {
-				protolex.Error(fmt.Sprintf("oneof must contain at least one field"))
-			}
-			protoVAL.ood = &oneofDesc{name: protoDollar[2].str}
-			for _, i := range protoDollar[4].msgDecs {
-				if i.fld != nil {
-					protoVAL.ood.fields = append(protoVAL.ood.fields, i.fld)
-				} else if i.option != nil {
-					protoVAL.ood.options = append(protoVAL.ood.options, i.option)
+			c := 0
+			for _, el := range protoDollar[4].ooDecls {
+				if el.field != nil {
+					c++
 				}
 			}
+			if c == 0 {
+				lexError(protolex, protoDollar[1].id.start(), "oneof must contain at least one field")
+			}
+			protoVAL.oo = &oneOfNode{name: protoDollar[2].id, decls: protoDollar[4].ooDecls}
+			protoVAL.oo.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
 	case 80:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:376
+		//line proto.y:489
 		{
-			protoVAL.msgDecs = append(protoDollar[1].msgDecs, protoDollar[2].msgDecs...)
+			protoVAL.ooDecls = append(protoDollar[1].ooDecls, protoDollar[2].ooDecls...)
 		}
 	case 82:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:380
+		//line proto.y:493
 		{
-			protoVAL.msgDecs = nil
+			protoVAL.ooDecls = nil
 		}
 	case 83:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:384
+		//line proto.y:497
 		{
-			protoVAL.msgDecs = []*msgDecl{{option: protoDollar[1].opts[0]}}
+			protoVAL.ooDecls = []*oneOfElement{{option: protoDollar[1].opts[0]}}
 		}
 	case 84:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:387
+		//line proto.y:500
 		{
-			protoVAL.msgDecs = []*msgDecl{{fld: protoDollar[1].fldd}}
+			protoVAL.ooDecls = []*oneOfElement{{field: protoDollar[1].fld}}
 		}
 	case 85:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:390
+		//line proto.y:503
 		{
-			protoVAL.msgDecs = nil
+			protoVAL.ooDecls = []*oneOfElement{{empty: protoDollar[1].b}}
 		}
 	case 86:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:394
+		//line proto.y:507
 		{
-			checkTag(protolex, protoDollar[4].ui)
-			protoVAL.fldd = asFieldDescriptor(nil, protoDollar[1].str, protoDollar[2].str, int32(protoDollar[4].ui), nil)
+			checkTag(protolex, protoDollar[4].ui.val)
+			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui}
+			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
 	case 87:
 		protoDollar = protoS[protopt-8 : protopt+1]
-		//line proto.y:398
+		//line proto.y:512
 		{
-			checkTag(protolex, protoDollar[4].ui)
-			protoVAL.fldd = asFieldDescriptor(nil, protoDollar[1].str, protoDollar[2].str, int32(protoDollar[4].ui), protoDollar[6].opts)
+			checkTag(protolex, protoDollar[4].ui.val)
+			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui, options: protoDollar[6].opts}
+			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
 	case 88:
 		protoDollar = protoS[protopt-10 : protopt+1]
-		//line proto.y:403
+		//line proto.y:518
 		{
-			checkTag(protolex, protoDollar[9].ui)
-			protoVAL.grpd = asMapField(protoDollar[3].str, protoDollar[5].str, protoDollar[7].str, int32(protoDollar[9].ui), nil)
+			checkTag(protolex, protoDollar[9].ui.val)
+			protoVAL.mapFld = &mapFieldNode{mapKeyword: protoDollar[1].id, keyType: protoDollar[3].id, valueType: protoDollar[5].id, name: protoDollar[7].id, tag: protoDollar[9].ui}
+			protoVAL.mapFld.setRange(protoDollar[1].id, protoDollar[10].b)
 		}
 	case 89:
 		protoDollar = protoS[protopt-13 : protopt+1]
-		//line proto.y:407
+		//line proto.y:523
 		{
-			checkTag(protolex, protoDollar[9].ui)
-			protoVAL.grpd = asMapField(protoDollar[3].str, protoDollar[5].str, protoDollar[7].str, int32(protoDollar[9].ui), protoDollar[11].opts)
+			checkTag(protolex, protoDollar[9].ui.val)
+			protoVAL.mapFld = &mapFieldNode{mapKeyword: protoDollar[1].id, keyType: protoDollar[3].id, valueType: protoDollar[5].id, name: protoDollar[7].id, tag: protoDollar[9].ui, options: protoDollar[11].opts}
+			protoVAL.mapFld.setRange(protoDollar[1].id, protoDollar[13].b)
 		}
 	case 102:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:425
+		//line proto.y:542
 		{
-			protoVAL.extRngs = asExtensionRanges(protoDollar[2].rngs, nil)
+			protoVAL.ext = &extensionRangeNode{ranges: protoDollar[2].rngs}
+			protoVAL.ext.setRange(protoDollar[1].id, protoDollar[3].b)
 		}
 	case 103:
 		protoDollar = protoS[protopt-6 : protopt+1]
-		//line proto.y:428
+		//line proto.y:546
 		{
-			protoVAL.extRngs = asExtensionRanges(protoDollar[2].rngs, protoDollar[4].opts)
+			protoVAL.ext = &extensionRangeNode{ranges: protoDollar[2].rngs, options: protoDollar[4].opts}
+			protoVAL.ext.setRange(protoDollar[1].id, protoDollar[6].b)
 		}
 	case 104:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:432
+		//line proto.y:551
 		{
 			protoVAL.rngs = append(protoDollar[1].rngs, protoDollar[3].rngs...)
 		}
 	case 106:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:437
+		//line proto.y:556
 		{
-			if protoDollar[1].ui > maxTag {
-				protolex.Error(fmt.Sprintf("range includes out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui, maxTag))
+			if protoDollar[1].ui.val > maxTag {
+				lexError(protolex, protoDollar[1].ui.start(), fmt.Sprintf("range includes out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui.val, maxTag))
 			}
-			protoVAL.rngs = []tagRange{{Start: int32(protoDollar[1].ui), End: int32(protoDollar[1].ui) + 1}}
+			r := &rangeNode{st: protoDollar[1].ui, en: protoDollar[1].ui}
+			r.setRange(protoDollar[1].ui, protoDollar[1].ui)
+			protoVAL.rngs = []*rangeNode{r}
 		}
 	case 107:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:443
+		//line proto.y:564
 		{
-			if protoDollar[1].ui > maxTag {
-				protolex.Error(fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui, maxTag))
+			if protoDollar[1].ui.val > maxTag {
+				lexError(protolex, protoDollar[1].ui.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui.val, maxTag))
 			}
-			if protoDollar[3].ui > maxTag {
-				protolex.Error(fmt.Sprintf("range end is out-of-range tag: %d (should be between 0 and %d)", protoDollar[3].ui, maxTag))
+			if protoDollar[3].ui.val > maxTag {
+				lexError(protolex, protoDollar[3].ui.start(), fmt.Sprintf("range end is out-of-range tag: %d (should be between 0 and %d)", protoDollar[3].ui.val, maxTag))
 			}
-			if protoDollar[1].ui > protoDollar[3].ui {
-				protolex.Error(fmt.Sprintf("range, %d to %d, is invalid: start must be <= end", protoDollar[1].ui, protoDollar[3].ui))
+			if protoDollar[1].ui.val > protoDollar[3].ui.val {
+				lexError(protolex, protoDollar[1].ui.start(), fmt.Sprintf("range, %d to %d, is invalid: start must be <= end", protoDollar[1].ui.val, protoDollar[3].ui.val))
 			}
-			protoVAL.rngs = []tagRange{{Start: int32(protoDollar[1].ui), End: int32(protoDollar[3].ui) + 1}}
+			r := &rangeNode{st: protoDollar[1].ui, en: protoDollar[3].ui}
+			r.setRange(protoDollar[1].ui, protoDollar[3].ui)
+			protoVAL.rngs = []*rangeNode{r}
 		}
 	case 108:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:455
+		//line proto.y:578
 		{
-			if protoDollar[1].ui > maxTag {
-				protolex.Error(fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui, maxTag))
+			if protoDollar[1].ui.val > maxTag {
+				lexError(protolex, protoDollar[1].ui.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui.val, maxTag))
 			}
-			protoVAL.rngs = []tagRange{{Start: int32(protoDollar[1].ui), End: maxTag + 1}}
+			m := &intLiteralNode{basicNode: protoDollar[3].id.basicNode, val: maxTag}
+			r := &rangeNode{st: protoDollar[1].ui, en: m}
+			r.setRange(protoDollar[1].ui, protoDollar[3].id)
+			protoVAL.rngs = []*rangeNode{r}
 		}
 	case 109:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:462
+		//line proto.y:588
 		{
-			protoVAL.resvd = &reservedFields{tags: protoDollar[2].rngs}
+			protoVAL.resvd = &reservedNode{ranges: protoDollar[2].rngs}
+			protoVAL.resvd.setRange(protoDollar[1].id, protoDollar[3].b)
 		}
 	case 110:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:465
+		//line proto.y:592
 		{
 			rsvd := map[string]struct{}{}
 			for _, n := range protoDollar[2].names {
-				if _, ok := rsvd[n]; ok {
-					protolex.Error(fmt.Sprintf("field %q is reserved multiple times", n))
+				if _, ok := rsvd[n.val]; ok {
+					lexError(protolex, n.start(), fmt.Sprintf("field %q is reserved multiple times", n.val))
 					break
 				}
-				rsvd[n] = struct{}{}
+				rsvd[n.val] = struct{}{}
 			}
-			protoVAL.resvd = &reservedFields{names: protoDollar[2].names}
+			protoVAL.resvd = &reservedNode{names: protoDollar[2].names}
+			protoVAL.resvd.setRange(protoDollar[1].id, protoDollar[3].b)
 		}
 	case 111:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:477
+		//line proto.y:605
 		{
 			protoVAL.names = append(protoDollar[1].names, protoDollar[3].str)
 		}
 	case 112:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:480
+		//line proto.y:608
 		{
-			protoVAL.names = []string{protoDollar[1].str}
+			protoVAL.names = []*stringLiteralNode{protoDollar[1].str}
 		}
 	case 113:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:484
+		//line proto.y:612
 		{
-			if len(protoDollar[4].enDecs) == 0 {
-				protolex.Error(fmt.Sprintf("enums must define at least one value"))
+			c := 0
+			for _, el := range protoDollar[4].enDecls {
+				if el.value != nil {
+					c++
+				}
 			}
-			protoVAL.end = enumDeclsToProto(protoDollar[2].str, protoDollar[4].enDecs)
+			if c == 0 {
+				lexError(protolex, protoDollar[1].id.start(), "enums must define at least one value")
+			}
+			protoVAL.en = &enumNode{name: protoDollar[2].id, decls: protoDollar[4].enDecls}
+			protoVAL.en.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
 	case 114:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:491
+		//line proto.y:626
 		{
-			protoVAL.enDecs = append(protoDollar[1].enDecs, protoDollar[2].enDecs...)
+			protoVAL.enDecls = append(protoDollar[1].enDecls, protoDollar[2].enDecls...)
 		}
 	case 116:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:495
+		//line proto.y:630
 		{
-			protoVAL.enDecs = nil
+			protoVAL.enDecls = nil
 		}
 	case 117:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:499
+		//line proto.y:634
 		{
-			protoVAL.enDecs = []*enumDecl{{option: protoDollar[1].opts[0]}}
+			protoVAL.enDecls = []*enumElement{{option: protoDollar[1].opts[0]}}
 		}
 	case 118:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:502
+		//line proto.y:637
 		{
-			protoVAL.enDecs = []*enumDecl{{val: protoDollar[1].envd}}
+			protoVAL.enDecls = []*enumElement{{value: protoDollar[1].env}}
 		}
 	case 119:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:505
+		//line proto.y:640
 		{
-			protoVAL.enDecs = nil
+			protoVAL.enDecls = []*enumElement{{empty: protoDollar[1].b}}
 		}
 	case 120:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:509
+		//line proto.y:644
 		{
-			checkUint64InInt32Range(protolex, protoDollar[3].ui)
-			protoVAL.envd = asEnumValue(protoDollar[1].str, int32(protoDollar[3].ui), nil)
+			checkUint64InInt32Range(protolex, protoDollar[3].ui.val)
+			protoVAL.env = &enumValueNode{name: protoDollar[1].id, number: protoDollar[3].ui}
+			protoVAL.env.setRange(protoDollar[1].id, protoDollar[4].b)
 		}
 	case 121:
 		protoDollar = protoS[protopt-7 : protopt+1]
-		//line proto.y:513
+		//line proto.y:649
 		{
-			checkUint64InInt32Range(protolex, protoDollar[3].ui)
-			protoVAL.envd = asEnumValue(protoDollar[1].str, int32(protoDollar[3].ui), protoDollar[5].opts)
+			checkUint64InInt32Range(protolex, protoDollar[3].ui.val)
+			protoVAL.env = &enumValueNode{name: protoDollar[1].id, number: protoDollar[3].ui, options: protoDollar[5].opts}
+			protoVAL.env.setRange(protoDollar[1].id, protoDollar[7].b)
 		}
 	case 122:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:517
+		//line proto.y:654
 		{
-			checkInt64InInt32Range(protolex, protoDollar[3].i)
-			protoVAL.envd = asEnumValue(protoDollar[1].str, int32(protoDollar[3].i), nil)
+			checkInt64InInt32Range(protolex, protoDollar[3].i.val)
+			protoVAL.env = &enumValueNode{name: protoDollar[1].id, numberN: protoDollar[3].i}
+			protoVAL.env.setRange(protoDollar[1].id, protoDollar[4].b)
 		}
 	case 123:
 		protoDollar = protoS[protopt-7 : protopt+1]
-		//line proto.y:521
+		//line proto.y:659
 		{
-			checkInt64InInt32Range(protolex, protoDollar[3].i)
-			protoVAL.envd = asEnumValue(protoDollar[1].str, int32(protoDollar[3].i), protoDollar[5].opts)
+			checkInt64InInt32Range(protolex, protoDollar[3].i.val)
+			protoVAL.env = &enumValueNode{name: protoDollar[1].id, numberN: protoDollar[3].i, options: protoDollar[5].opts}
+			protoVAL.env.setRange(protoDollar[1].id, protoDollar[7].b)
 		}
 	case 124:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:526
+		//line proto.y:665
 		{
-			protoVAL.msgd = msgDeclsToProto(protoDollar[2].str, protoDollar[4].msgDecs)
+			protoVAL.msg = &messageNode{name: protoDollar[2].id, decls: protoDollar[4].msgDecls}
+			protoVAL.msg.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
 	case 125:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:530
+		//line proto.y:670
 		{
-			protoVAL.msgDecs = append(protoDollar[1].msgDecs, protoDollar[2].msgDecs...)
+			protoVAL.msgDecls = append(protoDollar[1].msgDecls, protoDollar[2].msgDecls...)
 		}
 	case 127:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:534
+		//line proto.y:674
 		{
-			protoVAL.msgDecs = nil
+			protoVAL.msgDecls = nil
 		}
 	case 128:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:538
+		//line proto.y:678
 		{
-			protoVAL.msgDecs = []*msgDecl{{fld: protoDollar[1].fldd}}
+			protoVAL.msgDecls = []*messageElement{{field: protoDollar[1].fld}}
 		}
 	case 129:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:541
+		//line proto.y:681
 		{
-			protoVAL.msgDecs = []*msgDecl{{enum: protoDollar[1].end}}
+			protoVAL.msgDecls = []*messageElement{{enum: protoDollar[1].en}}
 		}
 	case 130:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:544
+		//line proto.y:684
 		{
-			protoVAL.msgDecs = []*msgDecl{{msg: protoDollar[1].msgd}}
+			protoVAL.msgDecls = []*messageElement{{nested: protoDollar[1].msg}}
 		}
 	case 131:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:547
+		//line proto.y:687
 		{
-			protoVAL.msgDecs = []*msgDecl{{extend: protoDollar[1].extend}}
+			protoVAL.msgDecls = []*messageElement{{extend: protoDollar[1].extend}}
 		}
 	case 132:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:550
+		//line proto.y:690
 		{
-			protoVAL.msgDecs = []*msgDecl{{extensions: protoDollar[1].extRngs}}
+			protoVAL.msgDecls = []*messageElement{{extensionRange: protoDollar[1].ext}}
 		}
 	case 133:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:553
+		//line proto.y:693
 		{
-			protoVAL.msgDecs = []*msgDecl{{grp: protoDollar[1].grpd}}
+			protoVAL.msgDecls = []*messageElement{{group: protoDollar[1].grp}}
 		}
 	case 134:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:556
+		//line proto.y:696
 		{
-			protoVAL.msgDecs = []*msgDecl{{option: protoDollar[1].opts[0]}}
+			protoVAL.msgDecls = []*messageElement{{option: protoDollar[1].opts[0]}}
 		}
 	case 135:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:559
+		//line proto.y:699
 		{
-			protoVAL.msgDecs = []*msgDecl{{oneof: protoDollar[1].ood}}
+			protoVAL.msgDecls = []*messageElement{{oneOf: protoDollar[1].oo}}
 		}
 	case 136:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:562
+		//line proto.y:702
 		{
-			protoVAL.msgDecs = []*msgDecl{{grp: protoDollar[1].grpd}}
+			protoVAL.msgDecls = []*messageElement{{mapField: protoDollar[1].mapFld}}
 		}
 	case 137:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:565
+		//line proto.y:705
 		{
-			protoVAL.msgDecs = []*msgDecl{{reserved: protoDollar[1].resvd}}
+			protoVAL.msgDecls = []*messageElement{{reserved: protoDollar[1].resvd}}
 		}
 	case 138:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:568
+		//line proto.y:708
 		{
-			protoVAL.msgDecs = nil
+			protoVAL.msgDecls = []*messageElement{{empty: protoDollar[1].b}}
 		}
 	case 139:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:572
+		//line proto.y:712
 		{
-			if len(protoDollar[4].msgDecs) == 0 {
-				protolex.Error(fmt.Sprintf("extend sections must define at least one extension"))
-			}
-			protoVAL.extend = &extendBlock{}
-			for _, i := range protoDollar[4].msgDecs {
-				var fd *dpb.FieldDescriptorProto
-				if i.fld != nil {
-					fd = i.fld
-				} else if i.grp != nil {
-					fd = i.grp.field
-					protoVAL.extend.msgs = append(protoVAL.extend.msgs, i.grp.msg)
+			c := 0
+			for _, el := range protoDollar[4].extDecls {
+				if el.field != nil || el.group != nil {
+					c++
 				}
-				fd.Extendee = proto.String(protoDollar[2].str)
-				protoVAL.extend.fields = append(protoVAL.extend.fields, fd)
 			}
+			if c == 0 {
+				lexError(protolex, protoDollar[1].id.start(), "extend sections must define at least one extension")
+			}
+			protoVAL.extend = &extendNode{extendee: protoDollar[2].id, decls: protoDollar[4].extDecls}
+			protoVAL.extend.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
 	case 140:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:590
+		//line proto.y:726
 		{
-			protoVAL.msgDecs = append(protoDollar[1].msgDecs, protoDollar[2].msgDecs...)
+			protoVAL.extDecls = append(protoDollar[1].extDecls, protoDollar[2].extDecls...)
 		}
 	case 142:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:594
+		//line proto.y:730
 		{
-			protoVAL.msgDecs = nil
+			protoVAL.extDecls = nil
 		}
 	case 143:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:598
+		//line proto.y:734
 		{
-			protoVAL.msgDecs = []*msgDecl{{fld: protoDollar[1].fldd}}
+			protoVAL.extDecls = []*extendElement{{field: protoDollar[1].fld}}
 		}
 	case 144:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:601
+		//line proto.y:737
 		{
-			protoVAL.msgDecs = []*msgDecl{{grp: protoDollar[1].grpd}}
+			protoVAL.extDecls = []*extendElement{{group: protoDollar[1].grp}}
 		}
 	case 145:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:604
+		//line proto.y:740
 		{
-			protoVAL.msgDecs = nil
+			protoVAL.extDecls = []*extendElement{{empty: protoDollar[1].b}}
 		}
 	case 146:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:608
+		//line proto.y:744
 		{
-			protoVAL.sd = svcDeclsToProto(protoDollar[2].str, protoDollar[4].svcDecs)
+			protoVAL.svc = &serviceNode{name: protoDollar[2].id, decls: protoDollar[4].svcDecls}
+			protoVAL.svc.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
 	case 147:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:612
+		//line proto.y:749
 		{
-			protoVAL.svcDecs = append(protoDollar[1].svcDecs, protoDollar[2].svcDecs...)
+			protoVAL.svcDecls = append(protoDollar[1].svcDecls, protoDollar[2].svcDecls...)
 		}
 	case 149:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:616
+		//line proto.y:753
 		{
-			protoVAL.svcDecs = nil
+			protoVAL.svcDecls = nil
 		}
 	case 150:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:623
+		//line proto.y:760
 		{
-			protoVAL.svcDecs = []*serviceDecl{{option: protoDollar[1].opts[0]}}
+			protoVAL.svcDecls = []*serviceElement{{option: protoDollar[1].opts[0]}}
 		}
 	case 151:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:626
+		//line proto.y:763
 		{
-			protoVAL.svcDecs = []*serviceDecl{{rpc: protoDollar[1].mtd}}
+			protoVAL.svcDecls = []*serviceElement{{rpc: protoDollar[1].mtd}}
 		}
 	case 152:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:629
+		//line proto.y:766
 		{
-			protoVAL.svcDecs = nil
+			protoVAL.svcDecls = []*serviceElement{{empty: protoDollar[1].b}}
 		}
 	case 153:
 		protoDollar = protoS[protopt-10 : protopt+1]
-		//line proto.y:633
+		//line proto.y:770
 		{
-			protoVAL.mtd = asMethodDescriptor(protoDollar[2].str, protoDollar[4].rpcType, protoDollar[8].rpcType, nil)
+			protoVAL.mtd = &methodNode{name: protoDollar[2].id, input: protoDollar[4].rpcType, output: protoDollar[8].rpcType}
+			protoVAL.mtd.setRange(protoDollar[1].id, protoDollar[10].b)
 		}
 	case 154:
 		protoDollar = protoS[protopt-12 : protopt+1]
-		//line proto.y:636
+		//line proto.y:774
 		{
-			protoVAL.mtd = asMethodDescriptor(protoDollar[2].str, protoDollar[4].rpcType, protoDollar[8].rpcType, protoDollar[11].opts)
+			protoVAL.mtd = &methodNode{name: protoDollar[2].id, input: protoDollar[4].rpcType, output: protoDollar[8].rpcType, options: protoDollar[11].opts}
+			protoVAL.mtd.setRange(protoDollar[1].id, protoDollar[12].b)
 		}
 	case 155:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:640
+		//line proto.y:779
 		{
-			protoVAL.rpcType = &rpcType{msgType: protoDollar[2].str, stream: true}
+			protoVAL.rpcType = &rpcTypeNode{msgType: protoDollar[2].id, stream: true}
+			protoVAL.rpcType.setRange(protoDollar[1].id, protoDollar[2].id)
 		}
 	case 156:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:643
+		//line proto.y:783
 		{
-			protoVAL.rpcType = &rpcType{msgType: protoDollar[1].str}
+			protoVAL.rpcType = &rpcTypeNode{msgType: protoDollar[1].id}
+			protoVAL.rpcType.setRange(protoDollar[1].id, protoDollar[1].id)
 		}
 	case 157:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:647
+		//line proto.y:788
 		{
 			protoVAL.opts = append(protoDollar[1].opts, protoDollar[2].opts...)
 		}
 	case 159:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:651
+		//line proto.y:792
 		{
 			protoVAL.opts = nil
 		}
 	case 160:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:655
+		//line proto.y:796
 		{
 			protoVAL.opts = protoDollar[1].opts
 		}
 	case 161:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:658
+		//line proto.y:799
 		{
 			protoVAL.opts = nil
 		}

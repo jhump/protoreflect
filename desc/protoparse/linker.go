@@ -15,14 +15,13 @@ import (
 )
 
 type linker struct {
-	files          map[string]*dpb.FileDescriptorProto
-	aggregates     map[string][]*aggregate
+	files          map[string]*parseResult
 	descriptorPool map[*dpb.FileDescriptorProto]map[string]proto.Message
 	extensions     map[string]map[int32]string
 }
 
-func newLinker(files map[string]*dpb.FileDescriptorProto, aggregates map[string][]*aggregate) *linker {
-	return &linker{files: files, aggregates: aggregates}
+func newLinker(files map[string]*parseResult) *linker {
+	return &linker{files: files}
 }
 
 func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
@@ -66,7 +65,8 @@ func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
 
 func (l *linker) createDescriptorPool() error {
 	l.descriptorPool = map[*dpb.FileDescriptorProto]map[string]proto.Message{}
-	for _, fd := range l.files {
+	for _, r := range l.files {
+		fd := r.fd
 		pool := map[string]proto.Message{}
 		l.descriptorPool[fd] = pool
 		prefix := fd.GetPackage()
@@ -223,7 +223,8 @@ func descriptorType(m proto.Message) string {
 
 func (l *linker) resolveReferences() error {
 	l.extensions = map[string]map[int32]string{}
-	for _, fd := range l.files {
+	for _, r := range l.files {
+		fd := r.fd
 		prefix := fd.GetPackage()
 		scopes := []scope{fileScope(fd, l)}
 		if prefix != "" {
@@ -509,23 +510,23 @@ func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, name string, public boo
 	if public {
 		for _, depIndex := range fd.PublicDependency {
 			dep := fd.Dependency[depIndex]
-			depfd := l.files[dep]
-			if depfd == nil {
+			depres := l.files[dep]
+			if depres == nil {
 				// we'll catch this error later
 				continue
 			}
-			if d = l.findSymbol(depfd, name, true, checked); d != nil {
+			if d = l.findSymbol(depres.fd, name, true, checked); d != nil {
 				return d
 			}
 		}
 	} else {
 		for _, dep := range fd.Dependency {
-			depfd := l.files[dep]
-			if depfd == nil {
+			depres := l.files[dep]
+			if depres == nil {
 				// we'll catch this error later
 				continue
 			}
-			if d = l.findSymbol(depfd, name, true, checked); d != nil {
+			if d = l.findSymbol(depres.fd, name, true, checked); d != nil {
 				return d
 			}
 		}
@@ -573,20 +574,20 @@ func (l *linker) linkFile(name string, seen []string, linked map[string]*desc.Fi
 		// already linked
 		return lfd, nil
 	}
-	fd := l.files[name]
-	if fd == nil {
+	r := l.files[name]
+	if r == nil {
 		importer := seen[len(seen)-2] // len-1 is *this* file, before that is the one that imported it
 		return nil, fmt.Errorf("no descriptor found for %q, imported by %q", name, importer)
 	}
 	var deps []*desc.FileDescriptor
-	for _, dep := range fd.Dependency {
+	for _, dep := range r.fd.Dependency {
 		ldep, err := l.linkFile(dep, seen, linked)
 		if err != nil {
 			return nil, err
 		}
 		deps = append(deps, ldep)
 	}
-	lfd, err := desc.CreateFileDescriptor(fd, deps...)
+	lfd, err := desc.CreateFileDescriptor(r.fd, deps...)
 	if err != nil {
 		return nil, fmt.Errorf("error linking %q: %s", name, err)
 	}
@@ -931,7 +932,11 @@ func (l *linker) interpretField(mc *messageContext, element descriptorish, dm *d
 
 	var val interface{}
 	if opt.AggregateValue != nil {
-		val = l.aggregates[opt.GetAggregateValue()]
+		fn := mc.filename
+		if mc.file != nil {
+			fn = mc.file.GetName()
+		}
+		val = l.files[fn].aggregates[opt.GetAggregateValue()]
 	} else if opt.DoubleValue != nil {
 		val = opt.GetDoubleValue()
 	} else if opt.IdentifierValue != nil {
@@ -987,7 +992,7 @@ func findExtension(fd *desc.FileDescriptor, name string, public bool, checked ma
 }
 
 func setOptionField(mc *messageContext, dm *dynamic.Message, fld *desc.FieldDescriptor, val interface{}) error {
-	if sl, ok := val.([]interface{}); ok {
+	if sl, ok := val.([]valueNode); ok {
 		// handle slices a little differently than the others
 		if !fld.IsRepeated() {
 			return fmt.Errorf("%v: value is an array but field is not repeated", mc)
@@ -998,7 +1003,7 @@ func setOptionField(mc *messageContext, dm *dynamic.Message, fld *desc.FieldDesc
 		}()
 		for index, item := range sl {
 			mc.optAggPath = fmt.Sprintf("%s[%d]", origPath, index)
-			if v, err := fieldValue(mc, fld, item, false); err != nil {
+			if v, err := fieldValue(mc, fld, item.value(), false); err != nil {
 				return err
 			} else if err = dm.TryAddRepeatedField(fld, v); err != nil {
 				return fmt.Errorf("%v: error setting value: %s", mc, err)
@@ -1103,7 +1108,7 @@ func valueKind(val interface{}) string {
 		return "double"
 	case string, []byte:
 		return "string/bytes"
-	case []*aggregate:
+	case []*aggregateEntryNode:
 		return "message"
 	default:
 		return fmt.Sprintf("%T", val)
@@ -1126,7 +1131,7 @@ func fieldValue(mc *messageContext, fld *desc.FieldDescriptor, val interface{}, 
 		}
 		return nil, fmt.Errorf("%v: expecting enum, got %s", mc, valueKind(val))
 	case dpb.FieldDescriptorProto_TYPE_MESSAGE, dpb.FieldDescriptorProto_TYPE_GROUP:
-		if aggs, ok := val.([]*aggregate); ok {
+		if aggs, ok := val.([]*aggregateEntryNode); ok {
 			fmd := fld.GetMessageType()
 			fdm := dynamic.NewMessage(fmd)
 			origPath := mc.optAggPath
@@ -1135,13 +1140,13 @@ func fieldValue(mc *messageContext, fld *desc.FieldDescriptor, val interface{}, 
 			}()
 			for _, a := range aggs {
 				if origPath == "" {
-					mc.optAggPath = a.name
+					mc.optAggPath = a.name.value()
 				} else {
-					mc.optAggPath = origPath + "." + a.name
+					mc.optAggPath = origPath + "." + a.name.value()
 				}
 				var ffld *desc.FieldDescriptor
-				if a.name[0] == '[' {
-					n := a.name[1 : len(a.name)-1]
+				if a.name.isExtension {
+					n := a.name.name.val
 					ffld = findExtension(mc.file, n, false, map[*desc.FileDescriptor]struct{}{})
 					if ffld == nil {
 						// may need to qualify with package name
@@ -1151,12 +1156,12 @@ func fieldValue(mc *messageContext, fld *desc.FieldDescriptor, val interface{}, 
 						}
 					}
 				} else {
-					ffld = fmd.FindFieldByName(a.name)
+					ffld = fmd.FindFieldByName(a.name.value())
 				}
 				if ffld == nil {
 					return nil, fmt.Errorf("%v: field %s not found", mc, a.name)
 				}
-				if err := setOptionField(mc, fdm, ffld, a.val); err != nil {
+				if err := setOptionField(mc, fdm, ffld, a.val.value()); err != nil {
 					return nil, err
 				}
 			}
