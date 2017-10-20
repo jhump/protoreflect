@@ -11,88 +11,98 @@ import (
 )
 
 func TestSimpleParse(t *testing.T) {
-	protos := map[string]*dpb.FileDescriptorProto{}
+	protos := map[string]*parseResult{}
 
 	// Just verify that we can successfully parse the same files we use for
 	// testing. We do a *very* shallow check of what was parsed because we know
 	// it won't be fully correct until after linking. (So that will be tested
 	// below, where we parse *and* link.)
-	fd, err := parseProtoFile("../../internal/testprotos/desc_test1.proto")
+	res, err := parseProtoFile("../../internal/testprotos/desc_test1.proto")
 	testutil.Ok(t, err)
+	fd := res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test1.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasExtension(fd, "xtm"))
 	testutil.Require(t, hasMessage(fd, "TestMessage"))
-	protos[fd.GetName()] = fd
+	protos[fd.GetName()] = res
 
-	fd, err = parseProtoFile("../../internal/testprotos/desc_test2.proto")
+	res, err = parseProtoFile("../../internal/testprotos/desc_test2.proto")
 	testutil.Ok(t, err)
+	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test2.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasExtension(fd, "groupx"))
 	testutil.Require(t, hasMessage(fd, "GroupX"))
 	testutil.Require(t, hasMessage(fd, "Frobnitz"))
-	protos[fd.GetName()] = fd
+	protos[fd.GetName()] = res
 
-	fd, err = parseProtoFile("../../internal/testprotos/desc_test_defaults.proto")
+	res, err = parseProtoFile("../../internal/testprotos/desc_test_defaults.proto")
 	testutil.Ok(t, err)
+	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test_defaults.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasMessage(fd, "PrimitiveDefaults"))
-	protos[fd.GetName()] = fd
+	protos[fd.GetName()] = res
 
-	fd, err = parseProtoFile("../../internal/testprotos/desc_test_field_types.proto")
+	res, err = parseProtoFile("../../internal/testprotos/desc_test_field_types.proto")
 	testutil.Ok(t, err)
+	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test_field_types.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasEnum(fd, "TestEnum"))
 	testutil.Require(t, hasMessage(fd, "UnaryFields"))
-	protos[fd.GetName()] = fd
+	protos[fd.GetName()] = res
 
-	fd, err = parseProtoFile("../../internal/testprotos/desc_test_options.proto")
+	res, err = parseProtoFile("../../internal/testprotos/desc_test_options.proto")
 	testutil.Ok(t, err)
+	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test_options.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasExtension(fd, "mfubar"))
 	testutil.Require(t, hasEnum(fd, "ReallySimpleEnum"))
 	testutil.Require(t, hasMessage(fd, "ReallySimpleMessage"))
-	protos[fd.GetName()] = fd
+	protos[fd.GetName()] = res
 
-	fd, err = parseProtoFile("../../internal/testprotos/desc_test_proto3.proto")
+	res, err = parseProtoFile("../../internal/testprotos/desc_test_proto3.proto")
 	testutil.Ok(t, err)
+	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test_proto3.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasEnum(fd, "Proto3Enum"))
 	testutil.Require(t, hasService(fd, "TestService"))
-	protos[fd.GetName()] = fd
+	protos[fd.GetName()] = res
 
-	fd, err = parseProtoFile("../../internal/testprotos/desc_test_wellknowntypes.proto")
+	res, err = parseProtoFile("../../internal/testprotos/desc_test_wellknowntypes.proto")
 	testutil.Ok(t, err)
+	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test_wellknowntypes.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasMessage(fd, "TestWellKnownTypes"))
-	protos[fd.GetName()] = fd
+	protos[fd.GetName()] = res
 
-	fd, err = parseProtoFile("../../internal/testprotos/nopkg/desc_test_nopkg.proto")
+	res, err = parseProtoFile("../../internal/testprotos/nopkg/desc_test_nopkg.proto")
 	testutil.Ok(t, err)
+	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/nopkg/desc_test_nopkg.proto", fd.GetName())
 	testutil.Eq(t, "", fd.GetPackage())
-	protos[fd.GetName()] = fd
+	protos[fd.GetName()] = res
 
-	fd, err = parseProtoFile("../../internal/testprotos/nopkg/desc_test_nopkg_new.proto")
+	res, err = parseProtoFile("../../internal/testprotos/nopkg/desc_test_nopkg_new.proto")
 	testutil.Ok(t, err)
+	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/nopkg/desc_test_nopkg_new.proto", fd.GetName())
 	testutil.Eq(t, "", fd.GetPackage())
 	testutil.Require(t, hasMessage(fd, "TopLevel"))
-	protos[fd.GetName()] = fd
+	protos[fd.GetName()] = res
 
-	fd, err = parseProtoFile("../../internal/testprotos/pkg/desc_test_pkg.proto")
+	res, err = parseProtoFile("../../internal/testprotos/pkg/desc_test_pkg.proto")
 	testutil.Ok(t, err)
+	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/pkg/desc_test_pkg.proto", fd.GetName())
 	testutil.Eq(t, "jhump.protoreflect.desc", fd.GetPackage())
 	testutil.Require(t, hasEnum(fd, "Foo"))
 	testutil.Require(t, hasMessage(fd, "Bar"))
-	protos[fd.GetName()] = fd
+	protos[fd.GetName()] = res
 
 	// We'll also check our fixup logic to make sure it correctly rewrites the
 	// names of the files to match corresponding import statementes. This should
@@ -307,7 +317,7 @@ func TestBasicValidation(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		_, err := parseProto("test.proto", strings.NewReader(tc.contents), map[string][]*aggregate{})
+		_, err := parseProto("test.proto", strings.NewReader(tc.contents))
 		if tc.succeeds {
 			testutil.Ok(t, err, "case #%d should succeed", i)
 		} else {

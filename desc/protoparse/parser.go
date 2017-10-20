@@ -2,6 +2,7 @@ package protoparse
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -90,16 +91,15 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 		}
 	}
 
-	protos := map[string]*dpb.FileDescriptorProto{}
-	aggregates := map[string][]*aggregate{}
-	err := parseProtoFiles(accessor, filenames, protos, aggregates)
+	protos := map[string]*parseResult{}
+	err := parseProtoFiles(accessor, filenames, protos)
 	if err != nil {
 		return nil, err
 	}
 	if p.InferImportPaths {
 		protos = fixupFilenames(protos)
 	}
-	linkedProtos, err := newLinker(protos, aggregates).linkFiles()
+	linkedProtos, err := newLinker(protos).linkFiles()
 	if err != nil {
 		return nil, err
 	}
@@ -110,11 +110,11 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	return fds, nil
 }
 
-func fixupFilenames(protos map[string]*dpb.FileDescriptorProto) map[string]*dpb.FileDescriptorProto {
+func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	// In the event that the given filenames (keys in the supplied map) do not
 	// match the actual paths used in 'import' statements in the files, we try
 	// to revise names in the protos so that they will match and be linkable.
-	revisedProtos := map[string]*dpb.FileDescriptorProto{}
+	revisedProtos := map[string]*parseResult{}
 
 	protoPaths := map[string]struct{}{}
 	// TODO: this is O(n^2) but could likely be O(n) with a clever data structure (prefix tree that is indexed backwards?)
@@ -122,8 +122,8 @@ func fixupFilenames(protos map[string]*dpb.FileDescriptorProto) map[string]*dpb.
 	candidatesAvailable := map[string]struct{}{}
 	for name := range protos {
 		candidatesAvailable[name] = struct{}{}
-		for _, fd := range protos {
-			for _, imp := range fd.Dependency {
+		for _, f := range protos {
+			for _, imp := range f.fd.Dependency {
 				if strings.HasSuffix(name, imp) {
 					candidates := importCandidates[imp]
 					if candidates == nil {
@@ -167,9 +167,9 @@ func fixupFilenames(protos map[string]*dpb.FileDescriptorProto) map[string]*dpb.
 			if len(prefix) > 0 {
 				protoPaths[prefix] = struct{}{}
 			}
-			fd := protos[best]
-			fd.Name = proto.String(imp)
-			revisedProtos[imp] = fd
+			f := protos[best]
+			f.fd.Name = proto.String(imp)
+			revisedProtos[imp] = f
 			delete(candidatesAvailable, best)
 		}
 	}
@@ -207,9 +207,9 @@ func fixupFilenames(protos map[string]*dpb.FileDescriptorProto) map[string]*dpb.
 			}
 		}
 		if imp != "" {
-			fd := protos[c]
-			fd.Name = proto.String(imp)
-			revisedProtos[imp] = fd
+			f := protos[c]
+			f.fd.Name = proto.String(imp)
+			revisedProtos[imp] = f
 		} else {
 			revisedProtos[c] = protos[c]
 		}
@@ -218,7 +218,7 @@ func fixupFilenames(protos map[string]*dpb.FileDescriptorProto) map[string]*dpb.
 	return revisedProtos
 }
 
-func parseProtoFiles(acc FileAccessor, filenames []string, parsed map[string]*dpb.FileDescriptorProto, aggregates map[string][]*aggregate) error {
+func parseProtoFiles(acc FileAccessor, filenames []string, parsed map[string]*parseResult) error {
 	for _, name := range filenames {
 		if _, ok := parsed[name]; ok {
 			continue
@@ -226,19 +226,19 @@ func parseProtoFiles(acc FileAccessor, filenames []string, parsed map[string]*dp
 		in, err := acc(name)
 		if err != nil {
 			if d, ok := standardImports[name]; ok {
-				parsed[name] = d
+				parsed[name] = &parseResult{fd: d}
 				continue
 			}
 			return err
 		}
 		func() {
 			defer in.Close()
-			parsed[name], err = parseProto(name, in, aggregates)
+			parsed[name], err = parseProto(name, in)
 		}()
 		if err != nil {
 			return err
 		}
-		err = parseProtoFiles(acc, parsed[name].Dependency, parsed, aggregates)
+		err = parseProtoFiles(acc, parsed[name].fd.Dependency, parsed)
 		if err != nil {
 			return fmt.Errorf("failed to load imports for %q: %s", name, err)
 		}
@@ -246,143 +246,115 @@ func parseProtoFiles(acc FileAccessor, filenames []string, parsed map[string]*dp
 	return nil
 }
 
-func parseProtoFile(filename string) (*dpb.FileDescriptorProto, error) {
+func parseProtoFile(filename string) (*parseResult, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	return parseProto(filename, f, map[string][]*aggregate{})
+	return parseProto(filename, f)
 }
 
-func parseProto(filename string, r io.Reader, aggregates map[string][]*aggregate) (*dpb.FileDescriptorProto, error) {
+type parseResult struct {
+	// the parsed file descriptor
+	fd *dpb.FileDescriptorProto
+
+	// a map of elements in the descriptor to nodes in the AST
+	// (for extracting position information when validating the descriptor)
+	nodes map[interface{}]node
+
+	// a map of aggregate option values to their ASTs
+	aggregates map[string][]*aggregateEntryNode
+}
+
+func parseProto(filename string, r io.Reader) (*parseResult, error) {
 	lx := newLexer(r)
-	lx.aggregates = aggregates
+	lx.filename = filename
 	protoParse(lx)
 	if lx.err != nil {
-		if lx.prevLineNo == lx.lineNo && lx.prevColNo != lx.colNo {
-			return nil, fmt.Errorf("file %s: line %d, col %d-%d: %s", filename, lx.lineNo, lx.prevColNo, lx.colNo, lx.err)
+		if _, ok := lx.err.(ErrorWithSourcePos); ok {
+			return nil, lx.err
 		} else {
-			return nil, fmt.Errorf("file %s: line %d, col %d: %s", filename, lx.lineNo, lx.prevColNo, lx.err)
+			return nil, ErrorWithSourcePos{Pos: lx.prev(), Underlying: lx.err}
 		}
 	}
-	lx.res.Name = proto.String(filename)
-	if err := basicValidate(lx.res); err != nil {
+
+	if res, err := createParseResult(filename, lx.res); err != nil {
 		return nil, err
+	} else if err := basicValidate(res); err != nil {
+		return nil, err
+	} else {
+		return res, nil
 	}
-	return lx.res, nil
 }
 
-type importSpec struct {
-	name         string
-	weak, public bool
+func createParseResult(filename string, file *fileNode) (*parseResult, error) {
+	res := &parseResult{
+		nodes:      map[interface{}]node{},
+		aggregates: map[string][]*aggregateEntryNode{},
+	}
+	var err error
+	res.fd, err = res.asFileDescriptor(filename, file)
+	return res, err
 }
 
-type fileDecl struct {
-	importSpec  *importSpec
-	packageName string
-	option      *dpb.UninterpretedOption
-	message     *dpb.DescriptorProto
-	enum        *dpb.EnumDescriptorProto
-	extend      *extendBlock
-	service     *dpb.ServiceDescriptorProto
-}
+func (r *parseResult) asFileDescriptor(filename string, file *fileNode) (*dpb.FileDescriptorProto, error) {
+	fd := &dpb.FileDescriptorProto{Name: proto.String(filename)}
+	r.nodes[fd] = file
 
-type groupDesc struct {
-	field *dpb.FieldDescriptorProto
-	msg   *dpb.DescriptorProto
-}
+	isProto3 := false
+	if file.syntax != nil {
+		fd.Syntax = proto.String(file.syntax.syntax.val)
+		isProto3 = file.syntax.syntax.val == "proto3"
+	}
 
-type oneofDesc struct {
-	name    string
-	fields  []*dpb.FieldDescriptorProto
-	options []*dpb.UninterpretedOption
-}
-
-type extendBlock struct {
-	fields []*dpb.FieldDescriptorProto
-	msgs   []*dpb.DescriptorProto
-}
-
-type reservedFields struct {
-	tags  []tagRange
-	names []string
-}
-
-type enumDecl struct {
-	option *dpb.UninterpretedOption
-	val    *dpb.EnumValueDescriptorProto
-}
-
-type msgDecl struct {
-	option     *dpb.UninterpretedOption
-	fld        *dpb.FieldDescriptorProto
-	grp        *groupDesc
-	oneof      *oneofDesc
-	enum       *dpb.EnumDescriptorProto
-	msg        *dpb.DescriptorProto
-	extend     *extendBlock
-	extensions []*dpb.DescriptorProto_ExtensionRange
-	reserved   *reservedFields
-}
-
-type serviceDecl struct {
-	option *dpb.UninterpretedOption
-	rpc    *dpb.MethodDescriptorProto
-}
-
-type rpcType struct {
-	msgType string
-	stream  bool
-}
-
-type option struct {
-	name []*dpb.UninterpretedOption_NamePart
-	val  interface{}
-}
-
-type aggregate struct {
-	name string
-	val  interface{}
-}
-
-type identifier string
-
-func fileDeclsToProto(decls []*fileDecl) *dpb.FileDescriptorProto {
-	fd := &dpb.FileDescriptorProto{}
-	for _, decl := range decls {
+	for _, decl := range file.decls {
 		if decl.enum != nil {
-			fd.EnumType = append(fd.EnumType, decl.enum)
+			fd.EnumType = append(fd.EnumType, r.asEnumDescriptor(decl.enum))
 		} else if decl.extend != nil {
-			fd.Extension = append(fd.Extension, decl.extend.fields...)
-			fd.MessageType = append(fd.MessageType, decl.extend.msgs...)
-		} else if decl.importSpec != nil {
+			r.addExtensions(decl.extend, &fd.Extension, &fd.MessageType, isProto3)
+		} else if decl.imp != nil {
+			file.imports = append(file.imports, decl.imp)
 			index := len(fd.Dependency)
-			fd.Dependency = append(fd.Dependency, decl.importSpec.name)
-			if decl.importSpec.public {
+			fd.Dependency = append(fd.Dependency, decl.imp.name.val)
+			if decl.imp.public {
 				fd.PublicDependency = append(fd.PublicDependency, int32(index))
-			} else if decl.importSpec.weak {
+			} else if decl.imp.weak {
 				fd.WeakDependency = append(fd.WeakDependency, int32(index))
 			}
 		} else if decl.message != nil {
-			fd.MessageType = append(fd.MessageType, decl.message)
+			fd.MessageType = append(fd.MessageType, r.asMessageDescriptor(decl.message, isProto3))
 		} else if decl.option != nil {
 			if fd.Options == nil {
 				fd.Options = &dpb.FileOptions{}
 			}
-			fd.Options.UninterpretedOption = append(fd.Options.UninterpretedOption, decl.option)
+			fd.Options.UninterpretedOption = append(fd.Options.UninterpretedOption, r.asUninterpretedOption(decl.option))
 		} else if decl.service != nil {
-			fd.Service = append(fd.Service, decl.service)
-		} else if decl.packageName != "" {
-			fd.Package = proto.String(decl.packageName)
+			fd.Service = append(fd.Service, r.asServiceDescriptor(decl.service))
+		} else if decl.pkg != nil {
+			if fd.Package != nil {
+				return nil, ErrorWithSourcePos{Pos: decl.pkg.start(), Underlying: errors.New("files should have only one package declaration")}
+			}
+			file.pkg = decl.pkg
+			fd.Package = proto.String(decl.pkg.name.val)
 		}
 	}
-	return fd
+	return fd, nil
 }
 
-func asOption(ctx *protoLex, name []*dpb.UninterpretedOption_NamePart, val interface{}) *dpb.UninterpretedOption {
-	opt := &dpb.UninterpretedOption{Name: name}
-	switch val := val.(type) {
+func (r *parseResult) asUninterpretedOptions(nodes []*optionNode) []*dpb.UninterpretedOption {
+	opts := make([]*dpb.UninterpretedOption, len(nodes))
+	for i, n := range nodes {
+		opts[i] = r.asUninterpretedOption(n)
+	}
+	return opts
+}
+
+func (r *parseResult) asUninterpretedOption(node *optionNode) *dpb.UninterpretedOption {
+	opt := &dpb.UninterpretedOption{Name: r.asUninterpretedOptionName(node.name.parts)}
+	r.nodes[opt] = node
+
+	switch val := node.val.value().(type) {
 	case bool:
 		if val {
 			opt.IdentifierValue = proto.String("true")
@@ -399,38 +371,80 @@ func asOption(ctx *protoLex, name []*dpb.UninterpretedOption_NamePart, val inter
 		opt.StringValue = []byte(val)
 	case identifier:
 		opt.IdentifierValue = proto.String(string(val))
-	case []*aggregate:
+	case []*aggregateEntryNode:
 		var buf bytes.Buffer
 		aggToString(val, &buf)
 		aggStr := buf.String()
 		opt.AggregateValue = proto.String(aggStr)
-		if ctx.aggregates != nil {
-			ctx.aggregates[aggStr] = val
-		}
+		r.aggregates[aggStr] = val
 	}
 	return opt
 }
 
-func toNameParts(ident string) []*dpb.UninterpretedOption_NamePart {
-	parts := strings.Split(ident, ".")
+func (r *parseResult) asUninterpretedOptionName(parts []*optionNamePartNode) []*dpb.UninterpretedOption_NamePart {
 	ret := make([]*dpb.UninterpretedOption_NamePart, len(parts))
-	for i, p := range parts {
-		ret[i] = &dpb.UninterpretedOption_NamePart{NamePart: proto.String(p)}
+	for i, part := range parts {
+		txt := part.text.val
+		if !part.isExtension {
+			txt = part.text.val[part.offset : part.offset+part.length]
+		}
+		np := &dpb.UninterpretedOption_NamePart{
+			NamePart:    proto.String(txt),
+			IsExtension: proto.Bool(part.isExtension),
+		}
+		r.nodes[np] = part
+		ret[i] = np
 	}
 	return ret
 }
 
-func asFieldDescriptor(label *dpb.FieldDescriptorProto_Label, typ, name string, tag int32, opts []*dpb.UninterpretedOption) *dpb.FieldDescriptorProto {
+func (r *parseResult) addExtensions(ext *extendNode, flds *[]*dpb.FieldDescriptorProto, msgs *[]*dpb.DescriptorProto, isProto3 bool) {
+	extendee := ext.extendee.val
+	for _, decl := range ext.decls {
+		if decl.field != nil {
+			fd := r.asFieldDescriptor(decl.field)
+			fd.Extendee = proto.String(extendee)
+			*flds = append(*flds, fd)
+		} else if decl.group != nil {
+			fd, md := r.asGroupDescriptors(decl.group, isProto3)
+			fd.Extendee = proto.String(extendee)
+			*flds = append(*flds, fd)
+			*msgs = append(*msgs, md)
+		}
+	}
+}
+
+func asLabel(lbl *labelNode) *dpb.FieldDescriptorProto_Label {
+	if lbl == nil {
+		return nil
+	}
+	switch {
+	case lbl.repeated:
+		return dpb.FieldDescriptorProto_LABEL_REPEATED.Enum()
+	case lbl.required:
+		return dpb.FieldDescriptorProto_LABEL_REQUIRED.Enum()
+	default:
+		return dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
+	}
+}
+
+func (r *parseResult) asFieldDescriptor(node *fieldNode) *dpb.FieldDescriptorProto {
+	fd := newFieldDescriptor(node.name.val, node.fldType.val, int32(node.tag.val), asLabel(node.label))
+	r.nodes[fd] = node
+	if len(node.options) > 0 {
+		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(node.options)}
+	}
+	return fd
+}
+
+func newFieldDescriptor(name string, fieldType string, tag int32, lbl *dpb.FieldDescriptorProto_Label) *dpb.FieldDescriptorProto {
 	fd := &dpb.FieldDescriptorProto{
 		Name:     proto.String(name),
 		JsonName: proto.String(jsonName(name)),
 		Number:   proto.Int32(tag),
-		Label:    label,
+		Label:    lbl,
 	}
-	if len(opts) > 0 {
-		fd.Options = &dpb.FieldOptions{UninterpretedOption: opts}
-	}
-	switch typ {
+	switch fieldType {
 	case "double":
 		fd.Type = dpb.FieldDescriptorProto_TYPE_DOUBLE.Enum()
 	case "float":
@@ -465,153 +479,214 @@ func asFieldDescriptor(label *dpb.FieldDescriptorProto_Label, typ, name string, 
 		// NB: we don't have enough info to determine whether this is an enum or a message type,
 		// so we'll change it to enum later once we can ascertain if it's an enum reference
 		fd.Type = dpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
-		fd.TypeName = proto.String(typ)
+		fd.TypeName = proto.String(fieldType)
 	}
 	return fd
 }
 
-func asGroupDescriptor(lex protoLexer, label dpb.FieldDescriptorProto_Label, name string, tag int32, body []*msgDecl) *groupDesc {
-	if !unicode.IsUpper(rune(name[0])) {
-		lex.Error(fmt.Sprintf("group %s should have a name that starts with a capital letter", name))
-	}
-	fieldName := strings.ToLower(name)
+func (r *parseResult) asGroupDescriptors(group *groupNode, isProto3 bool) (*dpb.FieldDescriptorProto, *dpb.DescriptorProto) {
+	fieldName := strings.ToLower(group.name.val)
 	fd := &dpb.FieldDescriptorProto{
 		Name:     proto.String(fieldName),
 		JsonName: proto.String(jsonName(fieldName)),
-		Number:   proto.Int32(tag),
-		Label:    label.Enum(),
+		Number:   proto.Int32(int32(group.tag.val)),
+		Label:    asLabel(group.label),
 		Type:     dpb.FieldDescriptorProto_TYPE_GROUP.Enum(),
-		TypeName: proto.String(name),
+		TypeName: proto.String(group.name.val),
 	}
-	md := msgDeclsToProto(name, body)
-	return &groupDesc{field: fd, msg: md}
+	r.nodes[fd] = group
+	md := &dpb.DescriptorProto{Name: proto.String(group.name.val)}
+	r.nodes[md] = group
+	r.addMessageDecls(md, &group.reserved, group.decls, isProto3)
+	return fd, md
 }
 
-func asMapField(keyType, valType, name string, tag int32, opts []*dpb.UninterpretedOption) *groupDesc {
-	keyFd := asFieldDescriptor(nil, keyType, "key", 1, nil)
-	valFd := asFieldDescriptor(nil, valType, "value", 2, nil)
-	entryName := initCap(jsonName(name)) + "Entry"
-	fd := asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), entryName, name, tag, opts)
+func (r *parseResult) asMapDescriptors(mapField *mapFieldNode, isProto3 bool) (*dpb.FieldDescriptorProto, *dpb.DescriptorProto) {
+	var lbl *dpb.FieldDescriptorProto_Label
+	if !isProto3 {
+		lbl = dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
+	}
+	keyFd := newFieldDescriptor("key", mapField.keyType.val, 1, lbl)
+	r.nodes[keyFd] = mapField.keyField()
+	valFd := newFieldDescriptor("value", mapField.valueType.val, 2, lbl)
+	r.nodes[valFd] = mapField.valueField()
+	entryName := initCap(jsonName(mapField.name.val)) + "Entry"
+	fd := newFieldDescriptor(mapField.name.val, entryName, int32(mapField.tag.val), dpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
+	if len(mapField.options) > 0 {
+		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(mapField.options)}
+	}
+	r.nodes[fd] = mapField
 	md := &dpb.DescriptorProto{
 		Name:    proto.String(entryName),
 		Options: &dpb.MessageOptions{MapEntry: proto.Bool(true)},
 		Field:   []*dpb.FieldDescriptorProto{keyFd, valFd},
 	}
-	return &groupDesc{field: fd, msg: md}
+	r.nodes[md] = mapField
+	return fd, md
 }
 
-func asExtensionRanges(ranges []tagRange, opts []*dpb.UninterpretedOption) []*dpb.DescriptorProto_ExtensionRange {
-	ers := make([]*dpb.DescriptorProto_ExtensionRange, len(ranges))
-	for i, r := range ranges {
-		ers[i] = &dpb.DescriptorProto_ExtensionRange{Start: proto.Int32(r.Start), End: proto.Int32(r.End)}
-		if len(opts) > 0 {
-			ers[i].Options = &dpb.ExtensionRangeOptions{UninterpretedOption: opts}
+func (r *parseResult) asExtensionRanges(node *extensionRangeNode) []*dpb.DescriptorProto_ExtensionRange {
+	opts := r.asUninterpretedOptions(node.options)
+	ers := make([]*dpb.DescriptorProto_ExtensionRange, len(node.ranges))
+	for i, rng := range node.ranges {
+		er := &dpb.DescriptorProto_ExtensionRange{
+			Start: proto.Int32(int32(rng.st.val)),
+			End:   proto.Int32(int32(rng.en.val + 1)),
 		}
+		if len(opts) > 0 {
+			er.Options = &dpb.ExtensionRangeOptions{UninterpretedOption: opts}
+		}
+		r.nodes[er] = rng
+		ers[i] = er
 	}
 	return ers
 }
 
-func asEnumValue(name string, val int32, opts []*dpb.UninterpretedOption) *dpb.EnumValueDescriptorProto {
-	evd := &dpb.EnumValueDescriptorProto{Name: proto.String(name), Number: proto.Int32(val)}
-	if len(opts) > 0 {
-		evd.Options = &dpb.EnumValueOptions{UninterpretedOption: opts}
+func (r *parseResult) asEnumValue(ev *enumValueNode) *dpb.EnumValueDescriptorProto {
+	var num int32
+	if ev.number != nil {
+		num = int32(ev.number.val)
+	} else {
+		num = int32(ev.numberN.val)
+	}
+	evd := &dpb.EnumValueDescriptorProto{Name: proto.String(ev.name.val), Number: proto.Int32(num)}
+	r.nodes[evd] = ev
+	if len(ev.options) > 0 {
+		evd.Options = &dpb.EnumValueOptions{UninterpretedOption: r.asUninterpretedOptions(ev.options)}
 	}
 	return evd
 }
 
-func asMethodDescriptor(name string, req, resp *rpcType, opts []*dpb.UninterpretedOption) *dpb.MethodDescriptorProto {
+func (r *parseResult) asMethodDescriptor(node *methodNode) *dpb.MethodDescriptorProto {
 	md := &dpb.MethodDescriptorProto{
-		Name:       proto.String(name),
-		InputType:  proto.String(req.msgType),
-		OutputType: proto.String(resp.msgType),
+		Name:       proto.String(node.name.val),
+		InputType:  proto.String(node.input.msgType.val),
+		OutputType: proto.String(node.output.msgType.val),
 	}
-	if req.stream {
+	r.nodes[md] = node
+	if node.input.stream {
 		md.ClientStreaming = proto.Bool(true)
 	}
-	if resp.stream {
+	if node.output.stream {
 		md.ServerStreaming = proto.Bool(true)
 	}
-	if len(opts) > 0 {
-		md.Options = &dpb.MethodOptions{UninterpretedOption: opts}
+	if len(node.options) > 0 {
+		md.Options = &dpb.MethodOptions{UninterpretedOption: r.asUninterpretedOptions(node.options)}
 	}
 	return md
 }
 
-func enumDeclsToProto(name string, decls []*enumDecl) *dpb.EnumDescriptorProto {
-	ed := &dpb.EnumDescriptorProto{Name: proto.String(name)}
-	for _, decl := range decls {
+func (r *parseResult) asEnumDescriptor(en *enumNode) *dpb.EnumDescriptorProto {
+	ed := &dpb.EnumDescriptorProto{Name: proto.String(en.name.val)}
+	r.nodes[ed] = en
+	for _, decl := range en.decls {
 		if decl.option != nil {
 			if ed.Options == nil {
 				ed.Options = &dpb.EnumOptions{}
 			}
-			ed.Options.UninterpretedOption = append(ed.Options.UninterpretedOption, decl.option)
-		} else if decl.val != nil {
-			ed.Value = append(ed.Value, decl.val)
+			ed.Options.UninterpretedOption = append(ed.Options.UninterpretedOption, r.asUninterpretedOption(decl.option))
+		} else if decl.value != nil {
+			ed.Value = append(ed.Value, r.asEnumValue(decl.value))
 		}
 	}
 	return ed
 }
 
-func msgDeclsToProto(name string, decls []*msgDecl) *dpb.DescriptorProto {
-	msgd := &dpb.DescriptorProto{Name: proto.String(name)}
+func (r *parseResult) asMessageDescriptor(node *messageNode, isProto3 bool) *dpb.DescriptorProto {
+	msgd := &dpb.DescriptorProto{Name: proto.String(node.name.val)}
+	r.nodes[msgd] = node
+	r.addMessageDecls(msgd, &node.reserved, node.decls, isProto3)
+	return msgd
+}
+
+func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, reservedNames *[]*stringLiteralNode, decls []*messageElement, isProto3 bool) {
 	for _, decl := range decls {
 		if decl.enum != nil {
-			msgd.EnumType = append(msgd.EnumType, decl.enum)
+			msgd.EnumType = append(msgd.EnumType, r.asEnumDescriptor(decl.enum))
 		} else if decl.extend != nil {
-			msgd.Extension = append(msgd.Extension, decl.extend.fields...)
-			msgd.NestedType = append(msgd.NestedType, decl.extend.msgs...)
-		} else if decl.extensions != nil {
-			msgd.ExtensionRange = append(msgd.ExtensionRange, decl.extensions...)
-		} else if decl.fld != nil {
-			msgd.Field = append(msgd.Field, decl.fld)
-		} else if decl.grp != nil {
-			msgd.Field = append(msgd.Field, decl.grp.field)
-			msgd.NestedType = append(msgd.NestedType, decl.grp.msg)
-		} else if decl.oneof != nil {
+			r.addExtensions(decl.extend, &msgd.Extension, &msgd.NestedType, isProto3)
+		} else if decl.extensionRange != nil {
+			msgd.ExtensionRange = append(msgd.ExtensionRange, r.asExtensionRanges(decl.extensionRange)...)
+		} else if decl.field != nil {
+			msgd.Field = append(msgd.Field, r.asFieldDescriptor(decl.field))
+		} else if decl.mapField != nil {
+			fd, md := r.asMapDescriptors(decl.mapField, isProto3)
+			msgd.Field = append(msgd.Field, fd)
+			msgd.NestedType = append(msgd.NestedType, md)
+		} else if decl.group != nil {
+			fd, md := r.asGroupDescriptors(decl.group, isProto3)
+			msgd.Field = append(msgd.Field, fd)
+			msgd.NestedType = append(msgd.NestedType, md)
+		} else if decl.oneOf != nil {
 			oodIndex := len(msgd.OneofDecl)
-			ood := &dpb.OneofDescriptorProto{Name: proto.String(decl.oneof.name)}
-			if len(decl.oneof.options) > 0 {
-				ood.Options = &dpb.OneofOptions{UninterpretedOption: decl.oneof.options}
-			}
+			ood := &dpb.OneofDescriptorProto{Name: proto.String(decl.oneOf.name.val)}
+			r.nodes[ood] = decl.oneOf
 			msgd.OneofDecl = append(msgd.OneofDecl, ood)
-			for _, fd := range decl.oneof.fields {
-				fd.OneofIndex = proto.Int32(int32(oodIndex))
+			for _, oodecl := range decl.oneOf.decls {
+				if oodecl.option != nil {
+					if ood.Options != nil {
+						ood.Options = &dpb.OneofOptions{}
+					}
+					ood.Options.UninterpretedOption = append(ood.Options.UninterpretedOption, r.asUninterpretedOption(oodecl.option))
+				} else if oodecl.field != nil {
+					fd := r.asFieldDescriptor(oodecl.field)
+					fd.OneofIndex = proto.Int32(int32(oodIndex))
+					msgd.Field = append(msgd.Field, fd)
+				}
 			}
-			msgd.Field = append(msgd.Field, decl.oneof.fields...)
 		} else if decl.option != nil {
 			if msgd.Options == nil {
 				msgd.Options = &dpb.MessageOptions{}
 			}
-			msgd.Options.UninterpretedOption = append(msgd.Options.UninterpretedOption, decl.option)
-		} else if decl.msg != nil {
-			msgd.NestedType = append(msgd.NestedType, decl.msg)
+			msgd.Options.UninterpretedOption = append(msgd.Options.UninterpretedOption, r.asUninterpretedOption(decl.option))
+		} else if decl.nested != nil {
+			msgd.NestedType = append(msgd.NestedType, r.asMessageDescriptor(decl.nested, isProto3))
 		} else if decl.reserved != nil {
-			if len(decl.reserved.names) > 0 {
-				msgd.ReservedName = append(msgd.ReservedName, decl.reserved.names...)
+			for _, n := range decl.reserved.names {
+				*reservedNames = append(*reservedNames, n)
+				msgd.ReservedName = append(msgd.ReservedName, n.val)
 			}
-			if len(decl.reserved.tags) > 0 {
-				for _, r := range decl.reserved.tags {
-					msgd.ReservedRange = append(msgd.ReservedRange, &dpb.DescriptorProto_ReservedRange{Start: proto.Int32(r.Start), End: proto.Int32(r.End)})
-				}
+			for _, rng := range decl.reserved.ranges {
+				msgd.ReservedRange = append(msgd.ReservedRange, r.asReservedRange(rng))
 			}
 		}
 	}
-	return msgd
 }
 
-func svcDeclsToProto(name string, decls []*serviceDecl) *dpb.ServiceDescriptorProto {
-	sd := &dpb.ServiceDescriptorProto{Name: proto.String(name)}
-	for _, decl := range decls {
+func (r *parseResult) asReservedRange(rng *rangeNode) *dpb.DescriptorProto_ReservedRange {
+	rr := &dpb.DescriptorProto_ReservedRange{
+		Start: proto.Int32(int32(rng.st.val)),
+		End:   proto.Int32(int32(rng.en.val + 1)),
+	}
+	r.nodes[rr] = rng
+	return rr
+}
+
+func (r *parseResult) asServiceDescriptor(svc *serviceNode) *dpb.ServiceDescriptorProto {
+	sd := &dpb.ServiceDescriptorProto{Name: proto.String(svc.name.val)}
+	r.nodes[sd] = svc
+	for _, decl := range svc.decls {
 		if decl.option != nil {
 			if sd.Options == nil {
 				sd.Options = &dpb.ServiceOptions{}
 			}
-			sd.Options.UninterpretedOption = append(sd.Options.UninterpretedOption, decl.option)
+			sd.Options.UninterpretedOption = append(sd.Options.UninterpretedOption, r.asUninterpretedOption(decl.option))
 		} else if decl.rpc != nil {
-			sd.Method = append(sd.Method, decl.rpc)
+			sd.Method = append(sd.Method, r.asMethodDescriptor(decl.rpc))
 		}
 	}
 	return sd
+}
+
+func toNameParts(ident *identNode, offset int) []*optionNamePartNode {
+	parts := strings.Split(ident.val[offset:], ".")
+	ret := make([]*optionNamePartNode, len(parts))
+	for i, p := range parts {
+		ret[i] = &optionNamePartNode{text: ident, offset: offset, length: len(p)}
+		ret[i].setRange(ident, ident)
+		offset += len(p) + 1
+	}
+	return ret
 }
 
 func checkUint64InInt32Range(lex protoLexer, v uint64) {
@@ -659,13 +734,13 @@ func initCap(name string) string {
 	return string(unicode.ToUpper(rune(name[0]))) + name[1:]
 }
 
-func aggToString(agg []*aggregate, buf *bytes.Buffer) {
+func aggToString(agg []*aggregateEntryNode, buf *bytes.Buffer) {
 	buf.WriteString("{")
 	for _, a := range agg {
 		buf.WriteString(" ")
-		buf.WriteString(a.name)
-		if v, ok := a.val.([]*aggregate); ok {
-			aggToString(v, buf)
+		buf.WriteString(a.name.value())
+		if v, ok := a.val.(*aggregateLiteralNode); ok {
+			aggToString(v.elements, buf)
 		} else {
 			buf.WriteString(": ")
 			elementToString(v, buf)
@@ -692,19 +767,19 @@ func elementToString(v interface{}, buf *bytes.Buffer) {
 		buf.WriteRune('"')
 		writeEscapedBytes(buf, []byte(v))
 		buf.WriteRune('"')
-	case []interface{}:
+	case []valueNode:
 		buf.WriteString(": [")
 		first := true
-		for e := range v {
+		for _, e := range v {
 			if first {
 				first = false
 			} else {
 				buf.WriteString(", ")
 			}
-			elementToString(e, buf)
+			elementToString(e.value(), buf)
 		}
 		buf.WriteString("]")
-	case []*aggregate:
+	case []*aggregateEntryNode:
 		aggToString(v, buf)
 	}
 }
@@ -739,9 +814,9 @@ func writeEscapedBytes(buf *bytes.Buffer, b []byte) {
 	}
 }
 
-func basicValidate(fd *dpb.FileDescriptorProto) error {
-	// TODO: track syntax during parse so we can then apply validations at parse time instead of in post-process
-	// (this will allow us to include location information: e.g. line number in file where error is)
+func basicValidate(res *parseResult) error {
+	fd := res.fd
+	// TODO: include position information in errors
 	if fd.Syntax != nil && fd.GetSyntax() != "proto2" && fd.GetSyntax() != "proto3" {
 		return fmt.Errorf(`file %q: syntax must be "proto2" or "proto3", instead found %q`, fd.GetName(), fd.GetSyntax())
 	}

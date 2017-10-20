@@ -5,9 +5,7 @@ package protoparse
 import (
 	"fmt"
 	"math"
-
-	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"unicode"
 )
 
 %}
@@ -15,97 +13,124 @@ import (
 // fields inside this union end up as the fields in a structure known
 // as ${PREFIX}SymType, of which a reference is passed to the lexer.
 %union{
-	str      string
-	b        bool
-	i        int64
-	ui       uint64
-	f        float64
-	u        interface{}
-	sl       []interface{}
-	names    []string
-	agg      []*aggregate
-	fd       *dpb.FileDescriptorProto
-	msgd     *dpb.DescriptorProto
-	fldd     *dpb.FieldDescriptorProto
-	end      *dpb.EnumDescriptorProto
-	envd     *dpb.EnumValueDescriptorProto
-	sd       *dpb.ServiceDescriptorProto
-	mtd      *dpb.MethodDescriptorProto
-	opts     []*dpb.UninterpretedOption
-	optNm    []*dpb.UninterpretedOption_NamePart
-	imprt    *importSpec
-	extend   *extendBlock
-	grpd     *groupDesc
-	ood      *oneofDesc
-	fileDecs []*fileDecl
-	msgDecs  []*msgDecl
-	enDecs   []*enumDecl
-	svcDecs  []*serviceDecl
-	rpcType  *rpcType
-	resvd    *reservedFields
-	rngs     []tagRange
-	extRngs  []*dpb.DescriptorProto_ExtensionRange
+	file      *fileNode
+	fileDecls []*fileElement
+	syn       *syntaxNode
+	pkg       *packageNode
+	imprt     *importNode
+	msg       *messageNode
+	msgDecls  []*messageElement
+	fld       *fieldNode
+	mapFld    *mapFieldNode
+	grp       *groupNode
+	oo        *oneOfNode
+	ooDecls   []*oneOfElement
+	ext       *extensionRangeNode
+	resvd     *reservedNode
+	en        *enumNode
+	enDecls   []*enumElement
+	env       *enumValueNode
+	extend    *extendNode
+	extDecls  []*extendElement
+	svc       *serviceNode
+	svcDecls  []*serviceElement
+	mtd       *methodNode
+	rpcType   *rpcTypeNode
+	opts      []*optionNode
+	optNm     []*optionNamePartNode
+	rngs      []*rangeNode
+	names     []*stringLiteralNode
+	sl        []valueNode
+	agg       []*aggregateEntryNode
+	aggName   *aggregateNameNode
+	v         valueNode
+	str       *stringLiteralNode
+	i         *negativeIntLiteralNode
+	ui        *intLiteralNode
+	f         *floatLiteralNode
+	id        *identNode
+	b         *basicNode
+	err       error
 }
 
 // any non-terminal which returns a value needs a type, which is
 // really a field name in the above union struct
-%type <str>      name syntax package ident typeIdent keyType aggName
-%type <i>        negIntLit
-%type <ui>       intLit
-%type <f>        floatLit
-%type <u>        constant scalarConstant
-%type <sl>       constantList
-%type <names>    fieldNames
-%type <agg>      aggregate aggFields aggField
-%type <fd>       file
-%type <msgd>     message
-%type <fldd>     field oneofField
-%type <end>      enum
-%type <envd>     enumField
-%type <sd>       service
-%type <mtd>      rpc
-%type <opts>     option fieldOption fieldOptions rpcOption rpcOptions
-%type <optNm>    optionName optionNameRest optionNameComponent
-%type <imprt>    import
-%type <extend>   extend
-%type <grpd>     group mapField
-%type <ood>      oneof
-%type <fileDecs> fileDecl fileDecls
-%type <msgDecs>  messageItem messageBody extendItem extendBody oneofItem oneofBody
-%type <enDecs>   enumItem enumBody
-%type <svcDecs>  serviceItem serviceBody
-%type <rpcType>  rpcType
-%type <resvd>    reserved
-%type <rngs>     range ranges
-%type <extRngs>  extensions
+%type <file>      file
+%type <syn>       syntax
+%type <fileDecls> fileDecl fileDecls
+%type <imprt>     import
+%type <pkg>       package
+%type <opts>      option fieldOption fieldOptions rpcOption rpcOptions
+%type <optNm>     optionName optionNameRest optionNameComponent
+%type <v>         constant scalarConstant aggregate
+%type <id>        name ident typeIdent keyType
+%type <aggName>   aggName
+%type <i>         negIntLit
+%type <ui>        intLit
+%type <f>         floatLit
+%type <sl>        constantList
+%type <agg>       aggFields aggField
+%type <fld>       field oneofField
+%type <oo>        oneof
+%type <grp>       group
+%type <mapFld>    mapField
+%type <msg>       message
+%type <msgDecls>  messageItem messageBody
+%type <ooDecls>   oneofItem oneofBody
+%type <names>     fieldNames
+%type <resvd>     reserved
+%type <rngs>      range ranges
+%type <ext>       extensions
+%type <en>        enum
+%type <enDecls>   enumItem enumBody
+%type <env>       enumField
+%type <extend>    extend
+%type <extDecls>  extendItem extendBody
+%type <svc>       service
+%type <svcDecls>  serviceItem serviceBody
+%type <mtd>       rpc
+%type <rpcType>   rpcType
 
 // same for terminals
-%token <str> _SYNTAX _IMPORT _WEAK _PUBLIC _PACKAGE _OPTION _TRUE _FALSE _INF _NAN _REPEATED _OPTIONAL _REQUIRED
-%token <str> _DOUBLE _FLOAT _INT32 _INT64 _UINT32 _UINT64 _SINT32 _SINT64 _FIXED32 _FIXED64 _SFIXED32 _SFIXED64
-%token <str> _BOOL _STRING _BYTES _GROUP _ONEOF _MAP _EXTENSIONS _TO _MAX _RESERVED _ENUM _MESSAGE _EXTEND
-%token <str> _SERVICE _RPC _STREAM _RETURNS _NAME _FQNAME _TYPENAME _STRING_LIT
+%token <str> _STRING_LIT
 %token <ui>  _INT_LIT
 %token <f>   _FLOAT_LIT
-%token <u>   _ERROR
+%token <id>  _NAME _FQNAME _TYPENAME
+%token <id>   _SYNTAX _IMPORT _WEAK _PUBLIC _PACKAGE _OPTION _TRUE _FALSE _INF _NAN _REPEATED _OPTIONAL _REQUIRED
+%token <id>   _DOUBLE _FLOAT _INT32 _INT64 _UINT32 _UINT64 _SINT32 _SINT64 _FIXED32 _FIXED64 _SFIXED32 _SFIXED64
+%token <id>   _BOOL _STRING _BYTES _GROUP _ONEOF _MAP _EXTENSIONS _TO _MAX _RESERVED _ENUM _MESSAGE _EXTEND
+%token <id>   _SERVICE _RPC _STREAM _RETURNS
+%token <err> _ERROR
+// we define all of these, even ones that aren't used, to improve error messages
+// so it shows the unexpected symbol instead of showing "$unk"
+%token <b>   '=' ';' ':' '{' '}' '\\' '/' '?' '.' ',' '>' '<' '+' '-' '(' ')' '[' ']' '*' '&' '^' '%' '$' '#' '@' '!' '~' '`'
 
 %%
 
 file : syntax {
-		$$ = &dpb.FileDescriptorProto{}
-		$$.Syntax = proto.String($1)
+		$$ = &fileNode{syntax: $1}
+		$$.setRange($1, $1)
 		protolex.(*protoLex).res = $$
 	}
 	| fileDecls  {
-		$$ = fileDeclsToProto($1)
+		$$ = &fileNode{decls: $1}
+		if len($1) > 0 {
+			$$.setRange($1[0], $1[len($1)-1])
+		}
 		protolex.(*protoLex).res = $$
 	}
 	| syntax fileDecls {
-		$$ = fileDeclsToProto($2)
-		$$.Syntax = proto.String($1)
+		$$ = &fileNode{syntax: $1, decls: $2}
+		var end node
+		if len($2) > 0 {
+			end = $2[len($2)-1]
+		} else {
+			end = $1
+		}
+		$$.setRange($1, end)
 		protolex.(*protoLex).res = $$
 	}
 	| {
-		$$ = &dpb.FileDescriptorProto{}
 	}
 
 fileDecls : fileDecls fileDecl {
@@ -114,67 +139,81 @@ fileDecls : fileDecls fileDecl {
 	| fileDecl
 
 fileDecl : import {
-		$$ = []*fileDecl{ { importSpec: $1 } }
+		$$ = []*fileElement{{imp: $1}}
 	}
 	| package {
-		$$ = []*fileDecl{ { packageName: $1 } }
+		$$ = []*fileElement{{pkg: $1}}
 	}
 	| option {
-		$$ = []*fileDecl{ { option: $1[0] } }
+		$$ = []*fileElement{{option: $1[0]}}
 	}
 	| message {
-		$$ = []*fileDecl{ { message: $1 } }
+		$$ = []*fileElement{{message: $1}}
 	}
 	| enum {
-		$$ = []*fileDecl{ { enum: $1 } }
+		$$ = []*fileElement{{enum: $1}}
 	}
 	| extend {
-		$$ = []*fileDecl{ { extend: $1 } }
+		$$ = []*fileElement{{extend: $1}}
 	}
 	| service {
-		$$ = []*fileDecl{ { service: $1 } }
+		$$ = []*fileElement{{service: $1}}
 	}
 	| ';' {
-		$$ = nil
+		$$ = []*fileElement{{empty: $1}}
 	}
 
 syntax : _SYNTAX '=' _STRING_LIT ';' {
-		if $3 != "proto2" && $3 != "proto3" {
-			protolex.Error("syntax value must be 'proto2' or 'proto3'")
+		if $3.val != "proto2" && $3.val != "proto3" {
+			lexError(protolex, $3.start(), "syntax value must be 'proto2' or 'proto3'")
 		}
-		$$ = $3
+		$$ = &syntaxNode{syntax: $3}
+		$$.setRange($1, $4)
 	}
 
 import : _IMPORT _STRING_LIT ';' {
-		$$ = &importSpec{ name: $2 }
+		$$ = &importNode{ name: $2 }
+		$$.setRange($1, $3)
 	}
 	| _IMPORT _WEAK _STRING_LIT ';' {
-		$$ = &importSpec{ name: $3, weak: true }
+		$$ = &importNode{ name: $3, weak: true }
+		$$.setRange($1, $4)
 	}
 	| _IMPORT _PUBLIC _STRING_LIT ';' {
-		$$ = &importSpec{ name: $3, public: true }
+		$$ = &importNode{ name: $3, public: true }
+		$$.setRange($1, $4)
 	}
 
 package : _PACKAGE ident ';' {
-		$$ = $2
+		$$ = &packageNode{name: $2}
+		$$.setRange($1, $3)
 	}
 
 ident : name
 	| _FQNAME
 
 option : _OPTION optionName '=' constant ';' {
-		$$ = []*dpb.UninterpretedOption{asOption(protolex.(*protoLex), $2, $4)}
+		n := &optionNameNode{parts: $2}
+		n.setRange($2[0], $2[len($2)-1])
+		o := &optionNode{name: n, val: $4}
+		o.setRange($1, $5)
+		$$ = []*optionNode{o}
 	}
 
 optionName : ident {
-		$$ = toNameParts($1)
+		$$ = toNameParts($1, 0)
 	}
 	| '(' typeIdent ')' {
-		$$ = []*dpb.UninterpretedOption_NamePart{{NamePart: proto.String($2), IsExtension: proto.Bool(true)}}
+		p := &optionNamePartNode{text: $2, isExtension: true}
+		p.setRange($1, $3)
+		$$ = []*optionNamePartNode{p}
 	}
 	| '(' typeIdent ')' optionNameRest {
-		on := []*dpb.UninterpretedOption_NamePart{{NamePart: proto.String($2), IsExtension: proto.Bool(true)}}
-		$$ = append(on, $4...)
+		p := &optionNamePartNode{text: $2, isExtension: true}
+		p.setRange($1, $3)
+		ps := make([]*optionNamePartNode, 1, len($4)+1)
+		ps[0] = p
+		$$ = append(ps, $4...)
 	}
 
 optionNameRest : optionNameComponent
@@ -183,16 +222,16 @@ optionNameRest : optionNameComponent
 	}
 
 optionNameComponent : _TYPENAME {
-		$$ = toNameParts($1[1:] /* exclude leading dot */)
+		$$ = toNameParts($1, 1 /* exclude leading dot */)
 	}
 	| '.' '(' typeIdent ')' {
-		$$ = []*dpb.UninterpretedOption_NamePart{{NamePart: proto.String($3), IsExtension: proto.Bool(true)}}
+		p := &optionNamePartNode{text: $3, isExtension: true}
+		p.setRange($2, $4)
+		$$ = []*optionNamePartNode{p}
 	}
 
 constant : scalarConstant
-	| aggregate {
-		$$ = $1
-	}
+	| aggregate
 
 scalarConstant : _STRING_LIT {
 		$$ = $1
@@ -207,16 +246,20 @@ scalarConstant : _STRING_LIT {
 		$$ = $1
 	}
 	| name {
-		if $1 == "true" {
-			$$ = true
-		} else if $1 == "false" {
-			$$ = false
-		} else if $1 == "inf" {
-			$$ = math.Inf(1)
-		} else if $1 == "nan" {
-			$$ = math.NaN()
+		if $1.val == "true" {
+			$$ = &boolLiteralNode{basicNode: $1.basicNode, val: true}
+		} else if $1.val == "false" {
+			$$ = &boolLiteralNode{basicNode: $1.basicNode, val: false}
+		} else if $1.val == "inf" {
+			f := &floatLiteralNode{val: math.Inf(1)}
+			f.setRange($1, $1)
+			$$ = f
+		} else if $1.val == "nan" {
+			f := &floatLiteralNode{val: math.NaN()}
+			f.setRange($1, $1)
+			$$ = f
 		} else {
-			$$ = identifier($1)
+			$$ = $1
 		}
 	}
 
@@ -226,28 +269,35 @@ intLit : _INT_LIT
 	}
 
 negIntLit : '-' _INT_LIT {
-		if $2 > math.MaxInt64 + 1 {
-			protolex.Error(fmt.Sprintf("numeric constant %d would underflow (allowed range is %d to %d)", $2, int64(math.MinInt64), int64(math.MaxInt64)))
+		if $2.val > math.MaxInt64 + 1 {
+			lexError(protolex, $2.start(), fmt.Sprintf("numeric constant %d would underflow (allowed range is %d to %d)", $2.val, int64(math.MinInt64), int64(math.MaxInt64)))
 		}
-		$$ = -int64($2)
+		$$ = &negativeIntLiteralNode{val: -int64($2.val)}
+		$$.setRange($1, $2)
 	}
 
 floatLit : _FLOAT_LIT
 	| '-' _FLOAT_LIT {
-		$$ = -$2
+		$$ = &floatLiteralNode{val: -$2.val}
+		$$.setRange($1, $2)
 	}
 	| '+' _FLOAT_LIT {
-		$$ = $2
+		$$ = &floatLiteralNode{val: $2.val}
+		$$.setRange($1, $2)
 	}
 	| '+' _INF {
-		$$ = math.Inf(1)
+		$$ = &floatLiteralNode{val: math.Inf(1)}
+		$$.setRange($1, $2)
 	}
 	| '-' _INF {
-		$$ = math.Inf(-1)
+		$$ = &floatLiteralNode{val: math.Inf(-1)}
+		$$.setRange($1, $2)
 	}
 
 aggregate : '{' aggFields '}' {
-		$$ = $2
+		a := &aggregateLiteralNode{elements: $2}
+		a.setRange($1, $3)
+		$$ = a
 	}
 
 aggFields : aggField
@@ -262,79 +312,123 @@ aggFields : aggField
 	}
 
 aggField : aggName ':' scalarConstant {
-		$$ = []*aggregate{{name: $1, val: $3}}
+		a := &aggregateEntryNode{name: $1, val: $3}
+		a.setRange($1, $3)
+		$$ = []*aggregateEntryNode{a}
 	}
 	| aggName ':' '[' ']' {
-		$$ = []*aggregate{{name: $1, val: []interface{}(nil)}}
+		s := &sliceLiteralNode{}
+		s.setRange($3, $4)
+		a := &aggregateEntryNode{name: $1, val: s}
+		a.setRange($1, $4)
+		$$ = []*aggregateEntryNode{a}
 	}
 	| aggName ':' '[' constantList ']' {
-		$$ = []*aggregate{{name: $1, val: $4}}
+		s := &sliceLiteralNode{elements: $4}
+		s.setRange($3, $5)
+		a := &aggregateEntryNode{name: $1, val: s}
+		a.setRange($1, $5)
+		$$ = []*aggregateEntryNode{a}
 	}
 	| aggName ':' aggregate {
-		$$ = []*aggregate{{name: $1, val: $3}}
+		a := &aggregateEntryNode{name: $1, val: $3}
+		a.setRange($1, $3)
+		$$ = []*aggregateEntryNode{a}
 	}
 	| aggName aggregate {
-		$$ = []*aggregate{{name: $1, val: $2}}
+		a := &aggregateEntryNode{name: $1, val: $2}
+		a.setRange($1, $2)
+		$$ = []*aggregateEntryNode{a}
 	}
 	| aggName ':' '<' aggFields '>' {
-		$$ = []*aggregate{{name: $1, val: $4}}
+		s := &aggregateLiteralNode{elements: $4}
+		s.setRange($3, $5)
+		a := &aggregateEntryNode{name: $1, val: s}
+		a.setRange($1, $5)
+		$$ = []*aggregateEntryNode{a}
 	}
 	| aggName '<' aggFields '>' {
-		$$ = []*aggregate{{name: $1, val: $3}}
+		s := &aggregateLiteralNode{elements: $3}
+		s.setRange($2, $4)
+		a := &aggregateEntryNode{name: $1, val: s}
+		a.setRange($1, $4)
+		$$ = []*aggregateEntryNode{a}
 	}
 
-aggName : _NAME
+aggName : _NAME {
+		$$ = &aggregateNameNode{name: $1}
+		$$.setRange($1, $1)
+	}
 	| '[' ident ']' {
-		$$ = "[" + $2 + "]"
+		$$ = &aggregateNameNode{name: $2, isExtension: true}
+		$$.setRange($1, $3)
 	}
 
 constantList : constant {
-		$$ = []interface{}{ $1 }
+		$$ = []valueNode{$1}
 	}
 	| constantList ',' constant {
 		$$ = append($1, $3)
 	}
 	| '<' aggFields '>' {
-		$$ = []interface{}{ $2 }
+		s := &aggregateLiteralNode{elements: $2}
+		s.setRange($1, $3)
+		$$ = []valueNode{s}
 	}
 	| constantList ','  '<' aggFields '>' {
-		$$ = append($1, $4)
+		s := &aggregateLiteralNode{elements: $4}
+		s.setRange($3, $5)
+		$$ = append($1, s)
 	}
 
 typeIdent : ident
 	| _TYPENAME
 
 field : _REQUIRED typeIdent name '=' _INT_LIT ';' {
-		checkTag(protolex, $5)
-		$$ = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_REQUIRED.Enum(), $2, $3, int32($5), nil)
+		checkTag(protolex, $5.val)
+		lbl := &labelNode{basicNode: $1.basicNode, required: true}
+		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
+		$$.setRange($1, $6)
 	}
 	| _OPTIONAL typeIdent name '=' _INT_LIT ';' {
-		checkTag(protolex, $5)
-		$$ = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), $2, $3, int32($5), nil)
+		checkTag(protolex, $5.val)
+		lbl := &labelNode{basicNode: $1.basicNode}
+		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
+		$$.setRange($1, $6)
 	}
 	| _REPEATED typeIdent name '=' _INT_LIT ';' {
-		checkTag(protolex, $5)
-		$$ = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), $2, $3, int32($5), nil)
+		checkTag(protolex, $5.val)
+		lbl := &labelNode{basicNode: $1.basicNode, repeated: true}
+		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
+		$$.setRange($1, $6)
 	}
 	| typeIdent name '=' _INT_LIT ';' {
-		checkTag(protolex, $4)
-		$$ = asFieldDescriptor(nil, $1, $2, int32($4), nil)
+		checkTag(protolex, $4.val)
+		$$ = &fieldNode{fldType: $1, name: $2, tag: $4}
+		$$.setRange($1, $5)
 	}
 	| _REQUIRED typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $5)
-		$$ = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_REQUIRED.Enum(), $2, $3, int32($5), $7)
+		checkTag(protolex, $5.val)
+		lbl := &labelNode{basicNode: $1.basicNode, required: true}
+		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
+		$$.setRange($1, $9)
 	}
 	| _OPTIONAL typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $5)
-		$$ = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(), $2, $3, int32($5), $7)
+		checkTag(protolex, $5.val)
+		lbl := &labelNode{basicNode: $1.basicNode}
+		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
+		$$.setRange($1, $9)
 	}
 	| _REPEATED typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $5)
-		$$ = asFieldDescriptor(dpb.FieldDescriptorProto_LABEL_REPEATED.Enum(), $2, $3, int32($5), $7)
+		checkTag(protolex, $5.val)
+		lbl := &labelNode{basicNode: $1.basicNode, repeated: true}
+		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
+		$$.setRange($1, $9)
 	}
 	| typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $4)
-		$$ = asFieldDescriptor(nil, $1, $2, int32($4), $6)
+		checkTag(protolex, $4.val)
+		$$ = &fieldNode{fldType: $1, name: $2, tag: $4, options: $6}
+		$$.setRange($1, $8)
 	}
 
 fieldOptions : fieldOptions ',' fieldOption {
@@ -343,34 +437,53 @@ fieldOptions : fieldOptions ',' fieldOption {
 	| fieldOption
 
 fieldOption: optionName '=' constant {
-		$$ = []*dpb.UninterpretedOption{asOption(protolex.(*protoLex), $1, $3)}
+		n := &optionNameNode{parts: $1}
+		n.setRange($1[0], $1[len($1)-1])
+		o := &optionNode{name: n, val: $3}
+		o.setRange($1[0], $3)
+		$$ = []*optionNode{o}
 	}
 
 group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageBody '}' {
-		checkTag(protolex, $5)
-		$$ = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_REQUIRED, $3, int32($5), $7)
+		checkTag(protolex, $5.val)
+		if !unicode.IsUpper(rune($3.val[0])) {
+			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
+		}
+		lbl := &labelNode{basicNode: $1.basicNode, required: true}
+		$$ = &groupNode{label: lbl, name: $3, tag: $5, decls: $7}
+		$$.setRange($1, $8)
 	}
 	| _OPTIONAL _GROUP name '=' _INT_LIT '{' messageBody '}' {
-		checkTag(protolex, $5)
-		$$ = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_OPTIONAL, $3, int32($5), $7)
+		checkTag(protolex, $5.val)
+		if !unicode.IsUpper(rune($3.val[0])) {
+			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
+		}
+		lbl := &labelNode{basicNode: $1.basicNode}
+		$$ = &groupNode{label: lbl, name: $3, tag: $5, decls: $7}
+		$$.setRange($1, $8)
 	}
 	| _REPEATED _GROUP name '=' _INT_LIT '{' messageBody '}' {
-		checkTag(protolex, $5)
-		$$ = asGroupDescriptor(protolex, dpb.FieldDescriptorProto_LABEL_REPEATED, $3, int32($5), $7)
+		checkTag(protolex, $5.val)
+		if !unicode.IsUpper(rune($3.val[0])) {
+			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
+		}
+		lbl := &labelNode{basicNode: $1.basicNode, repeated: true}
+		$$ = &groupNode{label: lbl, name: $3, tag: $5, decls: $7}
+		$$.setRange($1, $8)
 	}
 
 oneof : _ONEOF name '{' oneofBody '}' {
-		if len($4) == 0 {
-			protolex.Error(fmt.Sprintf("oneof must contain at least one field"))
-		}
-		$$ = &oneofDesc{name: $2}
-		for _, i := range $4 {
-			if i.fld != nil {
-				$$.fields = append($$.fields, i.fld)
-			} else if i.option != nil {
-				$$.options = append($$.options, i.option)
+		c := 0
+		for _, el := range $4 {
+			if el.field != nil {
+				c++
 			}
 		}
+		if c == 0 {
+			lexError(protolex, $1.start(), "oneof must contain at least one field")
+		}
+		$$ = &oneOfNode{name: $2, decls: $4}
+		$$.setRange($1, $5)
 	}
 
 oneofBody : oneofBody oneofItem {
@@ -382,31 +495,35 @@ oneofBody : oneofBody oneofItem {
 	}
 
 oneofItem : option {
-		$$ = []*msgDecl{ { option: $1[0] } }
+		$$ = []*oneOfElement{{option: $1[0]}}
 	}
 	| oneofField {
-		$$ = []*msgDecl{ { fld: $1 } }
+		$$ = []*oneOfElement{{field: $1}}
 	}
 	| ';' {
-		$$ = nil
+		$$ = []*oneOfElement{{empty: $1}}
 	}
 
 oneofField : typeIdent name '=' _INT_LIT ';' {
-		checkTag(protolex, $4)
-		$$ = asFieldDescriptor(nil, $1, $2, int32($4), nil)
+		checkTag(protolex, $4.val)
+		$$ = &fieldNode{fldType: $1, name: $2, tag: $4}
+		$$.setRange($1, $5)
 	}
 	| typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $4)
-		$$ = asFieldDescriptor(nil, $1, $2, int32($4), $6)
+		checkTag(protolex, $4.val)
+		$$ = &fieldNode{fldType: $1, name: $2, tag: $4, options: $6}
+		$$.setRange($1, $8)
 	}
 
 mapField : _MAP '<' keyType ',' typeIdent '>' name '=' _INT_LIT ';' {
-		checkTag(protolex, $9)
-		$$ = asMapField($3, $5, $7, int32($9), nil)
+		checkTag(protolex, $9.val)
+		$$ = &mapFieldNode{mapKeyword: $1, keyType: $3, valueType: $5, name: $7, tag: $9}
+		$$.setRange($1, $10)
 	}
 	| _MAP '<' keyType ',' typeIdent '>' name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $9)
-		$$ = asMapField($3, $5, $7, int32($9), $11)
+		checkTag(protolex, $9.val)
+		$$ = &mapFieldNode{mapKeyword: $1, keyType: $3, valueType: $5, name: $7, tag: $9, options: $11}
+		$$.setRange($1, $13)
 	}
 
 keyType : _INT32
@@ -423,10 +540,12 @@ keyType : _INT32
 	| _STRING
 
 extensions : _EXTENSIONS ranges ';' {
-		$$ = asExtensionRanges($2, nil)
+		$$ = &extensionRangeNode{ranges: $2}
+		$$.setRange($1, $3)
 	}
 	| _EXTENSIONS ranges '[' fieldOptions ']' ';' {
-		$$ = asExtensionRanges($2, $4)
+		$$ = &extensionRangeNode{ranges: $2, options: $4}
+		$$.setRange($1, $6)
 	}
 
 ranges : ranges ',' range {
@@ -435,57 +554,73 @@ ranges : ranges ',' range {
 	| range
 
 range : _INT_LIT {
-		if $1 > maxTag {
-			protolex.Error(fmt.Sprintf("range includes out-of-range tag: %d (should be between 0 and %d)", $1, maxTag))
+		if $1.val > maxTag {
+			lexError(protolex, $1.start(), fmt.Sprintf("range includes out-of-range tag: %d (should be between 0 and %d)", $1.val, maxTag))
 		}
-		$$ = []tagRange{{Start: int32($1), End: int32($1)+1}}
+		r := &rangeNode{st: $1, en: $1}
+		r.setRange($1, $1)
+		$$ = []*rangeNode{r}
 	}
 	| _INT_LIT _TO _INT_LIT {
-		if $1 > maxTag {
-			protolex.Error(fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", $1, maxTag))
+		if $1.val > maxTag {
+			lexError(protolex, $1.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", $1.val, maxTag))
 		}
-		if $3 > maxTag {
-			protolex.Error(fmt.Sprintf("range end is out-of-range tag: %d (should be between 0 and %d)", $3, maxTag))
+		if $3.val > maxTag {
+			lexError(protolex, $3.start(), fmt.Sprintf("range end is out-of-range tag: %d (should be between 0 and %d)", $3.val, maxTag))
 		}
-		if $1 > $3 {
-			protolex.Error(fmt.Sprintf("range, %d to %d, is invalid: start must be <= end", $1, $3))
+		if $1.val > $3.val {
+			lexError(protolex, $1.start(), fmt.Sprintf("range, %d to %d, is invalid: start must be <= end", $1.val, $3.val))
 		}
-		$$ = []tagRange{{Start: int32($1), End: int32($3)+1}}
+		r := &rangeNode{st: $1, en: $3}
+		r.setRange($1, $3)
+		$$ = []*rangeNode{r}
 	}
 	| _INT_LIT _TO _MAX {
-		if $1 > maxTag {
-			protolex.Error(fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", $1, maxTag))
+		if $1.val > maxTag {
+			lexError(protolex, $1.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", $1.val, maxTag))
 		}
-		$$ = []tagRange{{Start: int32($1), End: maxTag+1}}
+		m := &intLiteralNode{basicNode: $3.basicNode, val: maxTag}
+		r := &rangeNode{st: $1, en: m}
+		r.setRange($1, $3)
+		$$ = []*rangeNode{r}
 	}
 
 reserved : _RESERVED ranges ';' {
-		$$ = &reservedFields{ tags: $2 }
+		$$ = &reservedNode{ranges: $2}
+		$$.setRange($1, $3)
 	}
 	| _RESERVED fieldNames ';' {
 		rsvd := map[string]struct{}{}
 		for _, n := range $2 {
-			if _, ok := rsvd[n]; ok {
-				protolex.Error(fmt.Sprintf("field %q is reserved multiple times", n))
+			if _, ok := rsvd[n.val]; ok {
+				lexError(protolex, n.start(), fmt.Sprintf("field %q is reserved multiple times", n.val))
 				break
 			}
-			rsvd[n] = struct{}{}
+			rsvd[n.val] = struct{}{}
 		}
-		$$ = &reservedFields{ names: $2 }
+		$$ = &reservedNode{names: $2}
+		$$.setRange($1, $3)
 	}
 
 fieldNames : fieldNames ',' _STRING_LIT {
 		$$ = append($1, $3)
 	}
 	| _STRING_LIT {
-		$$ = []string{$1}
+		$$ = []*stringLiteralNode{$1}
 	}
 
 enum : _ENUM name '{' enumBody '}' {
-		if len($4) == 0 {
-			protolex.Error(fmt.Sprintf("enums must define at least one value"))
+		c := 0
+		for _, el := range $4 {
+			if el.value != nil {
+				c++
+			}
 		}
-		$$ = enumDeclsToProto($2, $4)
+		if c == 0 {
+			lexError(protolex, $1.start(), "enums must define at least one value")
+		}
+		$$ = &enumNode{name: $2, decls: $4}
+		$$.setRange($1, $5)
 	}
 
 enumBody : enumBody enumItem {
@@ -497,34 +632,39 @@ enumBody : enumBody enumItem {
 	}
 
 enumItem : option {
-		$$ = []*enumDecl{{ option: $1[0] }}
+		$$ = []*enumElement{{option: $1[0]}}
 	}
 	| enumField {
-		$$ = []*enumDecl{{ val: $1 }}
+		$$ = []*enumElement{{value: $1}}
 	}
 	| ';' {
-		$$ = nil
+		$$ = []*enumElement{{empty: $1}}
 	}
 
 enumField : name '=' intLit ';' {
-		checkUint64InInt32Range(protolex, $3)
-		$$ = asEnumValue($1, int32($3), nil)
+		checkUint64InInt32Range(protolex, $3.val)
+		$$ = &enumValueNode{name: $1, number: $3}
+		$$.setRange($1, $4)
 	}
 	|  name '=' intLit '[' fieldOptions ']' ';' {
-		checkUint64InInt32Range(protolex, $3)
-		$$ = asEnumValue($1, int32($3), $5)
+		checkUint64InInt32Range(protolex, $3.val)
+		$$ = &enumValueNode{name: $1, number: $3, options: $5}
+		$$.setRange($1, $7)
 	}
 	| name '=' negIntLit ';' {
-		checkInt64InInt32Range(protolex, $3)
-		$$ = asEnumValue($1, int32($3), nil)
+		checkInt64InInt32Range(protolex, $3.val)
+		$$ = &enumValueNode{name: $1, numberN: $3}
+		$$.setRange($1, $4)
 	}
 	|  name '=' negIntLit '[' fieldOptions ']' ';' {
-		checkInt64InInt32Range(protolex, $3)
-		$$ = asEnumValue($1, int32($3), $5)
+		checkInt64InInt32Range(protolex, $3.val)
+		$$ = &enumValueNode{name: $1, numberN: $3, options: $5}
+		$$.setRange($1, $7)
 	}
 
 message : _MESSAGE name '{' messageBody '}' {
-		$$ = msgDeclsToProto($2, $4)
+		$$ = &messageNode{name: $2, decls: $4}
+		$$.setRange($1, $5)
 	}
 
 messageBody : messageBody messageItem {
@@ -536,55 +676,51 @@ messageBody : messageBody messageItem {
 	}
 
 messageItem : field {
-		$$ = []*msgDecl{{ fld: $1 }}
+		$$ = []*messageElement{{field: $1}}
 	}
 	| enum {
-		$$ = []*msgDecl{{ enum: $1 }}
+		$$ = []*messageElement{{enum: $1}}
 	}
 	| message {
-		$$ = []*msgDecl{{ msg: $1 }}
+		$$ = []*messageElement{{nested: $1}}
 	}
 	| extend {
-		$$ = []*msgDecl{{ extend: $1 }}
+		$$ = []*messageElement{{extend: $1}}
 	}
 	| extensions {
-		$$ = []*msgDecl{{ extensions: $1 }}
+		$$ = []*messageElement{{extensionRange: $1}}
 	}
 	| group {
-		$$ = []*msgDecl{{ grp: $1 }}
+		$$ = []*messageElement{{group: $1}}
 	}
 	| option {
-		$$ = []*msgDecl{{ option: $1[0] }}
+		$$ = []*messageElement{{option: $1[0]}}
 	}
 	| oneof {
-		$$ = []*msgDecl{{ oneof: $1 }}
+		$$ = []*messageElement{{oneOf: $1}}
 	}
 	| mapField {
-		$$ = []*msgDecl{{ grp: $1 }}
+		$$ = []*messageElement{{mapField: $1}}
 	}
 	| reserved {
-		$$ = []*msgDecl{{ reserved: $1 }}
+		$$ = []*messageElement{{reserved: $1}}
 	}
 	| ';' {
-		$$ = nil
+		$$ = []*messageElement{{empty: $1}}
 	}
 
 extend : _EXTEND typeIdent '{' extendBody '}' {
-		if len($4) == 0 {
-			protolex.Error(fmt.Sprintf("extend sections must define at least one extension"))
-		}
-		$$ = &extendBlock{}
-		for _, i := range $4 {
-			var fd *dpb.FieldDescriptorProto
-			if i.fld != nil {
-				fd = i.fld
-			} else if i.grp != nil {
-				fd = i.grp.field
-				$$.msgs = append($$.msgs, i.grp.msg)
+		c := 0
+		for _, el := range $4 {
+			if el.field != nil || el.group != nil {
+				c++
 			}
-			fd.Extendee = proto.String($2)
-			$$.fields = append($$.fields, fd)
 		}
+		if c == 0 {
+			lexError(protolex, $1.start(), "extend sections must define at least one extension")
+		}
+		$$ = &extendNode{extendee: $2, decls: $4}
+		$$.setRange($1, $5)
 	}
 
 extendBody : extendBody extendItem {
@@ -596,17 +732,18 @@ extendBody : extendBody extendItem {
 	}
 
 extendItem : field {
-		$$ = []*msgDecl{{ fld: $1 }}
+		$$ = []*extendElement{{field: $1}}
 	}
 	| group {
-		$$ = []*msgDecl{{ grp: $1 }}
+		$$ = []*extendElement{{group: $1}}
 	}
 	| ';' {
-		$$ = nil
+		$$ = []*extendElement{{empty: $1}}
 	}
 
 service : _SERVICE name '{' serviceBody '}' {
-		$$ = svcDeclsToProto($2, $4)
+		$$ = &serviceNode{name: $2, decls: $4}
+		$$.setRange($1, $5)
 	}
 
 serviceBody : serviceBody serviceItem {
@@ -621,27 +758,31 @@ serviceBody : serviceBody serviceItem {
 // it does not appear to be supported in protoc (doc is likely from grammar for
 // Google-internal version of protoc, with support for streaming stubby)
 serviceItem : option {
-		$$ = []*serviceDecl{{option: $1[0]}}
+		$$ = []*serviceElement{{option: $1[0]}}
 	}
 	| rpc {
-		$$ = []*serviceDecl{{rpc: $1}}
+		$$ = []*serviceElement{{rpc: $1}}
 	}
 	| ';' {
-		$$ = nil
+		$$ = []*serviceElement{{empty: $1}}
 	}
 
 rpc : _RPC name '(' rpcType ')' _RETURNS '(' rpcType ')' ';' {
-		$$ = asMethodDescriptor($2, $4, $8, nil)
+		$$ = &methodNode{name: $2, input: $4, output: $8}
+		$$.setRange($1, $10)
 	}
 	| _RPC name '(' rpcType ')' _RETURNS '(' rpcType ')' '{' rpcOptions '}' {
-		$$ = asMethodDescriptor($2, $4, $8, $11)
+		$$ = &methodNode{name: $2, input: $4, output: $8, options: $11}
+		$$.setRange($1, $12)
 	}
 
 rpcType : _STREAM typeIdent {
-		$$ = &rpcType{msgType: $2, stream: true}
+		$$ = &rpcTypeNode{msgType: $2, stream: true}
+		$$.setRange($1, $2)
 	}
 	| typeIdent {
-		$$ = &rpcType{msgType: $1}
+		$$ = &rpcTypeNode{msgType: $1}
+		$$.setRange($1, $1)
 	}
 
 rpcOptions : rpcOptions rpcOption {
