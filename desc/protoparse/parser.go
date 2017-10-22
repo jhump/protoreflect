@@ -81,8 +81,10 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 			var ret error
 			for _, path := range paths {
 				f, err := acc(filepath.Join(path, name))
-				if err != nil && ret == nil {
-					ret = err
+				if err != nil {
+					if ret == nil {
+						ret = err
+					}
 					continue
 				}
 				return f, nil
