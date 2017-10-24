@@ -54,7 +54,7 @@ type protoLex struct {
 	colNo  int
 	offset int
 
-	prevSym node
+	prevSym terminalNode
 }
 
 func newLexer(in io.Reader) *protoLex {
@@ -156,8 +156,50 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			leading:  comments,
 		}
 	}
-	setPrev := func(n node) {
-		// TODO: move detached leading comments over to prev's trailing if appropriate
+	setPrev := func(n terminalNode) {
+		if l.prevSym != nil && len(n.leadingComments()) > 0 && l.prevSym.end().Line < n.start().Line {
+			// we may need to re-attribute the first comment to
+			// instead be previous node's trailing comment
+			prevEnd := l.prevSym.end().Line
+			comments := n.leadingComments()
+			c := comments[0]
+			commentStart := c.start.Line
+			if commentStart == prevEnd {
+				// comment is on same line as previous symbol
+				n.popLeadingComment()
+				l.prevSym.pushTrailingComment(c)
+			} else if commentStart == prevEnd+1 {
+				// comment is right after previous symbol; see if it is detached
+				// and if so re-attribute
+				singleLineStyle := strings.HasPrefix(c.text, "//")
+				line := c.end.Line
+				for i := 1; i < len(comments); i++ {
+					c := comments[i]
+					newGroup := false
+					if !singleLineStyle || c.start.Line > line+1 {
+						// we've found a gap between comments, which means the
+						// previous comments were detached
+						newGroup = true
+					} else {
+						line = c.end.Line
+						singleLineStyle = strings.HasPrefix(comments[i].text, "//")
+						if !singleLineStyle {
+							// we've found a switch from // comments to /*
+							// consider that a new group which means the
+							// previous comments were detached
+							newGroup = true
+						}
+					}
+					if newGroup {
+						for j := 0; j < i; j++ {
+							l.prevSym.pushTrailingComment(n.popLeadingComment())
+						}
+						break
+					}
+				}
+			}
+		}
+
 		l.prevSym = n
 	}
 	setString := func(val string) {
@@ -197,6 +239,10 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			return _ERROR
 		}
 
+		prevLineNo = l.lineNo
+		prevColNo = l.colNo
+		prevOffset = l.offset
+
 		l.offset += n
 		if c == '\n' {
 			l.colNo = 0
@@ -205,18 +251,10 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 		} else if c == '\r' {
 			continue
 		}
-		if c == '\t' {
-			l.colNo += 4
-		} else {
-			l.colNo++
-		}
+		l.colNo++
 		if c == ' ' || c == '\t' {
 			continue
 		}
-
-		prevLineNo = l.lineNo
-		prevColNo = l.colNo
-		prevOffset = l.offset
 
 		if c == '.' {
 			// tokens that start with a dot include type names and decimal literals
