@@ -30,6 +30,12 @@ type node interface {
 	trailingComment() []*comment
 }
 
+type terminalNode interface {
+	node
+	popLeadingComment() *comment
+	pushTrailingComment(*comment)
+}
+
 type posRange struct {
 	start, end *SourcePos
 }
@@ -54,6 +60,16 @@ func (n *basicNode) leadingComments() []*comment {
 
 func (n *basicNode) trailingComment() []*comment {
 	return n.trailing
+}
+
+func (n *basicNode) popLeadingComment() *comment {
+	c := n.leading[0]
+	n.leading = n.leading[1:]
+	return c
+}
+
+func (n *basicNode) pushTrailingComment(c *comment) {
+	n.trailing = append(n.trailing, c)
 }
 
 type comment struct {
@@ -272,6 +288,14 @@ type floatLiteralNode struct {
 
 func (n *floatLiteralNode) value() interface{} {
 	return n.val
+}
+
+func (n *floatLiteralNode) popLeadingComment() *comment {
+	return n.first.(terminalNode).popLeadingComment()
+}
+
+func (n *floatLiteralNode) pushTrailingComment(c *comment) {
+	n.last.(terminalNode).pushTrailingComment(c)
 }
 
 type boolLiteralNode struct {
