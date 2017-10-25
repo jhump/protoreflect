@@ -691,23 +691,23 @@ func toNameParts(ident *identNode, offset int) []*optionNamePartNode {
 	return ret
 }
 
-func checkUint64InInt32Range(lex protoLexer, v uint64) {
+func checkUint64InInt32Range(lex protoLexer, pos *SourcePos, v uint64) {
 	if v > math.MaxInt32 {
-		lex.Error(fmt.Sprintf("constant %d is out of range for int32 (%d to %d)", v, math.MinInt32, math.MaxInt32))
+		lexError(lex, pos, fmt.Sprintf("constant %d is out of range for int32 (%d to %d)", v, math.MinInt32, math.MaxInt32))
 	}
 }
 
-func checkInt64InInt32Range(lex protoLexer, v int64) {
+func checkInt64InInt32Range(lex protoLexer, pos *SourcePos, v int64) {
 	if v > math.MaxInt32 || v < math.MinInt32 {
-		lex.Error(fmt.Sprintf("constant %d is out of range for int32 (%d to %d)", v, math.MinInt32, math.MaxInt32))
+		lexError(lex, pos, fmt.Sprintf("constant %d is out of range for int32 (%d to %d)", v, math.MinInt32, math.MaxInt32))
 	}
 }
 
-func checkTag(lex protoLexer, v uint64) {
+func checkTag(lex protoLexer, pos *SourcePos, v uint64) {
 	if v > maxTag {
-		lex.Error(fmt.Sprintf("tag number %d is higher than max allowed tag number (%d)", v, maxTag))
+		lexError(lex, pos, fmt.Sprintf("tag number %d is higher than max allowed tag number (%d)", v, maxTag))
 	} else if v >= specialReservedStart && v <= specialReservedEnd {
-		lex.Error(fmt.Sprintf("tag number %d is in disallowed reserved range %d-%d", v, specialReservedStart, specialReservedEnd))
+		lexError(lex, pos, fmt.Sprintf("tag number %d is in disallowed reserved range %d-%d", v, specialReservedStart, specialReservedEnd))
 	}
 }
 
@@ -818,122 +818,122 @@ func writeEscapedBytes(buf *bytes.Buffer, b []byte) {
 
 func basicValidate(res *parseResult) error {
 	fd := res.fd
-	// TODO: include position information in errors
-	if fd.Syntax != nil && fd.GetSyntax() != "proto2" && fd.GetSyntax() != "proto3" {
-		return fmt.Errorf(`file %q: syntax must be "proto2" or "proto3", instead found %q`, fd.GetName(), fd.GetSyntax())
-	}
 	isProto3 := fd.GetSyntax() == "proto3"
 
 	for _, md := range fd.MessageType {
-		if err := validateMessage(fd, isProto3, "", md); err != nil {
+		if err := validateMessage(res, isProto3, "", md); err != nil {
 			return err
 		}
 	}
 
 	for _, ed := range fd.EnumType {
-		if err := validateEnum(fd, isProto3, "", ed); err != nil {
+		if err := validateEnum(res, isProto3, "", ed); err != nil {
 			return err
 		}
 	}
 
 	for _, fld := range fd.Extension {
-		if err := validateField(fd, isProto3, "", fld); err != nil {
+		if err := validateField(res, isProto3, "", fld); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateMessage(fd *dpb.FileDescriptorProto, isProto3 bool, prefix string, md *dpb.DescriptorProto) error {
+func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.DescriptorProto) error {
 	nextPrefix := md.GetName() + "."
 
-	if md.GetOptions().GetMapEntry() && !isProto3 {
-		// we build map fields without a label, but it should
-		// instead be "optional" for proto2 messages
-		for _, fld := range md.Field {
-			if fld.Label == nil {
-				fld.Label = dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
-			}
-		}
-	}
-
 	for _, fld := range md.Field {
-		if err := validateField(fd, isProto3, nextPrefix, fld); err != nil {
+		if err := validateField(res, isProto3, nextPrefix, fld); err != nil {
 			return err
 		}
 	}
 	for _, fld := range md.Extension {
-		if err := validateField(fd, isProto3, nextPrefix, fld); err != nil {
+		if err := validateField(res, isProto3, nextPrefix, fld); err != nil {
 			return err
 		}
 	}
 	for _, ed := range md.EnumType {
-		if err := validateEnum(fd, isProto3, nextPrefix, ed); err != nil {
+		if err := validateEnum(res, isProto3, nextPrefix, ed); err != nil {
 			return err
 		}
 	}
 	for _, nmd := range md.NestedType {
-		if err := validateMessage(fd, isProto3, nextPrefix, nmd); err != nil {
+		if err := validateMessage(res, isProto3, nextPrefix, nmd); err != nil {
 			return err
 		}
 	}
 
+	scope := fmt.Sprintf("message %s%s", prefix, md.GetName())
+
 	if isProto3 && len(md.ExtensionRange) > 0 {
-		return fmt.Errorf("file %q: message %s%s: extension ranges are not allowed in proto3", fd.GetName(), prefix, md.GetName())
+		n := res.nodes[md.ExtensionRange[0]].(*rangeNode)
+		return ErrorWithSourcePos{Pos: n.start(), Underlying: fmt.Errorf("%s: extension ranges are not allowed in proto3", scope)}
 	}
 
-	if index, err := findOption(md.Options.GetUninterpretedOption(), "map_entry"); err != nil {
-		return fmt.Errorf("file %q: message %s%s: %s", fd.GetName(), prefix, md.GetName(), err)
+	if index, err := findOption(res, scope, md.Options.GetUninterpretedOption(), "map_entry"); err != nil {
+		return err
 	} else if index >= 0 {
 		opt := md.Options.UninterpretedOption[index]
+		optn := res.nodes[opt].(*optionNode)
 		md.Options.UninterpretedOption = removeOption(md.Options.UninterpretedOption, index)
 		valid := false
 		if opt.IdentifierValue != nil {
 			if opt.GetIdentifierValue() == "true" {
-				return fmt.Errorf("file %q: message %s%s: map_entry option should not be set explicitly; use map type instead", fd.GetName(), prefix, md.GetName())
+				return ErrorWithSourcePos{Pos: optn.val.start(), Underlying: fmt.Errorf("%s: map_entry option should not be set explicitly; use map type instead", scope)}
 			} else if opt.GetIdentifierValue() == "false" {
 				md.Options.MapEntry = proto.Bool(false)
 				valid = true
 			}
 		}
 		if !valid {
-			return fmt.Errorf("file %q: message %s%s: expecting bool value for map_entry option", fd.GetName(), prefix, md.GetName())
+			return ErrorWithSourcePos{Pos: optn.val.start(), Underlying: fmt.Errorf("%s: expecting bool value for map_entry option", scope)}
 		}
 	}
 
 	// reserved ranges should not overlap
 	rsvd := make(tagRanges, len(md.ReservedRange))
 	for i, r := range md.ReservedRange {
-		rsvd[i] = tagRange{Start: r.GetStart(), End: r.GetEnd()}
+		n := res.nodes[r].(*rangeNode)
+		rsvd[i] = tagRange{start: r.GetStart(), end: r.GetEnd(), node: n}
+
 	}
 	sort.Sort(rsvd)
 	for i := 1; i < len(rsvd); i++ {
-		if rsvd[i].Start < rsvd[i-1].End {
-			return fmt.Errorf("file %s: message %s%s: reserved ranges overlap: %d to %d and %d to %d", fd.GetName(), prefix, md.GetName(), rsvd[i-1].Start, rsvd[i-1].End-1, rsvd[i].Start, rsvd[i].End-1)
+		if rsvd[i].start < rsvd[i-1].end {
+			return ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end-1, rsvd[i].start, rsvd[i].end-1) }
 		}
 	}
 
 	// extensions ranges should not overlap
 	exts := make(tagRanges, len(md.ExtensionRange))
 	for i, r := range md.ExtensionRange {
-		exts[i] = tagRange{Start: r.GetStart(), End: r.GetEnd()}
+		n := res.nodes[r].(*rangeNode)
+		exts[i] = tagRange{start: r.GetStart(), end: r.GetEnd(), node: n}
 	}
 	sort.Sort(exts)
 	for i := 1; i < len(exts); i++ {
-		if exts[i].Start < exts[i-1].End {
-			return fmt.Errorf("file %s: message %s%s: extension ranges overlap: %d to %d and %d to %d", fd.GetName(), prefix, md.GetName(), exts[i-1].Start, exts[i-1].End-1, exts[i].Start, exts[i].End-1)
+		if exts[i].start < exts[i-1].end {
+			return ErrorWithSourcePos{Pos: exts[i].node.start(), Underlying: fmt.Errorf("%s: extension ranges overlap: %d to %d and %d to %d", scope, exts[i-1].start, exts[i-1].end-1, exts[i].start, exts[i].end-1)}
 		}
 	}
 
 	// see if any extension range overlaps any reserved range
 	var i, j int // i indexes rsvd; j indexes exts
 	for i < len(rsvd) && j < len(exts) {
-		if rsvd[i].Start >= exts[j].Start && rsvd[i].Start < exts[j].End ||
-			exts[j].Start >= rsvd[i].Start && exts[j].Start < rsvd[i].End {
+		if rsvd[i].start >= exts[j].start && rsvd[i].start < exts[j].end ||
+			exts[j].start >= rsvd[i].start && exts[j].start < rsvd[i].end {
+
+			var pos *SourcePos
+			if rsvd[i].start >= exts[j].start && rsvd[i].start < exts[j].end {
+				pos = rsvd[i].node.start()
+			} else {
+				pos = exts[j].node.start()
+			}
 			// ranges overlap
-			return fmt.Errorf("file %s: message %s%s: extension range %d to %d overlaps reserved range %d to %d", fd.GetName(), prefix, md.GetName(), exts[j].Start, exts[j].End-1, rsvd[i].Start, rsvd[i].End-1)
+			return ErrorWithSourcePos{Pos: pos, Underlying: fmt.Errorf("%s: extension range %d to %d overlaps reserved range %d to %d", scope, exts[j].start, exts[j].end-1, rsvd[i].start, rsvd[i].end-1)}
 		}
-		if rsvd[i].Start < exts[j].Start {
+		if rsvd[i].start < exts[j].start {
 			i++
 		} else {
 			j++
@@ -948,31 +948,34 @@ func validateMessage(fd *dpb.FileDescriptorProto, isProto3 bool, prefix string, 
 	}
 	fieldTags := map[int32]string{}
 	for _, fld := range md.Field {
+		fn := res.nodes[fld].(fieldDecl)
 		if _, ok := rsvdNames[fld.GetName()]; ok {
-			return fmt.Errorf("file %s: message %s%s: field %s is using a reserved name", fd.GetName(), prefix, md.GetName(), fld.GetName())
+			return ErrorWithSourcePos{Pos: fn.fieldName().start(), Underlying: fmt.Errorf("%s: field %s is using a reserved name", scope, fld.GetName())}
 		}
 		if existing := fieldTags[fld.GetNumber()]; existing != "" {
-			return fmt.Errorf("file %s: message %s%s: fields %s and %s both have the same tag %d", fd.GetName(), prefix, md.GetName(), existing, fld.GetName(), fld.GetNumber())
+			return ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: fields %s and %s both have the same tag %d", scope, existing, fld.GetName(), fld.GetNumber())}
 		}
 		fieldTags[fld.GetNumber()] = fld.GetName()
 		// check reserved ranges
-		r := sort.Search(len(rsvd), func(index int) bool { return rsvd[index].End > fld.GetNumber() })
-		if r < len(rsvd) && rsvd[r].Start <= fld.GetNumber() {
-			return fmt.Errorf("file %s: message %s%s: field %s is using tag %d which is in reserved range %d to %d", fd.GetName(), prefix, md.GetName(), fld.GetName(), fld.GetNumber(), rsvd[r].Start, rsvd[r].End-1)
+		r := sort.Search(len(rsvd), func(index int) bool { return rsvd[index].end > fld.GetNumber() })
+		if r < len(rsvd) && rsvd[r].start <= fld.GetNumber() {
+			return ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: field %s is using tag %d which is in reserved range %d to %d", scope, fld.GetName(), fld.GetNumber(), rsvd[r].start, rsvd[r].end-1)}
 		}
 		// and check extension ranges
-		e := sort.Search(len(exts), func(index int) bool { return exts[index].End > fld.GetNumber() })
-		if e < len(exts) && exts[e].Start <= fld.GetNumber() {
-			return fmt.Errorf("file %s: message %s%s: field %s is using tag %d which is in extension range %d to %d", fd.GetName(), prefix, md.GetName(), fld.GetName(), fld.GetNumber(), exts[e].Start, exts[e].End-1)
+		e := sort.Search(len(exts), func(index int) bool { return exts[index].end > fld.GetNumber() })
+		if e < len(exts) && exts[e].start <= fld.GetNumber() {
+			return ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: field %s is using tag %d which is in extension range %d to %d", scope, fld.GetName(), fld.GetNumber(), exts[e].start, exts[e].end-1)}
 		}
 	}
 
 	return nil
 }
 
-func validateEnum(fd *dpb.FileDescriptorProto, isProto3 bool, prefix string, ed *dpb.EnumDescriptorProto) error {
-	if index, err := findOption(ed.Options.GetUninterpretedOption(), "allow_alias"); err != nil {
-		return fmt.Errorf("file %q: enum %s%s: %s", fd.GetName(), prefix, ed.GetName(), err)
+func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDescriptorProto) error {
+	scope := fmt.Sprintf("enum %s%s", prefix, ed.GetName())
+
+	if index, err := findOption(res, scope, ed.Options.GetUninterpretedOption(), "allow_alias"); err != nil {
+		return err
 	} else if index >= 0 {
 		opt := ed.Options.UninterpretedOption[index]
 		ed.Options.UninterpretedOption = removeOption(ed.Options.UninterpretedOption, index)
@@ -987,12 +990,18 @@ func validateEnum(fd *dpb.FileDescriptorProto, isProto3 bool, prefix string, ed 
 			}
 		}
 		if !valid {
-			return fmt.Errorf("file %q: enum %s%s: expecting bool value for allow_alias option", fd.GetName(), prefix, ed.GetName())
+			optNode := res.nodes[opt].(*optionNode)
+			return ErrorWithSourcePos{Pos: optNode.val.start(), Underlying: fmt.Errorf("%s: expecting bool value for allow_alias option", scope)}
 		}
 	}
 
 	if isProto3 && ed.Value[0].GetNumber() != 0 {
-		return fmt.Errorf("file %q: enum %s%s: proto3 requires that first value in enum have numeric value of 0", fd.GetName(), prefix, ed.GetName())
+		evNode := res.nodes[ed.Value[0]].(*enumValueNode)
+		var n node = evNode.number
+		if n == nil {
+			n = evNode.numberN
+		}
+		return ErrorWithSourcePos{Pos: n.start(), Underlying: fmt.Errorf("%s: proto3 requires that first value in enum have numeric value of 0", scope)}
 	}
 
 	if !ed.Options.GetAllowAlias() {
@@ -1000,7 +1009,12 @@ func validateEnum(fd *dpb.FileDescriptorProto, isProto3 bool, prefix string, ed 
 		vals := map[int32]string{}
 		for _, evd := range ed.Value {
 			if existing := vals[evd.GetNumber()]; existing != "" {
-				return fmt.Errorf("file %s: enum %s%s: values %s and %s both have the same numeric value %d; use allow_alias option if intentional", fd.GetName(), prefix, ed.GetName(), existing, evd.GetName(), evd.GetNumber())
+				evNode := res.nodes[evd].(*enumValueNode)
+				var n node = evNode.number
+				if n == nil {
+					n = evNode.numberN
+				}
+				return ErrorWithSourcePos{Pos: n.start(), Underlying: fmt.Errorf("%s: values %s and %s both have the same numeric value %d; use allow_alias option if intentional", scope, existing, evd.GetName(), evd.GetNumber())}
 			}
 			vals[evd.GetNumber()] = evd.GetName()
 		}
@@ -1009,33 +1023,36 @@ func validateEnum(fd *dpb.FileDescriptorProto, isProto3 bool, prefix string, ed 
 	return nil
 }
 
-func validateField(fd *dpb.FileDescriptorProto, isProto3 bool, prefix string, fld *dpb.FieldDescriptorProto) error {
+func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.FieldDescriptorProto) error {
+	scope := fmt.Sprintf("field %s%s", prefix, fld.GetName())
+
+	node := res.nodes[fld].(fieldDecl)
 	if isProto3 {
 		if fld.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP {
-			return fmt.Errorf("file %q: group %s%s: groups are not allowed in proto3", fd.GetName(), prefix, fld.GetTypeName())
+			n := node.(*groupNode)
+			return ErrorWithSourcePos{Pos: n.groupKeyword.start(), Underlying: fmt.Errorf("%s: groups are not allowed in proto3", scope)}
 		}
 		if fld.Label != nil && fld.GetLabel() != dpb.FieldDescriptorProto_LABEL_REPEATED {
-			return fmt.Errorf("file %q: field %s%s: field has label %v, but proto3 should omit labels other than 'repeated'",
-				fd.GetName(), prefix, fld.GetName(), fld.GetLabel())
+			return ErrorWithSourcePos{Pos: node.fieldLabel().start(), Underlying: fmt.Errorf("%s: field has label %v, but proto3 should omit labels other than 'repeated'", scope, fld.GetLabel())}
 		}
-		if index, err := findOption(fld.Options.GetUninterpretedOption(), "default"); err != nil {
-			return fmt.Errorf("file %q: field %s%s: %s", fd.GetName(), prefix, fld.GetName(), err)
+		if index, err := findOption(res, scope, fld.Options.GetUninterpretedOption(), "default"); err != nil {
+			return err
 		} else if index >= 0 {
-			return fmt.Errorf("file %q: field %s%s: default values are not allowed in proto3", fd.GetName(), prefix, fld.GetName())
+			optNode := res.nodes[fld.Options.GetUninterpretedOption()[index]].(*optionNode)
+			return ErrorWithSourcePos{Pos: optNode.name.start(), Underlying: fmt.Errorf("%s: default values are not allowed in proto3", scope)}
 		}
 	} else {
 		if fld.Label == nil && fld.OneofIndex == nil {
-			return fmt.Errorf("file %q: field %s%s: field has no label, but proto2 must indicate 'optional' or 'required'",
-				fd.GetName(), prefix, fld.GetName())
+			return ErrorWithSourcePos{Pos: node.fieldName().start(), Underlying: fmt.Errorf("%s: field has no label, but proto2 must indicate 'optional' or 'required'", scope)}
 		}
 		if fld.GetExtendee() != "" && fld.Label != nil && fld.GetLabel() == dpb.FieldDescriptorProto_LABEL_REQUIRED {
-			return fmt.Errorf("file %q: field %s%s: extension fields cannot be 'required'", fd.GetName(), prefix, fld.GetName())
+			return ErrorWithSourcePos{Pos: node.fieldLabel().start(), Underlying: fmt.Errorf("%s: extension fields cannot be 'required'", scope)}
 		}
 	}
 
 	// process json_name pseudo-option
-	if index, err := findOption(fld.Options.GetUninterpretedOption(), "json_name"); err != nil {
-		return fmt.Errorf("file %q: field %s%s: %s", fd.GetName(), prefix, fld.GetName(), err)
+	if index, err := findOption(res, scope, fld.Options.GetUninterpretedOption(), "json_name"); err != nil {
+		return err
 	} else if index >= 0 {
 		opt := fld.Options.UninterpretedOption[index]
 		if len(fld.Options.UninterpretedOption) == 1 {
@@ -1045,7 +1062,8 @@ func validateField(fd *dpb.FileDescriptorProto, isProto3 bool, prefix string, fl
 			fld.Options.UninterpretedOption = removeOption(fld.Options.UninterpretedOption, index)
 		}
 		if opt.StringValue == nil {
-			return fmt.Errorf("file %q: field %s%s: expecting string value for json_name option", fd.GetName(), prefix, fld.GetName())
+			optNode := res.nodes[opt].(*optionNode)
+			return ErrorWithSourcePos{Pos: optNode.val.start(), Underlying: fmt.Errorf("%s: expecting string value for json_name option", scope)}
 		}
 		fld.JsonName = proto.String(string(opt.StringValue))
 	}
@@ -1057,7 +1075,7 @@ func validateField(fd *dpb.FileDescriptorProto, isProto3 bool, prefix string, fl
 	return nil
 }
 
-func findOption(opts []*dpb.UninterpretedOption, name string) (int, error) {
+func findOption(res *parseResult, scope string, opts []*dpb.UninterpretedOption, name string) (int, error) {
 	found := -1
 	for i, opt := range opts {
 		if len(opt.Name) != 1 {
@@ -1067,7 +1085,8 @@ func findOption(opts []*dpb.UninterpretedOption, name string) (int, error) {
 			continue
 		}
 		if found >= 0 {
-			return -1, fmt.Errorf("option %s cannot be defined more than once", name)
+			optNode := res.nodes[opt].(*optionNode)
+			return -1, ErrorWithSourcePos{Pos: optNode.name.start(), Underlying: fmt.Errorf("option %s cannot be defined more than once", name)}
 		}
 		found = i
 	}
@@ -1085,8 +1104,9 @@ func removeOption(uo []*dpb.UninterpretedOption, indexToRemove int) []*dpb.Unint
 }
 
 type tagRange struct {
-	Start int32
-	End   int32
+	start int32
+	end   int32
+	node  *rangeNode
 }
 
 type tagRanges []tagRange
@@ -1096,8 +1116,8 @@ func (r tagRanges) Len() int {
 }
 
 func (r tagRanges) Less(i, j int) bool {
-	return r[i].Start < r[j].Start ||
-		(r[i].Start == r[j].Start && r[i].End < r[j].End)
+	return r[i].start < r[j].start ||
+		(r[i].start == r[j].start && r[i].end < r[j].end)
 }
 
 func (r tagRanges) Swap(i, j int) {

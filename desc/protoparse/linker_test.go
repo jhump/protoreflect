@@ -162,19 +162,19 @@ func TestLinkerValidation(t *testing.T) {
 			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ repeated string a = 1 [default = \"abc\"]; }",
 			},
-			"file \"foo.proto\": default value cannot be set for field fu.baz.foobar.a because it is repeated",
+			"foo.proto:1:56: field fu.baz.foobar.a: default value cannot be set because field is repeated",
 		},
 		{
 			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ optional foobar a = 1 [default = { a: {} }]; }",
 			},
-			"file \"foo.proto\": default value cannot be set for field fu.baz.foobar.a because it is a message",
+			"foo.proto:1:56: field fu.baz.foobar.a: default value cannot be set because field is a message",
 		},
 		{
 			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ optional string a = 1 [default = { a: \"abc\" }]; }",
 			},
-			"file \"foo.proto\": default value for field fu.baz.foobar.a cannot be an aggregate",
+			"foo.proto:1:66: field fu.baz.foobar.a: default value cannot be an aggregate",
 		},
 		{
 			map[string]string{

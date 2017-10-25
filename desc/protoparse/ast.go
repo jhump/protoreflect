@@ -386,10 +386,11 @@ type labelNode struct {
 
 type groupNode struct {
 	basicCompositeNode
-	label *labelNode
-	name  *identNode
-	tag   *intLiteralNode
-	decls []*messageElement
+	groupKeyword *identNode
+	label        *labelNode
+	name         *identNode
+	tag          *intLiteralNode
+	decls        []*messageElement
 
 	// This field is populated after parsing, to make it easier to find them
 	// without searching decls. The parse result has a map of descriptors to

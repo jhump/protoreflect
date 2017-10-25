@@ -714,7 +714,7 @@ func (l *linker) interpretFieldOptions(fld *desc.FieldDescriptor) error {
 	if opts != nil {
 		if len(opts.UninterpretedOption) > 0 {
 			uo := opts.UninterpretedOption
-			if i, err := processDefaultOption(fld, uo); err != nil {
+			if i, err := processDefaultOption(l.files[fld.GetFile().GetName()], fld, uo); err != nil {
 				return err
 			} else if i >= 0 {
 				if len(uo) == 1 {
@@ -739,26 +739,25 @@ func (l *linker) interpretFieldOptions(fld *desc.FieldDescriptor) error {
 	return nil
 }
 
-func processDefaultOption(fld *desc.FieldDescriptor, uos []*dpb.UninterpretedOption) (defaultIndex int, err error) {
-	found, err := findOption(uos, "default")
+func processDefaultOption(res *parseResult, fld *desc.FieldDescriptor, uos []*dpb.UninterpretedOption) (defaultIndex int, err error) {
+	scope := fmt.Sprintf("field %s", fld.GetFullyQualifiedName())
+	found, err := findOption(res, scope, uos, "default")
 	if err != nil {
-		return -1, fmt.Errorf("file %q: field %s: %s", fld.GetFile().GetName(), fld.GetFullyQualifiedName(), err)
+		return -1, err
 	} else if found == -1 {
 		return -1, nil
 	}
 	opt := uos[found]
+	optNode := res.nodes[opt].(*optionNode)
 	if fld.IsRepeated() {
-		return -1, fmt.Errorf("file %q: default value cannot be set for field %s because it is repeated",
-			fld.GetFile().GetName(), fld.GetFullyQualifiedName())
+		return -1, ErrorWithSourcePos{Pos: optNode.name.start(), Underlying: fmt.Errorf("%s: default value cannot be set because field is repeated", scope)}
 	}
 	if fld.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP || fld.GetType() == dpb.FieldDescriptorProto_TYPE_MESSAGE {
-		return -1, fmt.Errorf("file %q: default value cannot be set for field %s because it is a message",
-			fld.GetFile().GetName(), fld.GetFullyQualifiedName())
+		return -1, ErrorWithSourcePos{Pos: optNode.name.start(), Underlying: fmt.Errorf("%s: default value cannot be set because field is a message", scope)}
 	}
 	var val interface{}
 	if opt.AggregateValue != nil {
-		return -1, fmt.Errorf("file %q: default value for field %s cannot be an aggregate",
-			fld.GetFile().GetName(), fld.GetFullyQualifiedName())
+		return -1, ErrorWithSourcePos{Pos: optNode.val.start(), Underlying: fmt.Errorf("%s: default value cannot be an aggregate", scope)}
 	} else if opt.DoubleValue != nil {
 		val = opt.GetDoubleValue()
 	} else if opt.IdentifierValue != nil {

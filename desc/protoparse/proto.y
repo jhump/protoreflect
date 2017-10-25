@@ -385,48 +385,48 @@ typeIdent : ident
 	| _TYPENAME
 
 field : _REQUIRED typeIdent name '=' _INT_LIT ';' {
-		checkTag(protolex, $5.val)
+		checkTag(protolex, $5.start(), $5.val)
 		lbl := &labelNode{basicNode: $1.basicNode, required: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
 		$$.setRange($1, $6)
 	}
 	| _OPTIONAL typeIdent name '=' _INT_LIT ';' {
-		checkTag(protolex, $5.val)
+		checkTag(protolex, $5.start(), $5.val)
 		lbl := &labelNode{basicNode: $1.basicNode}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
 		$$.setRange($1, $6)
 	}
 	| _REPEATED typeIdent name '=' _INT_LIT ';' {
-		checkTag(protolex, $5.val)
+		checkTag(protolex, $5.start(), $5.val)
 		lbl := &labelNode{basicNode: $1.basicNode, repeated: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
 		$$.setRange($1, $6)
 	}
 	| typeIdent name '=' _INT_LIT ';' {
-		checkTag(protolex, $4.val)
+		checkTag(protolex, $4.start(), $4.val)
 		$$ = &fieldNode{fldType: $1, name: $2, tag: $4}
 		$$.setRange($1, $5)
 	}
 	| _REQUIRED typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $5.val)
+		checkTag(protolex, $5.start(), $5.val)
 		lbl := &labelNode{basicNode: $1.basicNode, required: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
 		$$.setRange($1, $9)
 	}
 	| _OPTIONAL typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $5.val)
+		checkTag(protolex, $5.start(), $5.val)
 		lbl := &labelNode{basicNode: $1.basicNode}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
 		$$.setRange($1, $9)
 	}
 	| _REPEATED typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $5.val)
+		checkTag(protolex, $5.start(), $5.val)
 		lbl := &labelNode{basicNode: $1.basicNode, repeated: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
 		$$.setRange($1, $9)
 	}
 	| typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $4.val)
+		checkTag(protolex, $4.start(), $4.val)
 		$$ = &fieldNode{fldType: $1, name: $2, tag: $4, options: $6}
 		$$.setRange($1, $8)
 	}
@@ -445,30 +445,30 @@ fieldOption: optionName '=' constant {
 	}
 
 group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageBody '}' {
-		checkTag(protolex, $5.val)
+		checkTag(protolex, $5.start(), $5.val)
 		if !unicode.IsUpper(rune($3.val[0])) {
 			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
 		}
 		lbl := &labelNode{basicNode: $1.basicNode, required: true}
-		$$ = &groupNode{label: lbl, name: $3, tag: $5, decls: $7}
+		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, decls: $7}
 		$$.setRange($1, $8)
 	}
 	| _OPTIONAL _GROUP name '=' _INT_LIT '{' messageBody '}' {
-		checkTag(protolex, $5.val)
+		checkTag(protolex, $5.start(), $5.val)
 		if !unicode.IsUpper(rune($3.val[0])) {
 			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
 		}
 		lbl := &labelNode{basicNode: $1.basicNode}
-		$$ = &groupNode{label: lbl, name: $3, tag: $5, decls: $7}
+		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, decls: $7}
 		$$.setRange($1, $8)
 	}
 	| _REPEATED _GROUP name '=' _INT_LIT '{' messageBody '}' {
-		checkTag(protolex, $5.val)
+		checkTag(protolex, $5.start(), $5.val)
 		if !unicode.IsUpper(rune($3.val[0])) {
 			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
 		}
 		lbl := &labelNode{basicNode: $1.basicNode, repeated: true}
-		$$ = &groupNode{label: lbl, name: $3, tag: $5, decls: $7}
+		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, decls: $7}
 		$$.setRange($1, $8)
 	}
 
@@ -505,23 +505,23 @@ oneofItem : option {
 	}
 
 oneofField : typeIdent name '=' _INT_LIT ';' {
-		checkTag(protolex, $4.val)
+		checkTag(protolex, $4.start(), $4.val)
 		$$ = &fieldNode{fldType: $1, name: $2, tag: $4}
 		$$.setRange($1, $5)
 	}
 	| typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $4.val)
+		checkTag(protolex, $4.start(), $4.val)
 		$$ = &fieldNode{fldType: $1, name: $2, tag: $4, options: $6}
 		$$.setRange($1, $8)
 	}
 
 mapField : _MAP '<' keyType ',' typeIdent '>' name '=' _INT_LIT ';' {
-		checkTag(protolex, $9.val)
+		checkTag(protolex, $9.start(), $9.val)
 		$$ = &mapFieldNode{mapKeyword: $1, keyType: $3, valueType: $5, name: $7, tag: $9}
 		$$.setRange($1, $10)
 	}
 	| _MAP '<' keyType ',' typeIdent '>' name '=' _INT_LIT '[' fieldOptions ']' ';' {
-		checkTag(protolex, $9.val)
+		checkTag(protolex, $9.start(), $9.val)
 		$$ = &mapFieldNode{mapKeyword: $1, keyType: $3, valueType: $5, name: $7, tag: $9, options: $11}
 		$$.setRange($1, $13)
 	}
@@ -642,22 +642,22 @@ enumItem : option {
 	}
 
 enumField : name '=' intLit ';' {
-		checkUint64InInt32Range(protolex, $3.val)
+		checkUint64InInt32Range(protolex, $3.start(), $3.val)
 		$$ = &enumValueNode{name: $1, number: $3}
 		$$.setRange($1, $4)
 	}
 	|  name '=' intLit '[' fieldOptions ']' ';' {
-		checkUint64InInt32Range(protolex, $3.val)
+		checkUint64InInt32Range(protolex, $3.start(), $3.val)
 		$$ = &enumValueNode{name: $1, number: $3, options: $5}
 		$$.setRange($1, $7)
 	}
 	| name '=' negIntLit ';' {
-		checkInt64InInt32Range(protolex, $3.val)
+		checkInt64InInt32Range(protolex, $3.start(), $3.val)
 		$$ = &enumValueNode{name: $1, numberN: $3}
 		$$.setRange($1, $4)
 	}
 	|  name '=' negIntLit '[' fieldOptions ']' ';' {
-		checkInt64InInt32Range(protolex, $3.val)
+		checkInt64InInt32Range(protolex, $3.start(), $3.val)
 		$$ = &enumValueNode{name: $1, numberN: $3, options: $5}
 		$$.setRange($1, $7)
 	}
