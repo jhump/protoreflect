@@ -132,7 +132,7 @@ func (*Test) ExtensionRangeArray() []proto.ExtensionRange {
 	return extRange_Test
 }
 
-var Default_Test_B []byte = []byte("\x00\x01\x02\x03\x04\x05\x06\afubar!")
+var Default_Test_B []byte = []byte("\\000\\001\\002\\003\\004\\005\\006\\007fubar!")
 
 func (m *Test) GetFoo() string {
 	if m != nil && m.Foo != nil {

@@ -263,10 +263,139 @@ type parseResult struct {
 
 	// a map of elements in the descriptor to nodes in the AST
 	// (for extracting position information when validating the descriptor)
-	nodes map[interface{}]node
+	nodes map[proto.Message]node
+}
 
-	// a map of aggregate option values to their ASTs
-	aggregates map[string][]*aggregateEntryNode
+func (r *parseResult) getFileNode(f *dpb.FileDescriptorProto) fileDecl {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(f.GetName())}
+	}
+	return r.nodes[f].(fileDecl)
+}
+
+func (r *parseResult) getOptionNode(o *dpb.UninterpretedOption) optionDecl {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[o].(optionDecl)
+}
+
+func (r *parseResult) getOptionNamePartNode(o *dpb.UninterpretedOption_NamePart) node {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[o]
+}
+
+func (r *parseResult) getMessageNode(m *dpb.DescriptorProto) msgDecl {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[m].(msgDecl)
+}
+
+func (r *parseResult) getFieldNode(f *dpb.FieldDescriptorProto) fieldDecl {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[f].(fieldDecl)
+}
+
+func (r *parseResult) getOneOfNode(o *dpb.OneofDescriptorProto) node {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[o]
+}
+
+func (r *parseResult) getExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange) rangeDecl {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[e].(rangeDecl)
+}
+
+func (r *parseResult) getReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange) rangeDecl {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[rr].(rangeDecl)
+}
+
+func (r *parseResult) getEnumNode(e *dpb.EnumDescriptorProto) node {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[e]
+}
+
+func (r *parseResult) getEnumValueNode(e *dpb.EnumValueDescriptorProto) enumValueDecl {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[e].(enumValueDecl)
+}
+
+func (r *parseResult) getServiceNode(s *dpb.ServiceDescriptorProto) node {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[s]
+}
+
+func (r *parseResult) getMethodNode(m *dpb.MethodDescriptorProto) methodDecl {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[m].(methodDecl)
+}
+
+func (r *parseResult) putFileNode(f *dpb.FileDescriptorProto, n *fileNode) {
+	r.nodes[f] = n
+}
+
+func (r *parseResult) putOptionNode(o *dpb.UninterpretedOption, n *optionNode) {
+	r.nodes[o] = n
+}
+
+func (r *parseResult) putOptionNamePartNode(o *dpb.UninterpretedOption_NamePart, n *optionNamePartNode) {
+	r.nodes[o] = n
+}
+
+func (r *parseResult) putMessageNode(m *dpb.DescriptorProto, n msgDecl) {
+	r.nodes[m] = n
+}
+
+func (r *parseResult) putFieldNode(f *dpb.FieldDescriptorProto, n fieldDecl) {
+	r.nodes[f] = n
+}
+
+func (r *parseResult) putOneOfNode(o *dpb.OneofDescriptorProto, n *oneOfNode) {
+	r.nodes[o] = n
+}
+
+func (r *parseResult) putExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange, n *rangeNode) {
+	r.nodes[e] = n
+}
+
+func (r *parseResult) putReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange, n *rangeNode) {
+	r.nodes[rr] = n
+}
+
+func (r *parseResult) putEnumNode(e *dpb.EnumDescriptorProto, n *enumNode) {
+	r.nodes[e] = n
+}
+
+func (r *parseResult) putEnumValueNode(e *dpb.EnumValueDescriptorProto, n *enumValueNode) {
+	r.nodes[e] = n
+}
+
+func (r *parseResult) putServiceNode(s *dpb.ServiceDescriptorProto, n *serviceNode) {
+	r.nodes[s] = n
+}
+
+func (r *parseResult) putMethodNode(m *dpb.MethodDescriptorProto, n *methodNode) {
+	r.nodes[m] = n
 }
 
 func parseProto(filename string, r io.Reader) (*parseResult, error) {
@@ -291,10 +420,7 @@ func parseProto(filename string, r io.Reader) (*parseResult, error) {
 }
 
 func createParseResult(filename string, file *fileNode) (*parseResult, error) {
-	res := &parseResult{
-		nodes:      map[interface{}]node{},
-		aggregates: map[string][]*aggregateEntryNode{},
-	}
+	res := &parseResult{nodes: map[proto.Message]node{}}
 	var err error
 	res.fd, err = res.asFileDescriptor(filename, file)
 	return res, err
@@ -302,7 +428,7 @@ func createParseResult(filename string, file *fileNode) (*parseResult, error) {
 
 func (r *parseResult) asFileDescriptor(filename string, file *fileNode) (*dpb.FileDescriptorProto, error) {
 	fd := &dpb.FileDescriptorProto{Name: proto.String(filename)}
-	r.nodes[fd] = file
+	r.putFileNode(fd, file)
 
 	isProto3 := false
 	if file.syntax != nil {
@@ -354,7 +480,7 @@ func (r *parseResult) asUninterpretedOptions(nodes []*optionNode) []*dpb.Uninter
 
 func (r *parseResult) asUninterpretedOption(node *optionNode) *dpb.UninterpretedOption {
 	opt := &dpb.UninterpretedOption{Name: r.asUninterpretedOptionName(node.name.parts)}
-	r.nodes[opt] = node
+	r.putOptionNode(opt, node)
 
 	switch val := node.val.value().(type) {
 	case bool:
@@ -378,7 +504,6 @@ func (r *parseResult) asUninterpretedOption(node *optionNode) *dpb.Uninterpreted
 		aggToString(val, &buf)
 		aggStr := buf.String()
 		opt.AggregateValue = proto.String(aggStr)
-		r.aggregates[aggStr] = val
 	}
 	return opt
 }
@@ -394,7 +519,7 @@ func (r *parseResult) asUninterpretedOptionName(parts []*optionNamePartNode) []*
 			NamePart:    proto.String(txt),
 			IsExtension: proto.Bool(part.isExtension),
 		}
-		r.nodes[np] = part
+		r.putOptionNamePartNode(np, part)
 		ret[i] = np
 	}
 	return ret
@@ -404,10 +529,12 @@ func (r *parseResult) addExtensions(ext *extendNode, flds *[]*dpb.FieldDescripto
 	extendee := ext.extendee.val
 	for _, decl := range ext.decls {
 		if decl.field != nil {
+			decl.field.extendee = ext
 			fd := r.asFieldDescriptor(decl.field)
 			fd.Extendee = proto.String(extendee)
 			*flds = append(*flds, fd)
 		} else if decl.group != nil {
+			decl.group.extendee = ext
 			fd, md := r.asGroupDescriptors(decl.group, isProto3)
 			fd.Extendee = proto.String(extendee)
 			*flds = append(*flds, fd)
@@ -432,7 +559,7 @@ func asLabel(lbl *labelNode) *dpb.FieldDescriptorProto_Label {
 
 func (r *parseResult) asFieldDescriptor(node *fieldNode) *dpb.FieldDescriptorProto {
 	fd := newFieldDescriptor(node.name.val, node.fldType.val, int32(node.tag.val), asLabel(node.label))
-	r.nodes[fd] = node
+	r.putFieldNode(fd, node)
 	if len(node.options) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(node.options)}
 	}
@@ -496,9 +623,9 @@ func (r *parseResult) asGroupDescriptors(group *groupNode, isProto3 bool) (*dpb.
 		Type:     dpb.FieldDescriptorProto_TYPE_GROUP.Enum(),
 		TypeName: proto.String(group.name.val),
 	}
-	r.nodes[fd] = group
+	r.putFieldNode(fd, group)
 	md := &dpb.DescriptorProto{Name: proto.String(group.name.val)}
-	r.nodes[md] = group
+	r.putMessageNode(md, group)
 	r.addMessageDecls(md, &group.reserved, group.decls, isProto3)
 	return fd, md
 }
@@ -509,21 +636,21 @@ func (r *parseResult) asMapDescriptors(mapField *mapFieldNode, isProto3 bool) (*
 		lbl = dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
 	}
 	keyFd := newFieldDescriptor("key", mapField.keyType.val, 1, lbl)
-	r.nodes[keyFd] = mapField.keyField()
+	r.putFieldNode(keyFd, mapField.keyField())
 	valFd := newFieldDescriptor("value", mapField.valueType.val, 2, lbl)
-	r.nodes[valFd] = mapField.valueField()
+	r.putFieldNode(valFd, mapField.valueField())
 	entryName := initCap(jsonName(mapField.name.val)) + "Entry"
 	fd := newFieldDescriptor(mapField.name.val, entryName, int32(mapField.tag.val), dpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
 	if len(mapField.options) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(mapField.options)}
 	}
-	r.nodes[fd] = mapField
+	r.putFieldNode(fd, mapField)
 	md := &dpb.DescriptorProto{
 		Name:    proto.String(entryName),
 		Options: &dpb.MessageOptions{MapEntry: proto.Bool(true)},
 		Field:   []*dpb.FieldDescriptorProto{keyFd, valFd},
 	}
-	r.nodes[md] = mapField
+	r.putMessageNode(md, mapField)
 	return fd, md
 }
 
@@ -538,7 +665,7 @@ func (r *parseResult) asExtensionRanges(node *extensionRangeNode) []*dpb.Descrip
 		if len(opts) > 0 {
 			er.Options = &dpb.ExtensionRangeOptions{UninterpretedOption: opts}
 		}
-		r.nodes[er] = rng
+		r.putExtensionRangeNode(er, rng)
 		ers[i] = er
 	}
 	return ers
@@ -552,7 +679,7 @@ func (r *parseResult) asEnumValue(ev *enumValueNode) *dpb.EnumValueDescriptorPro
 		num = int32(ev.numberN.val)
 	}
 	evd := &dpb.EnumValueDescriptorProto{Name: proto.String(ev.name.val), Number: proto.Int32(num)}
-	r.nodes[evd] = ev
+	r.putEnumValueNode(evd, ev)
 	if len(ev.options) > 0 {
 		evd.Options = &dpb.EnumValueOptions{UninterpretedOption: r.asUninterpretedOptions(ev.options)}
 	}
@@ -565,7 +692,7 @@ func (r *parseResult) asMethodDescriptor(node *methodNode) *dpb.MethodDescriptor
 		InputType:  proto.String(node.input.msgType.val),
 		OutputType: proto.String(node.output.msgType.val),
 	}
-	r.nodes[md] = node
+	r.putMethodNode(md, node)
 	if node.input.stream {
 		md.ClientStreaming = proto.Bool(true)
 	}
@@ -580,7 +707,7 @@ func (r *parseResult) asMethodDescriptor(node *methodNode) *dpb.MethodDescriptor
 
 func (r *parseResult) asEnumDescriptor(en *enumNode) *dpb.EnumDescriptorProto {
 	ed := &dpb.EnumDescriptorProto{Name: proto.String(en.name.val)}
-	r.nodes[ed] = en
+	r.putEnumNode(ed, en)
 	for _, decl := range en.decls {
 		if decl.option != nil {
 			if ed.Options == nil {
@@ -596,7 +723,7 @@ func (r *parseResult) asEnumDescriptor(en *enumNode) *dpb.EnumDescriptorProto {
 
 func (r *parseResult) asMessageDescriptor(node *messageNode, isProto3 bool) *dpb.DescriptorProto {
 	msgd := &dpb.DescriptorProto{Name: proto.String(node.name.val)}
-	r.nodes[msgd] = node
+	r.putMessageNode(msgd, node)
 	r.addMessageDecls(msgd, &node.reserved, node.decls, isProto3)
 	return msgd
 }
@@ -622,7 +749,7 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, reservedNames *
 		} else if decl.oneOf != nil {
 			oodIndex := len(msgd.OneofDecl)
 			ood := &dpb.OneofDescriptorProto{Name: proto.String(decl.oneOf.name.val)}
-			r.nodes[ood] = decl.oneOf
+			r.putOneOfNode(ood, decl.oneOf)
 			msgd.OneofDecl = append(msgd.OneofDecl, ood)
 			for _, oodecl := range decl.oneOf.decls {
 				if oodecl.option != nil {
@@ -660,13 +787,13 @@ func (r *parseResult) asReservedRange(rng *rangeNode) *dpb.DescriptorProto_Reser
 		Start: proto.Int32(int32(rng.st.val)),
 		End:   proto.Int32(int32(rng.en.val + 1)),
 	}
-	r.nodes[rr] = rng
+	r.putReservedRangeNode(rr, rng)
 	return rr
 }
 
 func (r *parseResult) asServiceDescriptor(svc *serviceNode) *dpb.ServiceDescriptorProto {
 	sd := &dpb.ServiceDescriptorProto{Name: proto.String(svc.name.val)}
-	r.nodes[sd] = svc
+	r.putServiceNode(sd, svc)
 	for _, decl := range svc.decls {
 		if decl.option != nil {
 			if sd.Options == nil {
@@ -867,7 +994,7 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	scope := fmt.Sprintf("message %s%s", prefix, md.GetName())
 
 	if isProto3 && len(md.ExtensionRange) > 0 {
-		n := res.nodes[md.ExtensionRange[0]].(*rangeNode)
+		n := res.getExtensionRangeNode(md.ExtensionRange[0])
 		return ErrorWithSourcePos{Pos: n.start(), Underlying: fmt.Errorf("%s: extension ranges are not allowed in proto3", scope)}
 	}
 
@@ -875,40 +1002,40 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 		return err
 	} else if index >= 0 {
 		opt := md.Options.UninterpretedOption[index]
-		optn := res.nodes[opt].(*optionNode)
+		optn := res.getOptionNode(opt)
 		md.Options.UninterpretedOption = removeOption(md.Options.UninterpretedOption, index)
 		valid := false
 		if opt.IdentifierValue != nil {
 			if opt.GetIdentifierValue() == "true" {
-				return ErrorWithSourcePos{Pos: optn.val.start(), Underlying: fmt.Errorf("%s: map_entry option should not be set explicitly; use map type instead", scope)}
+				return ErrorWithSourcePos{Pos: optn.getValue().start(), Underlying: fmt.Errorf("%s: map_entry option should not be set explicitly; use map type instead", scope)}
 			} else if opt.GetIdentifierValue() == "false" {
 				md.Options.MapEntry = proto.Bool(false)
 				valid = true
 			}
 		}
 		if !valid {
-			return ErrorWithSourcePos{Pos: optn.val.start(), Underlying: fmt.Errorf("%s: expecting bool value for map_entry option", scope)}
+			return ErrorWithSourcePos{Pos: optn.getValue().start(), Underlying: fmt.Errorf("%s: expecting bool value for map_entry option", scope)}
 		}
 	}
 
 	// reserved ranges should not overlap
 	rsvd := make(tagRanges, len(md.ReservedRange))
 	for i, r := range md.ReservedRange {
-		n := res.nodes[r].(*rangeNode)
+		n := res.getReservedRangeNode(r)
 		rsvd[i] = tagRange{start: r.GetStart(), end: r.GetEnd(), node: n}
 
 	}
 	sort.Sort(rsvd)
 	for i := 1; i < len(rsvd); i++ {
 		if rsvd[i].start < rsvd[i-1].end {
-			return ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end-1, rsvd[i].start, rsvd[i].end-1) }
+			return ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end-1, rsvd[i].start, rsvd[i].end-1)}
 		}
 	}
 
 	// extensions ranges should not overlap
 	exts := make(tagRanges, len(md.ExtensionRange))
 	for i, r := range md.ExtensionRange {
-		n := res.nodes[r].(*rangeNode)
+		n := res.getExtensionRangeNode(r)
 		exts[i] = tagRange{start: r.GetStart(), end: r.GetEnd(), node: n}
 	}
 	sort.Sort(exts)
@@ -948,7 +1075,7 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	}
 	fieldTags := map[int32]string{}
 	for _, fld := range md.Field {
-		fn := res.nodes[fld].(fieldDecl)
+		fn := res.getFieldNode(fld)
 		if _, ok := rsvdNames[fld.GetName()]; ok {
 			return ErrorWithSourcePos{Pos: fn.fieldName().start(), Underlying: fmt.Errorf("%s: field %s is using a reserved name", scope, fld.GetName())}
 		}
@@ -990,18 +1117,14 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 			}
 		}
 		if !valid {
-			optNode := res.nodes[opt].(*optionNode)
-			return ErrorWithSourcePos{Pos: optNode.val.start(), Underlying: fmt.Errorf("%s: expecting bool value for allow_alias option", scope)}
+			optNode := res.getOptionNode(opt)
+			return ErrorWithSourcePos{Pos: optNode.getValue().start(), Underlying: fmt.Errorf("%s: expecting bool value for allow_alias option", scope)}
 		}
 	}
 
 	if isProto3 && ed.Value[0].GetNumber() != 0 {
-		evNode := res.nodes[ed.Value[0]].(*enumValueNode)
-		var n node = evNode.number
-		if n == nil {
-			n = evNode.numberN
-		}
-		return ErrorWithSourcePos{Pos: n.start(), Underlying: fmt.Errorf("%s: proto3 requires that first value in enum have numeric value of 0", scope)}
+		evNode := res.getEnumValueNode(ed.Value[0])
+		return ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: proto3 requires that first value in enum have numeric value of 0", scope)}
 	}
 
 	if !ed.Options.GetAllowAlias() {
@@ -1009,12 +1132,8 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 		vals := map[int32]string{}
 		for _, evd := range ed.Value {
 			if existing := vals[evd.GetNumber()]; existing != "" {
-				evNode := res.nodes[evd].(*enumValueNode)
-				var n node = evNode.number
-				if n == nil {
-					n = evNode.numberN
-				}
-				return ErrorWithSourcePos{Pos: n.start(), Underlying: fmt.Errorf("%s: values %s and %s both have the same numeric value %d; use allow_alias option if intentional", scope, existing, evd.GetName(), evd.GetNumber())}
+				evNode := res.getEnumValueNode(evd)
+				return ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: values %s and %s both have the same numeric value %d; use allow_alias option if intentional", scope, existing, evd.GetName(), evd.GetNumber())}
 			}
 			vals[evd.GetNumber()] = evd.GetName()
 		}
@@ -1026,7 +1145,7 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.FieldDescriptorProto) error {
 	scope := fmt.Sprintf("field %s%s", prefix, fld.GetName())
 
-	node := res.nodes[fld].(fieldDecl)
+	node := res.getFieldNode(fld)
 	if isProto3 {
 		if fld.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP {
 			n := node.(*groupNode)
@@ -1038,8 +1157,8 @@ func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.Fiel
 		if index, err := findOption(res, scope, fld.Options.GetUninterpretedOption(), "default"); err != nil {
 			return err
 		} else if index >= 0 {
-			optNode := res.nodes[fld.Options.GetUninterpretedOption()[index]].(*optionNode)
-			return ErrorWithSourcePos{Pos: optNode.name.start(), Underlying: fmt.Errorf("%s: default values are not allowed in proto3", scope)}
+			optNode := res.getOptionNode(fld.Options.GetUninterpretedOption()[index])
+			return ErrorWithSourcePos{Pos: optNode.getName().start(), Underlying: fmt.Errorf("%s: default values are not allowed in proto3", scope)}
 		}
 	} else {
 		if fld.Label == nil && fld.OneofIndex == nil {
@@ -1062,8 +1181,8 @@ func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.Fiel
 			fld.Options.UninterpretedOption = removeOption(fld.Options.UninterpretedOption, index)
 		}
 		if opt.StringValue == nil {
-			optNode := res.nodes[opt].(*optionNode)
-			return ErrorWithSourcePos{Pos: optNode.val.start(), Underlying: fmt.Errorf("%s: expecting string value for json_name option", scope)}
+			optNode := res.getOptionNode(opt)
+			return ErrorWithSourcePos{Pos: optNode.getValue().start(), Underlying: fmt.Errorf("%s: expecting string value for json_name option", scope)}
 		}
 		fld.JsonName = proto.String(string(opt.StringValue))
 	}
@@ -1085,8 +1204,8 @@ func findOption(res *parseResult, scope string, opts []*dpb.UninterpretedOption,
 			continue
 		}
 		if found >= 0 {
-			optNode := res.nodes[opt].(*optionNode)
-			return -1, ErrorWithSourcePos{Pos: optNode.name.start(), Underlying: fmt.Errorf("option %s cannot be defined more than once", name)}
+			optNode := res.getOptionNode(opt)
+			return -1, ErrorWithSourcePos{Pos: optNode.getName().start(), Underlying: fmt.Errorf("%s: option %s cannot be defined more than once", scope, name)}
 		}
 		found = i
 	}
@@ -1106,7 +1225,7 @@ func removeOption(uo []*dpb.UninterpretedOption, indexToRemove int) []*dpb.Unint
 type tagRange struct {
 	start int32
 	end   int32
-	node  *rangeNode
+	node  rangeDecl
 }
 
 type tagRanges []tagRange
