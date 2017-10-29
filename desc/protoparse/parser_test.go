@@ -172,39 +172,39 @@ func TestBasicValidation(t *testing.T) {
 	}{
 		{
 			contents: `syntax = "proto1";`,
-			errMsg:   `syntax value must be 'proto2' or 'proto3'`,
+			errMsg:   `test.proto:1:10: syntax value must be 'proto2' or 'proto3'`,
 		},
 		{
 			contents: `message Foo { optional string s = 5000000000; }`,
-			errMsg:   `higher than max allowed tag number`,
+			errMsg:   `test.proto:1:35: tag number 5000000000 is higher than max allowed tag number (536870911)`,
 		},
 		{
 			contents: `message Foo { optional string s = 19500; }`,
-			errMsg:   `in disallowed reserved range`,
+			errMsg:   `test.proto:1:35: tag number 19500 is in disallowed reserved range 19000-19999`,
 		},
 		{
 			contents: `enum Foo { V = 5000000000; }`,
-			errMsg:   `is out of range for int32`,
+			errMsg:   `test.proto:1:16: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
 			contents: `enum Foo { V = -5000000000; }`,
-			errMsg:   `is out of range for int32`,
+			errMsg:   `test.proto:1:16: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
 			contents: `enum Foo { }`,
-			errMsg:   `enums must define at least one value`,
+			errMsg:   `test.proto:1:1: enums must define at least one value`,
 		},
 		{
 			contents: `message Foo { oneof Bar { } }`,
-			errMsg:   `oneof must contain at least one field`,
+			errMsg:   `test.proto:1:15: oneof must contain at least one field`,
 		},
 		{
 			contents: `message Foo { extensions 1 to max; } extend Foo { }`,
-			errMsg:   `extend sections must define at least one extension`,
+			errMsg:   `test.proto:1:38: extend sections must define at least one extension`,
 		},
 		{
 			contents: `message Foo { option map_entry = true; }`,
-			errMsg:   `map_entry option should not be set explicitly; use map type instead`,
+			errMsg:   `test.proto:1:34: message Foo: map_entry option should not be set explicitly; use map type instead`,
 		},
 		{
 			contents: `message Foo { option map_entry = false; }`,
@@ -212,39 +212,39 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `syntax = "proto2"; message Foo { string s = 1; }`,
-			errMsg:   `field has no label, but proto2 must indicate 'optional' or 'required'`,
+			errMsg:   `test.proto:1:41: field Foo.s: field has no label, but proto2 must indicate 'optional' or 'required'`,
 		},
 		{
 			contents: `message Foo { string s = 1; }`, // syntax defaults to proto2
-			errMsg:   `field has no label, but proto2 must indicate 'optional' or 'required'`,
+			errMsg:   `test.proto:1:22: field Foo.s: field has no label, but proto2 must indicate 'optional' or 'required'`,
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { optional string s = 1; }`,
-			errMsg:   `field has label LABEL_OPTIONAL, but proto3 should omit labels other than 'repeated'`,
+			errMsg:   `test.proto:1:34: field Foo.s: field has label LABEL_OPTIONAL, but proto3 should omit labels other than 'repeated'`,
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { required string s = 1; }`,
-			errMsg:   `field has label LABEL_REQUIRED, but proto3 should omit labels other than 'repeated'`,
+			errMsg:   `test.proto:1:34: field Foo.s: field has label LABEL_REQUIRED, but proto3 should omit labels other than 'repeated'`,
 		},
 		{
 			contents: `message Foo { extensions 1 to max; } extend Foo { required string sss = 100; }`,
-			errMsg:   `extension fields cannot be 'required'`,
+			errMsg:   `test.proto:1:51: field sss: extension fields cannot be 'required'`,
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { optional group Grp = 1 { } }`,
-			errMsg:   `groups are not allowed in proto3`,
+			errMsg:   `test.proto:1:43: field Foo.grp: groups are not allowed in proto3`,
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { extensions 1 to max; }`,
-			errMsg:   `extension ranges are not allowed in proto3`,
+			errMsg:   `test.proto:1:45: message Foo: extension ranges are not allowed in proto3`,
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { string s = 1 [default = "abcdef"]; }`,
-			errMsg:   `default values are not allowed in proto3`,
+			errMsg:   `test.proto:1:48: field Foo.s: default values are not allowed in proto3`,
 		},
 		{
 			contents: `enum Foo { V1 = 1; V2 = 1; }`,
-			errMsg:   `values V1 and V2 both have the same numeric value 1; use allow_alias option if intentional`,
+			errMsg:   `test.proto:1:25: enum Foo: values V1 and V2 both have the same numeric value 1; use allow_alias option if intentional`,
 		},
 		{
 			contents: `enum Foo { option allow_alias = true; V1 = 1; V2 = 1; }`,
@@ -252,23 +252,23 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `syntax = "proto3"; enum Foo { FIRST = 1; }`,
-			errMsg:   `proto3 requires that first value in enum have numeric value of 0`,
+			errMsg:   `test.proto:1:39: enum Foo: proto3 requires that first value in enum have numeric value of 0`,
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { string s = 1; int32 i = 1; }`,
-			errMsg:   `fields s and i both have the same tag 1`,
+			errMsg:   `test.proto:1:58: message Foo: fields s and i both have the same tag 1`,
 		},
 		{
 			contents: `message Foo { reserved 1 to 10, 10 to 12; }`,
-			errMsg:   `reserved ranges overlap: 1 to 10 and 10 to 12`,
+			errMsg:   `test.proto:1:33: message Foo: reserved ranges overlap: 1 to 10 and 10 to 12`,
 		},
 		{
 			contents: `message Foo { extensions 1 to 10, 10 to 12; }`,
-			errMsg:   `extension ranges overlap: 1 to 10 and 10 to 12`,
+			errMsg:   `test.proto:1:35: message Foo: extension ranges overlap: 1 to 10 and 10 to 12`,
 		},
 		{
 			contents: `message Foo { reserved 1 to 10; extensions 10 to 12; }`,
-			errMsg:   `extension range 10 to 12 overlaps reserved range 1 to 10`,
+			errMsg:   `test.proto:1:44: message Foo: extension range 10 to 12 overlaps reserved range 1 to 10`,
 		},
 		{
 			contents: `message Foo { reserved 1, 2 to 10, 11 to 20; extensions 21 to 22; }`,
@@ -276,43 +276,43 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `message Foo { reserved 10 to 1; }`,
-			errMsg:   `range, 10 to 1, is invalid: start must be <= end`,
+			errMsg:   `test.proto:1:24: range, 10 to 1, is invalid: start must be <= end`,
 		},
 		{
 			contents: `message Foo { extensions 10 to 1; }`,
-			errMsg:   `range, 10 to 1, is invalid: start must be <= end`,
+			errMsg:   `test.proto:1:26: range, 10 to 1, is invalid: start must be <= end`,
 		},
 		{
 			contents: `message Foo { reserved 1 to 5000000000; }`,
-			errMsg:   `range end is out-of-range tag`,
+			errMsg:   `test.proto:1:29: range end is out-of-range tag: 5000000000 (should be between 0 and 536870911)`,
 		},
 		{
 			contents: `message Foo { extensions 1000000000; }`,
-			errMsg:   `range includes out-of-range tag`,
+			errMsg:   `test.proto:1:26: range includes out-of-range tag: 1000000000 (should be between 0 and 536870911)`,
 		},
 		{
 			contents: `message Foo { extensions 1000000000 to 1000000001; }`,
-			errMsg:   `range start is out-of-range tag`,
+			errMsg:   `test.proto:1:26: range start is out-of-range tag: 1000000000 (should be between 0 and 536870911)`,
 		},
 		{
 			contents: `message Foo { extensions 1000000000 to 1000000001; }`,
-			errMsg:   `range start is out-of-range tag`,
+			errMsg:   `test.proto:1:26: range start is out-of-range tag: 1000000000 (should be between 0 and 536870911)`,
 		},
 		{
 			contents: `message Foo { reserved "foo", "foo"; }`,
-			errMsg:   `field "foo" is reserved multiple times`,
+			errMsg:   `test.proto:1:31: field "foo" is reserved multiple times`,
 		},
 		{
 			contents: `message Foo { reserved "foo"; optional string foo = 1; }`,
-			errMsg:   `field foo is using a reserved name`,
+			errMsg:   `test.proto:1:47: message Foo: field foo is using a reserved name`,
 		},
 		{
 			contents: `message Foo { reserved 1 to 10; optional string foo = 1; }`,
-			errMsg:   `field foo is using tag 1 which is in reserved range 1 to 10`,
+			errMsg:   `test.proto:1:55: message Foo: field foo is using tag 1 which is in reserved range 1 to 10`,
 		},
 		{
 			contents: `message Foo { extensions 1 to 10; optional string foo = 1; }`,
-			errMsg:   `field foo is using tag 1 which is in extension range 1 to 10`,
+			errMsg:   `test.proto:1:57: message Foo: field foo is using tag 1 which is in extension range 1 to 10`,
 		},
 	}
 
@@ -322,7 +322,7 @@ func TestBasicValidation(t *testing.T) {
 			testutil.Ok(t, err, "case #%d should succeed", i)
 		} else {
 			testutil.Require(t, err != nil, "case #%d should fail", i)
-			testutil.Require(t, strings.Contains(err.Error(), tc.errMsg), "case #%d should contain %q but does not: %q", i, tc.errMsg, err.Error())
+			testutil.Eq(t, tc.errMsg, err.Error(), "case #%d bad error message", i)
 		}
 	}
 }

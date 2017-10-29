@@ -1312,7 +1312,7 @@ protodefault:
 		protoDollar = protoS[protopt-6 : protopt+1]
 		//line proto.y:387
 		{
-			checkTag(protolex, protoDollar[5].ui.val)
+			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, required: true}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[6].b)
@@ -1321,7 +1321,7 @@ protodefault:
 		protoDollar = protoS[protopt-6 : protopt+1]
 		//line proto.y:393
 		{
-			checkTag(protolex, protoDollar[5].ui.val)
+			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[6].b)
@@ -1330,7 +1330,7 @@ protodefault:
 		protoDollar = protoS[protopt-6 : protopt+1]
 		//line proto.y:399
 		{
-			checkTag(protolex, protoDollar[5].ui.val)
+			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, repeated: true}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[6].b)
@@ -1339,7 +1339,7 @@ protodefault:
 		protoDollar = protoS[protopt-5 : protopt+1]
 		//line proto.y:405
 		{
-			checkTag(protolex, protoDollar[4].ui.val)
+			checkTag(protolex, protoDollar[4].ui.start(), protoDollar[4].ui.val)
 			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
@@ -1347,7 +1347,7 @@ protodefault:
 		protoDollar = protoS[protopt-9 : protopt+1]
 		//line proto.y:410
 		{
-			checkTag(protolex, protoDollar[5].ui.val)
+			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, required: true}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui, options: protoDollar[7].opts}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[9].b)
@@ -1356,7 +1356,7 @@ protodefault:
 		protoDollar = protoS[protopt-9 : protopt+1]
 		//line proto.y:416
 		{
-			checkTag(protolex, protoDollar[5].ui.val)
+			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui, options: protoDollar[7].opts}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[9].b)
@@ -1365,7 +1365,7 @@ protodefault:
 		protoDollar = protoS[protopt-9 : protopt+1]
 		//line proto.y:422
 		{
-			checkTag(protolex, protoDollar[5].ui.val)
+			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, repeated: true}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui, options: protoDollar[7].opts}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[9].b)
@@ -1374,7 +1374,7 @@ protodefault:
 		protoDollar = protoS[protopt-8 : protopt+1]
 		//line proto.y:428
 		{
-			checkTag(protolex, protoDollar[4].ui.val)
+			checkTag(protolex, protoDollar[4].ui.start(), protoDollar[4].ui.val)
 			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui, options: protoDollar[6].opts}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
@@ -1398,36 +1398,36 @@ protodefault:
 		protoDollar = protoS[protopt-8 : protopt+1]
 		//line proto.y:447
 		{
-			checkTag(protolex, protoDollar[5].ui.val)
+			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
 				lexError(protolex, protoDollar[3].id.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", protoDollar[3].id.val))
 			}
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, required: true}
-			protoVAL.grp = &groupNode{label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
+			protoVAL.grp = &groupNode{groupKeyword: protoDollar[2].id, label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
 			protoVAL.grp.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
 	case 77:
 		protoDollar = protoS[protopt-8 : protopt+1]
 		//line proto.y:456
 		{
-			checkTag(protolex, protoDollar[5].ui.val)
+			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
 				lexError(protolex, protoDollar[3].id.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", protoDollar[3].id.val))
 			}
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode}
-			protoVAL.grp = &groupNode{label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
+			protoVAL.grp = &groupNode{groupKeyword: protoDollar[2].id, label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
 			protoVAL.grp.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
 	case 78:
 		protoDollar = protoS[protopt-8 : protopt+1]
 		//line proto.y:465
 		{
-			checkTag(protolex, protoDollar[5].ui.val)
+			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
 				lexError(protolex, protoDollar[3].id.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", protoDollar[3].id.val))
 			}
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, repeated: true}
-			protoVAL.grp = &groupNode{label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
+			protoVAL.grp = &groupNode{groupKeyword: protoDollar[2].id, label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
 			protoVAL.grp.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
 	case 79:
@@ -1480,7 +1480,7 @@ protodefault:
 		protoDollar = protoS[protopt-5 : protopt+1]
 		//line proto.y:507
 		{
-			checkTag(protolex, protoDollar[4].ui.val)
+			checkTag(protolex, protoDollar[4].ui.start(), protoDollar[4].ui.val)
 			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
@@ -1488,7 +1488,7 @@ protodefault:
 		protoDollar = protoS[protopt-8 : protopt+1]
 		//line proto.y:512
 		{
-			checkTag(protolex, protoDollar[4].ui.val)
+			checkTag(protolex, protoDollar[4].ui.start(), protoDollar[4].ui.val)
 			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui, options: protoDollar[6].opts}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
@@ -1496,7 +1496,7 @@ protodefault:
 		protoDollar = protoS[protopt-10 : protopt+1]
 		//line proto.y:518
 		{
-			checkTag(protolex, protoDollar[9].ui.val)
+			checkTag(protolex, protoDollar[9].ui.start(), protoDollar[9].ui.val)
 			protoVAL.mapFld = &mapFieldNode{mapKeyword: protoDollar[1].id, keyType: protoDollar[3].id, valueType: protoDollar[5].id, name: protoDollar[7].id, tag: protoDollar[9].ui}
 			protoVAL.mapFld.setRange(protoDollar[1].id, protoDollar[10].b)
 		}
@@ -1504,7 +1504,7 @@ protodefault:
 		protoDollar = protoS[protopt-13 : protopt+1]
 		//line proto.y:523
 		{
-			checkTag(protolex, protoDollar[9].ui.val)
+			checkTag(protolex, protoDollar[9].ui.start(), protoDollar[9].ui.val)
 			protoVAL.mapFld = &mapFieldNode{mapKeyword: protoDollar[1].id, keyType: protoDollar[3].id, valueType: protoDollar[5].id, name: protoDollar[7].id, tag: protoDollar[9].ui, options: protoDollar[11].opts}
 			protoVAL.mapFld.setRange(protoDollar[1].id, protoDollar[13].b)
 		}
@@ -1652,7 +1652,7 @@ protodefault:
 		protoDollar = protoS[protopt-4 : protopt+1]
 		//line proto.y:644
 		{
-			checkUint64InInt32Range(protolex, protoDollar[3].ui.val)
+			checkUint64InInt32Range(protolex, protoDollar[3].ui.start(), protoDollar[3].ui.val)
 			protoVAL.env = &enumValueNode{name: protoDollar[1].id, number: protoDollar[3].ui}
 			protoVAL.env.setRange(protoDollar[1].id, protoDollar[4].b)
 		}
@@ -1660,7 +1660,7 @@ protodefault:
 		protoDollar = protoS[protopt-7 : protopt+1]
 		//line proto.y:649
 		{
-			checkUint64InInt32Range(protolex, protoDollar[3].ui.val)
+			checkUint64InInt32Range(protolex, protoDollar[3].ui.start(), protoDollar[3].ui.val)
 			protoVAL.env = &enumValueNode{name: protoDollar[1].id, number: protoDollar[3].ui, options: protoDollar[5].opts}
 			protoVAL.env.setRange(protoDollar[1].id, protoDollar[7].b)
 		}
@@ -1668,7 +1668,7 @@ protodefault:
 		protoDollar = protoS[protopt-4 : protopt+1]
 		//line proto.y:654
 		{
-			checkInt64InInt32Range(protolex, protoDollar[3].i.val)
+			checkInt64InInt32Range(protolex, protoDollar[3].i.start(), protoDollar[3].i.val)
 			protoVAL.env = &enumValueNode{name: protoDollar[1].id, numberN: protoDollar[3].i}
 			protoVAL.env.setRange(protoDollar[1].id, protoDollar[4].b)
 		}
@@ -1676,7 +1676,7 @@ protodefault:
 		protoDollar = protoS[protopt-7 : protopt+1]
 		//line proto.y:659
 		{
-			checkInt64InInt32Range(protolex, protoDollar[3].i.val)
+			checkInt64InInt32Range(protolex, protoDollar[3].i.start(), protoDollar[3].i.val)
 			protoVAL.env = &enumValueNode{name: protoDollar[1].id, numberN: protoDollar[3].i, options: protoDollar[5].opts}
 			protoVAL.env.setRange(protoDollar[1].id, protoDollar[7].b)
 		}

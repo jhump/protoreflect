@@ -10,6 +10,9 @@ type ErrorWithSourcePos struct {
 }
 
 func (e ErrorWithSourcePos) Error() string {
+	if e.Pos.Line <= 0 || e.Pos.Col <= 0 {
+		return fmt.Sprintf("%s: %v", e.Pos.Filename, e.Underlying)
+	}
 	return fmt.Sprintf("%s:%d:%d: %v", e.Pos.Filename, e.Pos.Line, e.Pos.Col, e.Underlying)
 }
 
@@ -35,6 +38,83 @@ type terminalNode interface {
 	popLeadingComment() *comment
 	pushTrailingComment(*comment)
 }
+
+var _ terminalNode = (*basicNode)(nil)
+var _ terminalNode = (*stringLiteralNode)(nil)
+var _ terminalNode = (*intLiteralNode)(nil)
+var _ terminalNode = (*floatLiteralNode)(nil)
+var _ terminalNode = (*identNode)(nil)
+
+type fileDecl interface {
+	node
+	getSyntax() node
+}
+
+var _ fileDecl = (*fileNode)(nil)
+var _ fileDecl = (*noSourceNode)(nil)
+
+type optionDecl interface {
+	node
+	getName() node
+	getValue() valueNode
+}
+
+var _ optionDecl = (*optionNode)(nil)
+var _ optionDecl = (*noSourceNode)(nil)
+
+type fieldDecl interface {
+	node
+	fieldLabel() node
+	fieldName() node
+	fieldType() node
+	fieldTag() node
+	fieldExtendee() node
+	getGroupKeyword() node
+}
+
+var _ fieldDecl = (*fieldNode)(nil)
+var _ fieldDecl = (*groupNode)(nil)
+var _ fieldDecl = (*mapFieldNode)(nil)
+var _ fieldDecl = (*syntheticMapField)(nil)
+var _ fieldDecl = (*noSourceNode)(nil)
+
+type rangeDecl interface {
+	node
+	rangeStart() node
+	rangeEnd() node
+}
+
+var _ rangeDecl = (*rangeNode)(nil)
+var _ rangeDecl = (*noSourceNode)(nil)
+
+type enumValueDecl interface {
+	node
+	getName() node
+	getNumber() node
+}
+
+var _ enumValueDecl = (*enumValueNode)(nil)
+var _ enumValueDecl = (*noSourceNode)(nil)
+
+type msgDecl interface {
+	node
+	messageName() node
+	reservedNames() []*stringLiteralNode
+}
+
+var _ msgDecl = (*messageNode)(nil)
+var _ msgDecl = (*groupNode)(nil)
+var _ msgDecl = (*mapFieldNode)(nil)
+var _ msgDecl = (*noSourceNode)(nil)
+
+type methodDecl interface {
+	node
+	getInputType() node
+	getOutputType() node
+}
+
+var _ methodDecl = (*methodNode)(nil)
+var _ methodDecl = (*noSourceNode)(nil)
 
 type posRange struct {
 	start, end *SourcePos
@@ -115,6 +195,10 @@ type fileNode struct {
 	// the file descriptor.
 	imports []*importNode
 	pkg     *packageNode
+}
+
+func (n *fileNode) getSyntax() node {
+	return n.syntax
 }
 
 type fileElement struct {
@@ -209,6 +293,14 @@ type optionNode struct {
 	val  valueNode
 }
 
+func (n *optionNode) getName() node {
+	return n.name
+}
+
+func (n *optionNode) getValue() valueNode {
+	return n.val
+}
+
 type optionNameNode struct {
 	basicCompositeNode
 	parts []*optionNamePartNode
@@ -253,6 +345,15 @@ type valueNode interface {
 	node
 	value() interface{}
 }
+
+var _ valueNode = (*stringLiteralNode)(nil)
+var _ valueNode = (*intLiteralNode)(nil)
+var _ valueNode = (*negativeIntLiteralNode)(nil)
+var _ valueNode = (*floatLiteralNode)(nil)
+var _ valueNode = (*boolLiteralNode)(nil)
+var _ valueNode = (*sliceLiteralNode)(nil)
+var _ valueNode = (*aggregateLiteralNode)(nil)
+var _ valueNode = (*noSourceNode)(nil)
 
 type stringLiteralNode struct {
 	basicNode
@@ -345,14 +446,6 @@ func (a *aggregateNameNode) value() string {
 	}
 }
 
-type fieldDecl interface {
-	node
-	fieldLabel() node
-	fieldName() *identNode
-	fieldType() *identNode
-	fieldTag() *intLiteralNode
-}
-
 type fieldNode struct {
 	basicCompositeNode
 	label   *labelNode
@@ -360,22 +453,39 @@ type fieldNode struct {
 	name    *identNode
 	tag     *intLiteralNode
 	options []*optionNode
+
+	// This field is populated after parsing, to allow lookup of extendee source
+	// locations when field extendees cannot be linked. (Otherwise, this is just
+	// stored as a string in the field descriptors defined inside the extend
+	// block).
+	extendee *extendNode
 }
 
 func (n *fieldNode) fieldLabel() node {
 	return n.label
 }
 
-func (n *fieldNode) fieldName() *identNode {
+func (n *fieldNode) fieldName() node {
 	return n.name
 }
 
-func (n *fieldNode) fieldType() *identNode {
+func (n *fieldNode) fieldType() node {
 	return n.fldType
 }
 
-func (n *fieldNode) fieldTag() *intLiteralNode {
+func (n *fieldNode) fieldTag() node {
 	return n.tag
+}
+
+func (n *fieldNode) fieldExtendee() node {
+	if n.extendee != nil {
+		return n.extendee.extendee
+	}
+	return nil
+}
+
+func (n *fieldNode) getGroupKeyword() node {
+	return nil
 }
 
 type labelNode struct {
@@ -386,10 +496,11 @@ type labelNode struct {
 
 type groupNode struct {
 	basicCompositeNode
-	label *labelNode
-	name  *identNode
-	tag   *intLiteralNode
-	decls []*messageElement
+	groupKeyword *identNode
+	label        *labelNode
+	name         *identNode
+	tag          *intLiteralNode
+	decls        []*messageElement
 
 	// This field is populated after parsing, to make it easier to find them
 	// without searching decls. The parse result has a map of descriptors to
@@ -397,25 +508,41 @@ type groupNode struct {
 	// elements do not map to descriptors -- they are just stored as strings in
 	// the message descriptor.
 	reserved []*stringLiteralNode
+	// This field is populated after parsing, to allow lookup of extendee source
+	// locations when field extendees cannot be linked. (Otherwise, this is just
+	// stored as a string in the field descriptors defined inside the extend
+	// block).
+	extendee *extendNode
 }
 
 func (n *groupNode) fieldLabel() node {
 	return n.label
 }
 
-func (n *groupNode) fieldName() *identNode {
+func (n *groupNode) fieldName() node {
 	return n.name
 }
 
-func (n *groupNode) fieldType() *identNode {
+func (n *groupNode) fieldType() node {
 	return n.name
 }
 
-func (n *groupNode) fieldTag() *intLiteralNode {
+func (n *groupNode) fieldTag() node {
 	return n.tag
 }
 
-func (n *groupNode) messageName() *identNode {
+func (n *groupNode) fieldExtendee() node {
+	if n.extendee != nil {
+		return n.extendee.extendee
+	}
+	return nil
+}
+
+func (n *groupNode) getGroupKeyword() node {
+	return n.groupKeyword
+}
+
+func (n *groupNode) messageName() node {
 	return n.name
 }
 
@@ -477,19 +604,27 @@ func (n *mapFieldNode) fieldLabel() node {
 	return n.mapKeyword
 }
 
-func (n *mapFieldNode) fieldName() *identNode {
+func (n *mapFieldNode) fieldName() node {
 	return n.name
 }
 
-func (n *mapFieldNode) fieldType() *identNode {
+func (n *mapFieldNode) fieldType() node {
 	return n.mapKeyword
 }
 
-func (n *mapFieldNode) fieldTag() *intLiteralNode {
+func (n *mapFieldNode) fieldTag() node {
 	return n.tag
 }
 
-func (n *mapFieldNode) messageName() *identNode {
+func (n *mapFieldNode) fieldExtendee() node {
+	return nil
+}
+
+func (n *mapFieldNode) getGroupKeyword() node {
+	return nil
+}
+
+func (n *mapFieldNode) messageName() node {
 	return n.name
 }
 
@@ -542,16 +677,24 @@ func (n *syntheticMapField) fieldLabel() node {
 	return n.ident
 }
 
-func (n *syntheticMapField) fieldName() *identNode {
+func (n *syntheticMapField) fieldName() node {
 	return n.ident
 }
 
-func (n *syntheticMapField) fieldType() *identNode {
+func (n *syntheticMapField) fieldType() node {
 	return n.ident
 }
 
-func (n *syntheticMapField) fieldTag() *intLiteralNode {
+func (n *syntheticMapField) fieldTag() node {
 	return n.tag
+}
+
+func (n *syntheticMapField) fieldExtendee() node {
+	return nil
+}
+
+func (n *syntheticMapField) getGroupKeyword() node {
+	return nil
 }
 
 type extensionRangeNode struct {
@@ -563,6 +706,14 @@ type extensionRangeNode struct {
 type rangeNode struct {
 	basicCompositeNode
 	st, en *intLiteralNode
+}
+
+func (n *rangeNode) rangeStart() node {
+	return n.st
+}
+
+func (n *rangeNode) rangeEnd() node {
+	return n.en
 }
 
 type reservedNode struct {
@@ -620,10 +771,15 @@ type enumValueNode struct {
 	numberN *negativeIntLiteralNode
 }
 
-type msgDecl interface {
-	node
-	messageName() *identNode
-	reservedNames() []*stringLiteralNode
+func (n *enumValueNode) getName() node {
+	return n.name
+}
+
+func (n *enumValueNode) getNumber() node {
+	if n.number != nil {
+		return n.number
+	}
+	return n.numberN
 }
 
 type messageNode struct {
@@ -639,7 +795,7 @@ type messageNode struct {
 	reserved []*stringLiteralNode
 }
 
-func (n *messageNode) messageName() *identNode {
+func (n *messageNode) messageName() node {
 	return n.name
 }
 
@@ -793,8 +949,104 @@ type methodNode struct {
 	options []*optionNode
 }
 
+func (n *methodNode) getInputType() node {
+	return n.input.msgType
+}
+
+func (n *methodNode) getOutputType() node {
+	return n.output.msgType
+}
+
 type rpcTypeNode struct {
 	basicCompositeNode
 	msgType *identNode
 	stream  bool
+}
+
+type noSourceNode struct {
+	pos *SourcePos
+}
+
+func (n noSourceNode) start() *SourcePos {
+	return n.pos
+}
+
+func (n noSourceNode) end() *SourcePos {
+	return n.pos
+}
+
+func (n noSourceNode) leadingComments() []*comment {
+	return nil
+}
+
+func (n noSourceNode) trailingComment() []*comment {
+	return nil
+}
+
+func (n noSourceNode) getSyntax() node {
+	return n
+}
+
+func (n noSourceNode) getName() node {
+	return n
+}
+
+func (n noSourceNode) getValue() valueNode {
+	return n
+}
+
+func (n noSourceNode) fieldLabel() node {
+	return n
+}
+
+func (n noSourceNode) fieldName() node {
+	return n
+}
+
+func (n noSourceNode) fieldType() node {
+	return n
+}
+
+func (n noSourceNode) fieldTag() node {
+	return n
+}
+
+func (n noSourceNode) fieldExtendee() node {
+	return n
+}
+
+func (n noSourceNode) getGroupKeyword() node {
+	return n
+}
+
+func (n noSourceNode) rangeStart() node {
+	return n
+}
+
+func (n noSourceNode) rangeEnd() node {
+	return n
+}
+
+func (n noSourceNode) getNumber() node {
+	return n
+}
+
+func (n noSourceNode) messageName() node {
+	return n
+}
+
+func (n noSourceNode) reservedNames() []*stringLiteralNode {
+	return nil
+}
+
+func (n noSourceNode) getInputType() node {
+	return n
+}
+
+func (n noSourceNode) getOutputType() node {
+	return n
+}
+
+func (n noSourceNode) value() interface{} {
+	return nil
 }

@@ -99,56 +99,56 @@ func TestLinkerValidation(t *testing.T) {
 			map[string]string{
 				"foo.proto": "message foo {} enum foo { V = 0; }",
 			},
-			"file \"foo.proto\": duplicate symbol foo: enum and message",
+			"foo.proto:1:16: duplicate symbol foo: already defined as message",
 		},
 		{
 			map[string]string{
 				"foo.proto": "message foo { optional string a = 1; optional string a = 2; }",
 			},
-			"file \"foo.proto\": duplicate symbol foo.a: field and field",
+			"foo.proto:1:38: duplicate symbol foo.a: already defined as field",
 		},
 		{
 			map[string]string{
 				"foo.proto":  "message foo {}",
 				"foo2.proto": "enum foo { V = 0; }",
 			},
-			"duplicate symbol foo: message in \"foo.proto\" and enum in \"foo2.proto\"",
+			"foo2.proto:1:1: duplicate symbol foo: already defined as message in \"foo.proto\"",
 		},
 		{
 			map[string]string{
 				"foo.proto": "message foo { optional blah a = 1; }",
 			},
-			"file \"foo.proto\": field foo.a references unknown type: blah",
+			"foo.proto:1:24: field foo.a: unknown type blah",
 		},
 		{
 			map[string]string{
 				"foo.proto": "message foo { optional bar.baz a = 1; } service bar { rpc baz (foo) returns (foo); }",
 			},
-			"file \"foo.proto\": field foo.a has invalid type: bar.baz is a method, not a message or enum",
+			"foo.proto:1:24: field foo.a: invalid type: bar.baz is a method, not a message or enum",
 		},
 		{
 			map[string]string{
 				"foo.proto": "message foo { extensions 1 to 2; } extend foo { optional string a = 1; } extend foo { optional int32 b = 1; }",
 			},
-			"file \"foo.proto\": duplicate extension for foo: a and b are both using tag 1",
+			"foo.proto:1:106: field b: duplicate extension: a and b are both using tag 1",
 		},
 		{
 			map[string]string{
 				"foo.proto": "package fu.baz; extend foobar { optional string a = 1; }",
 			},
-			"file \"foo.proto\": field fu.baz.a extends unknown type: foobar",
+			"foo.proto:1:24: unknown extendee type foobar",
 		},
 		{
 			map[string]string{
 				"foo.proto": "package fu.baz; service foobar{} extend foobar { optional string a = 1; }",
 			},
-			"file \"foo.proto\": field fu.baz.a extends invalid type: fu.baz.foobar is a service, not a message",
+			"foo.proto:1:41: extendee is invalid: fu.baz.foobar is a service, not a message",
 		},
 		{
 			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ extensions 1; } extend foobar { optional string a = 2; }",
 			},
-			"file \"foo.proto\": field fu.baz.a tag is not in valid range for extended type fu.baz.foobar: 2",
+			"foo.proto:1:85: field fu.baz.a: tag 2 is not in valid range for extended type fu.baz.foobar",
 		},
 		{
 			map[string]string{
@@ -156,55 +156,55 @@ func TestLinkerValidation(t *testing.T) {
 				"foo2.proto": "package fu.baz; import \"foo3.proto\"; message fizzle{ }",
 				"foo3.proto": "package fu.baz; message baz{ }",
 			},
-			"file \"foo.proto\": field fu.baz.foobar.a references unknown type: baz",
+			"foo.proto:1:70: field fu.baz.foobar.a: unknown type baz",
 		},
 		{
 			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ repeated string a = 1 [default = \"abc\"]; }",
 			},
-			"file \"foo.proto\": default value cannot be set for field fu.baz.foobar.a because it is repeated",
+			"foo.proto:1:56: field fu.baz.foobar.a: default value cannot be set because field is repeated",
 		},
 		{
 			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ optional foobar a = 1 [default = { a: {} }]; }",
 			},
-			"file \"foo.proto\": default value cannot be set for field fu.baz.foobar.a because it is a message",
+			"foo.proto:1:56: field fu.baz.foobar.a: default value cannot be set because field is a message",
 		},
 		{
 			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ optional string a = 1 [default = { a: \"abc\" }]; }",
 			},
-			"file \"foo.proto\": default value for field fu.baz.foobar.a cannot be an aggregate",
+			"foo.proto:1:66: field fu.baz.foobar.a: default value cannot be an aggregate",
 		},
 		{
 			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ optional string a = 1 [default = 1.234]; }",
 			},
-			"file \"foo.proto\": field fu.baz.foobar.a: option default: expecting string, got double",
+			"foo.proto:1:66: field fu.baz.foobar.a: option default: expecting string, got double",
 		},
 		{
 			map[string]string{
 				"foo.proto": "package fu.baz; enum abc { OK=0; NOK=1; } message foobar{ optional abc a = 1 [default = NACK]; }",
 			},
-			"file \"foo.proto\": field fu.baz.foobar.a: option default: enum fu.baz.abc has no value named NACK",
+			"foo.proto:1:89: field fu.baz.foobar.a: option default: enum fu.baz.abc has no value named NACK",
 		},
 		{
 			map[string]string{
 				"foo.proto": "option b = 123;",
 			},
-			"file \"foo.proto\": option b: field b of google.protobuf.FileOptions does not exist",
+			"foo.proto:1:8: option b: field b of google.protobuf.FileOptions does not exist",
 		},
 		{
 			map[string]string{
 				"foo.proto": "option (foo.bar) = 123;",
 			},
-			"file \"foo.proto\": option (foo.bar): unknown extension: foo.bar",
+			"foo.proto:1:8: unknown extension foo.bar",
 		},
 		{
 			map[string]string{
 				"foo.proto": "option uninterpreted_option = { };",
 			},
-			"file \"foo.proto\": invalid option 'uninterpreted_option'",
+			"foo.proto:1:8: invalid option 'uninterpreted_option'",
 		},
 		{
 			map[string]string{
@@ -214,7 +214,7 @@ func TestLinkerValidation(t *testing.T) {
 					"extend google.protobuf.FileOptions { optional foo f = 20000; }\n" +
 					"option (f).b = 123;",
 			},
-			"file \"foo.proto\": option (f).b: field b of foo does not exist",
+			"foo.proto:5:12: option (f).b: field b of foo does not exist",
 		},
 		{
 			map[string]string{
@@ -224,7 +224,7 @@ func TestLinkerValidation(t *testing.T) {
 					"extend google.protobuf.FileOptions { optional foo f = 20000; }\n" +
 					"option (f).a = 123;",
 			},
-			"file \"foo.proto\": option (f).a: expecting string, got integer",
+			"foo.proto:5:16: option (f).a: expecting string, got integer",
 		},
 		{
 			map[string]string{
@@ -234,7 +234,7 @@ func TestLinkerValidation(t *testing.T) {
 					"extend google.protobuf.FileOptions { optional foo f = 20000; }\n" +
 					"option (b) = 123;",
 			},
-			"file \"foo.proto\": option (b): extension b should extend google.protobuf.FileOptions but instead extends foo",
+			"foo.proto:5:8: option (b): extension b should extend google.protobuf.FileOptions but instead extends foo",
 		},
 		{
 			map[string]string{
@@ -244,7 +244,7 @@ func TestLinkerValidation(t *testing.T) {
 					"extend google.protobuf.FileOptions { optional foo f = 20000; }\n" +
 					"option (foo) = 123;",
 			},
-			"file \"foo.proto\": option (foo): invalid extension: foo is a message, not an extension",
+			"foo.proto:5:8: invalid extension: foo is a message, not an extension",
 		},
 		{
 			map[string]string{
@@ -254,7 +254,7 @@ func TestLinkerValidation(t *testing.T) {
 					"extend google.protobuf.FileOptions { optional foo f = 20000; }\n" +
 					"option (foo.a) = 123;",
 			},
-			"file \"foo.proto\": option (foo.a): invalid extension: foo.a is a field but not an extension",
+			"foo.proto:5:8: invalid extension: foo.a is a field but not an extension",
 		},
 		{
 			map[string]string{
@@ -264,7 +264,7 @@ func TestLinkerValidation(t *testing.T) {
 					"extend google.protobuf.FileOptions { optional foo f = 20000; }\n" +
 					"option (f) = { a: [ 123 ] };",
 			},
-			"file \"foo.proto\": option (f) at a: value is an array but field is not repeated",
+			"foo.proto:5:19: option (f): value is an array but field is not repeated",
 		},
 		{
 			map[string]string{
@@ -274,7 +274,7 @@ func TestLinkerValidation(t *testing.T) {
 					"extend google.protobuf.FileOptions { optional foo f = 20000; }\n" +
 					"option (f) = { a: [ \"a\", \"b\", 123 ] };",
 			},
-			"file \"foo.proto\": option (f) at a[2]: expecting string, got integer",
+			"foo.proto:5:31: option (f): expecting string, got integer",
 		},
 		{
 			map[string]string{
@@ -285,7 +285,7 @@ func TestLinkerValidation(t *testing.T) {
 					"option (f) = { a: \"a\" };\n" +
 					"option (f) = { a: \"b\" };",
 			},
-			"file \"foo.proto\": option (f): non-repeated option field f already set",
+			"foo.proto:6:8: option (f): non-repeated option field f already set",
 		},
 		{
 			map[string]string{
@@ -296,7 +296,7 @@ func TestLinkerValidation(t *testing.T) {
 					"option (f) = { a: \"a\" };\n" +
 					"option (f).a = \"b\";",
 			},
-			"file \"foo.proto\": option (f).a: non-repeated option field a already set",
+			"foo.proto:6:12: option (f).a: non-repeated option field a already set",
 		},
 		{
 			map[string]string{
@@ -307,7 +307,7 @@ func TestLinkerValidation(t *testing.T) {
 					"option (f) = { a: \"a\" };\n" +
 					"option (f).(b) = \"b\";",
 			},
-			"file \"foo.proto\": option (f).(b): expecting int32, got string/bytes",
+			"foo.proto:6:18: option (f).(b): expecting int32, got string",
 		},
 	}
 	for i, tc := range testCases {
@@ -324,7 +324,7 @@ func TestLinkerValidation(t *testing.T) {
 		}
 		_, err := Parser{Accessor: acc}.ParseFiles(names...)
 		if err == nil || !strings.Contains(err.Error(), tc.errMsg) {
-			t.Errorf("case %d: expecting validation error %q; instead got: %v", i, tc.errMsg, err)
+			t.Errorf("case %d: expecting validation error %q; instead got: %q", i, tc.errMsg, err)
 		}
 	}
 }
