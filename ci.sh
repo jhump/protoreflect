@@ -3,7 +3,7 @@ set -e
 
 gover="$(go version | awk '{ print $3 }')"
 
-# We don't run gofmt # for devel versions because it
+# We don't run gofmt for devel versions because it
 # changed circa 11/2017. So code that passes the gofmt
 # check for other versions will fail for devel version.
 # For now, just skip the check for devel versions.
