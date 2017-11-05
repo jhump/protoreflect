@@ -1151,7 +1151,7 @@ func fieldValue(res *parseResult, mc *messageContext, fld *desc.FieldDescriptor,
 					ffld = fmd.FindFieldByName(a.name.value())
 				}
 				if ffld == nil {
-					return nil, ErrorWithSourcePos{Pos: val.start(), Underlying: fmt.Errorf("%vfield %s not found", mc, a.name)}
+					return nil, ErrorWithSourcePos{Pos: val.start(), Underlying: fmt.Errorf("%vfield %s not found", mc, a.name.name.val)}
 				}
 				if err := setOptionField(res, mc, fdm, ffld, a.name, a.val); err != nil {
 					return nil, err
