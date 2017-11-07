@@ -479,7 +479,17 @@ func (m *Message) internalSetField(fd *desc.FieldDescriptor, val interface{}) {
 			if b, ok := val.([]byte); ok {
 				equal = ok && bytes.Equal(b, fd.GetDefaultValue().([]byte))
 			} else {
-				equal = fd.GetDefaultValue() == val
+				defVal := fd.GetDefaultValue()
+				equal = defVal == val
+				if !equal && defVal == nil {
+					// above just checks if value is the nil interface,
+					// but we should also test if the given value is a
+					// nil pointer
+					rv := reflect.ValueOf(val)
+					if rv.Kind() == reflect.Ptr && rv.IsNil() {
+						equal = true
+					}
+				}
 			}
 			if equal {
 				if m.values != nil {
@@ -1473,7 +1483,7 @@ func (m *Message) mergeInto(pm proto.Message) error {
 			continue
 		}
 		f := target.FieldByName(prop.Name)
-		convert(reflect.ValueOf(v), f)
+		mergeVal(reflect.ValueOf(v), f)
 	}
 	// merge one-ofs
 	for _, oop := range structProps.OneofTypes {
@@ -1485,7 +1495,7 @@ func (m *Message) mergeInto(pm proto.Message) error {
 		}
 		oov := reflect.New(oop.Type.Elem())
 		f := oov.FieldByName(prop.Name)
-		convert(reflect.ValueOf(v), f)
+		mergeVal(reflect.ValueOf(v), f)
 		target.Field(oop.Field).Set(oov)
 	}
 	// merge extensions, too
@@ -1495,7 +1505,7 @@ func (m *Message) mergeInto(pm proto.Message) error {
 			continue
 		}
 		e := reflect.New(reflect.TypeOf(ext.ExtensionType)).Elem()
-		convert(reflect.ValueOf(v), e)
+		mergeVal(reflect.ValueOf(v), e)
 		if err := proto.SetExtension(pm, ext, e.Interface()); err != nil {
 			// shouldn't happen since we already checked that the extension type was compatible above
 			return err
@@ -1576,14 +1586,18 @@ func canConvert(src reflect.Value, target reflect.Type) bool {
 	}
 }
 
-func convert(src, target reflect.Value) {
-	if src.Kind() == reflect.Interface {
+func mergeVal(src, target reflect.Value) {
+	if src.Kind() == reflect.Interface && !src.IsNil() {
 		src = src.Elem()
 	}
 	srcType := src.Type()
 	targetType := target.Type()
 	if srcType.ConvertibleTo(targetType) {
-		target.Set(src.Convert(targetType))
+		if targetType.Implements(typeOfProtoMessage) && !target.IsNil() {
+			Merge(target.Interface().(proto.Message), src.Convert(targetType).Interface().(proto.Message))
+		} else {
+			target.Set(src.Convert(targetType))
+		}
 	} else if targetType.Kind() == reflect.Ptr && srcType.ConvertibleTo(targetType.Elem()) {
 		if !src.CanAddr() {
 			target.Set(reflect.New(targetType.Elem()))
@@ -1609,7 +1623,7 @@ func convert(src, target reflect.Value) {
 			if dest.Kind() == reflect.Ptr {
 				dest.Set(reflect.New(dest.Type().Elem()))
 			}
-			convert(src.Index(i), dest)
+			mergeVal(src.Index(i), dest)
 		}
 	} else if targetType.Kind() == reflect.Map {
 		tkt := targetType.Key()
@@ -1625,7 +1639,7 @@ func convert(src, target reflect.Value) {
 				nk = k.Addr()
 			} else {
 				nk = reflect.New(tkt).Elem()
-				convert(k, nk)
+				mergeVal(k, nk)
 			}
 			if tvt == svt {
 				nv = v
@@ -1633,7 +1647,7 @@ func convert(src, target reflect.Value) {
 				nv = v.Addr()
 			} else {
 				nv = reflect.New(tvt).Elem()
-				convert(v, nv)
+				mergeVal(v, nv)
 			}
 			if target.IsNil() {
 				target.Set(reflect.MakeMap(targetType))
@@ -1646,7 +1660,7 @@ func convert(src, target reflect.Value) {
 			target.Set(reflect.New(targetType.Elem()))
 		}
 		m := target.Interface().(proto.Message)
-		dm.ConvertTo(m)
+		dm.mergeInto(m)
 	} else {
 		panic(fmt.Sprintf("Cannot convert %v to %v", srcType, targetType))
 	}
@@ -1660,29 +1674,8 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 			if fd == nil {
 				fd = dm.FindFieldDescriptor(tag)
 			}
-			if fd.IsMap() {
-				existing := m.values[tag]
-				if existing == nil {
-					m.internalSetField(fd, v)
-				} else {
-					emap := existing.(map[interface{}]interface{})
-					nmap := v.(map[interface{}]interface{})
-					for kk, vv := range nmap {
-						emap[kk] = vv
-					}
-				}
-			} else if fd.IsRepeated() {
-				existing := m.values[tag]
-				if existing == nil {
-					m.internalSetField(fd, v)
-				} else {
-					esl := existing.([]interface{})
-					nsl := v.([]interface{})
-					esl = append(esl, nsl...)
-					m.values[tag] = esl
-				}
-			} else {
-				m.internalSetField(fd, v)
+			if err := mergeField(m, fd, v); err != nil {
+				return err
 			}
 		}
 		return nil
@@ -1788,7 +1781,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 
 	// now actually perform the merge
 	for fd, v := range values {
-		m.internalSetField(fd, v)
+		mergeField(m, fd, v)
 	}
 
 	u := src.FieldByName("XXX_unrecognized")
@@ -1823,6 +1816,9 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 			oov.Set(reflect.Zero(oov.Type()))
 		}
 		for _, ed := range rexts {
+			if ed.Name == "" {
+				continue
+			}
 			proto.ClearExtension(clone, ed)
 		}
 		if u.IsValid() && u.Type() == typeOfBytes {
@@ -1835,7 +1831,6 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 			m.UnmarshalMerge(bb)
 		}
 	}
-
 	return nil
 }
 
