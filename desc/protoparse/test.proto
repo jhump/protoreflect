@@ -49,6 +49,8 @@ message Test {
 			option (rept) = { foo: "goo" [foo.bar.Test.Nested._NestedNested._garblez]: "boo" };
 			message NestedNestedNested {
 				option (rept) = { foo: "hoo" [Test.Nested._NestedNested._garblez]: "spoo" };
+
+				optional Test Test = 1;
 			}
 		}
 	}
