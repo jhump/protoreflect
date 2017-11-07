@@ -10,12 +10,12 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"unicode"
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/internal"
 )
 
 //go:generate goyacc -o proto.y.go -p proto proto.y
@@ -569,7 +569,7 @@ func (r *parseResult) asFieldDescriptor(node *fieldNode) *dpb.FieldDescriptorPro
 func newFieldDescriptor(name string, fieldType string, tag int32, lbl *dpb.FieldDescriptorProto_Label) *dpb.FieldDescriptorProto {
 	fd := &dpb.FieldDescriptorProto{
 		Name:     proto.String(name),
-		JsonName: proto.String(jsonName(name)),
+		JsonName: proto.String(internal.JsonName(name)),
 		Number:   proto.Int32(tag),
 		Label:    lbl,
 	}
@@ -617,7 +617,7 @@ func (r *parseResult) asGroupDescriptors(group *groupNode, isProto3 bool) (*dpb.
 	fieldName := strings.ToLower(group.name.val)
 	fd := &dpb.FieldDescriptorProto{
 		Name:     proto.String(fieldName),
-		JsonName: proto.String(jsonName(fieldName)),
+		JsonName: proto.String(internal.JsonName(fieldName)),
 		Number:   proto.Int32(int32(group.tag.val)),
 		Label:    asLabel(group.label),
 		Type:     dpb.FieldDescriptorProto_TYPE_GROUP.Enum(),
@@ -639,7 +639,7 @@ func (r *parseResult) asMapDescriptors(mapField *mapFieldNode, isProto3 bool) (*
 	r.putFieldNode(keyFd, mapField.keyField())
 	valFd := newFieldDescriptor("value", mapField.valueType.val, 2, lbl)
 	r.putFieldNode(valFd, mapField.valueField())
-	entryName := initCap(jsonName(mapField.name.val)) + "Entry"
+	entryName := internal.InitCap(internal.JsonName(mapField.name.val)) + "Entry"
 	fd := newFieldDescriptor(mapField.name.val, entryName, int32(mapField.tag.val), dpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
 	if len(mapField.options) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(mapField.options)}
@@ -836,31 +836,6 @@ func checkTag(lex protoLexer, pos *SourcePos, v uint64) {
 	} else if v >= specialReservedStart && v <= specialReservedEnd {
 		lexError(lex, pos, fmt.Sprintf("tag number %d is in disallowed reserved range %d-%d", v, specialReservedStart, specialReservedEnd))
 	}
-}
-
-func jsonName(name string) string {
-	var js []rune
-	nextUpper := false
-	for i, r := range name {
-		if r == '_' {
-			nextUpper = true
-			continue
-		}
-		if i == 0 {
-			// start lower-case
-			js = append(js, unicode.ToLower(r))
-		} else if nextUpper {
-			nextUpper = false
-			js = append(js, unicode.ToUpper(r))
-		} else {
-			js = append(js, r)
-		}
-	}
-	return string(js)
-}
-
-func initCap(name string) string {
-	return string(unicode.ToUpper(rune(name[0]))) + name[1:]
 }
 
 func aggToString(agg []*aggregateEntryNode, buf *bytes.Buffer) {

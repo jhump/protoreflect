@@ -315,7 +315,7 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 	node := r.getFieldNode(fld)
 	elemType := "field"
 	if fld.GetExtendee() != "" {
-		fqn, dsc := l.resolve(fd, fld.GetExtendee(), scopes)
+		fqn, dsc := l.resolve(fd, fld.GetExtendee(), isMessage, scopes)
 		if dsc == nil {
 			return ErrorWithSourcePos{Pos: node.fieldExtendee().start(), Underlying: fmt.Errorf("unknown extendee type %s", fld.GetExtendee())}
 		}
@@ -361,7 +361,7 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 		return nil
 	}
 
-	fqn, dsc := l.resolve(fd, fld.GetTypeName(), scopes)
+	fqn, dsc := l.resolve(fd, fld.GetTypeName(), isType, scopes)
 	if dsc == nil {
 		return ErrorWithSourcePos{Pos: node.fieldType().start(), Underlying: fmt.Errorf("%s: unknown type %s", scope, fld.GetTypeName())}
 	}
@@ -395,7 +395,7 @@ func (l *linker) resolveServiceTypes(r *parseResult, fd *dpb.FileDescriptorProto
 		}
 		scope := fmt.Sprintf("method %s.%s", thisName, mtd.GetName())
 		node := r.getMethodNode(mtd)
-		fqn, dsc := l.resolve(fd, mtd.GetInputType(), scopes)
+		fqn, dsc := l.resolve(fd, mtd.GetInputType(), isMessage, scopes)
 		if dsc == nil {
 			return ErrorWithSourcePos{Pos: node.getInputType().start(), Underlying: fmt.Errorf("%s: unknown request type %s", scope, mtd.GetInputType())}
 		}
@@ -405,7 +405,7 @@ func (l *linker) resolveServiceTypes(r *parseResult, fd *dpb.FileDescriptorProto
 		}
 		mtd.InputType = proto.String("." + fqn)
 
-		fqn, dsc = l.resolve(fd, mtd.GetOutputType(), scopes)
+		fqn, dsc = l.resolve(fd, mtd.GetOutputType(), isMessage, scopes)
 		if dsc == nil {
 			return ErrorWithSourcePos{Pos: node.getOutputType().start(), Underlying: fmt.Errorf("%s: unknown response type %s", scope, mtd.GetOutputType())}
 		}
@@ -427,7 +427,7 @@ func (l *linker) resolveOptions(r *parseResult, fd *dpb.FileDescriptorProto, ele
 		for _, nm := range opt.Name {
 			if nm.GetIsExtension() {
 				node := r.getOptionNamePartNode(nm)
-				fqn, dsc := l.resolve(fd, nm.GetNamePart(), scopes)
+				fqn, dsc := l.resolve(fd, nm.GetNamePart(), isField, scopes)
 				if dsc == nil {
 					return ErrorWithSourcePos{Pos: node.start(), Underlying: fmt.Errorf("%sunknown extension %s", scope, nm.GetNamePart())}
 				}
@@ -444,7 +444,7 @@ func (l *linker) resolveOptions(r *parseResult, fd *dpb.FileDescriptorProto, ele
 	return nil
 }
 
-func (l *linker) resolve(fd *dpb.FileDescriptorProto, name string, scopes []scope) (string, proto.Message) {
+func (l *linker) resolve(fd *dpb.FileDescriptorProto, name string, allowed func(proto.Message) bool, scopes []scope) (string, proto.Message) {
 	if strings.HasPrefix(name, ".") {
 		// already fully-qualified
 		d := l.findSymbol(fd, name[1:], false, map[*dpb.FileDescriptorProto]struct{}{})
@@ -454,14 +454,43 @@ func (l *linker) resolve(fd *dpb.FileDescriptorProto, name string, scopes []scop
 	} else {
 		// unqualified, so we look in the enclosing (last) scope first and move
 		// towards outermost (first) scope, trying to resolve the symbol
+		var bestGuess proto.Message
+		var bestGuessFqn string
 		for i := len(scopes) - 1; i >= 0; i-- {
 			fqn, d := scopes[i](name)
 			if d != nil {
-				return fqn, d
+				if allowed(d) {
+					return fqn, d
+				} else if bestGuess == nil {
+					bestGuess = d
+					bestGuessFqn = fqn
+				}
 			}
 		}
+		// we return best guess, even though it was not an allowed kind of
+		// descriptor, so caller can print a better error message (e.g.
+		// indicating that the name was found but that it's the wrong type)
+		return bestGuessFqn, bestGuess
 	}
 	return "", nil
+}
+
+func isField(m proto.Message) bool {
+	_, ok := m.(*dpb.FieldDescriptorProto)
+	return ok
+}
+
+func isMessage(m proto.Message) bool {
+	_, ok := m.(*dpb.DescriptorProto)
+	return ok
+}
+
+func isType(m proto.Message) bool {
+	switch m.(type) {
+	case *dpb.DescriptorProto, *dpb.EnumDescriptorProto:
+		return true
+	}
+	return false
 }
 
 // scope represents a lexical scope in a proto file in which messages and enums

@@ -13,6 +13,7 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/internal"
 )
 
 // TODO: finish writing Go doc for all types and methods
@@ -1995,7 +1996,7 @@ func (flb *FieldBuilder) buildProto() (*dpb.FieldDescriptorProto, error) {
 	}
 	jsName := flb.JsonName
 	if jsName == "" {
-		jsName = jsonName(flb.name)
+		jsName = internal.JsonName(flb.name)
 	}
 	var def *string
 	if flb.Default != "" {
@@ -2767,30 +2768,5 @@ func (mtb *MethodBuilder) Build() (*desc.MethodDescriptor, error) {
 }
 
 func entryTypeName(fieldName string) string {
-	return initCap(jsonName(fieldName)) + "Entry"
-}
-
-func jsonName(name string) string {
-	var js []rune
-	nextUpper := false
-	for i, r := range name {
-		if r == '_' {
-			nextUpper = true
-			continue
-		}
-		if i == 0 {
-			// start lower-case
-			js = append(js, unicode.ToLower(r))
-		} else if nextUpper {
-			nextUpper = false
-			js = append(js, unicode.ToUpper(r))
-		} else {
-			js = append(js, r)
-		}
-	}
-	return string(js)
-}
-
-func initCap(name string) string {
-	return string(unicode.ToUpper(rune(name[0]))) + name[1:]
+	return internal.InitCap(internal.JsonName(fieldName)) + "Entry"
 }
