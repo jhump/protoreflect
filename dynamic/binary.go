@@ -581,40 +581,7 @@ func (m *Message) unmarshalKnownField(fd *desc.FieldDescriptor, encoding int8, b
 		return err
 	}
 
-	if fd.IsMap() {
-		newEntry := val.(*Message)
-		k, err := newEntry.TryGetFieldByNumber(1)
-		if err != nil {
-			return err
-		}
-		v, err := newEntry.TryGetFieldByNumber(2)
-		if err != nil {
-			return err
-		}
-		if existing, ok := m.values[fd.GetNumber()]; ok {
-			mp := existing.(map[interface{}]interface{})
-			mp[k] = v
-		} else {
-			m.internalSetField(fd, map[interface{}]interface{}{k: v})
-		}
-	} else if fd.IsRepeated() {
-		t := reflect.TypeOf(val)
-		var slice []interface{}
-		if existing, ok := m.values[fd.GetNumber()]; ok {
-			slice = existing.([]interface{})
-		}
-		if t.Kind() == reflect.Slice && t != typeOfBytes {
-			// append slices if we unmarshalled a packed repeated field
-			sl := val.([]interface{})
-			slice = append(slice, sl...)
-		} else {
-			slice = append(slice, val)
-		}
-		m.internalSetField(fd, slice)
-	} else {
-		m.internalSetField(fd, val)
-	}
-	return nil
+	return mergeField(m, fd, val)
 }
 
 func (m *Message) unmarshalUnknownField(tagNumber int32, encoding int8, b *codedBuffer) error {

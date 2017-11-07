@@ -569,17 +569,12 @@ func textError(tok *token, format string, args ...interface{}) error {
 
 type setFunction func(*Message, *desc.FieldDescriptor, interface{}) error
 
-var (
-	setUnaryField    = (*Message).TrySetField
-	setRepeatedField = (*Message).TryAddRepeatedField
-)
-
 func (m *Message) unmarshalFieldValueText(fd *desc.FieldDescriptor, tr *txtReader) error {
 	var set setFunction
 	if fd.IsRepeated() {
-		set = setRepeatedField
+		set = (*Message).addRepeatedField
 	} else {
-		set = setUnaryField
+		set = mergeField
 	}
 	tok := tr.peek()
 	if tok.tokTyp == tokenOpenBracket {

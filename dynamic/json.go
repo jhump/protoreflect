@@ -422,7 +422,9 @@ func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
 			return err
 		}
 		if v != nil {
-			m.internalSetField(fd, v)
+			if err := mergeField(m, fd, v); err != nil {
+				return err
+			}
 		} else if m.values != nil {
 			delete(m.values, fd.GetNumber())
 		}
