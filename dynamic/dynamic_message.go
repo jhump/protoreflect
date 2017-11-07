@@ -795,6 +795,74 @@ func (m *Message) removeMapField(fd *desc.FieldDescriptor, key interface{}) erro
 	return nil
 }
 
+func (m *Message) FieldLength(fd *desc.FieldDescriptor) int {
+	l, err := m.TryFieldLength(fd)
+	if err != nil {
+		panic(err.Error())
+	}
+	return l
+}
+
+func (m *Message) FieldLengthByNumber(tagNumber int32) int {
+	l, err := m.TryFieldLengthByNumber(tagNumber)
+	if err != nil {
+		panic(err.Error())
+	}
+	return l
+}
+
+func (m *Message) FieldLengthByName(name string) int {
+	l, err := m.TryFieldLengthByName(name)
+	if err != nil {
+		panic(err.Error())
+	}
+	return l
+}
+
+func (m *Message) TryFieldLength(fd *desc.FieldDescriptor) (int, error) {
+	if err := m.checkField(fd); err != nil {
+		return 0, err
+	}
+	return m.fieldLength(fd)
+}
+
+func (m *Message) TryFieldLengthByNumber(tagNumber int32) (int, error) {
+	fd := m.FindFieldDescriptor(int32(tagNumber))
+	if fd == nil {
+		return 0, UnknownTagNumberError
+	}
+	return m.fieldLength(fd)
+}
+
+func (m *Message) TryFieldLengthByName(name string) (int, error) {
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return 0, UnknownFieldNameError
+	}
+	return m.fieldLength(fd)
+}
+
+func (m *Message) fieldLength(fd *desc.FieldDescriptor) (int, error) {
+	if !fd.IsRepeated() {
+		return 0, FieldIsNotRepeatedError
+	}
+	val := m.values[fd.GetNumber()]
+	if val == nil {
+		var err error
+		if val, err = m.parseUnknownField(fd); err != nil {
+			return 0, err
+		} else if val == nil {
+			return 0, nil
+		}
+	}
+	if sl, ok := val.([]interface{}); ok {
+		return len(sl), nil
+	} else if mp, ok := val.(map[interface{}]interface{}); ok {
+		return len(mp), nil
+	}
+	return 0, nil
+}
+
 func (m *Message) GetRepeatedField(fd *desc.FieldDescriptor, index int) interface{} {
 	if v, err := m.TryGetRepeatedField(fd, index); err != nil {
 		panic(err.Error())
