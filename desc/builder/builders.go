@@ -13,7 +13,7 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/internal"
+	. "github.com/jhump/protoreflect/desc/internal"
 )
 
 // TODO: finish writing Go doc for all types and methods
@@ -55,6 +55,8 @@ type Builder interface {
 	// parent.
 	GetChildren() []Builder
 
+	GetComments() *Comments
+
 	// findChild returns the child builder with the given name or nil if this
 	// builder has no such child.
 	findChild(string) Builder
@@ -76,6 +78,51 @@ type Builder interface {
 	// this element's parent is up-to-date. It does NOT try to remove references
 	// from the parent to this child. (See doc for removeChild(Builder)).
 	setParent(Builder)
+}
+
+// Comments represents the various comments that might be associated with a
+// descriptor. These are equivalent to the various kinds of comments found in a
+// *dpb.SourceCodeInfo_Location struct that protoc associates with elements in
+// the parsed proto source file. This can be used to create or preserve comments
+// (including documentation) for elements.
+type Comments struct {
+	LeadingDetachedComments []string
+	LeadingComment          string
+	TrailingComment         string
+}
+
+func setComments(c *Comments, loc *dpb.SourceCodeInfo_Location) {
+	c.LeadingDetachedComments = loc.GetLeadingDetachedComments()
+	c.LeadingComment = loc.GetLeadingComments()
+	c.TrailingComment = loc.GetTrailingComments()
+}
+
+func addCommentsTo(sourceInfo *dpb.SourceCodeInfo, path []int32, c *Comments) {
+	var lead, trail *string
+	if c.LeadingComment != "" {
+		lead = proto.String(c.LeadingComment)
+	}
+	if c.TrailingComment != "" {
+		trail = proto.String(c.TrailingComment)
+	}
+
+	// we need defensive copies of the slices
+	p := make([]int32, len(path))
+	copy(p, path)
+
+	var detached []string
+	if len(c.LeadingDetachedComments) > 0 {
+		detached := make([]string, len(c.LeadingDetachedComments))
+		copy(detached, c.LeadingDetachedComments)
+	}
+
+	sourceInfo.Location = append(sourceInfo.Location, &dpb.SourceCodeInfo_Location{
+		LeadingDetachedComments: detached,
+		LeadingComments:         lead,
+		TrailingComments:        trail,
+		Path:                    p,
+		Span:                    []int32{0, 0, 0},
+	})
 }
 
 /* NB: There are a few flows that need to maintain strong referential integrity
@@ -156,8 +203,9 @@ type Builder interface {
 // and provides a kernel of builder-wiring support (to reduce boiler-plate in
 // each implementation).
 type baseBuilder struct {
-	name   string
-	parent Builder
+	name     string
+	parent   Builder
+	comments Comments
 }
 
 func baseBuilderWithName(name string) baseBuilder {
@@ -222,6 +270,10 @@ func (b *baseBuilder) GetFile() *FileBuilder {
 		p = p.GetParent()
 	}
 	return nil
+}
+
+func (b *baseBuilder) GetComments() *Comments {
+	return &b.comments
 }
 
 // doBuild is a helper for implementing the Build() method that each builder
@@ -338,6 +390,10 @@ type FileBuilder struct {
 	Package  string
 	Options  *dpb.FileOptions
 
+	comments        Comments
+	SyntaxComments  Comments
+	PackageComments Comments
+
 	messages   []*MessageBuilder
 	extensions []*FieldBuilder
 	enums      []*EnumBuilder
@@ -362,6 +418,18 @@ func FromFile(fd *desc.FileDescriptor) (*FileBuilder, error) {
 	fb.IsProto3 = fd.IsProto3()
 	fb.Package = fd.GetPackage()
 	fb.Options = fd.GetFileOptions()
+	setComments(&fb.comments, fd.GetSourceInfo())
+
+	// find syntax and package comments, too
+	for _, loc := range fd.AsFileDescriptorProto().GetSourceCodeInfo().GetLocation() {
+		if len(loc.Path) == 1 {
+			if loc.Path[0] == File_syntaxTag {
+				setComments(&fb.SyntaxComments, loc)
+			} else if loc.Path[0] == File_packageTag {
+				setComments(&fb.PackageComments, loc)
+			}
+		}
+	}
 
 	localMessages := map[*desc.MessageDescriptor]*MessageBuilder{}
 	localEnums := map[*desc.EnumDescriptor]*EnumBuilder{}
@@ -490,6 +558,10 @@ func (fb *FileBuilder) setParent(parent Builder) {
 	if parent != nil {
 		panic("files cannot have parent elements")
 	}
+}
+
+func (fb *FileBuilder) GetComments() *Comments {
+	return &fb.comments
 }
 
 // GetFile implements the Builder interface and always returns this file.
@@ -823,9 +895,16 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 		pkg = proto.String(fb.Package)
 	}
 
+	path := make([]int32, 0, 10)
+	sourceInfo := dpb.SourceCodeInfo{}
+	addCommentsTo(&sourceInfo, path, &fb.comments)
+	addCommentsTo(&sourceInfo, append(path, File_syntaxTag), &fb.SyntaxComments)
+	addCommentsTo(&sourceInfo, append(path, File_packageTag), &fb.PackageComments)
+
 	messages := make([]*dpb.DescriptorProto, 0, len(fb.messages))
 	for _, mb := range fb.messages {
-		if md, err := mb.buildProto(); err != nil {
+		path := append(path, File_messagesTag, int32(len(messages)))
+		if md, err := mb.buildProto(path, &sourceInfo); err != nil {
 			return nil, err
 		} else {
 			messages = append(messages, md)
@@ -834,7 +913,8 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 
 	enums := make([]*dpb.EnumDescriptorProto, 0, len(fb.enums))
 	for _, eb := range fb.enums {
-		if ed, err := eb.buildProto(); err != nil {
+		path := append(path, File_enumsTag, int32(len(enums)))
+		if ed, err := eb.buildProto(path, &sourceInfo); err != nil {
 			return nil, err
 		} else {
 			enums = append(enums, ed)
@@ -843,7 +923,8 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 
 	extensions := make([]*dpb.FieldDescriptorProto, 0, len(fb.extensions))
 	for _, exb := range fb.extensions {
-		if exd, err := exb.buildProto(); err != nil {
+		path := append(path, File_extensionsTag, int32(len(extensions)))
+		if exd, err := exb.buildProto(path, &sourceInfo); err != nil {
 			return nil, err
 		} else {
 			extensions = append(extensions, exd)
@@ -852,7 +933,8 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 
 	services := make([]*dpb.ServiceDescriptorProto, 0, len(fb.services))
 	for _, sb := range fb.services {
-		if sd, err := sb.buildProto(); err != nil {
+		path := append(path, File_servicesTag, int32(len(services)))
+		if sd, err := sb.buildProto(path, &sourceInfo); err != nil {
 			return nil, err
 		} else {
 			services = append(services, sd)
@@ -860,14 +942,15 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 	}
 
 	return &dpb.FileDescriptorProto{
-		Name:        proto.String(name),
-		Package:     pkg,
-		Options:     fb.Options,
-		Syntax:      syntax,
-		MessageType: messages,
-		EnumType:    enums,
-		Extension:   extensions,
-		Service:     services,
+		Name:           proto.String(name),
+		Package:        pkg,
+		Options:        fb.Options,
+		Syntax:         syntax,
+		MessageType:    messages,
+		EnumType:       enums,
+		Extension:      extensions,
+		Service:        services,
+		SourceCodeInfo: &sourceInfo,
 	}, nil
 }
 
@@ -943,6 +1026,7 @@ func fromMessage(md *desc.MessageDescriptor,
 	mb.ExtensionRanges = md.AsDescriptorProto().GetExtensionRange()
 	mb.ReservedRanges = md.AsDescriptorProto().GetReservedRange()
 	mb.ReservedNames = md.AsDescriptorProto().GetReservedName()
+	setComments(&mb.comments, md.GetSourceInfo())
 
 	localMessages[md] = mb
 
@@ -1502,7 +1586,9 @@ func (mb *MessageBuilder) SetReservedNames(names []string) *MessageBuilder {
 	return mb
 }
 
-func (mb *MessageBuilder) buildProto() (*dpb.DescriptorProto, error) {
+func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.DescriptorProto, error) {
+	addCommentsTo(sourceInfo, path, &mb.comments)
+
 	var needTagsAssigned []*dpb.FieldDescriptorProto
 	nestedMessages := make([]*dpb.DescriptorProto, 0, len(mb.nestedMessages))
 	oneOfCount := 0
@@ -1515,7 +1601,8 @@ func (mb *MessageBuilder) buildProto() (*dpb.DescriptorProto, error) {
 	oneOfs := make([]*dpb.OneofDescriptorProto, 0, oneOfCount)
 	for _, b := range mb.fieldsAndOneOfs {
 		if flb, ok := b.(*FieldBuilder); ok {
-			fld, err := flb.buildProto()
+			fldpath := append(path, Message_fieldsTag, int32(len(fields)))
+			fld, err := flb.buildProto(fldpath, sourceInfo)
 			if err != nil {
 				return nil, err
 			}
@@ -1524,22 +1611,25 @@ func (mb *MessageBuilder) buildProto() (*dpb.DescriptorProto, error) {
 				needTagsAssigned = append(needTagsAssigned, fld)
 			}
 			if flb.msgType != nil {
-				if entry, err := flb.msgType.buildProto(); err != nil {
+				nmpath := append(path, Message_nestedMessagesTag, int32(len(nestedMessages)))
+				if entry, err := flb.msgType.buildProto(nmpath, sourceInfo); err != nil {
 					return nil, err
 				} else {
 					nestedMessages = append(nestedMessages, entry)
 				}
 			}
 		} else {
+			oopath := append(path, Message_oneOfsTag, int32(len(oneOfs)))
 			oob := b.(*OneOfBuilder)
 			oobIndex := len(oneOfs)
-			ood, err := oob.buildProto()
+			ood, err := oob.buildProto(oopath, sourceInfo)
 			if err != nil {
 				return nil, err
 			}
 			oneOfs = append(oneOfs, ood)
 			for _, flb := range oob.choices {
-				fld, err := flb.buildProto()
+				path := append(path, Message_fieldsTag, int32(len(fields)))
+				fld, err := flb.buildProto(path, sourceInfo)
 				if err != nil {
 					return nil, err
 				}
@@ -1574,7 +1664,8 @@ func (mb *MessageBuilder) buildProto() (*dpb.DescriptorProto, error) {
 	}
 
 	for _, nmb := range mb.nestedMessages {
-		if nmd, err := nmb.buildProto(); err != nil {
+		path := append(path, Message_nestedMessagesTag, int32(len(nestedMessages)))
+		if nmd, err := nmb.buildProto(path, sourceInfo); err != nil {
 			return nil, err
 		} else {
 			nestedMessages = append(nestedMessages, nmd)
@@ -1583,7 +1674,8 @@ func (mb *MessageBuilder) buildProto() (*dpb.DescriptorProto, error) {
 
 	nestedExtensions := make([]*dpb.FieldDescriptorProto, 0, len(mb.nestedExtensions))
 	for _, exb := range mb.nestedExtensions {
-		if exd, err := exb.buildProto(); err != nil {
+		path := append(path, Message_extensionsTag, int32(len(nestedExtensions)))
+		if exd, err := exb.buildProto(path, sourceInfo); err != nil {
 			return nil, err
 		} else {
 			nestedExtensions = append(nestedExtensions, exd)
@@ -1592,7 +1684,8 @@ func (mb *MessageBuilder) buildProto() (*dpb.DescriptorProto, error) {
 
 	nestedEnums := make([]*dpb.EnumDescriptorProto, 0, len(mb.nestedEnums))
 	for _, eb := range mb.nestedEnums {
-		if ed, err := eb.buildProto(); err != nil {
+		path := append(path, Message_enumsTag, int32(len(nestedEnums)))
+		if ed, err := eb.buildProto(path, sourceInfo); err != nil {
 			return nil, err
 		} else {
 			nestedEnums = append(nestedEnums, ed)
@@ -1747,6 +1840,8 @@ func fromField(fld *desc.FieldDescriptor) (*FieldBuilder, error) {
 	flb.Label = fld.GetLabel()
 	flb.Default = fld.AsFieldDescriptorProto().GetDefaultValue()
 	flb.JsonName = fld.GetJSONName()
+	setComments(&flb.comments, fld.GetSourceInfo())
+
 	if fld.IsExtension() {
 		flb.foreignExtendee = fld.GetOwner()
 	}
@@ -1871,11 +1966,11 @@ func (flb *FieldBuilder) TrySetNumber(tag int32) error {
 	if tag == 0 && flb.IsExtension() {
 		return fmt.Errorf("cannot set tag number for extension %s; only regular fields can be auto-assigned", GetFullyQualifiedName(flb))
 	}
-	if tag >= internal.SpecialReservedStart && tag <= internal.SpecialReservedEnd {
-		return fmt.Errorf("tag for field %s cannot be in special reserved range %d-%d", GetFullyQualifiedName(flb), internal.SpecialReservedStart, internal.SpecialReservedEnd)
+	if tag >= SpecialReservedStart && tag <= SpecialReservedEnd {
+		return fmt.Errorf("tag for field %s cannot be in special reserved range %d-%d", GetFullyQualifiedName(flb), SpecialReservedStart, SpecialReservedEnd)
 	}
-	if tag > internal.MaxTag {
-		return fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), internal.MaxTag)
+	if tag > MaxTag {
+		return fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), MaxTag)
 	}
 	oldTag := flb.number
 	flb.number = tag
@@ -1973,7 +2068,9 @@ func (flb *FieldBuilder) GetExtendeeTypeName() string {
 	}
 }
 
-func (flb *FieldBuilder) buildProto() (*dpb.FieldDescriptorProto, error) {
+func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.FieldDescriptorProto, error) {
+	addCommentsTo(sourceInfo, path, &flb.comments)
+
 	var lbl *dpb.FieldDescriptorProto_Label
 	if int32(flb.Label) != 0 {
 		lbl = flb.Label.Enum()
@@ -1989,12 +2086,13 @@ func (flb *FieldBuilder) buildProto() (*dpb.FieldDescriptorProto, error) {
 	}
 	jsName := flb.JsonName
 	if jsName == "" {
-		jsName = internal.JsonName(flb.name)
+		jsName = JsonName(flb.name)
 	}
 	var def *string
 	if flb.Default != "" {
 		def = proto.String(flb.Default)
 	}
+
 	return &dpb.FieldDescriptorProto{
 		Name:         proto.String(flb.name),
 		Number:       proto.Int32(flb.number),
@@ -2045,6 +2143,7 @@ func FromOneOf(ood *desc.OneOfDescriptor) (*OneOfBuilder, error) {
 func fromOneOf(ood *desc.OneOfDescriptor) (*OneOfBuilder, error) {
 	oob := NewOneOf(ood.GetName())
 	oob.Options = ood.GetOneOfOptions()
+	setComments(&oob.comments, ood.GetSourceInfo())
 
 	for _, fld := range ood.GetChoices() {
 		if flb, err := fromField(fld); err != nil {
@@ -2203,12 +2302,15 @@ func (oob *OneOfBuilder) SetOptions(options *dpb.OneofOptions) *OneOfBuilder {
 	return oob
 }
 
-func (oob *OneOfBuilder) buildProto() (*dpb.OneofDescriptorProto, error) {
+func (oob *OneOfBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.OneofDescriptorProto, error) {
+	addCommentsTo(sourceInfo, path, &oob.comments)
+
 	for _, flb := range oob.choices {
 		if flb.IsRepeated() || flb.IsRequired() {
 			return nil, fmt.Errorf("fields in a one-of must be optional, %s is %v", GetFullyQualifiedName(flb), flb.Label)
 		}
 	}
+
 	return &dpb.OneofDescriptorProto{
 		Name:    proto.String(oob.name),
 		Options: oob.Options,
@@ -2252,6 +2354,7 @@ func FromEnum(ed *desc.EnumDescriptor) (*EnumBuilder, error) {
 func fromEnum(ed *desc.EnumDescriptor, localEnums map[*desc.EnumDescriptor]*EnumBuilder) (*EnumBuilder, error) {
 	eb := NewEnum(ed.GetName())
 	eb.Options = ed.GetEnumOptions()
+	setComments(&eb.comments, ed.GetSourceInfo())
 
 	localEnums[ed] = eb
 
@@ -2357,11 +2460,14 @@ func (eb *EnumBuilder) TryAddValue(evb *EnumValueBuilder) error {
 	return nil
 }
 
-func (eb *EnumBuilder) buildProto() (*dpb.EnumDescriptorProto, error) {
+func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.EnumDescriptorProto, error) {
+	addCommentsTo(sourceInfo, path, &eb.comments)
+
 	var needNumbersAssigned []*dpb.EnumValueDescriptorProto
 	values := make([]*dpb.EnumValueDescriptorProto, 0, len(eb.values))
 	for _, evb := range eb.values {
-		evp, err := evb.buildProto()
+		path := append(path, Enum_valuesTag, int32(len(values)))
+		evp, err := evb.buildProto(path, sourceInfo)
 		if err != nil {
 			return nil, err
 		}
@@ -2440,6 +2546,8 @@ func fromEnumValue(evd *desc.EnumValueDescriptor) (*EnumValueBuilder, error) {
 	evb.Options = evd.GetEnumValueOptions()
 	evb.Number = evd.GetNumber()
 	evb.numberSet = true
+	setComments(&evb.comments, evd.GetSourceInfo())
+
 	return evb, nil
 }
 
@@ -2484,7 +2592,9 @@ func (evb *EnumValueBuilder) SetNumber(number int32) *EnumValueBuilder {
 	return evb
 }
 
-func (evb *EnumValueBuilder) buildProto() (*dpb.EnumValueDescriptorProto, error) {
+func (evb *EnumValueBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.EnumValueDescriptorProto, error) {
+	addCommentsTo(sourceInfo, path, &evb.comments)
+
 	return &dpb.EnumValueDescriptorProto{
 		Name:    proto.String(evb.name),
 		Number:  proto.Int32(evb.Number),
@@ -2529,6 +2639,7 @@ func FromService(sd *desc.ServiceDescriptor) (*ServiceBuilder, error) {
 func fromService(sd *desc.ServiceDescriptor) (*ServiceBuilder, error) {
 	sb := NewService(sd.GetName())
 	sb.Options = sd.GetServiceOptions()
+	setComments(&sb.comments, sd.GetSourceInfo())
 
 	for _, mtd := range sd.GetMethods() {
 		if mtb, err := fromMethod(mtd); err != nil {
@@ -2632,10 +2743,13 @@ func (sb *ServiceBuilder) SetOptions(options *dpb.ServiceOptions) *ServiceBuilde
 	return sb
 }
 
-func (sb *ServiceBuilder) buildProto() (*dpb.ServiceDescriptorProto, error) {
+func (sb *ServiceBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.ServiceDescriptorProto, error) {
+	addCommentsTo(sourceInfo, path, &sb.comments)
+
 	methods := make([]*dpb.MethodDescriptorProto, 0, len(sb.methods))
 	for _, mtb := range sb.methods {
-		if mtd, err := mtb.buildProto(); err != nil {
+		path := append(path, Service_methodsTag, int32(len(methods)))
+		if mtd, err := mtb.buildProto(path, sourceInfo); err != nil {
 			return nil, err
 		} else {
 			methods = append(methods, mtd)
@@ -2688,6 +2802,8 @@ func fromMethod(mtd *desc.MethodDescriptor) (*MethodBuilder, error) {
 	resp := RpcTypeImportedMessage(mtd.GetOutputType(), mtd.IsServerStreaming())
 	mtb := NewMethod(mtd.GetName(), req, resp)
 	mtb.Options = mtd.GetMethodOptions()
+	setComments(&mtb.comments, mtd.GetSourceInfo())
+
 	return mtb, nil
 }
 
@@ -2736,7 +2852,9 @@ func (mtb *MethodBuilder) SetResponseType(t *RpcType) *MethodBuilder {
 	return mtb
 }
 
-func (mtb *MethodBuilder) buildProto() (*dpb.MethodDescriptorProto, error) {
+func (mtb *MethodBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.MethodDescriptorProto, error) {
+	addCommentsTo(sourceInfo, path, &mtb.comments)
+
 	mtd := &dpb.MethodDescriptorProto{
 		Name:       proto.String(mtb.name),
 		Options:    mtb.Options,
@@ -2749,6 +2867,7 @@ func (mtb *MethodBuilder) buildProto() (*dpb.MethodDescriptorProto, error) {
 	if mtb.RespType.IsStream {
 		mtd.ServerStreaming = proto.Bool(true)
 	}
+
 	return mtd, nil
 }
 
@@ -2761,5 +2880,5 @@ func (mtb *MethodBuilder) Build() (*desc.MethodDescriptor, error) {
 }
 
 func entryTypeName(fieldName string) string {
-	return internal.InitCap(internal.JsonName(fieldName)) + "Entry"
+	return InitCap(JsonName(fieldName)) + "Entry"
 }

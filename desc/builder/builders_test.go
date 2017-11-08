@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -12,7 +13,7 @@ import (
 	"github.com/golang/protobuf/ptypes/timestamp"
 
 	"github.com/jhump/protoreflect/desc"
-	_ "github.com/jhump/protoreflect/internal/testprotos"
+	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
@@ -317,6 +318,114 @@ func TestBuildersFromDescriptors(t *testing.T) {
 	}
 }
 
+func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
+	fds := testprotos.GetDescriptorSet()
+	fd, err := desc.CreateFileDescriptorFromSet(fds)
+	testutil.Ok(t, err)
+
+	fb, err := FromFile(fd)
+	testutil.Ok(t, err)
+
+	count := 0
+	var checkBuilderComments func(b Builder)
+	checkBuilderComments = func(b Builder) {
+		hasComment := true
+		switch b := b.(type) {
+		case *FileBuilder:
+			hasComment = false
+		case *FieldBuilder:
+			// comments for groups are on the message, not the field
+			hasComment = b.GetType().GetType() != dpb.FieldDescriptorProto_TYPE_GROUP
+		case *MessageBuilder:
+			// comments for maps are on the field, not the entry message
+			if b.Options.GetMapEntry() {
+				// we just return to also skip checking child elements
+				// (map entry child elements are synthetic and have no comments)
+				return
+			}
+		}
+
+		if hasComment {
+			count++
+			testutil.Eq(t, fmt.Sprintf(" Comment for %s\n", b.GetName()), b.GetComments().LeadingComment,
+				"wrong comment for builder %s", GetFullyQualifiedName(b))
+		}
+		for _, ch := range b.GetChildren() {
+			checkBuilderComments(ch)
+		}
+	}
+
+	checkBuilderComments(fb)
+	// sanity check that we didn't accidentally short-circuit above and fail to check comments
+	testutil.Require(t, count > 30, "too few elements checked")
+
+	// now check that they also come out in the resulting descriptor
+	fd, err = fb.Build()
+	testutil.Ok(t, err)
+
+	descCount := 0
+	var checkDescriptorComments func(d desc.Descriptor)
+	checkDescriptorComments = func(d desc.Descriptor) {
+		switch d := d.(type) {
+		case *desc.FileDescriptor:
+			for _, ch := range d.GetMessageTypes() {
+				checkDescriptorComments(ch)
+			}
+			for _, ch := range d.GetEnumTypes() {
+				checkDescriptorComments(ch)
+			}
+			for _, ch := range d.GetExtensions() {
+				checkDescriptorComments(ch)
+			}
+			for _, ch := range d.GetServices() {
+				checkDescriptorComments(ch)
+			}
+			// files don't have comments, so bail out before check below
+			return
+		case *desc.MessageDescriptor:
+			if d.IsMapEntry() {
+				// map entry messages have no comments (and neither do their child fields)
+				return
+			}
+			for _, ch := range d.GetFields() {
+				checkDescriptorComments(ch)
+			}
+			for _, ch := range d.GetNestedMessageTypes() {
+				checkDescriptorComments(ch)
+			}
+			for _, ch := range d.GetNestedEnumTypes() {
+				checkDescriptorComments(ch)
+			}
+			for _, ch := range d.GetNestedExtensions() {
+				checkDescriptorComments(ch)
+			}
+			for _, ch := range d.GetOneOfs() {
+				checkDescriptorComments(ch)
+			}
+		case *desc.FieldDescriptor:
+			if d.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP {
+				// groups comments are on the message, not hte field; so bail out before check below
+				return
+			}
+		case *desc.EnumDescriptor:
+			for _, ch := range d.GetValues() {
+				checkDescriptorComments(ch)
+			}
+		case *desc.ServiceDescriptor:
+			for _, ch := range d.GetMethods() {
+				checkDescriptorComments(ch)
+			}
+		}
+
+		descCount++
+		testutil.Eq(t, fmt.Sprintf(" Comment for %s\n", d.GetName()), d.GetSourceInfo().GetLeadingComments(),
+			"wrong comment for descriptor %s", d.GetFullyQualifiedName())
+	}
+
+	checkDescriptorComments(fd)
+	testutil.Eq(t, count, descCount)
+}
+
 func roundTripFile(t *testing.T, fd *desc.FileDescriptor) {
 	// First, recursively verify that every child element can be converted to a
 	// Builder and back without loss of fidelity.
@@ -350,6 +459,12 @@ func roundTripFile(t *testing.T, fd *desc.FileDescriptor) {
 	//     uses public imports. The original file, on the other hand, could
 	//     used public imports and "indirectly" import other files that way.
 	//  3. The builder never emits weak imports.
+	//  4. The builder tries to preserve SourceCodeInfo, but will not preserve
+	//     position information. So that info does not survive round-tripping
+	//     (though comments do: there is a separate test for that). Also, the
+	//     round-tripped version will have source code info (even though it
+	//     may have no comments and zero position info), even if the original
+	//     descriptor had none.
 	// So we're going to modify the original descriptor in the same ways.
 	// That way, a simple proto.Equal() check will suffice to confirm that
 	// the file descriptor survived the round trip.
@@ -378,11 +493,15 @@ func roundTripFile(t *testing.T, fd *desc.FileDescriptor) {
 	fdp.PublicDependency = nil
 	fdp.WeakDependency = nil
 
+	// Remove source code info that the builder generated since the original
+	// has none.
+	roundTripped.AsFileDescriptorProto().SourceCodeInfo = nil
+
 	// Finally, sort the imports. That way they match the built result (which
 	// is always sorted).
 	sort.Strings(fdp.Dependency)
 
-	// Now the (now tweaked) original should match the round-tripped descriptor!
+	// Now (after tweaking) the original should match the round-tripped descriptor:
 	testutil.Require(t, proto.Equal(fdp, roundTripped.AsProto()), "File %q failed round trip.\nExpecting: %s\nGot: %s\n",
 		fd.GetName(), proto.MarshalTextString(fdp), proto.MarshalTextString(roundTripped.AsProto()))
 }
