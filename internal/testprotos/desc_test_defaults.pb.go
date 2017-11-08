@@ -532,12 +532,12 @@ func (*StringAndBytesDefaults) Descriptor() ([]byte, []int) { return fileDescrip
 const Default_StringAndBytesDefaults_Dq string = "this is a string with \"nested quotes\""
 const Default_StringAndBytesDefaults_Sq string = "this is a string with \"nested quotes\""
 
-var Default_StringAndBytesDefaults_EscapedBytes []byte = []byte("\x00\x01\a\b\f\n\r\t\v\\'\"\xfe")
+var Default_StringAndBytesDefaults_EscapedBytes []byte = []byte("\\000\\001\\007\\010\\014\\n\\r\\t\\013\\\\\\'\\\"\\376")
 
 const Default_StringAndBytesDefaults_Utf8String string = "ሴ"
 const Default_StringAndBytesDefaults_StringWithZero string = "hel\x00lo"
 
-var Default_StringAndBytesDefaults_BytesWithZero []byte = []byte("wor\x00ld")
+var Default_StringAndBytesDefaults_BytesWithZero []byte = []byte("wor\\000ld")
 
 func (m *StringAndBytesDefaults) GetDq() string {
 	if m != nil && m.Dq != nil {

@@ -272,6 +272,34 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 									"one of":       {(*FieldDescriptor).GetOneOf, nil},
 								},
 							},
+							{
+								name: "testprotos.AnotherTestMessage.str",
+								references: map[string]childCases{
+									"message type": {(*FieldDescriptor).GetMessageType, nil},
+									"enum type":    {(*FieldDescriptor).GetEnumType, nil},
+									"one of":       {(*FieldDescriptor).GetOneOf, refs("testprotos.AnotherTestMessage.atmoo")},
+								},
+							},
+							{
+								name: "testprotos.AnotherTestMessage.int",
+								references: map[string]childCases{
+									"message type": {(*FieldDescriptor).GetMessageType, nil},
+									"enum type":    {(*FieldDescriptor).GetEnumType, nil},
+									"one of":       {(*FieldDescriptor).GetOneOf, refs("testprotos.AnotherTestMessage.atmoo")},
+								},
+							},
+						}},
+						"one ofs": {(*MessageDescriptor).GetOneOfs, []descCase{
+							{
+								name:       "testprotos.AnotherTestMessage.atmoo",
+								skipParent: true,
+								references: map[string]childCases{
+									"fields": {(*OneOfDescriptor).GetChoices, fields(
+										fld{"testprotos.AnotherTestMessage.str", 7},
+										fld{"testprotos.AnotherTestMessage.int", 8}),
+									},
+								},
+							},
 						}},
 						"nested messages": {(*MessageDescriptor).GetNestedMessageTypes, []descCase{
 							{
@@ -420,7 +448,6 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 						}},
 						"nested enums":      {(*MessageDescriptor).GetNestedEnumTypes, nil},
 						"nested extensions": {(*MessageDescriptor).GetNestedExtensions, nil},
-						"one ofs":           {(*MessageDescriptor).GetOneOfs, nil},
 					},
 				},
 			}},

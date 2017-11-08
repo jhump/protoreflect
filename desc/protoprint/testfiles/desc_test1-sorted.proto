@@ -33,6 +33,16 @@ message AnotherTestMessage {
       optional string doors = 3;
    }
 
+   // Comment for atmoo
+   oneof atmoo {
+      // Comment for str
+      optional string str = 7;
+
+      // Comment for int
+      optional int64 int = 8;
+   }
+
+
    extensions 100 to 200;
 }
 

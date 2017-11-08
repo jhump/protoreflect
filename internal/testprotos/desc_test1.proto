@@ -84,6 +84,13 @@ message AnotherTestMessage {
 		// Comment for doors
 		optional string doors = 3;
 	}
+	// Comment for atmoo
+	oneof atmoo {
+		// Comment for str
+		string str = 7;
+		// Comment for int
+		int64 int = 8;
+	}
 
 	extensions 100 to 200;
 }
