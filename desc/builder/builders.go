@@ -55,6 +55,14 @@ type Builder interface {
 	// parent.
 	GetChildren() []Builder
 
+	// GetComments returns the comments for this element. If the element has no
+	// comments then the returned struct will have all empty fields. Comments
+	// can be added to the element by setting fields of the returned struct.
+	//
+	// All builders also have a SetComments method that modifies the comments
+	// and returns the builder itself (for method chaining). But that isn't
+	// defined on this interface because its return type varies with the type of
+	// the descriptor builder.
 	GetComments() *Comments
 
 	// findChild returns the child builder with the given name or nil if this
@@ -562,6 +570,21 @@ func (fb *FileBuilder) setParent(parent Builder) {
 
 func (fb *FileBuilder) GetComments() *Comments {
 	return &fb.comments
+}
+
+func (fb *FileBuilder) SetComments(c Comments) *FileBuilder {
+	fb.comments = c
+	return fb
+}
+
+func (fb *FileBuilder) SetSyntaxComments(c Comments) *FileBuilder {
+	fb.SyntaxComments = c
+	return fb
+}
+
+func (fb *FileBuilder) SetPackageComments(c Comments) *FileBuilder {
+	fb.PackageComments = c
+	return fb
 }
 
 // GetFile implements the Builder interface and always returns this file.
@@ -1108,6 +1131,11 @@ func (mb *MessageBuilder) setNameInternal(newName string) {
 	if err := mb.trySetNameInternal(newName); err != nil {
 		panic(err)
 	}
+}
+
+func (mb *MessageBuilder) SetComments(c Comments) *MessageBuilder {
+	mb.comments = c
+	return mb
 }
 
 func (mb *MessageBuilder) GetChildren() []Builder {
@@ -1891,6 +1919,11 @@ func (flb *FieldBuilder) setNameInternal(newName string) {
 	}
 }
 
+func (flb *FieldBuilder) SetComments(c Comments) *FieldBuilder {
+	flb.comments = c
+	return flb
+}
+
 func (flb *FieldBuilder) setParent(newParent Builder) {
 	flb.baseBuilder.setParent(newParent)
 }
@@ -2167,6 +2200,11 @@ func (oob *OneOfBuilder) TrySetName(newName string) error {
 	return oob.baseBuilder.setName(oob, newName)
 }
 
+func (oob *OneOfBuilder) SetComments(c Comments) *OneOfBuilder {
+	oob.comments = c
+	return oob
+}
+
 func (oob *OneOfBuilder) GetChildren() []Builder {
 	var ch []Builder
 	for _, evb := range oob.choices {
@@ -2380,6 +2418,11 @@ func (eb *EnumBuilder) TrySetName(newName string) error {
 	return eb.baseBuilder.setName(eb, newName)
 }
 
+func (eb *EnumBuilder) SetComments(c Comments) *EnumBuilder {
+	eb.comments = c
+	return eb
+}
+
 func (eb *EnumBuilder) GetChildren() []Builder {
 	var ch []Builder
 	for _, evb := range eb.values {
@@ -2562,6 +2605,11 @@ func (evb *EnumValueBuilder) TrySetName(newName string) error {
 	return evb.baseBuilder.setName(evb, newName)
 }
 
+func (evb *EnumValueBuilder) SetComments(c Comments) *EnumValueBuilder {
+	evb.comments = c
+	return evb
+}
+
 func (evb *EnumValueBuilder) GetChildren() []Builder {
 	// enum values do not have children
 	return nil
@@ -2661,6 +2709,11 @@ func (sb *ServiceBuilder) SetName(newName string) *ServiceBuilder {
 
 func (sb *ServiceBuilder) TrySetName(newName string) error {
 	return sb.baseBuilder.setName(sb, newName)
+}
+
+func (sb *ServiceBuilder) SetComments(c Comments) *ServiceBuilder {
+	sb.comments = c
+	return sb
 }
 
 func (sb *ServiceBuilder) GetChildren() []Builder {
@@ -2816,6 +2869,11 @@ func (mtb *MethodBuilder) SetName(newName string) *MethodBuilder {
 
 func (mtb *MethodBuilder) TrySetName(newName string) error {
 	return mtb.baseBuilder.setName(mtb, newName)
+}
+
+func (mtb *MethodBuilder) SetComments(c Comments) *MethodBuilder {
+	mtb.comments = c
+	return mtb
 }
 
 func (mtb *MethodBuilder) GetChildren() []Builder {
