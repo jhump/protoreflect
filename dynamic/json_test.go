@@ -31,22 +31,10 @@ func TestJSONRepeatedFields(t *testing.T) {
 }
 
 func TestJSONMapKeyFields(t *testing.T) {
-	// translation party wants deterministic marshalling to bytes
-	sort_map_keys = true
-	defer func() {
-		sort_map_keys = false
-	}()
-
 	jsonTranslationParty(t, mapKeyFieldsMsg)
 }
 
 func TestJSONMapValueFields(t *testing.T) {
-	// translation party wants deterministic marshalling to bytes
-	sort_map_keys = true
-	defer func() {
-		sort_map_keys = false
-	}()
-
 	jsonTranslationParty(t, mapValueFieldsMsg)
 }
 
@@ -173,11 +161,6 @@ func TestMarshalJSONEmitDefaults(t *testing.T) {
 }
 
 func TestMarshalJSONEmitDefaultsMapKeyFields(t *testing.T) {
-	sort_map_keys = true
-	defer func() {
-		sort_map_keys = false
-	}()
-
 	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.MapKeyFields)(nil))
 	testutil.Ok(t, err)
 	dm := NewMessage(md)

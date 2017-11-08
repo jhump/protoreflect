@@ -1,0 +1,74 @@
+// This is the first detached comment for the syntax.
+/*
+ * This is a second detached comment.
+ */
+// This is a third.
+
+// Syntax comment...
+syntax = "proto2";
+// Syntax trailer.
+
+// And now the package declaration
+package foo.bar;
+
+// option comments cannot be preserved, sadly...
+option go_package = "github.com/jhump/protoreflect/desc/protoprint"  ;
+
+
+// Multiple white space lines (like above) also cannot
+// preserved...
+
+// We need a request for our RPC service below.
+message /* detached message name */ /* request with a capital R */ Request // trailer
+{
+	// A field comment
+	repeated int32 ids = /* detached tag */ /* tag numero uno */ 1 /* tag trailer
+		that spans multiple lines...
+		more than two. */
+	  [packed=true];
+	// field trailer #1...
+
+	// some detached comments
+
+	// some detached comments
+
+	// Another field comment
+	/* label comment */ optional /* type comment */ string /* name comment */ name = 2;
+
+	// extension range comments are not preserved
+	extensions 100 to 200;
+
+	// another detached comment
+
+	/* reserved range comments */ reserved 10 to 20, 30 to 50 ;
+	reserved "foo", "bar", "baz"; /* reserved trailers */
+
+	// Group comment
+	optional group /* group name */ Extras = 3 {
+		optional double dbl = 1;
+		optional float flt = 2;
+
+		// Leading comment...
+		optional string str = 3;
+		// Trailing comment...
+	}
+}
+// And next we'll need some extensions...
+
+extend
+// extendee comment
+Request {
+	optional uint64 guid1 = 123;
+	optional uint64 guid2 = 124;
+}
+// extendee trailer...
+
+// Service comment
+service /* service name */ RpcService {
+	// Method comment
+	rpc /* rpc name */ StreamingRpc /* comment A */ (/* comment B */stream /* comment C */ Request)
+		returns /* comment D */ (/*comment E */ Request ) /* comment F */ ;
+}
+// service trailer
+
+// Detached comment after all elements cannot be preserved...

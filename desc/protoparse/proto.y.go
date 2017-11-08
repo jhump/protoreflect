@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"math"
 	"unicode"
+
+	"github.com/jhump/protoreflect/desc/internal"
 )
 
-//line proto.y:15
+//line proto.y:17
 type protoSymType struct {
 	yys       int
 	file      *fileNode
@@ -191,7 +193,7 @@ const protoEofCode = 1
 const protoErrCode = 2
 const protoInitialStackSize = 16
 
-//line proto.y:847
+//line proto.y:849
 
 //line yacctab:1
 var protoExca = [...]int{
@@ -907,7 +909,7 @@ protodefault:
 
 	case 1:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:110
+		//line proto.y:112
 		{
 			protoVAL.file = &fileNode{syntax: protoDollar[1].syn}
 			protoVAL.file.setRange(protoDollar[1].syn, protoDollar[1].syn)
@@ -915,7 +917,7 @@ protodefault:
 		}
 	case 2:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:115
+		//line proto.y:117
 		{
 			protoVAL.file = &fileNode{decls: protoDollar[1].fileDecls}
 			if len(protoDollar[1].fileDecls) > 0 {
@@ -925,7 +927,7 @@ protodefault:
 		}
 	case 3:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:122
+		//line proto.y:124
 		{
 			protoVAL.file = &fileNode{syntax: protoDollar[1].syn, decls: protoDollar[2].fileDecls}
 			var end node
@@ -939,66 +941,66 @@ protodefault:
 		}
 	case 4:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:133
+		//line proto.y:135
 		{
 		}
 	case 5:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:136
+		//line proto.y:138
 		{
 			protoVAL.fileDecls = append(protoDollar[1].fileDecls, protoDollar[2].fileDecls...)
 		}
 	case 7:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:141
+		//line proto.y:143
 		{
 			protoVAL.fileDecls = []*fileElement{{imp: protoDollar[1].imprt}}
 		}
 	case 8:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:144
+		//line proto.y:146
 		{
 			protoVAL.fileDecls = []*fileElement{{pkg: protoDollar[1].pkg}}
 		}
 	case 9:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:147
+		//line proto.y:149
 		{
 			protoVAL.fileDecls = []*fileElement{{option: protoDollar[1].opts[0]}}
 		}
 	case 10:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:150
+		//line proto.y:152
 		{
 			protoVAL.fileDecls = []*fileElement{{message: protoDollar[1].msg}}
 		}
 	case 11:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:153
+		//line proto.y:155
 		{
 			protoVAL.fileDecls = []*fileElement{{enum: protoDollar[1].en}}
 		}
 	case 12:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:156
+		//line proto.y:158
 		{
 			protoVAL.fileDecls = []*fileElement{{extend: protoDollar[1].extend}}
 		}
 	case 13:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:159
+		//line proto.y:161
 		{
 			protoVAL.fileDecls = []*fileElement{{service: protoDollar[1].svc}}
 		}
 	case 14:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:162
+		//line proto.y:164
 		{
 			protoVAL.fileDecls = []*fileElement{{empty: protoDollar[1].b}}
 		}
 	case 15:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:166
+		//line proto.y:168
 		{
 			if protoDollar[3].str.val != "proto2" && protoDollar[3].str.val != "proto3" {
 				lexError(protolex, protoDollar[3].str.start(), "syntax value must be 'proto2' or 'proto3'")
@@ -1008,35 +1010,35 @@ protodefault:
 		}
 	case 16:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:174
+		//line proto.y:176
 		{
 			protoVAL.imprt = &importNode{name: protoDollar[2].str}
 			protoVAL.imprt.setRange(protoDollar[1].id, protoDollar[3].b)
 		}
 	case 17:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:178
+		//line proto.y:180
 		{
 			protoVAL.imprt = &importNode{name: protoDollar[3].str, weak: true}
 			protoVAL.imprt.setRange(protoDollar[1].id, protoDollar[4].b)
 		}
 	case 18:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:182
+		//line proto.y:184
 		{
 			protoVAL.imprt = &importNode{name: protoDollar[3].str, public: true}
 			protoVAL.imprt.setRange(protoDollar[1].id, protoDollar[4].b)
 		}
 	case 19:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:187
+		//line proto.y:189
 		{
 			protoVAL.pkg = &packageNode{name: protoDollar[2].id}
 			protoVAL.pkg.setRange(protoDollar[1].id, protoDollar[3].b)
 		}
 	case 22:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:195
+		//line proto.y:197
 		{
 			n := &optionNameNode{parts: protoDollar[2].optNm}
 			n.setRange(protoDollar[2].optNm[0], protoDollar[2].optNm[len(protoDollar[2].optNm)-1])
@@ -1046,13 +1048,13 @@ protodefault:
 		}
 	case 23:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:203
+		//line proto.y:205
 		{
 			protoVAL.optNm = toNameParts(protoDollar[1].id, 0)
 		}
 	case 24:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:206
+		//line proto.y:208
 		{
 			p := &optionNamePartNode{text: protoDollar[2].id, isExtension: true}
 			p.setRange(protoDollar[1].b, protoDollar[3].b)
@@ -1060,7 +1062,7 @@ protodefault:
 		}
 	case 25:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:211
+		//line proto.y:213
 		{
 			p := &optionNamePartNode{text: protoDollar[2].id, isExtension: true}
 			p.setRange(protoDollar[1].b, protoDollar[3].b)
@@ -1070,19 +1072,19 @@ protodefault:
 		}
 	case 27:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:220
+		//line proto.y:222
 		{
 			protoVAL.optNm = append(protoDollar[1].optNm, protoDollar[2].optNm...)
 		}
 	case 28:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:224
+		//line proto.y:226
 		{
 			protoVAL.optNm = toNameParts(protoDollar[1].id, 1 /* exclude leading dot */)
 		}
 	case 29:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:227
+		//line proto.y:229
 		{
 			p := &optionNamePartNode{text: protoDollar[3].id, isExtension: true}
 			p.setRange(protoDollar[2].b, protoDollar[4].b)
@@ -1090,31 +1092,31 @@ protodefault:
 		}
 	case 32:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:236
+		//line proto.y:238
 		{
 			protoVAL.v = protoDollar[1].str
 		}
 	case 33:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:239
+		//line proto.y:241
 		{
 			protoVAL.v = protoDollar[1].ui
 		}
 	case 34:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:242
+		//line proto.y:244
 		{
 			protoVAL.v = protoDollar[1].i
 		}
 	case 35:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:245
+		//line proto.y:247
 		{
 			protoVAL.v = protoDollar[1].f
 		}
 	case 36:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:248
+		//line proto.y:250
 		{
 			if protoDollar[1].id.val == "true" {
 				protoVAL.v = &boolLiteralNode{basicNode: protoDollar[1].id.basicNode, val: true}
@@ -1134,13 +1136,13 @@ protodefault:
 		}
 	case 38:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:267
+		//line proto.y:269
 		{
 			protoVAL.ui = protoDollar[2].ui
 		}
 	case 39:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:271
+		//line proto.y:273
 		{
 			if protoDollar[2].ui.val > math.MaxInt64+1 {
 				lexError(protolex, protoDollar[2].ui.start(), fmt.Sprintf("numeric constant %d would underflow (allowed range is %d to %d)", protoDollar[2].ui.val, int64(math.MinInt64), int64(math.MaxInt64)))
@@ -1150,35 +1152,35 @@ protodefault:
 		}
 	case 41:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:280
+		//line proto.y:282
 		{
 			protoVAL.f = &floatLiteralNode{val: -protoDollar[2].f.val}
 			protoVAL.f.setRange(protoDollar[1].b, protoDollar[2].f)
 		}
 	case 42:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:284
+		//line proto.y:286
 		{
 			protoVAL.f = &floatLiteralNode{val: protoDollar[2].f.val}
 			protoVAL.f.setRange(protoDollar[1].b, protoDollar[2].f)
 		}
 	case 43:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:288
+		//line proto.y:290
 		{
 			protoVAL.f = &floatLiteralNode{val: math.Inf(1)}
 			protoVAL.f.setRange(protoDollar[1].b, protoDollar[2].id)
 		}
 	case 44:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:292
+		//line proto.y:294
 		{
 			protoVAL.f = &floatLiteralNode{val: math.Inf(-1)}
 			protoVAL.f.setRange(protoDollar[1].b, protoDollar[2].id)
 		}
 	case 45:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:297
+		//line proto.y:299
 		{
 			a := &aggregateLiteralNode{elements: protoDollar[2].agg}
 			a.setRange(protoDollar[1].b, protoDollar[3].b)
@@ -1186,25 +1188,25 @@ protodefault:
 		}
 	case 47:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:304
+		//line proto.y:306
 		{
 			protoVAL.agg = append(protoDollar[1].agg, protoDollar[2].agg...)
 		}
 	case 48:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:307
+		//line proto.y:309
 		{
 			protoVAL.agg = append(protoDollar[1].agg, protoDollar[3].agg...)
 		}
 	case 49:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:310
+		//line proto.y:312
 		{
 			protoVAL.agg = nil
 		}
 	case 50:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:314
+		//line proto.y:316
 		{
 			a := &aggregateEntryNode{name: protoDollar[1].aggName, val: protoDollar[3].v}
 			a.setRange(protoDollar[1].aggName, protoDollar[3].v)
@@ -1212,7 +1214,7 @@ protodefault:
 		}
 	case 51:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:319
+		//line proto.y:321
 		{
 			s := &sliceLiteralNode{}
 			s.setRange(protoDollar[3].b, protoDollar[4].b)
@@ -1222,7 +1224,7 @@ protodefault:
 		}
 	case 52:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:326
+		//line proto.y:328
 		{
 			s := &sliceLiteralNode{elements: protoDollar[4].sl}
 			s.setRange(protoDollar[3].b, protoDollar[5].b)
@@ -1232,7 +1234,7 @@ protodefault:
 		}
 	case 53:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:333
+		//line proto.y:335
 		{
 			a := &aggregateEntryNode{name: protoDollar[1].aggName, val: protoDollar[3].v}
 			a.setRange(protoDollar[1].aggName, protoDollar[3].v)
@@ -1240,7 +1242,7 @@ protodefault:
 		}
 	case 54:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:338
+		//line proto.y:340
 		{
 			a := &aggregateEntryNode{name: protoDollar[1].aggName, val: protoDollar[2].v}
 			a.setRange(protoDollar[1].aggName, protoDollar[2].v)
@@ -1248,7 +1250,7 @@ protodefault:
 		}
 	case 55:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:343
+		//line proto.y:345
 		{
 			s := &aggregateLiteralNode{elements: protoDollar[4].agg}
 			s.setRange(protoDollar[3].b, protoDollar[5].b)
@@ -1258,7 +1260,7 @@ protodefault:
 		}
 	case 56:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:350
+		//line proto.y:352
 		{
 			s := &aggregateLiteralNode{elements: protoDollar[3].agg}
 			s.setRange(protoDollar[2].b, protoDollar[4].b)
@@ -1268,33 +1270,33 @@ protodefault:
 		}
 	case 57:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:358
+		//line proto.y:360
 		{
 			protoVAL.aggName = &aggregateNameNode{name: protoDollar[1].id}
 			protoVAL.aggName.setRange(protoDollar[1].id, protoDollar[1].id)
 		}
 	case 58:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:362
+		//line proto.y:364
 		{
 			protoVAL.aggName = &aggregateNameNode{name: protoDollar[2].id, isExtension: true}
 			protoVAL.aggName.setRange(protoDollar[1].b, protoDollar[3].b)
 		}
 	case 59:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:367
+		//line proto.y:369
 		{
 			protoVAL.sl = []valueNode{protoDollar[1].v}
 		}
 	case 60:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:370
+		//line proto.y:372
 		{
 			protoVAL.sl = append(protoDollar[1].sl, protoDollar[3].v)
 		}
 	case 61:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:373
+		//line proto.y:375
 		{
 			s := &aggregateLiteralNode{elements: protoDollar[2].agg}
 			s.setRange(protoDollar[1].b, protoDollar[3].b)
@@ -1302,7 +1304,7 @@ protodefault:
 		}
 	case 62:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:378
+		//line proto.y:380
 		{
 			s := &aggregateLiteralNode{elements: protoDollar[4].agg}
 			s.setRange(protoDollar[3].b, protoDollar[5].b)
@@ -1310,7 +1312,7 @@ protodefault:
 		}
 	case 65:
 		protoDollar = protoS[protopt-6 : protopt+1]
-		//line proto.y:387
+		//line proto.y:389
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, required: true}
@@ -1319,7 +1321,7 @@ protodefault:
 		}
 	case 66:
 		protoDollar = protoS[protopt-6 : protopt+1]
-		//line proto.y:393
+		//line proto.y:395
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode}
@@ -1328,7 +1330,7 @@ protodefault:
 		}
 	case 67:
 		protoDollar = protoS[protopt-6 : protopt+1]
-		//line proto.y:399
+		//line proto.y:401
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, repeated: true}
@@ -1337,7 +1339,7 @@ protodefault:
 		}
 	case 68:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:405
+		//line proto.y:407
 		{
 			checkTag(protolex, protoDollar[4].ui.start(), protoDollar[4].ui.val)
 			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui}
@@ -1345,7 +1347,7 @@ protodefault:
 		}
 	case 69:
 		protoDollar = protoS[protopt-9 : protopt+1]
-		//line proto.y:410
+		//line proto.y:412
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, required: true}
@@ -1354,7 +1356,7 @@ protodefault:
 		}
 	case 70:
 		protoDollar = protoS[protopt-9 : protopt+1]
-		//line proto.y:416
+		//line proto.y:418
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode}
@@ -1363,7 +1365,7 @@ protodefault:
 		}
 	case 71:
 		protoDollar = protoS[protopt-9 : protopt+1]
-		//line proto.y:422
+		//line proto.y:424
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			lbl := &labelNode{basicNode: protoDollar[1].id.basicNode, repeated: true}
@@ -1372,7 +1374,7 @@ protodefault:
 		}
 	case 72:
 		protoDollar = protoS[protopt-8 : protopt+1]
-		//line proto.y:428
+		//line proto.y:430
 		{
 			checkTag(protolex, protoDollar[4].ui.start(), protoDollar[4].ui.val)
 			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui, options: protoDollar[6].opts}
@@ -1380,13 +1382,13 @@ protodefault:
 		}
 	case 73:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:434
+		//line proto.y:436
 		{
 			protoVAL.opts = append(protoDollar[1].opts, protoDollar[3].opts...)
 		}
 	case 75:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:439
+		//line proto.y:441
 		{
 			n := &optionNameNode{parts: protoDollar[1].optNm}
 			n.setRange(protoDollar[1].optNm[0], protoDollar[1].optNm[len(protoDollar[1].optNm)-1])
@@ -1396,7 +1398,7 @@ protodefault:
 		}
 	case 76:
 		protoDollar = protoS[protopt-8 : protopt+1]
-		//line proto.y:447
+		//line proto.y:449
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
@@ -1408,7 +1410,7 @@ protodefault:
 		}
 	case 77:
 		protoDollar = protoS[protopt-8 : protopt+1]
-		//line proto.y:456
+		//line proto.y:458
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
@@ -1420,7 +1422,7 @@ protodefault:
 		}
 	case 78:
 		protoDollar = protoS[protopt-8 : protopt+1]
-		//line proto.y:465
+		//line proto.y:467
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
 			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
@@ -1432,7 +1434,7 @@ protodefault:
 		}
 	case 79:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:475
+		//line proto.y:477
 		{
 			c := 0
 			for _, el := range protoDollar[4].ooDecls {
@@ -1448,37 +1450,37 @@ protodefault:
 		}
 	case 80:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:489
+		//line proto.y:491
 		{
 			protoVAL.ooDecls = append(protoDollar[1].ooDecls, protoDollar[2].ooDecls...)
 		}
 	case 82:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:493
+		//line proto.y:495
 		{
 			protoVAL.ooDecls = nil
 		}
 	case 83:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:497
+		//line proto.y:499
 		{
 			protoVAL.ooDecls = []*oneOfElement{{option: protoDollar[1].opts[0]}}
 		}
 	case 84:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:500
+		//line proto.y:502
 		{
 			protoVAL.ooDecls = []*oneOfElement{{field: protoDollar[1].fld}}
 		}
 	case 85:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:503
+		//line proto.y:505
 		{
 			protoVAL.ooDecls = []*oneOfElement{{empty: protoDollar[1].b}}
 		}
 	case 86:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:507
+		//line proto.y:509
 		{
 			checkTag(protolex, protoDollar[4].ui.start(), protoDollar[4].ui.val)
 			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui}
@@ -1486,7 +1488,7 @@ protodefault:
 		}
 	case 87:
 		protoDollar = protoS[protopt-8 : protopt+1]
-		//line proto.y:512
+		//line proto.y:514
 		{
 			checkTag(protolex, protoDollar[4].ui.start(), protoDollar[4].ui.val)
 			protoVAL.fld = &fieldNode{fldType: protoDollar[1].id, name: protoDollar[2].id, tag: protoDollar[4].ui, options: protoDollar[6].opts}
@@ -1494,7 +1496,7 @@ protodefault:
 		}
 	case 88:
 		protoDollar = protoS[protopt-10 : protopt+1]
-		//line proto.y:518
+		//line proto.y:520
 		{
 			checkTag(protolex, protoDollar[9].ui.start(), protoDollar[9].ui.val)
 			protoVAL.mapFld = &mapFieldNode{mapKeyword: protoDollar[1].id, keyType: protoDollar[3].id, valueType: protoDollar[5].id, name: protoDollar[7].id, tag: protoDollar[9].ui}
@@ -1502,7 +1504,7 @@ protodefault:
 		}
 	case 89:
 		protoDollar = protoS[protopt-13 : protopt+1]
-		//line proto.y:523
+		//line proto.y:525
 		{
 			checkTag(protolex, protoDollar[9].ui.start(), protoDollar[9].ui.val)
 			protoVAL.mapFld = &mapFieldNode{mapKeyword: protoDollar[1].id, keyType: protoDollar[3].id, valueType: protoDollar[5].id, name: protoDollar[7].id, tag: protoDollar[9].ui, options: protoDollar[11].opts}
@@ -1510,30 +1512,30 @@ protodefault:
 		}
 	case 102:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:542
+		//line proto.y:544
 		{
 			protoVAL.ext = &extensionRangeNode{ranges: protoDollar[2].rngs}
 			protoVAL.ext.setRange(protoDollar[1].id, protoDollar[3].b)
 		}
 	case 103:
 		protoDollar = protoS[protopt-6 : protopt+1]
-		//line proto.y:546
+		//line proto.y:548
 		{
 			protoVAL.ext = &extensionRangeNode{ranges: protoDollar[2].rngs, options: protoDollar[4].opts}
 			protoVAL.ext.setRange(protoDollar[1].id, protoDollar[6].b)
 		}
 	case 104:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:551
+		//line proto.y:553
 		{
 			protoVAL.rngs = append(protoDollar[1].rngs, protoDollar[3].rngs...)
 		}
 	case 106:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:556
+		//line proto.y:558
 		{
-			if protoDollar[1].ui.val > maxTag {
-				lexError(protolex, protoDollar[1].ui.start(), fmt.Sprintf("range includes out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui.val, maxTag))
+			if protoDollar[1].ui.val > internal.MaxTag {
+				lexError(protolex, protoDollar[1].ui.start(), fmt.Sprintf("range includes out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui.val, internal.MaxTag))
 			}
 			r := &rangeNode{st: protoDollar[1].ui, en: protoDollar[1].ui}
 			r.setRange(protoDollar[1].ui, protoDollar[1].ui)
@@ -1541,13 +1543,13 @@ protodefault:
 		}
 	case 107:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:564
+		//line proto.y:566
 		{
-			if protoDollar[1].ui.val > maxTag {
-				lexError(protolex, protoDollar[1].ui.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui.val, maxTag))
+			if protoDollar[1].ui.val > internal.MaxTag {
+				lexError(protolex, protoDollar[1].ui.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui.val, internal.MaxTag))
 			}
-			if protoDollar[3].ui.val > maxTag {
-				lexError(protolex, protoDollar[3].ui.start(), fmt.Sprintf("range end is out-of-range tag: %d (should be between 0 and %d)", protoDollar[3].ui.val, maxTag))
+			if protoDollar[3].ui.val > internal.MaxTag {
+				lexError(protolex, protoDollar[3].ui.start(), fmt.Sprintf("range end is out-of-range tag: %d (should be between 0 and %d)", protoDollar[3].ui.val, internal.MaxTag))
 			}
 			if protoDollar[1].ui.val > protoDollar[3].ui.val {
 				lexError(protolex, protoDollar[1].ui.start(), fmt.Sprintf("range, %d to %d, is invalid: start must be <= end", protoDollar[1].ui.val, protoDollar[3].ui.val))
@@ -1558,26 +1560,26 @@ protodefault:
 		}
 	case 108:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:578
+		//line proto.y:580
 		{
-			if protoDollar[1].ui.val > maxTag {
-				lexError(protolex, protoDollar[1].ui.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui.val, maxTag))
+			if protoDollar[1].ui.val > internal.MaxTag {
+				lexError(protolex, protoDollar[1].ui.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", protoDollar[1].ui.val, internal.MaxTag))
 			}
-			m := &intLiteralNode{basicNode: protoDollar[3].id.basicNode, val: maxTag}
+			m := &intLiteralNode{basicNode: protoDollar[3].id.basicNode, val: internal.MaxTag}
 			r := &rangeNode{st: protoDollar[1].ui, en: m}
 			r.setRange(protoDollar[1].ui, protoDollar[3].id)
 			protoVAL.rngs = []*rangeNode{r}
 		}
 	case 109:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:588
+		//line proto.y:590
 		{
 			protoVAL.resvd = &reservedNode{ranges: protoDollar[2].rngs}
 			protoVAL.resvd.setRange(protoDollar[1].id, protoDollar[3].b)
 		}
 	case 110:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:592
+		//line proto.y:594
 		{
 			rsvd := map[string]struct{}{}
 			for _, n := range protoDollar[2].names {
@@ -1592,19 +1594,19 @@ protodefault:
 		}
 	case 111:
 		protoDollar = protoS[protopt-3 : protopt+1]
-		//line proto.y:605
+		//line proto.y:607
 		{
 			protoVAL.names = append(protoDollar[1].names, protoDollar[3].str)
 		}
 	case 112:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:608
+		//line proto.y:610
 		{
 			protoVAL.names = []*stringLiteralNode{protoDollar[1].str}
 		}
 	case 113:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:612
+		//line proto.y:614
 		{
 			c := 0
 			for _, el := range protoDollar[4].enDecls {
@@ -1620,37 +1622,37 @@ protodefault:
 		}
 	case 114:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:626
+		//line proto.y:628
 		{
 			protoVAL.enDecls = append(protoDollar[1].enDecls, protoDollar[2].enDecls...)
 		}
 	case 116:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:630
+		//line proto.y:632
 		{
 			protoVAL.enDecls = nil
 		}
 	case 117:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:634
+		//line proto.y:636
 		{
 			protoVAL.enDecls = []*enumElement{{option: protoDollar[1].opts[0]}}
 		}
 	case 118:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:637
+		//line proto.y:639
 		{
 			protoVAL.enDecls = []*enumElement{{value: protoDollar[1].env}}
 		}
 	case 119:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:640
+		//line proto.y:642
 		{
 			protoVAL.enDecls = []*enumElement{{empty: protoDollar[1].b}}
 		}
 	case 120:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:644
+		//line proto.y:646
 		{
 			checkUint64InInt32Range(protolex, protoDollar[3].ui.start(), protoDollar[3].ui.val)
 			protoVAL.env = &enumValueNode{name: protoDollar[1].id, number: protoDollar[3].ui}
@@ -1658,7 +1660,7 @@ protodefault:
 		}
 	case 121:
 		protoDollar = protoS[protopt-7 : protopt+1]
-		//line proto.y:649
+		//line proto.y:651
 		{
 			checkUint64InInt32Range(protolex, protoDollar[3].ui.start(), protoDollar[3].ui.val)
 			protoVAL.env = &enumValueNode{name: protoDollar[1].id, number: protoDollar[3].ui, options: protoDollar[5].opts}
@@ -1666,7 +1668,7 @@ protodefault:
 		}
 	case 122:
 		protoDollar = protoS[protopt-4 : protopt+1]
-		//line proto.y:654
+		//line proto.y:656
 		{
 			checkInt64InInt32Range(protolex, protoDollar[3].i.start(), protoDollar[3].i.val)
 			protoVAL.env = &enumValueNode{name: protoDollar[1].id, numberN: protoDollar[3].i}
@@ -1674,7 +1676,7 @@ protodefault:
 		}
 	case 123:
 		protoDollar = protoS[protopt-7 : protopt+1]
-		//line proto.y:659
+		//line proto.y:661
 		{
 			checkInt64InInt32Range(protolex, protoDollar[3].i.start(), protoDollar[3].i.val)
 			protoVAL.env = &enumValueNode{name: protoDollar[1].id, numberN: protoDollar[3].i, options: protoDollar[5].opts}
@@ -1682,92 +1684,92 @@ protodefault:
 		}
 	case 124:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:665
+		//line proto.y:667
 		{
 			protoVAL.msg = &messageNode{name: protoDollar[2].id, decls: protoDollar[4].msgDecls}
 			protoVAL.msg.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
 	case 125:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:670
+		//line proto.y:672
 		{
 			protoVAL.msgDecls = append(protoDollar[1].msgDecls, protoDollar[2].msgDecls...)
 		}
 	case 127:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:674
+		//line proto.y:676
 		{
 			protoVAL.msgDecls = nil
 		}
 	case 128:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:678
+		//line proto.y:680
 		{
 			protoVAL.msgDecls = []*messageElement{{field: protoDollar[1].fld}}
 		}
 	case 129:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:681
+		//line proto.y:683
 		{
 			protoVAL.msgDecls = []*messageElement{{enum: protoDollar[1].en}}
 		}
 	case 130:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:684
+		//line proto.y:686
 		{
 			protoVAL.msgDecls = []*messageElement{{nested: protoDollar[1].msg}}
 		}
 	case 131:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:687
+		//line proto.y:689
 		{
 			protoVAL.msgDecls = []*messageElement{{extend: protoDollar[1].extend}}
 		}
 	case 132:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:690
+		//line proto.y:692
 		{
 			protoVAL.msgDecls = []*messageElement{{extensionRange: protoDollar[1].ext}}
 		}
 	case 133:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:693
+		//line proto.y:695
 		{
 			protoVAL.msgDecls = []*messageElement{{group: protoDollar[1].grp}}
 		}
 	case 134:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:696
+		//line proto.y:698
 		{
 			protoVAL.msgDecls = []*messageElement{{option: protoDollar[1].opts[0]}}
 		}
 	case 135:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:699
+		//line proto.y:701
 		{
 			protoVAL.msgDecls = []*messageElement{{oneOf: protoDollar[1].oo}}
 		}
 	case 136:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:702
+		//line proto.y:704
 		{
 			protoVAL.msgDecls = []*messageElement{{mapField: protoDollar[1].mapFld}}
 		}
 	case 137:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:705
+		//line proto.y:707
 		{
 			protoVAL.msgDecls = []*messageElement{{reserved: protoDollar[1].resvd}}
 		}
 	case 138:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:708
+		//line proto.y:710
 		{
 			protoVAL.msgDecls = []*messageElement{{empty: protoDollar[1].b}}
 		}
 	case 139:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:712
+		//line proto.y:714
 		{
 			c := 0
 			for _, el := range protoDollar[4].extDecls {
@@ -1783,120 +1785,120 @@ protodefault:
 		}
 	case 140:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:726
+		//line proto.y:728
 		{
 			protoVAL.extDecls = append(protoDollar[1].extDecls, protoDollar[2].extDecls...)
 		}
 	case 142:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:730
+		//line proto.y:732
 		{
 			protoVAL.extDecls = nil
 		}
 	case 143:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:734
+		//line proto.y:736
 		{
 			protoVAL.extDecls = []*extendElement{{field: protoDollar[1].fld}}
 		}
 	case 144:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:737
+		//line proto.y:739
 		{
 			protoVAL.extDecls = []*extendElement{{group: protoDollar[1].grp}}
 		}
 	case 145:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:740
+		//line proto.y:742
 		{
 			protoVAL.extDecls = []*extendElement{{empty: protoDollar[1].b}}
 		}
 	case 146:
 		protoDollar = protoS[protopt-5 : protopt+1]
-		//line proto.y:744
+		//line proto.y:746
 		{
 			protoVAL.svc = &serviceNode{name: protoDollar[2].id, decls: protoDollar[4].svcDecls}
 			protoVAL.svc.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
 	case 147:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:749
+		//line proto.y:751
 		{
 			protoVAL.svcDecls = append(protoDollar[1].svcDecls, protoDollar[2].svcDecls...)
 		}
 	case 149:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:753
+		//line proto.y:755
 		{
 			protoVAL.svcDecls = nil
 		}
 	case 150:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:760
+		//line proto.y:762
 		{
 			protoVAL.svcDecls = []*serviceElement{{option: protoDollar[1].opts[0]}}
 		}
 	case 151:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:763
+		//line proto.y:765
 		{
 			protoVAL.svcDecls = []*serviceElement{{rpc: protoDollar[1].mtd}}
 		}
 	case 152:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:766
+		//line proto.y:768
 		{
 			protoVAL.svcDecls = []*serviceElement{{empty: protoDollar[1].b}}
 		}
 	case 153:
 		protoDollar = protoS[protopt-10 : protopt+1]
-		//line proto.y:770
+		//line proto.y:772
 		{
 			protoVAL.mtd = &methodNode{name: protoDollar[2].id, input: protoDollar[4].rpcType, output: protoDollar[8].rpcType}
 			protoVAL.mtd.setRange(protoDollar[1].id, protoDollar[10].b)
 		}
 	case 154:
 		protoDollar = protoS[protopt-12 : protopt+1]
-		//line proto.y:774
+		//line proto.y:776
 		{
 			protoVAL.mtd = &methodNode{name: protoDollar[2].id, input: protoDollar[4].rpcType, output: protoDollar[8].rpcType, options: protoDollar[11].opts}
 			protoVAL.mtd.setRange(protoDollar[1].id, protoDollar[12].b)
 		}
 	case 155:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:779
+		//line proto.y:781
 		{
 			protoVAL.rpcType = &rpcTypeNode{msgType: protoDollar[2].id, stream: true}
 			protoVAL.rpcType.setRange(protoDollar[1].id, protoDollar[2].id)
 		}
 	case 156:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:783
+		//line proto.y:785
 		{
 			protoVAL.rpcType = &rpcTypeNode{msgType: protoDollar[1].id}
 			protoVAL.rpcType.setRange(protoDollar[1].id, protoDollar[1].id)
 		}
 	case 157:
 		protoDollar = protoS[protopt-2 : protopt+1]
-		//line proto.y:788
+		//line proto.y:790
 		{
 			protoVAL.opts = append(protoDollar[1].opts, protoDollar[2].opts...)
 		}
 	case 159:
 		protoDollar = protoS[protopt-0 : protopt+1]
-		//line proto.y:792
+		//line proto.y:794
 		{
 			protoVAL.opts = nil
 		}
 	case 160:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:796
+		//line proto.y:798
 		{
 			protoVAL.opts = protoDollar[1].opts
 		}
 	case 161:
 		protoDollar = protoS[protopt-1 : protopt+1]
-		//line proto.y:799
+		//line proto.y:801
 		{
 			protoVAL.opts = nil
 		}

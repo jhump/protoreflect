@@ -1862,13 +1862,6 @@ func (flb *FieldBuilder) SetNumber(tag int32) *FieldBuilder {
 }
 
 func (flb *FieldBuilder) TrySetNumber(tag int32) error {
-	const (
-		maxTag = 536870911 // 2^29 - 1
-
-		specialReservedStart = 19000
-		specialReservedEnd   = 19999
-	)
-
 	if tag == flb.number {
 		return nil // no change
 	}
@@ -1878,11 +1871,11 @@ func (flb *FieldBuilder) TrySetNumber(tag int32) error {
 	if tag == 0 && flb.IsExtension() {
 		return fmt.Errorf("cannot set tag number for extension %s; only regular fields can be auto-assigned", GetFullyQualifiedName(flb))
 	}
-	if tag >= specialReservedStart && tag <= specialReservedEnd {
-		return fmt.Errorf("tag for field %s cannot be in special reserved range %d-%d", GetFullyQualifiedName(flb), specialReservedStart, specialReservedEnd)
+	if tag >= internal.SpecialReservedStart && tag <= internal.SpecialReservedEnd {
+		return fmt.Errorf("tag for field %s cannot be in special reserved range %d-%d", GetFullyQualifiedName(flb), internal.SpecialReservedStart, internal.SpecialReservedEnd)
 	}
-	if tag > maxTag {
-		return fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), maxTag)
+	if tag > internal.MaxTag {
+		return fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), internal.MaxTag)
 	}
 	oldTag := flb.number
 	flb.number = tag

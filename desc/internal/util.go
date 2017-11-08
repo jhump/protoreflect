@@ -5,6 +5,13 @@ import (
 	"unicode/utf8"
 )
 
+const (
+	MaxTag = 536870911 // 2^29 - 1
+
+	SpecialReservedStart = 19000
+	SpecialReservedEnd   = 19999
+)
+
 func JsonName(name string) string {
 	var js []rune
 	nextUpper := false
