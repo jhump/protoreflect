@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math"
 	"unicode"
+
+	"github.com/jhump/protoreflect/desc/internal"
 )
 
 %}
@@ -554,19 +556,19 @@ ranges : ranges ',' range {
 	| range
 
 range : _INT_LIT {
-		if $1.val > maxTag {
-			lexError(protolex, $1.start(), fmt.Sprintf("range includes out-of-range tag: %d (should be between 0 and %d)", $1.val, maxTag))
+		if $1.val > internal.MaxTag {
+			lexError(protolex, $1.start(), fmt.Sprintf("range includes out-of-range tag: %d (should be between 0 and %d)", $1.val, internal.MaxTag))
 		}
 		r := &rangeNode{st: $1, en: $1}
 		r.setRange($1, $1)
 		$$ = []*rangeNode{r}
 	}
 	| _INT_LIT _TO _INT_LIT {
-		if $1.val > maxTag {
-			lexError(protolex, $1.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", $1.val, maxTag))
+		if $1.val > internal.MaxTag {
+			lexError(protolex, $1.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", $1.val, internal.MaxTag))
 		}
-		if $3.val > maxTag {
-			lexError(protolex, $3.start(), fmt.Sprintf("range end is out-of-range tag: %d (should be between 0 and %d)", $3.val, maxTag))
+		if $3.val > internal.MaxTag {
+			lexError(protolex, $3.start(), fmt.Sprintf("range end is out-of-range tag: %d (should be between 0 and %d)", $3.val, internal.MaxTag))
 		}
 		if $1.val > $3.val {
 			lexError(protolex, $1.start(), fmt.Sprintf("range, %d to %d, is invalid: start must be <= end", $1.val, $3.val))
@@ -576,10 +578,10 @@ range : _INT_LIT {
 		$$ = []*rangeNode{r}
 	}
 	| _INT_LIT _TO _MAX {
-		if $1.val > maxTag {
-			lexError(protolex, $1.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", $1.val, maxTag))
+		if $1.val > internal.MaxTag {
+			lexError(protolex, $1.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", $1.val, internal.MaxTag))
 		}
-		m := &intLiteralNode{basicNode: $3.basicNode, val: maxTag}
+		m := &intLiteralNode{basicNode: $3.basicNode, val: internal.MaxTag}
 		r := &rangeNode{st: $1, en: m}
 		r.setRange($1, $3)
 		$$ = []*rangeNode{r}

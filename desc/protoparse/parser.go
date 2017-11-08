@@ -20,13 +20,6 @@ import (
 
 //go:generate goyacc -o proto.y.go -p proto proto.y
 
-const (
-	maxTag = 536870911 // 2^29 - 1
-
-	specialReservedStart = 19000
-	specialReservedEnd   = 19999
-)
-
 func init() {
 	protoErrorVerbose = true
 }
@@ -831,10 +824,10 @@ func checkInt64InInt32Range(lex protoLexer, pos *SourcePos, v int64) {
 }
 
 func checkTag(lex protoLexer, pos *SourcePos, v uint64) {
-	if v > maxTag {
-		lexError(lex, pos, fmt.Sprintf("tag number %d is higher than max allowed tag number (%d)", v, maxTag))
-	} else if v >= specialReservedStart && v <= specialReservedEnd {
-		lexError(lex, pos, fmt.Sprintf("tag number %d is in disallowed reserved range %d-%d", v, specialReservedStart, specialReservedEnd))
+	if v > internal.MaxTag {
+		lexError(lex, pos, fmt.Sprintf("tag number %d is higher than max allowed tag number (%d)", v, internal.MaxTag))
+	} else if v >= internal.SpecialReservedStart && v <= internal.SpecialReservedEnd {
+		lexError(lex, pos, fmt.Sprintf("tag number %d is in disallowed reserved range %d-%d", v, internal.SpecialReservedStart, internal.SpecialReservedEnd))
 	}
 }
 

@@ -50,33 +50,20 @@ func (m *Message) marshalText(b *indentBuffer) error {
 			kfd := md.FindFieldByNumber(1)
 			vfd := md.FindFieldByNumber(2)
 			mp := v.(map[interface{}]interface{})
-			if sort_map_keys {
-				keys := make([]interface{}, 0, len(mp))
-				for k := range mp {
-					keys = append(keys, k)
+			keys := make([]interface{}, 0, len(mp))
+			for k := range mp {
+				keys = append(keys, k)
+			}
+			sort.Sort(sortable(keys))
+			for _, mk := range keys {
+				mv := mp[mk]
+				err := b.maybeNext(&first)
+				if err != nil {
+					return err
 				}
-				sort.Sort(sortable(keys))
-				for _, mk := range keys {
-					mv := mp[mk]
-					err := b.maybeNext(&first)
-					if err != nil {
-						return err
-					}
-					err = marshalKnownFieldMapEntryText(b, fd, kfd, mk, vfd, mv)
-					if err != nil {
-						return err
-					}
-				}
-			} else {
-				for mk, mv := range mp {
-					err := b.maybeNext(&first)
-					if err != nil {
-						return err
-					}
-					err = marshalKnownFieldMapEntryText(b, fd, kfd, mk, vfd, mv)
-					if err != nil {
-						return err
-					}
+				err = marshalKnownFieldMapEntryText(b, fd, kfd, mk, vfd, mv)
+				if err != nil {
+					return err
 				}
 			}
 		} else if fd.IsRepeated() {

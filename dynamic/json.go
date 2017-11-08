@@ -153,36 +153,22 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 		vfd := md.FindFieldByNumber(2)
 
 		mp := v.(map[interface{}]interface{})
-		if sort_map_keys {
-			keys := make([]interface{}, 0, len(mp))
-			for k := range mp {
-				keys = append(keys, k)
+		keys := make([]interface{}, 0, len(mp))
+		for k := range mp {
+			keys = append(keys, k)
+		}
+		sort.Sort(sortable(keys))
+		first := true
+		for _, mk := range keys {
+			mv := mp[mk]
+			err := b.maybeNext(&first)
+			if err != nil {
+				return err
 			}
-			sort.Sort(sortable(keys))
-			first := true
-			for _, mk := range keys {
-				mv := mp[mk]
-				err := b.maybeNext(&first)
-				if err != nil {
-					return err
-				}
 
-				err = marshalKnownFieldMapEntryJSON(b, mk, vfd, mv, opts)
-				if err != nil {
-					return err
-				}
-			}
-		} else {
-			first := true
-			for mk, mv := range mp {
-				err := b.maybeNext(&first)
-				if err != nil {
-					return err
-				}
-				err = marshalKnownFieldMapEntryJSON(b, mk, vfd, mv, opts)
-				if err != nil {
-					return err
-				}
+			err = marshalKnownFieldMapEntryJSON(b, mk, vfd, mv, opts)
+			if err != nil {
+				return err
 			}
 		}
 

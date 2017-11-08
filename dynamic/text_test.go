@@ -15,22 +15,10 @@ func TestTextRepeatedFields(t *testing.T) {
 }
 
 func TestTextMapKeyFields(t *testing.T) {
-	// translation party wants deterministic marshalling to bytes
-	sort_map_keys = true
-	defer func() {
-		sort_map_keys = false
-	}()
-
 	textTranslationParty(t, mapKeyFieldsMsg)
 }
 
 func TestTextMapValueFields(t *testing.T) {
-	// translation party wants deterministic marshalling to bytes
-	sort_map_keys = true
-	defer func() {
-		sort_map_keys = false
-	}()
-
 	textTranslationParty(t, mapValueFieldsMsg)
 }
 

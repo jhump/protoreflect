@@ -1,0 +1,47 @@
+// Syntax comment...
+syntax = "proto2";
+// Syntax trailer.
+
+// And now the package declaration
+package foo.bar;
+
+option go_package = "github.com/jhump/protoreflect/desc/protoprint";
+
+// We need a request for our RPC service below.
+message Request {
+   // A field comment
+   repeated int32 ids = 1 [packed = true];
+   // field trailer #1...
+
+   // label comment 
+   optional string name = 2;
+
+   // Group comment
+   optional group Extras = 3 {
+      optional double dbl = 1;
+
+      optional float flt = 2;
+
+      // Leading comment...
+      optional string str = 3;
+      // Trailing comment...
+   }
+
+   extensions 100 to 200;
+
+   reserved 10 to 20, 30 to 50;
+
+   reserved "bar", "baz", "foo";
+}
+
+// Service comment
+service RpcService {
+   // Method comment
+   rpc StreamingRpc ( stream Request ) returns ( Request );
+}
+
+extend Request {
+   optional uint64 guid1 = 123;
+
+   optional uint64 guid2 = 124;
+}

@@ -15,8 +15,9 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
-// sort_map_keys is set to true in tests, for deterministic serialization of protos with map fields
-var sort_map_keys = false
+// sortMapKeys, if true, will mean that map values' keys are sorted before
+// serialization, for deterministic output. This is set to true from tests.
+var sortMapKeys = false
 
 func (m *Message) Marshal() ([]byte, error) {
 	var b codedBuffer
@@ -93,7 +94,7 @@ func marshalField(tag int32, fd *desc.FieldDescriptor, val interface{}, b *coded
 		keyType := entryType.FindFieldByNumber(1)
 		valType := entryType.FindFieldByNumber(2)
 		var entryBuffer codedBuffer
-		if sort_map_keys {
+		if sortMapKeys {
 			keys := make([]interface{}, 0, len(mp))
 			for k := range mp {
 				keys = append(keys, k)
