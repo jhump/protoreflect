@@ -840,7 +840,7 @@ func aggToString(agg []*aggregateEntryNode, buf *bytes.Buffer) {
 			aggToString(v.elements, buf)
 		} else {
 			buf.WriteString(": ")
-			elementToString(v, buf)
+			elementToString(a.val, buf)
 		}
 	}
 	buf.WriteString(" }")
@@ -864,6 +864,8 @@ func elementToString(v interface{}, buf *bytes.Buffer) {
 		buf.WriteRune('"')
 		writeEscapedBytes(buf, []byte(v))
 		buf.WriteRune('"')
+	case valueNode:
+		elementToString(v.value(), buf)
 	case []valueNode:
 		buf.WriteString(": [")
 		first := true
