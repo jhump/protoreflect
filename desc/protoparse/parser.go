@@ -840,7 +840,7 @@ func aggToString(agg []*aggregateEntryNode, buf *bytes.Buffer) {
 			aggToString(v.elements, buf)
 		} else {
 			buf.WriteString(": ")
-			elementToString(v, buf)
+			elementToString(a.val.value(), buf)
 		}
 	}
 	buf.WriteString(" }")
