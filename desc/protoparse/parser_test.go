@@ -327,14 +327,14 @@ func TestBasicValidation(t *testing.T) {
 	}
 }
 
-func TestMethodOptions(t *testing.T) {
-	res, err := parseProtoFile("../../internal/testprotos/desc_test3.proto")
+func TestAggregateValueInUninterpretedOptions(t *testing.T) {
+	res, err := parseProtoFile("test.proto")
 	testutil.Ok(t, err)
 	fd := res.fd
 
 	aggregateValue1 := *fd.Service[0].Method[0].Options.UninterpretedOption[0].AggregateValue
-	testutil.Eq(t, "{ authenticated: true permission{ action: login entity: \"client\" } }", aggregateValue1)
+	testutil.Eq(t, "{ authenticated: true permission{ action: LOGIN entity: \"client\" } }", aggregateValue1)
 
 	aggregateValue2 := *fd.Service[0].Method[1].Options.UninterpretedOption[0].AggregateValue
-	testutil.Eq(t, "{ authenticated: true permission{ action: read entity: \"user\" } }", aggregateValue2)
+	testutil.Eq(t, "{ authenticated: true permission{ action: READ entity: \"user\" } }", aggregateValue2)
 }

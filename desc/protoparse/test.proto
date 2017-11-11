@@ -78,3 +78,44 @@ message Another {
     optional Test test = 1;
     optional Test.Nested._NestedNested.EEE fff = 2 [default = V1];
 }
+
+message Validator {
+	optional bool authenticated = 1;
+
+	enum Action {
+		LOGIN = 0;
+		READ = 1;
+		WRITE = 2;
+	}
+	message Permission {
+		optional Action action = 1;
+		optional string entity = 2;
+	}
+
+	repeated Permission permission = 2;
+}
+
+extend google.protobuf.MethodOptions {
+	optional Validator validator = 12345;
+}
+
+service TestService {
+	rpc UserAuth(Test) returns (Test) {
+		option (validator) = {
+			authenticated: true
+			permission: {
+				action: LOGIN
+				entity: "client"
+			}
+		};
+	}
+	rpc Get(Test) returns (Test) {
+		option (validator) = {
+			authenticated: true
+			permission: {
+				action: READ
+				entity: "user"
+			}
+		};
+	}
+}
