@@ -899,6 +899,11 @@ func (l *linker) interpretOptions(res *parseResult, element descriptorish, opts 
 		}
 	}
 
+	if err := dm.ValidateRecursive(); err != nil {
+		node := res.nodes[element.AsProto()]
+		return ErrorWithSourcePos{Pos: node.start(), Underlying: fmt.Errorf("error in %s options: %v", descriptorType(element.AsProto()), err)}
+	}
+
 	if err := dm.ConvertTo(opts); err != nil {
 		node := res.nodes[element.AsProto()]
 		return ErrorWithSourcePos{Pos: node.start(), Underlying: err}

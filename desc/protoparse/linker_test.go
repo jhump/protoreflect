@@ -309,6 +309,15 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			"foo.proto:6:18: option (f).(b): expecting int32, got string",
 		},
+		{
+			map[string]string{
+				"foo.proto": "import \"google/protobuf/descriptor.proto\";\n" +
+					"message foo { required string a = 1; required string b = 2; }\n" +
+					"extend google.protobuf.FileOptions { optional foo f = 20000; }\n" +
+					"option (f) = { a: \"a\" };\n",
+			},
+			"foo.proto:1:1: error in file options: some required fields missing: (f).b",
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
@@ -323,7 +332,9 @@ func TestLinkerValidation(t *testing.T) {
 			names = append(names, k)
 		}
 		_, err := Parser{Accessor: acc}.ParseFiles(names...)
-		if err == nil || !strings.Contains(err.Error(), tc.errMsg) {
+		if err == nil {
+			t.Errorf("case %d: expecting validation error %q; instead got no error", i, tc.errMsg)
+		} else if !strings.Contains(err.Error(), tc.errMsg) {
 			t.Errorf("case %d: expecting validation error %q; instead got: %q", i, tc.errMsg, err)
 		}
 	}

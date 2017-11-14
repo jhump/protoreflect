@@ -1904,7 +1904,19 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 
 // Validate checks that all required fields are present. It returns an error if any are absent.
 func (m *Message) Validate() error {
-	missingFields := []string{}
+	missingFields := m.findMissingFields()
+	if len(missingFields) == 0 {
+		return nil
+	}
+	return fmt.Errorf("some required fields missing: %v", strings.Join(missingFields, ", "))
+}
+
+func (m *Message) findMissingFields() []string {
+	if m.md.IsProto3() {
+		// proto3 does not allow required fields
+		return nil
+	}
+	var missingFields []string
 	for _, fd := range m.md.GetFields() {
 		if fd.IsRequired() {
 			if _, ok := m.values[fd.GetNumber()]; !ok {
@@ -1912,10 +1924,81 @@ func (m *Message) Validate() error {
 			}
 		}
 	}
-	if len(missingFields) == 0 {
-		return nil
+	return missingFields
+}
+
+// ValidateRecursive checks that all required fields are present and also
+// recursively validates all fields who are also messages. It returns an error
+// if any required fields, in this message or nested within, are absent.
+func (m *Message) ValidateRecursive() error {
+	return m.validateRecursive("")
+}
+
+func (m *Message) validateRecursive(prefix string) error {
+	if missingFields := m.findMissingFields(); len(missingFields) > 0 {
+		for i := range missingFields {
+			missingFields[i] = fmt.Sprintf("%s%s", prefix, missingFields[i])
+		}
+		return fmt.Errorf("some required fields missing: %v", strings.Join(missingFields, ", "))
 	}
-	return fmt.Errorf("Some required fields missing: %v", strings.Join(missingFields, ", "))
+
+	for tag, fld := range m.values {
+		fd := m.FindFieldDescriptor(tag)
+		var chprefix string
+		var md *desc.MessageDescriptor
+		checkMsg := func(pm proto.Message) error {
+			var dm *Message
+			if d, ok := pm.(*Message); ok {
+				dm = d
+			} else {
+				dm = m.mf.NewDynamicMessage(md)
+				if err := dm.ConvertFrom(pm); err != nil {
+					return nil
+				}
+			}
+			if err := dm.validateRecursive(chprefix); err != nil {
+				return err
+			}
+			return nil
+		}
+		isMap := fd.IsMap()
+		if isMap && fd.GetMapValueType().GetMessageType() != nil {
+			md = fd.GetMapValueType().GetMessageType()
+			mp := fld.(map[interface{}]interface{})
+			for k, v := range mp {
+				chprefix = fmt.Sprintf("%s%s[%v].", prefix, getName(fd), k)
+				if err := checkMsg(v.(proto.Message)); err != nil {
+					return err
+				}
+			}
+		} else if !isMap && fd.GetMessageType() != nil {
+			md = fd.GetMessageType()
+			if fd.IsRepeated() {
+				sl := fld.([]interface{})
+				for i, v := range sl {
+					chprefix = fmt.Sprintf("%s%s[%d].", prefix, getName(fd), i)
+					if err := checkMsg(v.(proto.Message)); err != nil {
+						return err
+					}
+				}
+			} else {
+				chprefix = fmt.Sprintf("%s%s.", prefix, getName(fd))
+				if err := checkMsg(fld.(proto.Message)); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func getName(fd *desc.FieldDescriptor) string {
+	if fd.IsExtension() {
+		return fmt.Sprintf("(%s)", fd.GetFullyQualifiedName())
+	} else {
+		return fd.GetName()
+	}
 }
 
 // knownFieldTags return tags of present and recognized fields, in sorted order.
