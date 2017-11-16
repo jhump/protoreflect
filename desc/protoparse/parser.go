@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -48,6 +49,12 @@ type Parser struct {
 	// file contents. If unset, os.Open is used, and relative paths are thus
 	// relative to the process's current working directory.
 	Accessor FileAccessor
+
+	// If true, the resulting file descriptors will retain source code info,
+	// that maps elements to their location in the source files as well as
+	// includes comments found during parsing (and attributed to elements of
+	// the source file).
+	IncludeSourceCodeInfo bool
 }
 
 // ParseFiles parses the named files into descriptors. The returned slice has
@@ -100,7 +107,12 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	}
 	fds := make([]*desc.FileDescriptor, len(filenames))
 	for i, name := range filenames {
-		fds[i] = linkedProtos[name]
+		fd := linkedProtos[name]
+		if p.IncludeSourceCodeInfo {
+			pr := protos[name]
+			fd.AsFileDescriptorProto().SourceCodeInfo = pr.generateSourceCodeInfo()
+		}
+		fds[i] = fd
 	}
 	return fds, nil
 }
@@ -257,6 +269,10 @@ type parseResult struct {
 	// a map of elements in the descriptor to nodes in the AST
 	// (for extracting position information when validating the descriptor)
 	nodes map[proto.Message]node
+
+	// a map of uninterpreted option AST nodes to their relative path
+	// in the resulting options message
+	interpretedOptions map[*optionNode][]int32
 }
 
 func (r *parseResult) getFileNode(f *dpb.FileDescriptorProto) fileDecl {
@@ -413,7 +429,10 @@ func parseProto(filename string, r io.Reader) (*parseResult, error) {
 }
 
 func createParseResult(filename string, file *fileNode) (*parseResult, error) {
-	res := &parseResult{nodes: map[proto.Message]node{}}
+	res := &parseResult{
+		nodes:              map[proto.Message]node{},
+		interpretedOptions: map[*optionNode][]int32{},
+	}
 	var err error
 	res.fd, err = res.asFileDescriptor(filename, file)
 	return res, err
@@ -686,10 +705,10 @@ func (r *parseResult) asMethodDescriptor(node *methodNode) *dpb.MethodDescriptor
 		OutputType: proto.String(node.output.msgType.val),
 	}
 	r.putMethodNode(md, node)
-	if node.input.stream {
+	if node.input.streamKeyword != nil {
 		md.ClientStreaming = proto.Bool(true)
 	}
-	if node.output.stream {
+	if node.output.streamKeyword != nil {
 		md.ServerStreaming = proto.Bool(true)
 	}
 	if len(node.options) > 0 {
@@ -798,6 +817,433 @@ func (r *parseResult) asServiceDescriptor(svc *serviceNode) *dpb.ServiceDescript
 		}
 	}
 	return sd
+}
+
+type sourceCodeInfo struct {
+	locs         []*dpb.SourceCodeInfo_Location
+	commentsUsed map[*comment]struct{}
+}
+
+func (r *parseResult) generateSourceCodeInfo() *dpb.SourceCodeInfo {
+	if r.nodes == nil {
+		// skip files that do not have AST info (these will be files
+		// that came from well-known descriptors, instead of from source)
+		return nil
+	}
+
+	sci := sourceCodeInfo{commentsUsed: map[*comment]struct{}{}}
+	path := make([]int32, 0, 10)
+
+	fn := r.getFileNode(r.fd).(*fileNode)
+	if fn.syntax != nil {
+		sci.newLoc(fn.syntax, append(path, internal.File_syntaxTag))
+	}
+	if fn.pkg != nil {
+		sci.newLoc(fn.pkg, append(path, internal.File_packageTag))
+	}
+	for i, imp := range fn.imports {
+		sci.newLoc(imp, append(path, internal.File_dependencyTag, int32(i)))
+	}
+
+	// file options
+	r.generateSourceCodeInfoForOptions(&sci, fn.decls, func(n interface{}) *optionNode {
+		return n.(*fileElement).option
+	}, r.fd.Options.GetUninterpretedOption(), append(path, internal.File_optionsTag))
+
+	// message types
+	for i, msg := range r.fd.GetMessageType() {
+		r.generateSourceCodeInfoForMessage(&sci, msg, append(path, internal.File_messagesTag, int32(i)))
+	}
+
+	// enum types
+	for i, enum := range r.fd.GetEnumType() {
+		r.generateSourceCodeInfoForEnum(&sci, enum, append(path, internal.File_enumsTag, int32(i)))
+	}
+
+	// extension fields
+	for i, ext := range r.fd.GetExtension() {
+		r.generateSourceCodeInfoForField(&sci, ext, append(path, internal.File_extensionsTag, int32(i)))
+	}
+
+	// services and methods
+	for i, svc := range r.fd.GetService() {
+		n := r.getServiceNode(svc).(*serviceNode)
+		svcPath := append(path, internal.File_servicesTag, int32(i))
+		sci.newLoc(n, svcPath)
+		sci.newLoc(n.name, append(svcPath, internal.Service_nameTag))
+
+		// service options
+		r.generateSourceCodeInfoForOptions(&sci, n.decls, func(n interface{}) *optionNode {
+			return n.(*serviceElement).option
+		}, svc.Options.GetUninterpretedOption(), append(svcPath, internal.Service_optionsTag))
+
+		// methods
+		for j, mtd := range svc.GetMethod() {
+			mn := r.getMethodNode(mtd).(*methodNode)
+			mtdPath := append(svcPath, internal.Service_methodsTag, int32(j))
+			sci.newLoc(mn, mtdPath)
+			sci.newLoc(mn.name, append(mtdPath, internal.Method_nameTag))
+
+			sci.newLoc(mn.input.msgType, append(mtdPath, internal.Method_inputTag))
+			if mn.input.streamKeyword != nil {
+				sci.newLoc(mn.input.streamKeyword, append(mtdPath, internal.Method_inputStreamTag))
+			}
+			sci.newLoc(mn.output.msgType, append(mtdPath, internal.Method_outputTag))
+			if mn.output.streamKeyword != nil {
+				sci.newLoc(mn.output.streamKeyword, append(mtdPath, internal.Method_outputStreamTag))
+			}
+
+			// method options
+			r.generateSourceCodeInfoForOptions(&sci, mn.options, func(n interface{}) *optionNode {
+				return n.(*optionNode)
+			}, mtd.Options.GetUninterpretedOption(), append(mtdPath, internal.Method_optionsTag))
+		}
+	}
+
+	return &dpb.SourceCodeInfo{Location: sci.locs}
+}
+
+func (r *parseResult) generateSourceCodeInfoForOptions(sci *sourceCodeInfo, elements interface{}, extractor func(interface{}) *optionNode, uninterp []*dpb.UninterpretedOption, path []int32) {
+	// Known options are option node elements that have a corresponding
+	// path in r.interpretedOptions. We'll do those first.
+	rv := reflect.ValueOf(elements)
+	for i := 0; i < rv.Len(); i++ {
+		on := extractor(rv.Index(i).Interface())
+		if on == nil {
+			continue
+		}
+		optPath := r.interpretedOptions[on]
+		if len(optPath) > 0 {
+			p := path
+			if optPath[0] == -1 {
+				// used by "default" and "json_name" field pseudo-options
+				// to attribute path to parent element (since those are
+				// stored directly on the descriptor, not its options)
+				p = path[:len(path)-1]
+				optPath = optPath[1:]
+			}
+			sci.newLoc(on, append(p, optPath...))
+		}
+	}
+
+	// Now uninterpreted options
+	for i, uo := range uninterp {
+		optPath := append(path, internal.UninterpretedOptionsTag, int32(i))
+		on := r.getOptionNode(uo).(*optionNode)
+		sci.newLoc(on, optPath)
+
+		var valTag int32
+		switch {
+		case uo.IdentifierValue != nil:
+			valTag = internal.Uninterpreted_identTag
+		case uo.PositiveIntValue != nil:
+			valTag = internal.Uninterpreted_posIntTag
+		case uo.NegativeIntValue != nil:
+			valTag = internal.Uninterpreted_negIntTag
+		case uo.DoubleValue != nil:
+			valTag = internal.Uninterpreted_doubleTag
+		case uo.StringValue != nil:
+			valTag = internal.Uninterpreted_stringTag
+		case uo.AggregateValue != nil:
+			valTag = internal.Uninterpreted_aggregateTag
+		}
+		if valTag != 0 {
+			sci.newLoc(on.val, append(optPath, valTag))
+		}
+
+		for j, n := range uo.Name {
+			optNmPath := append(optPath, internal.Uninterpreted_nameTag, int32(j))
+			nn := r.getOptionNamePartNode(n).(*optionNamePartNode)
+			sci.newLoc(nn, optNmPath)
+			sci.newLoc(nn.text, append(optNmPath, internal.UninterpretedName_nameTag))
+		}
+	}
+}
+
+func (r *parseResult) generateSourceCodeInfoForMessage(sci *sourceCodeInfo, msg *dpb.DescriptorProto, path []int32) {
+	n := r.getMessageNode(msg)
+	sci.newLoc(n, path)
+
+	var decls []*messageElement
+	var resvdNames []*stringLiteralNode
+	switch n := n.(type) {
+	case *messageNode:
+		decls = n.decls
+		resvdNames = n.reserved
+	case *groupNode:
+		decls = n.decls
+		resvdNames = n.reserved
+	}
+	if decls == nil {
+		// map entry so nothing else to do
+	}
+
+	sci.newLoc(n.messageName(), append(path, internal.Message_nameTag))
+
+	// message options
+	r.generateSourceCodeInfoForOptions(sci, decls, func(n interface{}) *optionNode {
+		return n.(*messageElement).option
+	}, msg.Options.GetUninterpretedOption(), append(path, internal.Message_optionsTag))
+
+	// fields
+	for i, fld := range msg.GetField() {
+		r.generateSourceCodeInfoForField(sci, fld, append(path, internal.Message_fieldsTag, int32(i)))
+	}
+
+	// one-ofs
+	for i, ood := range msg.GetOneofDecl() {
+		oon := r.getOneOfNode(ood).(*oneOfNode)
+		ooPath := append(path, internal.Message_oneOfsTag, int32(i))
+		sci.newLoc(oon, ooPath)
+		sci.newLoc(oon.name, append(ooPath, internal.OneOf_nameTag))
+
+		// one-of options
+		r.generateSourceCodeInfoForOptions(sci, oon.decls, func(n interface{}) *optionNode {
+			return n.(*oneOfElement).option
+		}, ood.Options.GetUninterpretedOption(), append(ooPath, internal.OneOf_optionsTag))
+	}
+
+	// nested messages
+	for i, nm := range msg.GetNestedType() {
+		r.generateSourceCodeInfoForMessage(sci, nm, append(path, internal.Message_nestedMessagesTag, int32(i)))
+	}
+
+	// nested enums
+	for i, enum := range msg.GetEnumType() {
+		r.generateSourceCodeInfoForEnum(sci, enum, append(path, internal.Message_enumsTag, int32(i)))
+	}
+
+	// nested extensions
+	for i, ext := range msg.GetExtension() {
+		r.generateSourceCodeInfoForField(sci, ext, append(path, internal.Message_extensionsTag, int32(i)))
+	}
+
+	// extension ranges
+	for i, er := range msg.ExtensionRange {
+		rangePath := append(path, internal.Message_extensionRangeTag, int32(i))
+		rn := r.getExtensionRangeNode(er).(*rangeNode)
+		sci.newLoc(rn, rangePath)
+		sci.newLoc(rn.st, append(rangePath, internal.ExtensionRange_startTag))
+		if rn.st != rn.en {
+			sci.newLoc(rn.en, append(rangePath, internal.ExtensionRange_endTag))
+		}
+		// now we have to find the extension decl and options that correspond to this range :(
+		for _, d := range decls {
+			found := false
+			if d.extensionRange != nil {
+				for _, r := range d.extensionRange.ranges {
+					if rn == r {
+						found = true
+						break
+					}
+				}
+			}
+			if found {
+				r.generateSourceCodeInfoForOptions(sci, d.extensionRange.options, func(n interface{}) *optionNode {
+					return n.(*optionNode)
+				}, er.Options.GetUninterpretedOption(), append(rangePath, internal.ExtensionRange_optionsTag))
+				break
+			}
+		}
+	}
+
+	// reserved ranges
+	for i, rr := range msg.ReservedRange {
+		rangePath := append(path, internal.Message_reservedRangeTag, int32(i))
+		rn := r.getReservedRangeNode(rr).(*rangeNode)
+		sci.newLoc(rn, rangePath)
+		sci.newLoc(rn.st, append(rangePath, internal.ReservedRange_startTag))
+		if rn.st != rn.en {
+			sci.newLoc(rn.en, append(rangePath, internal.ReservedRange_endTag))
+		}
+	}
+
+	// reserved names
+	for i, n := range resvdNames {
+		sci.newLoc(n, append(path, internal.Message_reservedNameTag, int32(i)))
+	}
+}
+
+func (r *parseResult) generateSourceCodeInfoForEnum(sci *sourceCodeInfo, enum *dpb.EnumDescriptorProto, path []int32) {
+	n := r.getEnumNode(enum).(*enumNode)
+	sci.newLoc(n, path)
+	sci.newLoc(n.name, append(path, internal.Enum_nameTag))
+
+	// enum options
+	r.generateSourceCodeInfoForOptions(sci, n.decls, func(n interface{}) *optionNode {
+		return n.(*enumElement).option
+	}, enum.Options.GetUninterpretedOption(), append(path, internal.Enum_optionsTag))
+
+	// enum values
+	for j, ev := range enum.GetValue() {
+		evn := r.getEnumValueNode(ev).(*enumValueNode)
+		evPath := append(path, internal.Enum_valuesTag, int32(j))
+		sci.newLoc(evn, evPath)
+		sci.newLoc(evn.name, append(evPath, internal.EnumVal_nameTag))
+		sci.newLoc(evn.number, append(evPath, internal.EnumVal_numberTag))
+
+		// enum value options
+		r.generateSourceCodeInfoForOptions(sci, evn.options, func(n interface{}) *optionNode {
+			return n.(*optionNode)
+		}, ev.Options.GetUninterpretedOption(), append(evPath, internal.EnumVal_optionsTag))
+	}
+}
+
+func (r *parseResult) generateSourceCodeInfoForField(sci *sourceCodeInfo, fld *dpb.FieldDescriptorProto, path []int32) {
+	n := r.getFieldNode(fld)
+
+	isGroup := false
+	var opts []*optionNode
+	var extendee *extendNode
+	switch n := n.(type) {
+	case *fieldNode:
+		opts = n.options
+		extendee = n.extendee
+	case *mapFieldNode:
+		opts = n.options
+	case *groupNode:
+		isGroup = true
+		extendee = n.extendee
+	case *syntheticMapField:
+		// shouldn't get here since we don't recurse into fields from a mapNode
+		// in generateSourceCodeInfoForMessage... but just in case
+		return
+	}
+
+	sci.newLoc(n, path)
+	if !isGroup {
+		sci.newLoc(n.fieldName(), append(path, internal.Field_nameTag))
+		sci.newLoc(n.fieldType(), append(path, internal.Field_typeTag))
+	}
+	if n.fieldLabel() != nil {
+		sci.newLoc(n.fieldLabel(), append(path, internal.Field_labelTag))
+	}
+	sci.newLoc(n.fieldTag(), append(path, internal.Field_numberTag))
+	if extendee != nil {
+		sci.newLoc(extendee.extendee, append(path, internal.Field_extendeeTag))
+	}
+
+	r.generateSourceCodeInfoForOptions(sci, opts, func(n interface{}) *optionNode {
+		return n.(*optionNode)
+	}, fld.Options.GetUninterpretedOption(), append(path, internal.Field_optionsTag))
+}
+
+func (sci *sourceCodeInfo) newLoc(n node, path []int32) {
+	leadingComments := n.leadingComments()
+	trailingComments := n.trailingComment()
+	if sci.commentUsed(leadingComments) {
+		leadingComments = nil
+	}
+	if sci.commentUsed(trailingComments) {
+		trailingComments = nil
+	}
+	detached := groupComments(leadingComments)
+	trail := combineComments(trailingComments)
+	var lead *string
+	if len(leadingComments) > 0 && leadingComments[len(leadingComments)-1].end.Line >= n.start().Line-1 {
+		lead = proto.String(detached[len(detached)-1])
+		detached = detached[:len(detached)-1]
+	}
+	dup := make([]int32, len(path))
+	copy(dup, path)
+	var span []int32
+	if n.start().Line == n.end().Line {
+		span = []int32{int32(n.start().Line) - 1, int32(n.start().Col) - 1, int32(n.end().Col) - 1}
+	} else {
+		span = []int32{int32(n.start().Line) - 1, int32(n.start().Col) - 1, int32(n.end().Line) - 1, int32(n.end().Col) - 1}
+	}
+	sci.locs = append(sci.locs, &dpb.SourceCodeInfo_Location{
+		LeadingDetachedComments: detached,
+		LeadingComments:         lead,
+		TrailingComments:        trail,
+		Path:                    dup,
+		Span:                    span,
+	})
+}
+
+func (sci *sourceCodeInfo) commentUsed(c []*comment) bool {
+	if len(c) == 0 {
+		return false
+	}
+	if _, ok := sci.commentsUsed[c[0]]; ok {
+		return true
+	}
+
+	sci.commentsUsed[c[0]] = struct{}{}
+	return false
+}
+
+func groupComments(comments []*comment) []string {
+	if len(comments) == 0 {
+		return nil
+	}
+
+	var groups []string
+	singleLineStyle := comments[0].text[:2] == "//"
+	line := comments[0].end.Line
+	start := 0
+	for i := 1; i < len(comments); i++ {
+		c := comments[i]
+		prevSingleLine := singleLineStyle
+		singleLineStyle = strings.HasPrefix(comments[i].text, "//")
+		if !singleLineStyle || prevSingleLine != singleLineStyle || c.start.Line > line+1 {
+			// new group!
+			groups = append(groups, *combineComments(comments[start:i]))
+			start = i
+		}
+		line = c.end.Line
+	}
+	// don't forget last group
+	groups = append(groups, *combineComments(comments[start:]))
+
+	return groups
+}
+
+func combineComments(comments []*comment) *string {
+	if len(comments) == 0 {
+		return nil
+	}
+	first := true
+	var buf bytes.Buffer
+	for _, c := range comments {
+		if first {
+			first = false
+		} else {
+			buf.WriteByte('\n')
+		}
+		if c.text[:2] == "//" {
+			buf.WriteString(c.text[2:])
+		} else {
+			lines := strings.Split(c.text[2:len(c.text)-2], "\n")
+			first := true
+			for _, l := range lines {
+				if first {
+					first = false
+				} else {
+					buf.WriteByte('\n')
+				}
+
+				// strip a prefix of whitespace followed by '*'
+				j := 0
+				for j < len(l) {
+					if l[j] != ' ' && l[j] != '\t' {
+						break
+					}
+					j++
+				}
+				if j == len(l) {
+					l = ""
+				} else if l[j] == '*' {
+					l = l[j+1:]
+				} else if j > 0 {
+					l = " " + l[j:]
+				}
+
+				buf.WriteString(l)
+			}
+		}
+	}
+	return proto.String(buf.String())
 }
 
 func toNameParts(ident *identNode, offset int) []*optionNamePartNode {
@@ -1135,24 +1581,6 @@ func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.Fiel
 		if fld.GetExtendee() != "" && fld.Label != nil && fld.GetLabel() == dpb.FieldDescriptorProto_LABEL_REQUIRED {
 			return ErrorWithSourcePos{Pos: node.fieldLabel().start(), Underlying: fmt.Errorf("%s: extension fields cannot be 'required'", scope)}
 		}
-	}
-
-	// process json_name pseudo-option
-	if index, err := findOption(res, scope, fld.Options.GetUninterpretedOption(), "json_name"); err != nil {
-		return err
-	} else if index >= 0 {
-		opt := fld.Options.UninterpretedOption[index]
-		if len(fld.Options.UninterpretedOption) == 1 {
-			// this was the only option and it's been hoisted out, so clean up
-			fld.Options = nil
-		} else {
-			fld.Options.UninterpretedOption = removeOption(fld.Options.UninterpretedOption, index)
-		}
-		if opt.StringValue == nil {
-			optNode := res.getOptionNode(opt)
-			return ErrorWithSourcePos{Pos: optNode.getValue().start(), Underlying: fmt.Errorf("%s: expecting string value for json_name option", scope)}
-		}
-		fld.JsonName = proto.String(string(opt.StringValue))
 	}
 
 	// finally, set any missing label to optional

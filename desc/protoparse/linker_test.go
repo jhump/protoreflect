@@ -1,19 +1,19 @@
 package protoparse
 
 import (
+	"fmt"
+	"io"
 	"io/ioutil"
+	"strings"
 	"testing"
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
-	"fmt"
 	"github.com/jhump/protoreflect/desc"
 	_ "github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
-	"io"
-	"strings"
 )
 
 //go:generate bash -c "protoc test.proto -o ./test.protoset --go_out=../../../../.. && mv test.pb.go test_pb_test.go"

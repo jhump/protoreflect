@@ -779,7 +779,7 @@ rpc : _RPC name '(' rpcType ')' _RETURNS '(' rpcType ')' ';' {
 	}
 
 rpcType : _STREAM typeIdent {
-		$$ = &rpcTypeNode{msgType: $2, stream: true}
+		$$ = &rpcTypeNode{msgType: $2, streamKeyword: $1}
 		$$.setRange($1, $2)
 	}
 	| typeIdent {

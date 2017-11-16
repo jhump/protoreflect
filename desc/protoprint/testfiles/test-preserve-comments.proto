@@ -13,13 +13,17 @@ package foo.bar;
 
 option go_package = "github.com/jhump/protoreflect/desc/protoprint";
 
-// Multiple white space lines (like above) also cannot
-// preserved...
+// Multiple white space lines (like above) cannot
+// be preserved...
 
 // We need a request for our RPC service below.
-message Request {
+message /* detached message name */ /* request with a capital R */ Request /* trailer */ {
   // A field comment
-  repeated int32 ids = 1 [packed = true];
+  repeated int32 ids = /* detached tag */ /* tag numero uno */ 1 /*
+       * tag trailer
+       * that spans multiple lines...
+       * more than two.
+       */ [json_name = "|foo|", packed = true];
   // field trailer #1...
 
   // some detached comments
@@ -29,7 +33,7 @@ message Request {
   // Another field comment
 
   // label comment
-  optional string name = 2;
+  optional /* type comment */ string /* name comment */ name = 2 [default = "fubar"];
 
   extensions 100 to 200;
 
@@ -37,7 +41,6 @@ message Request {
 
   reserved "foo", "bar", "baz";
 
-  // Group comment
   optional group Extras = 3 {
     optional double dbl = 1;
 
@@ -48,15 +51,17 @@ message Request {
     // Trailing comment...
   }
 }
+// And next we'll need some extensions...
 
-extend Request {
+extend /* extendee comment */ Request {
   optional uint64 guid1 = 123;
 
   optional uint64 guid2 = 124;
 }
 
 // Service comment
-service RpcService {
+service /* service name */ RpcService {
   // Method comment
-  rpc StreamingRpc ( stream Request ) returns ( Request );
+  rpc /* rpc name */ StreamingRpc /* comment A */ ( /* comment C */ stream Request ) returns ( /*comment E */ Request );
 }
+// service trailer

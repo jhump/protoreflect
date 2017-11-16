@@ -1,9 +1,3 @@
-// This is the first detached comment for the syntax.
-
-// This is a second detached comment.
-
-// This is a third.
-
 // Syntax comment...
 syntax = "proto2";
 // Syntax trailer.
@@ -13,22 +7,13 @@ package foo.bar;
 
 option go_package = "github.com/jhump/protoreflect/desc/protoprint";
 
-// Multiple white space lines (like above) also cannot
-// preserved...
-
 // We need a request for our RPC service below.
 message Request {
    // A field comment
    repeated int32 ids = 1 [packed = true];
    // field trailer #1...
 
-   // some detached comments
-
-   // some detached comments
-
-   // Another field comment
-
-   // label comment 
+   // label comment
    optional string name = 2;
 
    // Group comment
