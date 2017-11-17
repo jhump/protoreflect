@@ -11,12 +11,12 @@ syntax = "proto2";
 // And now the package declaration
 package foo.bar;
 
-// option comments cannot be preserved, sadly...
+// option comments FTW!!!
 option go_package = "github.com/jhump/protoreflect/desc/protoprint"  ;
 
 
-// Multiple white space lines (like above) also cannot
-// preserved...
+// Multiple white space lines (like above) cannot
+// be preserved...
 
 // We need a request for our RPC service below.
 message /* detached message name */ /* request with a capital R */ Request // trailer
@@ -25,7 +25,7 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 	repeated int32 ids = /* detached tag */ /* tag numero uno */ 1 /* tag trailer
 		that spans multiple lines...
 		more than two. */
-	  [packed=true];
+	  [packed=true, json_name="|foo|"];
 	// field trailer #1...
 
 	// some detached comments
@@ -33,7 +33,8 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 	// some detached comments
 
 	// Another field comment
-	/* label comment */ optional /* type comment */ string /* name comment */ name = 2;
+	/* label comment */ optional /* type comment */ string /* name comment */ name = 2
+		[/* default lead */ default = 'fubar' /* default trail */ ];
 
 	// extension range comments are not preserved
 	extensions 100 to 200;

@@ -202,19 +202,8 @@ func (p *Printer) PrintProtoFile(fd *desc.FileDescriptor, w io.Writer) error {
 
 func extensionsForTransitiveClosure(fd *desc.FileDescriptor) *dynamic.ExtensionRegistry {
 	er := dynamic.NewExtensionRegistryWithDefaults()
-	recursiveExtensionsFromFile(er, fd, map[string]struct{}{})
+	er.AddExtensionsFromFileRecursively(fd)
 	return er
-}
-
-func recursiveExtensionsFromFile(er *dynamic.ExtensionRegistry, fd *desc.FileDescriptor, seen map[string]struct{}) {
-	if _, ok := seen[fd.GetName()]; ok {
-		return
-	}
-	seen[fd.GetName()] = struct{}{}
-	er.AddExtensionsFromFile(fd)
-	for _, dep := range fd.GetDependencies() {
-		recursiveExtensionsFromFile(er, dep, seen)
-	}
 }
 
 func getLocalName(pkg, scope, fqn string) string {
@@ -881,7 +870,7 @@ func (p *Printer) printOptionsShortWithExtras(opts proto.Message, mf *dynamic.Me
 		if first {
 			fmt.Fprint(w, "[")
 			for i := 0; i < len(extras); i += 2 {
-				fmt.Fprintf(w, "%s = %s", extras[i], extras[i+1])
+				fmt.Fprintf(w, "%s = %s, ", extras[i], extras[i+1])
 			}
 		} else {
 			fmt.Fprint(w, ", ")
@@ -894,7 +883,7 @@ func (p *Printer) printOptionsShortWithExtras(opts proto.Message, mf *dynamic.Me
 		fmt.Fprint(w, "[")
 		for i := 0; i < len(extras); i += 2 {
 			if i > 0 {
-				fmt.Fprintf(w, ", ")
+				fmt.Fprint(w, ", ")
 			}
 			fmt.Fprintf(w, "%s = %s", extras[i], extras[i+1])
 		}
@@ -1287,11 +1276,16 @@ func (p *Printer) printLeadingComments(si *descriptor.SourceCodeInfo_Location, w
 
 	if si.GetLeadingComments() != "" {
 		endsInNewLine = p.printComment(si.GetLeadingComments(), w, indent)
-		if !endsInNewLine && indent >= 0 {
-			// leading comment didn't end with newline but needs one
-			// (because we're *not* inlining)
-			fmt.Fprintln(w)
-			endsInNewLine = true
+		if !endsInNewLine {
+			if indent >= 0 {
+				// leading comment didn't end with newline but needs one
+				// (because we're *not* inlining)
+				fmt.Fprintln(w)
+				endsInNewLine = true
+			} else {
+				// space between comment and following element when inlined
+				fmt.Fprint(w, " ")
+			}
 		}
 	}
 
@@ -1316,7 +1310,8 @@ func (p *Printer) printComment(comments string, w io.Writer, indent int) bool {
 	}
 
 	var multiLine bool
-	if indent == -1 {
+	if indent < 0 {
+		// use multi-line style when inlining
 		multiLine = true
 	} else {
 		multiLine = p.PreferMultiLineStyleComments
@@ -1367,7 +1362,7 @@ func (p *Printer) printComment(comments string, w io.Writer, indent int) bool {
 		if multiLine {
 			if i == 0 {
 				// first line
-				fmt.Fprintf(w, "/*%s\n", l)
+				fmt.Fprintf(w, "/*%s\n", strings.TrimRight(l, " \t"))
 			} else if i == len(lines)-1 {
 				// last line
 				if l == "" {
@@ -1379,10 +1374,10 @@ func (p *Printer) printComment(comments string, w io.Writer, indent int) bool {
 					fmt.Fprintln(w)
 				}
 			} else {
-				fmt.Fprintf(w, " *%s\n", l)
+				fmt.Fprintf(w, " *%s\n", strings.TrimRight(l, " \t"))
 			}
 		} else {
-			fmt.Fprintf(w, "//%s\n", l)
+			fmt.Fprintf(w, "//%s\n", strings.TrimRight(l, " \t"))
 		}
 	}
 

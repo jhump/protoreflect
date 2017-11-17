@@ -157,7 +157,15 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 		}
 	}
 	setPrev := func(n terminalNode) {
-		if l.prevSym != nil && len(n.leadingComments()) > 0 && l.prevSym.end().Line < n.start().Line {
+		nStart := n.start().Line
+		if _, ok := n.(*basicNode); ok {
+			// if the node is a simple rune, don't attribute comments to it
+			// HACK: adjusting the start line makes leading comments appear
+			// detached so logic below will naturally associated trailing
+			// comment to previous symbol
+			nStart += 2
+		}
+		if l.prevSym != nil && len(n.leadingComments()) > 0 && l.prevSym.end().Line < nStart {
 			// we may need to re-attribute the first comment to
 			// instead be previous node's trailing comment
 			prevEnd := l.prevSym.end().Line
@@ -173,6 +181,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 				// and if so re-attribute
 				singleLineStyle := strings.HasPrefix(c.text, "//")
 				line := c.end.Line
+				groupEnd := -1
 				for i := 1; i < len(comments); i++ {
 					c := comments[i]
 					newGroup := false
@@ -191,11 +200,24 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 						}
 					}
 					if newGroup {
-						for j := 0; j < i; j++ {
-							l.prevSym.pushTrailingComment(n.popLeadingComment())
-						}
+						groupEnd = i
 						break
 					}
+				}
+
+				if groupEnd == -1 {
+					// just one group of comments; we'll mark it as a trailing
+					// comment if it immediately follows previous symbol and is
+					// detached from current symbol
+					c1 := comments[0]
+					c2 := comments[len(comments)-1]
+					if c1.start.Line <= prevEnd+1 && c2.end.Line < nStart-1 {
+						groupEnd = len(comments)
+					}
+				}
+
+				for i := 0; i < groupEnd; i++ {
+					l.prevSym.pushTrailingComment(n.popLeadingComment())
 				}
 			}
 		}
@@ -233,6 +255,10 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 	for {
 		c, n, err := l.input.ReadRune()
 		if err == io.EOF {
+			// we're not actually returning a rune, but this will associate
+			// accumulated comments as a trailing comment on last symbol
+			// (if appropriate)
+			setRune()
 			return 0
 		} else if err != nil {
 			setError(err)
@@ -382,13 +408,21 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 				return int(c)
 			}
 			if cn == '/' {
-				txt := l.skipToEndOfLineComment()
-				comments = append(comments, &comment{posRange: pos(), text: txt})
+				l.colNo++
+				hitNewline, txt := l.skipToEndOfLineComment()
+				commentPos := pos()
+				commentPos.end.Col++
+				if hitNewline {
+					l.colNo = 0
+					l.lineNo++
+				}
+				comments = append(comments, &comment{posRange: commentPos, text: txt})
 				continue
 			}
 			if cn == '*' {
+				l.colNo++
 				if txt, ok := l.skipToEndOfBlockComment(); !ok {
-					setError(errors.New("Block comment never terminates, unexpected EOF"))
+					setError(errors.New("block comment never terminates, unexpected EOF"))
 					return _ERROR
 				} else {
 					comments = append(comments, &comment{posRange: pos(), text: txt})
@@ -679,17 +713,15 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 	return buf.String(), nil
 }
 
-func (l *protoLex) skipToEndOfLineComment() string {
+func (l *protoLex) skipToEndOfLineComment() (bool, string) {
 	txt := []rune{'/', '/'}
 	for {
 		c, _, err := l.input.ReadRune()
 		if err != nil {
-			return string(txt)
+			return false, string(txt)
 		}
 		if c == '\n' {
-			l.colNo = 0
-			l.lineNo++
-			return string(txt)
+			return true, string(txt)
 		}
 		l.colNo++
 		txt = append(txt, c)

@@ -959,8 +959,8 @@ func (n *methodNode) getOutputType() node {
 
 type rpcTypeNode struct {
 	basicCompositeNode
-	msgType *identNode
-	stream  bool
+	msgType       *identNode
+	streamKeyword node
 }
 
 type noSourceNode struct {

@@ -70,6 +70,24 @@ func (r *ExtensionRegistry) AddExtension(exts ...*desc.FieldDescriptor) error {
 func (r *ExtensionRegistry) AddExtensionsFromFile(fd *desc.FileDescriptor) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.addExtensionsFromFileLocked(fd, false, nil)
+}
+
+// AddExtensionsFromFileRecursively adds to the registry all extension fields defined in the give file
+// descriptor and also recursively adds all extensions defined in that file's dependencies. This adds
+// extensions from the entire transitive closure for the given file.
+func (r *ExtensionRegistry) AddExtensionsFromFileRecursively(fd *desc.FileDescriptor) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	already := map[*desc.FileDescriptor]struct{}{}
+	r.addExtensionsFromFileLocked(fd, true, already)
+}
+
+func (r *ExtensionRegistry) addExtensionsFromFileLocked(fd *desc.FileDescriptor, recursive bool, alreadySeen map[*desc.FileDescriptor]struct{}) {
+	if _, ok := alreadySeen[fd]; ok {
+		return
+	}
+
 	if r.exts == nil {
 		r.exts = map[string]map[int32]*desc.FieldDescriptor{}
 	}
@@ -78,6 +96,13 @@ func (r *ExtensionRegistry) AddExtensionsFromFile(fd *desc.FileDescriptor) {
 	}
 	for _, msg := range fd.GetMessageTypes() {
 		r.addExtensionsFromMessageLocked(msg)
+	}
+
+	if recursive {
+		alreadySeen[fd] = struct{}{}
+		for _, dep := range fd.GetDependencies() {
+			r.addExtensionsFromFileLocked(dep, recursive, alreadySeen)
+		}
 	}
 }
 

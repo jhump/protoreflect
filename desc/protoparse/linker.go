@@ -11,6 +11,7 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/internal"
 	"github.com/jhump/protoreflect/dynamic"
 )
 
@@ -53,7 +54,7 @@ func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
 	}
 
 	// Now that we have linked descriptors, we can interpret any uninterpreted
-	// options that remain.
+	// options that remain
 	for _, r := range l.files {
 		fd := linked[r.fd.GetName()]
 		if err := l.interpretFileOptions(r, fd); err != nil {
@@ -744,30 +745,47 @@ func (er extRangeDescriptorish) AsProto() proto.Message {
 	return er.er
 }
 
-var emptyFieldOptions dpb.FieldOptions
-
 func (l *linker) interpretFieldOptions(r *parseResult, fld *desc.FieldDescriptor) error {
 	opts := fld.GetFieldOptions()
 	if opts != nil {
 		if len(opts.UninterpretedOption) > 0 {
 			uo := opts.UninterpretedOption
-			if i, err := processDefaultOption(r, fld, uo); err != nil {
+			scope := fmt.Sprintf("field %s", fld.GetFullyQualifiedName())
+
+			// process json_name pseudo-option
+			if index, err := findOption(r, scope, uo, "json_name"); err != nil {
+				return err
+			} else if index >= 0 {
+				opt := uo[index]
+				optNode := r.getOptionNode(opt)
+
+				// attribute source code info
+				if on, ok := optNode.(*optionNode); ok {
+					r.interpretedOptions[on] = []int32{-1, internal.Field_jsonNameTag}
+				}
+				uo = removeOption(uo, index)
+				if opt.StringValue == nil {
+					return ErrorWithSourcePos{Pos: optNode.getValue().start(), Underlying: fmt.Errorf("%s: expecting string value for json_name option", scope)}
+				}
+				fld.AsFieldDescriptorProto().JsonName = proto.String(string(opt.StringValue))
+			}
+
+			// and process default pseudo-option
+			if i, err := processDefaultOption(r, scope, fld, uo); err != nil {
 				return err
 			} else if i >= 0 {
-				if len(uo) == 1 {
-					// The only option was "default" and we just hoisted that out. So
-					// clear out options if there is nothing there.
-					opts.UninterpretedOption = nil
-					if proto.Equal(opts, &emptyFieldOptions) {
-						fld.AsFieldDescriptorProto().Options = nil
-					}
-					return nil
+				// attribute source code info
+				optNode := r.getOptionNode(uo[i])
+				if on, ok := optNode.(*optionNode); ok {
+					r.interpretedOptions[on] = []int32{-1, internal.Field_defaultTag}
 				}
-				// if default was found, remove it before processing the other options
 				uo = removeOption(uo, i)
 			}
 
-			if err := l.interpretOptions(r, fld, opts, uo); err != nil {
+			if len(uo) == 0 {
+				// no real options, only pseudo-options above? clear out options
+				fld.AsFieldDescriptorProto().Options = nil
+			} else if err := l.interpretOptions(r, fld, opts, uo); err != nil {
 				return err
 			}
 		}
@@ -776,8 +794,7 @@ func (l *linker) interpretFieldOptions(r *parseResult, fld *desc.FieldDescriptor
 	return nil
 }
 
-func processDefaultOption(res *parseResult, fld *desc.FieldDescriptor, uos []*dpb.UninterpretedOption) (defaultIndex int, err error) {
-	scope := fmt.Sprintf("field %s", fld.GetFullyQualifiedName())
+func processDefaultOption(res *parseResult, scope string, fld *desc.FieldDescriptor, uos []*dpb.UninterpretedOption) (defaultIndex int, err error) {
 	found, err := findOption(res, scope, uos, "default")
 	if err != nil {
 		return -1, err
@@ -887,15 +904,18 @@ func (l *linker) interpretOptions(res *parseResult, element descriptorish, opts 
 
 	mc := &messageContext{res: res, file: element.GetFile(), elementName: element.GetName(), elementType: descriptorType(element.AsProto())}
 	for _, uo := range uninterpreted {
+		node := res.getOptionNode(uo)
 		if !uo.Name[0].GetIsExtension() && uo.Name[0].GetNamePart() == "uninterpreted_option" {
-			node := res.getOptionNode(uo)
 			// uninterpreted_option might be found reflectively, but is not actually valid for use
 			return ErrorWithSourcePos{Pos: node.getName().start(), Underlying: fmt.Errorf("%vinvalid option 'uninterpreted_option'", mc)}
 		}
 		mc.option = uo
-		err = l.interpretField(res, mc, element, dm, uo, 0)
+		path, err := l.interpretField(res, mc, element, dm, uo, 0, nil)
 		if err != nil {
 			return err
+		}
+		if optn, ok := node.(*optionNode); ok {
+			res.interpretedOptions[optn] = path
 		}
 	}
 
@@ -911,7 +931,7 @@ func (l *linker) interpretOptions(res *parseResult, element descriptorish, opts 
 	return nil
 }
 
-func (l *linker) interpretField(res *parseResult, mc *messageContext, element descriptorish, dm *dynamic.Message, opt *dpb.UninterpretedOption, nameIndex int) error {
+func (l *linker) interpretField(res *parseResult, mc *messageContext, element descriptorish, dm *dynamic.Message, opt *dpb.UninterpretedOption, nameIndex int, pathPrefix []int32) (path []int32, err error) {
 	var fld *desc.FieldDescriptor
 	nm := opt.GetName()[nameIndex]
 	node := res.getOptionNamePartNode(nm)
@@ -919,14 +939,14 @@ func (l *linker) interpretField(res *parseResult, mc *messageContext, element de
 		extName := nm.GetNamePart()[1:] /* skip leading dot */
 		fld = findExtension(element.GetFile(), extName, false, map[*desc.FileDescriptor]struct{}{})
 		if fld == nil {
-			return ErrorWithSourcePos{
+			return nil, ErrorWithSourcePos{
 				Pos: node.start(),
 				Underlying: fmt.Errorf("%vunrecognized extension %s of %s",
 					mc, extName, dm.GetMessageDescriptor().GetFullyQualifiedName()),
 			}
 		}
 		if fld.GetOwner().GetFullyQualifiedName() != dm.GetMessageDescriptor().GetFullyQualifiedName() {
-			return ErrorWithSourcePos{
+			return nil, ErrorWithSourcePos{
 				Pos: node.start(),
 				Underlying: fmt.Errorf("%vextension %s should extend %s but instead extends %s",
 					mc, extName, dm.GetMessageDescriptor().GetFullyQualifiedName(), fld.GetOwner().GetFullyQualifiedName()),
@@ -935,7 +955,7 @@ func (l *linker) interpretField(res *parseResult, mc *messageContext, element de
 	} else {
 		fld = dm.GetMessageDescriptor().FindFieldByName(nm.GetNamePart())
 		if fld == nil {
-			return ErrorWithSourcePos{
+			return nil, ErrorWithSourcePos{
 				Pos: node.start(),
 				Underlying: fmt.Errorf("%vfield %s of %s does not exist",
 					mc, nm.GetNamePart(), dm.GetMessageDescriptor().GetFullyQualifiedName()),
@@ -943,18 +963,20 @@ func (l *linker) interpretField(res *parseResult, mc *messageContext, element de
 		}
 	}
 
+	path = append(pathPrefix, fld.GetNumber())
+
 	if len(opt.GetName()) > nameIndex+1 {
 		nextnm := opt.GetName()[nameIndex+1]
 		nextnode := res.getOptionNamePartNode(nextnm)
 		if fld.GetType() != dpb.FieldDescriptorProto_TYPE_MESSAGE {
-			return ErrorWithSourcePos{
+			return nil, ErrorWithSourcePos{
 				Pos: nextnode.start(),
 				Underlying: fmt.Errorf("%vcannot set field %s because %s is not a message",
 					mc, nextnm.GetNamePart(), nm.GetNamePart()),
 			}
 		}
 		if fld.IsRepeated() {
-			return ErrorWithSourcePos{
+			return nil, ErrorWithSourcePos{
 				Pos: nextnode.start(),
 				Underlying: fmt.Errorf("%vcannot set field %s because %s is repeated (must use an aggregate)",
 					mc, nextnm.GetNamePart(), nm.GetNamePart()),
@@ -965,20 +987,26 @@ func (l *linker) interpretField(res *parseResult, mc *messageContext, element de
 		if dm.HasField(fld) {
 			var v interface{}
 			v, err = dm.TryGetField(fld)
-			fdm = v.(*dynamic.Message)
+			fdm, _ = v.(*dynamic.Message)
 		} else {
 			fdm = dynamic.NewMessage(fld.GetMessageType())
 			err = dm.TrySetField(fld, fdm)
 		}
 		if err != nil {
-			return ErrorWithSourcePos{Pos: node.start(), Underlying: err}
+			return nil, ErrorWithSourcePos{Pos: node.start(), Underlying: err}
 		}
 		// recurse to set next part of name
-		return l.interpretField(res, mc, element, fdm, opt, nameIndex+1)
+		return l.interpretField(res, mc, element, fdm, opt, nameIndex+1, path)
 	}
 
 	optNode := res.getOptionNode(opt)
-	return setOptionField(res, mc, dm, fld, node, optNode.getValue())
+	if err := setOptionField(res, mc, dm, fld, node, optNode.getValue()); err != nil {
+		return nil, err
+	}
+	if fld.IsRepeated() {
+		path = append(path, int32(dm.FieldLength(fld))-1)
+	}
+	return path, nil
 }
 
 func findExtension(fd *desc.FileDescriptor, name string, public bool, checked map[*desc.FileDescriptor]struct{}) *desc.FieldDescriptor {

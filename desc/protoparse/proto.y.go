@@ -1868,7 +1868,7 @@ protodefault:
 		protoDollar = protoS[protopt-2 : protopt+1]
 		//line proto.y:781
 		{
-			protoVAL.rpcType = &rpcTypeNode{msgType: protoDollar[2].id, stream: true}
+			protoVAL.rpcType = &rpcTypeNode{msgType: protoDollar[2].id, streamKeyword: protoDollar[1].id}
 			protoVAL.rpcType.setRange(protoDollar[1].id, protoDollar[2].id)
 		}
 	case 156:
