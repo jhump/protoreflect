@@ -54,7 +54,7 @@ func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
 	}
 
 	// Now that we have linked descriptors, we can interpret any uninterpreted
-	// options that remain
+	// options that remain.
 	for _, r := range l.files {
 		fd := linked[r.fd.GetName()]
 		if err := l.interpretFileOptions(r, fd); err != nil {

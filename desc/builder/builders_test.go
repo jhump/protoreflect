@@ -2,6 +2,8 @@ package builder
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -13,7 +15,7 @@ import (
 	"github.com/golang/protobuf/ptypes/timestamp"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/internal/testprotos"
+	_ "github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
@@ -319,8 +321,7 @@ func TestBuildersFromDescriptors(t *testing.T) {
 }
 
 func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
-	fds := testprotos.GetDescriptorSet()
-	fd, err := desc.CreateFileDescriptorFromSet(fds)
+	fd, err := loadProtoset("../../internal/testprotos/desc_test1.protoset")
 	testutil.Ok(t, err)
 
 	fb, err := FromFile(fd)
@@ -424,6 +425,23 @@ func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
 
 	checkDescriptorComments(fd)
 	testutil.Eq(t, count, descCount)
+}
+
+func loadProtoset(path string) (*desc.FileDescriptor, error) {
+	var fds dpb.FileDescriptorSet
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	bb, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	if err = proto.Unmarshal(bb, &fds); err != nil {
+		return nil, err
+	}
+	return desc.CreateFileDescriptorFromSet(&fds)
 }
 
 func roundTripFile(t *testing.T, fd *desc.FileDescriptor) {

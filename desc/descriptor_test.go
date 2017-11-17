@@ -2,7 +2,9 @@ package desc
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -24,7 +26,7 @@ import (
 func TestFileDescriptorObjectGraph(t *testing.T) {
 	// This checks the structure of the descriptor for desc_test1.proto to make sure
 	// the "rich descriptor" accurately models everything therein.
-	fd, err := CreateFileDescriptorFromSet(testprotos.GetDescriptorSet())
+	fd, err := loadProtoset("../internal/testprotos/desc_test1.protoset")
 	testutil.Ok(t, err)
 	checkDescriptor(t, "file", 0, fd, nil, fd, descCase{
 		name: "desc_test1.proto",
@@ -1139,4 +1141,21 @@ func TestUnescape(t *testing.T) {
 			}
 		}
 	}
+}
+
+func loadProtoset(path string) (*FileDescriptor, error) {
+	var fds dpb.FileDescriptorSet
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	bb, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	if err = proto.Unmarshal(bb, &fds); err != nil {
+		return nil, err
+	}
+	return CreateFileDescriptorFromSet(&fds)
 }

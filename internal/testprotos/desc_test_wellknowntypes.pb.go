@@ -36,7 +36,7 @@ type TestWellKnownTypes struct {
 func (m *TestWellKnownTypes) Reset()                    { *m = TestWellKnownTypes{} }
 func (m *TestWellKnownTypes) String() string            { return proto.CompactTextString(m) }
 func (*TestWellKnownTypes) ProtoMessage()               {}
-func (*TestWellKnownTypes) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{0} }
+func (*TestWellKnownTypes) Descriptor() ([]byte, []int) { return fileDescriptor8, []int{0} }
 
 func (m *TestWellKnownTypes) GetStartTime() *google_protobuf3.Timestamp {
 	if m != nil {
@@ -133,9 +133,9 @@ func init() {
 	proto.RegisterType((*TestWellKnownTypes)(nil), "testprotos.TestWellKnownTypes")
 }
 
-func init() { proto.RegisterFile("desc_test_wellknowntypes.proto", fileDescriptor6) }
+func init() { proto.RegisterFile("desc_test_wellknowntypes.proto", fileDescriptor8) }
 
-var fileDescriptor6 = []byte{
+var fileDescriptor8 = []byte{
 	// 426 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0xd3, 0x51, 0x8b, 0xd3, 0x40,
 	0x10, 0x07, 0x70, 0xae, 0xbd, 0xeb, 0x79, 0x5b, 0x7d, 0x09, 0x22, 0x7b, 0xf5, 0x38, 0x0f, 0x9f,

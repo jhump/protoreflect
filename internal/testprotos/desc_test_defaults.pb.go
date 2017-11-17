@@ -47,7 +47,7 @@ func (x *Color) UnmarshalJSON(data []byte) error {
 	*x = Color(value)
 	return nil
 }
-func (Color) EnumDescriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
+func (Color) EnumDescriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
 
 type Number int32
 
@@ -99,7 +99,7 @@ func (x *Number) UnmarshalJSON(data []byte) error {
 	*x = Number(value)
 	return nil
 }
-func (Number) EnumDescriptor() ([]byte, []int) { return fileDescriptor2, []int{1} }
+func (Number) EnumDescriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
 
 type PrimitiveDefaults struct {
 	// simple default
@@ -157,7 +157,7 @@ type PrimitiveDefaults struct {
 func (m *PrimitiveDefaults) Reset()                    { *m = PrimitiveDefaults{} }
 func (m *PrimitiveDefaults) String() string            { return proto.CompactTextString(m) }
 func (*PrimitiveDefaults) ProtoMessage()               {}
-func (*PrimitiveDefaults) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
+func (*PrimitiveDefaults) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
 
 const Default_PrimitiveDefaults_Fl32 float32 = 3.14159
 const Default_PrimitiveDefaults_Fl64 float64 = 3.14159
@@ -527,17 +527,17 @@ type StringAndBytesDefaults struct {
 func (m *StringAndBytesDefaults) Reset()                    { *m = StringAndBytesDefaults{} }
 func (m *StringAndBytesDefaults) String() string            { return proto.CompactTextString(m) }
 func (*StringAndBytesDefaults) ProtoMessage()               {}
-func (*StringAndBytesDefaults) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{1} }
+func (*StringAndBytesDefaults) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
 
 const Default_StringAndBytesDefaults_Dq string = "this is a string with \"nested quotes\""
 const Default_StringAndBytesDefaults_Sq string = "this is a string with \"nested quotes\""
 
-var Default_StringAndBytesDefaults_EscapedBytes []byte = []byte("\\000\\001\\007\\010\\014\\n\\r\\t\\013\\\\\\'\\\"\\376")
+var Default_StringAndBytesDefaults_EscapedBytes []byte = []byte("\x00\x01\a\b\f\n\r\t\v\\'\"\xfe")
 
 const Default_StringAndBytesDefaults_Utf8String string = "ሴ"
 const Default_StringAndBytesDefaults_StringWithZero string = "hel\x00lo"
 
-var Default_StringAndBytesDefaults_BytesWithZero []byte = []byte("wor\\000ld")
+var Default_StringAndBytesDefaults_BytesWithZero []byte = []byte("wor\x00ld")
 
 func (m *StringAndBytesDefaults) GetDq() string {
 	if m != nil && m.Dq != nil {
@@ -595,7 +595,7 @@ type EnumDefaults struct {
 func (m *EnumDefaults) Reset()                    { *m = EnumDefaults{} }
 func (m *EnumDefaults) String() string            { return proto.CompactTextString(m) }
 func (*EnumDefaults) ProtoMessage()               {}
-func (*EnumDefaults) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{2} }
+func (*EnumDefaults) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{2} }
 
 const Default_EnumDefaults_Red Color = Color_RED
 const Default_EnumDefaults_Green Color = Color_GREEN
@@ -662,9 +662,9 @@ func init() {
 	proto.RegisterEnum("testprotos.Number", Number_name, Number_value)
 }
 
-func init() { proto.RegisterFile("desc_test_defaults.proto", fileDescriptor2) }
+func init() { proto.RegisterFile("desc_test_defaults.proto", fileDescriptor4) }
 
-var fileDescriptor2 = []byte{
+var fileDescriptor4 = []byte{
 	// 1094 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x95, 0xdf, 0x4e, 0xe3, 0x46,
 	0x14, 0xc6, 0x71, 0xe2, 0x24, 0x9b, 0x59, 0xfe, 0x98, 0x69, 0xcb, 0x0e, 0xec, 0xd2, 0x75, 0x53,

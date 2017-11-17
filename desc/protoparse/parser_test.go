@@ -328,7 +328,7 @@ func TestBasicValidation(t *testing.T) {
 }
 
 func TestAggregateValueInUninterpretedOptions(t *testing.T) {
-	res, err := parseProtoFile("test.proto")
+	res, err := parseProtoFile("../../internal/testprotos/desc_test_complex.proto")
 	testutil.Ok(t, err)
 	fd := res.fd
 

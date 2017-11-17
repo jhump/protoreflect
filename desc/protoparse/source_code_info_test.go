@@ -19,7 +19,7 @@ const regenerateMode = false
 
 func TestSourceCodeInfo(t *testing.T) {
 	p := Parser{IncludeSourceCodeInfo: true}
-	fds, err := p.ParseFiles("../protoprint/test.proto")
+	fds, err := p.ParseFiles("../../internal/testprotos/desc_test_comments.proto")
 	testutil.Ok(t, err)
 	fd := fds[0]
 

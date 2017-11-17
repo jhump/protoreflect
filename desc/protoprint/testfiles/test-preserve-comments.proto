@@ -11,7 +11,7 @@ syntax = "proto2";
 // And now the package declaration
 package foo.bar;
 
-option go_package = "github.com/jhump/protoreflect/desc/protoprint";
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 // Multiple white space lines (like above) cannot
 // be preserved...

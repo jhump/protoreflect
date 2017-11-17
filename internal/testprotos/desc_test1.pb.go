@@ -7,6 +7,8 @@ Package testprotos is a generated protocol buffer package.
 It is generated from these files:
 	desc_test1.proto
 	desc_test2.proto
+	desc_test_comments.proto
+	desc_test_complex.proto
 	desc_test_defaults.proto
 	desc_test_field_types.proto
 	desc_test_options.proto
@@ -20,6 +22,11 @@ It has these top-level messages:
 	Whatchamacallit
 	Whatzit
 	GroupX
+	Request
+	Simple
+	Test
+	Another
+	Validator
 	PrimitiveDefaults
 	StringAndBytesDefaults
 	EnumDefaults

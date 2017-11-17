@@ -2,7 +2,7 @@ syntax = "proto2";
 
 package foo.bar;
 
-option go_package = "github.com/jhump/protoreflect/desc/protoparse";
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 import "google/protobuf/descriptor.proto";
 
@@ -99,7 +99,7 @@ extend google.protobuf.MethodOptions {
 	optional Validator validator = 12345;
 }
 
-service TestService {
+service TestTestService {
 	rpc UserAuth(Test) returns (Test) {
 		option (validator) = {
 			authenticated: true
