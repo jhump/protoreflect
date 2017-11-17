@@ -16,13 +16,11 @@ import (
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
-//go:generate bash -c "protoc test.proto -o ./test.protoset --go_out=../../../../.. && mv test.pb.go test_pb_test.go"
-
 func TestSimpleLink(t *testing.T) {
-	fds, err := Parser{}.ParseFiles("test.proto")
+	fds, err := Parser{ImportPaths: []string{"../../internal/testprotos"}}.ParseFiles("desc_test_complex.proto")
 	testutil.Ok(t, err)
 
-	b, err := ioutil.ReadFile("test.protoset")
+	b, err := ioutil.ReadFile("../../internal/testprotos/desc_test_complex.protoset")
 	testutil.Ok(t, err)
 	var files dpb.FileDescriptorSet
 	err = proto.Unmarshal(b, &files)

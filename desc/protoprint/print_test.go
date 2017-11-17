@@ -16,10 +16,6 @@ import (
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
-//go:generate protoc test.proto -o ./test.protoset --include_source_info --include_imports
-//go:generate protoc -I ../ ../protoparse/test.proto -o ./test2.protoset --include_source_info --include_imports
-//go:generate protoc -I ../../../../ ../../../../golang/protobuf/protoc-gen-go/descriptor/descriptor.proto -o ./descriptor.protoset --include_source_info --include_imports
-
 const (
 	// When false, test behaves normally, checking output against golden test files.
 	// But when changed to true, running test will actually re-generate golden test
@@ -37,9 +33,9 @@ func TestPrinter(t *testing.T) {
 		"sorted-AND-multiline-style-comments": {PreferMultiLineStyleComments: true, SortElements: true},
 	}
 	files := []string{
-		"test.protoset",
-		"test2.protoset",
-		"descriptor.protoset",
+		"../../internal/testprotos/desc_test_comments.protoset",
+		"../../internal/testprotos/desc_test_complex_source_info.protoset",
+		"../../internal/testprotos/descriptor.protoset",
 		"../../internal/testprotos/desc_test1.protoset",
 	}
 	for _, file := range files {
@@ -95,7 +91,7 @@ func checkFile(t *testing.T, pr *Printer, fd *desc.FileDescriptor, goldenFile st
 
 func TestParseAndPrintPreservesAsMuchAsPossible(t *testing.T) {
 	pa := protoparse.Parser{IncludeSourceCodeInfo: true}
-	fds, err := pa.ParseFiles("./test.proto")
+	fds, err := pa.ParseFiles("../../internal/testprotos/desc_test_comments.proto")
 	testutil.Ok(t, err)
 	fd := fds[0]
 	checkFile(t, &Printer{}, fd, "test-preserve-comments.proto")

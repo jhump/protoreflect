@@ -12,7 +12,7 @@ syntax = "proto2";
 package foo.bar;
 
 // option comments FTW!!!
-option go_package = "github.com/jhump/protoreflect/desc/protoprint"  ;
+option go_package = "github.com/jhump/protoreflect/internal/testprotos"  ;
 
 
 // Multiple white space lines (like above) cannot

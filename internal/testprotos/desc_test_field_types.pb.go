@@ -50,7 +50,7 @@ func (x *TestEnum) UnmarshalJSON(data []byte) error {
 	*x = TestEnum(value)
 	return nil
 }
-func (TestEnum) EnumDescriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
+func (TestEnum) EnumDescriptor() ([]byte, []int) { return fileDescriptor5, []int{0} }
 
 type UnaryFields struct {
 	I                *int32              `protobuf:"varint,1,opt,name=i" json:"i,omitempty"`
@@ -77,7 +77,7 @@ type UnaryFields struct {
 func (m *UnaryFields) Reset()                    { *m = UnaryFields{} }
 func (m *UnaryFields) String() string            { return proto.CompactTextString(m) }
 func (*UnaryFields) ProtoMessage()               {}
-func (*UnaryFields) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
+func (*UnaryFields) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0} }
 
 func (m *UnaryFields) GetI() int32 {
 	if m != nil && m.I != nil {
@@ -214,7 +214,7 @@ type UnaryFields_GroupY struct {
 func (m *UnaryFields_GroupY) Reset()                    { *m = UnaryFields_GroupY{} }
 func (m *UnaryFields_GroupY) String() string            { return proto.CompactTextString(m) }
 func (*UnaryFields_GroupY) ProtoMessage()               {}
-func (*UnaryFields_GroupY) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0, 0} }
+func (*UnaryFields_GroupY) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0, 0} }
 
 func (m *UnaryFields_GroupY) GetYa() string {
 	if m != nil && m.Ya != nil {
@@ -255,7 +255,7 @@ type RepeatedFields struct {
 func (m *RepeatedFields) Reset()                    { *m = RepeatedFields{} }
 func (m *RepeatedFields) String() string            { return proto.CompactTextString(m) }
 func (*RepeatedFields) ProtoMessage()               {}
-func (*RepeatedFields) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{1} }
+func (*RepeatedFields) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{1} }
 
 func (m *RepeatedFields) GetI() []int32 {
 	if m != nil {
@@ -392,7 +392,7 @@ type RepeatedFields_GroupY struct {
 func (m *RepeatedFields_GroupY) Reset()                    { *m = RepeatedFields_GroupY{} }
 func (m *RepeatedFields_GroupY) String() string            { return proto.CompactTextString(m) }
 func (*RepeatedFields_GroupY) ProtoMessage()               {}
-func (*RepeatedFields_GroupY) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{1, 0} }
+func (*RepeatedFields_GroupY) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{1, 0} }
 
 func (m *RepeatedFields_GroupY) GetYa() string {
 	if m != nil && m.Ya != nil {
@@ -430,7 +430,7 @@ type RepeatedPackedFields struct {
 func (m *RepeatedPackedFields) Reset()                    { *m = RepeatedPackedFields{} }
 func (m *RepeatedPackedFields) String() string            { return proto.CompactTextString(m) }
 func (*RepeatedPackedFields) ProtoMessage()               {}
-func (*RepeatedPackedFields) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{2} }
+func (*RepeatedPackedFields) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{2} }
 
 func (m *RepeatedPackedFields) GetI() []int32 {
 	if m != nil {
@@ -545,7 +545,7 @@ type RepeatedPackedFields_GroupY struct {
 func (m *RepeatedPackedFields_GroupY) Reset()                    { *m = RepeatedPackedFields_GroupY{} }
 func (m *RepeatedPackedFields_GroupY) String() string            { return proto.CompactTextString(m) }
 func (*RepeatedPackedFields_GroupY) ProtoMessage()               {}
-func (*RepeatedPackedFields_GroupY) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{2, 0} }
+func (*RepeatedPackedFields_GroupY) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{2, 0} }
 
 func (m *RepeatedPackedFields_GroupY) GetYb() []int32 {
 	if m != nil {
@@ -573,7 +573,7 @@ type MapKeyFields struct {
 func (m *MapKeyFields) Reset()                    { *m = MapKeyFields{} }
 func (m *MapKeyFields) String() string            { return proto.CompactTextString(m) }
 func (*MapKeyFields) ProtoMessage()               {}
-func (*MapKeyFields) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{3} }
+func (*MapKeyFields) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{3} }
 
 func (m *MapKeyFields) GetI() map[int32]string {
 	if m != nil {
@@ -683,7 +683,7 @@ type MapValFields struct {
 func (m *MapValFields) Reset()                    { *m = MapValFields{} }
 func (m *MapValFields) String() string            { return proto.CompactTextString(m) }
 func (*MapValFields) ProtoMessage()               {}
-func (*MapValFields) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{4} }
+func (*MapValFields) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{4} }
 
 func (m *MapValFields) GetI() map[string]int32 {
 	if m != nil {
@@ -816,9 +816,9 @@ func init() {
 	proto.RegisterEnum("testprotos.TestEnum", TestEnum_name, TestEnum_value)
 }
 
-func init() { proto.RegisterFile("desc_test_field_types.proto", fileDescriptor3) }
+func init() { proto.RegisterFile("desc_test_field_types.proto", fileDescriptor5) }
 
-var fileDescriptor3 = []byte{
+var fileDescriptor5 = []byte{
 	// 1080 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x97, 0xdd, 0x6e, 0xe3, 0x44,
 	0x1b, 0xc7, 0xdf, 0x27, 0xd3, 0xe6, 0x63, 0x92, 0x34, 0xae, 0xdf, 0x4a, 0x8c, 0x8a, 0x00, 0x53,

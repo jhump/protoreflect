@@ -5,16 +5,16 @@ syntax = "proto2";
 // And now the package declaration
 package foo.bar;
 
-option go_package = "github.com/jhump/protoreflect/desc/protoprint";
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 // We need a request for our RPC service below.
 message Request {
    // A field comment
-   repeated int32 ids = 1 [packed = true];
+   repeated int32 ids = 1 [json_name = "|foo|", packed = true];
    // field trailer #1...
 
    // label comment
-   optional string name = 2;
+   optional string name = 2 [default = "fubar"];
 
    // Group comment
    optional group Extras = 3 {

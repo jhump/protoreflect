@@ -40,7 +40,7 @@ var Proto3Enum_value = map[string]int32{
 func (x Proto3Enum) String() string {
 	return proto.EnumName(Proto3Enum_name, int32(x))
 }
-func (Proto3Enum) EnumDescriptor() ([]byte, []int) { return fileDescriptor5, []int{0} }
+func (Proto3Enum) EnumDescriptor() ([]byte, []int) { return fileDescriptor7, []int{0} }
 
 type TestRequest struct {
 	Foo   []Proto3Enum                                    `protobuf:"varint,1,rep,packed,name=foo,enum=testprotos.Proto3Enum" json:"foo,omitempty"`
@@ -53,7 +53,7 @@ type TestRequest struct {
 func (m *TestRequest) Reset()                    { *m = TestRequest{} }
 func (m *TestRequest) String() string            { return proto.CompactTextString(m) }
 func (*TestRequest) ProtoMessage()               {}
-func (*TestRequest) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0} }
+func (*TestRequest) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{0} }
 
 func (m *TestRequest) GetFoo() []Proto3Enum {
 	if m != nil {
@@ -98,7 +98,7 @@ type TestResponse struct {
 func (m *TestResponse) Reset()                    { *m = TestResponse{} }
 func (m *TestResponse) String() string            { return proto.CompactTextString(m) }
 func (*TestResponse) ProtoMessage()               {}
-func (*TestResponse) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{1} }
+func (*TestResponse) Descriptor() ([]byte, []int) { return fileDescriptor7, []int{1} }
 
 func (m *TestResponse) GetAtm() *AnotherTestMessage {
 	if m != nil {
@@ -385,9 +385,9 @@ var _TestService_serviceDesc = grpc.ServiceDesc{
 	Metadata: "desc_test_proto3.proto",
 }
 
-func init() { proto.RegisterFile("desc_test_proto3.proto", fileDescriptor5) }
+func init() { proto.RegisterFile("desc_test_proto3.proto", fileDescriptor7) }
 
-var fileDescriptor5 = []byte{
+var fileDescriptor7 = []byte{
 	// 472 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x53, 0xc1, 0x6e, 0xd3, 0x40,
 	0x10, 0xc5, 0x36, 0x29, 0x30, 0x46, 0xc5, 0x1a, 0xa1, 0xc6, 0xb2, 0x10, 0x8a, 0x72, 0x32, 0x1c,

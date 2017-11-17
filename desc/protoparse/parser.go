@@ -976,6 +976,7 @@ func (r *parseResult) generateSourceCodeInfoForMessage(sci *sourceCodeInfo, msg 
 	}
 	if decls == nil {
 		// map entry so nothing else to do
+		return
 	}
 
 	sci.newLoc(n.messageName(), append(path, internal.Message_nameTag))

@@ -42,7 +42,7 @@ func (x *ReallySimpleEnum) UnmarshalJSON(data []byte) error {
 	*x = ReallySimpleEnum(value)
 	return nil
 }
-func (ReallySimpleEnum) EnumDescriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
+func (ReallySimpleEnum) EnumDescriptor() ([]byte, []int) { return fileDescriptor6, []int{0} }
 
 type ReallySimpleMessage struct {
 	Id               *uint64 `protobuf:"varint,1,opt,name=id" json:"id,omitempty"`
@@ -53,7 +53,7 @@ type ReallySimpleMessage struct {
 func (m *ReallySimpleMessage) Reset()                    { *m = ReallySimpleMessage{} }
 func (m *ReallySimpleMessage) String() string            { return proto.CompactTextString(m) }
 func (*ReallySimpleMessage) ProtoMessage()               {}
-func (*ReallySimpleMessage) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
+func (*ReallySimpleMessage) Descriptor() ([]byte, []int) { return fileDescriptor6, []int{0} }
 
 func (m *ReallySimpleMessage) GetId() uint64 {
 	if m != nil && m.Id != nil {
@@ -244,9 +244,9 @@ func init() {
 	proto.RegisterExtension(E_Mtfubard)
 }
 
-func init() { proto.RegisterFile("desc_test_options.proto", fileDescriptor4) }
+func init() { proto.RegisterFile("desc_test_options.proto", fileDescriptor6) }
 
-var fileDescriptor4 = []byte{
+var fileDescriptor6 = []byte{
 	// 483 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x94, 0xcd, 0x6f, 0xd3, 0x40,
 	0x10, 0xc5, 0xe5, 0x34, 0xb5, 0x93, 0x01, 0x4a, 0x30, 0x07, 0x22, 0xd4, 0xd2, 0xc0, 0x29, 0xe2,

@@ -4,7 +4,7 @@ package foo.bar;
 
 import "google/protobuf/descriptor.proto";
 
-option go_package = "github.com/jhump/protoreflect/desc/protoparse";
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 message Another {
   option (foo.bar.rept) = { foo:"abc" array:1 array:2 array:3 s:<name:"foo" id:123> r:<name:"f"> r:<name:"s"> r:<id:456> };
@@ -79,6 +79,36 @@ message Test {
   extensions 300 to 350, 500 to 550 [(foo.bar.label) = "jazz"];
 }
 
+message Validator {
+  optional bool authenticated = 1;
+
+  repeated Permission permission = 2;
+
+  message Permission {
+    optional Action action = 1;
+
+    optional string entity = 2;
+  }
+
+  enum Action {
+    LOGIN = 0;
+
+    READ = 1;
+
+    WRITE = 2;
+  }
+}
+
+service TestTestService {
+  rpc Get ( Test ) returns ( Test ) {
+    option (foo.bar.validator) = { authenticated:true permission:<action:READ entity:"user"> };
+  }
+
+  rpc UserAuth ( Test ) returns ( Test ) {
+    option (foo.bar.validator) = { authenticated:true permission:<action:LOGIN entity:"client"> };
+  }
+}
+
 extend google.protobuf.ExtensionRangeOptions {
   optional string label = 20000;
 }
@@ -89,4 +119,8 @@ extend google.protobuf.MessageOptions {
   optional Test.Nested._NestedNested.EEE eee = 20010;
 
   optional Another a = 20020;
+}
+
+extend google.protobuf.MethodOptions {
+  optional Validator validator = 12345;
 }
