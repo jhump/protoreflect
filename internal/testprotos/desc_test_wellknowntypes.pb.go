@@ -6,11 +6,11 @@ package testprotos
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import google_protobuf1 "github.com/golang/protobuf/ptypes/any"
-import google_protobuf2 "github.com/golang/protobuf/ptypes/duration"
-import google_protobuf3 "github.com/golang/protobuf/ptypes/timestamp"
-import google_protobuf4 "github.com/golang/protobuf/ptypes/struct"
-import google_protobuf5 "github.com/golang/protobuf/ptypes/wrappers"
+import google_protobuf2 "github.com/golang/protobuf/ptypes/any"
+import google_protobuf3 "github.com/golang/protobuf/ptypes/duration"
+import google_protobuf4 "github.com/golang/protobuf/ptypes/timestamp"
+import google_protobuf5 "github.com/golang/protobuf/ptypes/struct"
+import google_protobuf6 "github.com/golang/protobuf/ptypes/wrappers"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -18,19 +18,19 @@ var _ = fmt.Errorf
 var _ = math.Inf
 
 type TestWellKnownTypes struct {
-	StartTime *google_protobuf3.Timestamp   `protobuf:"bytes,1,opt,name=start_time,json=startTime" json:"start_time,omitempty"`
-	Elapsed   *google_protobuf2.Duration    `protobuf:"bytes,2,opt,name=elapsed" json:"elapsed,omitempty"`
-	Dbl       *google_protobuf5.DoubleValue `protobuf:"bytes,3,opt,name=dbl" json:"dbl,omitempty"`
-	Flt       *google_protobuf5.FloatValue  `protobuf:"bytes,4,opt,name=flt" json:"flt,omitempty"`
-	Bl        *google_protobuf5.BoolValue   `protobuf:"bytes,5,opt,name=bl" json:"bl,omitempty"`
-	I32       *google_protobuf5.Int32Value  `protobuf:"bytes,6,opt,name=i32" json:"i32,omitempty"`
-	I64       *google_protobuf5.Int64Value  `protobuf:"bytes,7,opt,name=i64" json:"i64,omitempty"`
-	U32       *google_protobuf5.UInt32Value `protobuf:"bytes,8,opt,name=u32" json:"u32,omitempty"`
-	U64       *google_protobuf5.UInt64Value `protobuf:"bytes,9,opt,name=u64" json:"u64,omitempty"`
-	Str       *google_protobuf5.StringValue `protobuf:"bytes,10,opt,name=str" json:"str,omitempty"`
-	Byt       *google_protobuf5.BytesValue  `protobuf:"bytes,11,opt,name=byt" json:"byt,omitempty"`
-	Json      []*google_protobuf4.Value     `protobuf:"bytes,12,rep,name=json" json:"json,omitempty"`
-	Extras    []*google_protobuf1.Any       `protobuf:"bytes,13,rep,name=extras" json:"extras,omitempty"`
+	StartTime *google_protobuf4.Timestamp   `protobuf:"bytes,1,opt,name=start_time,json=startTime" json:"start_time,omitempty"`
+	Elapsed   *google_protobuf3.Duration    `protobuf:"bytes,2,opt,name=elapsed" json:"elapsed,omitempty"`
+	Dbl       *google_protobuf6.DoubleValue `protobuf:"bytes,3,opt,name=dbl" json:"dbl,omitempty"`
+	Flt       *google_protobuf6.FloatValue  `protobuf:"bytes,4,opt,name=flt" json:"flt,omitempty"`
+	Bl        *google_protobuf6.BoolValue   `protobuf:"bytes,5,opt,name=bl" json:"bl,omitempty"`
+	I32       *google_protobuf6.Int32Value  `protobuf:"bytes,6,opt,name=i32" json:"i32,omitempty"`
+	I64       *google_protobuf6.Int64Value  `protobuf:"bytes,7,opt,name=i64" json:"i64,omitempty"`
+	U32       *google_protobuf6.UInt32Value `protobuf:"bytes,8,opt,name=u32" json:"u32,omitempty"`
+	U64       *google_protobuf6.UInt64Value `protobuf:"bytes,9,opt,name=u64" json:"u64,omitempty"`
+	Str       *google_protobuf6.StringValue `protobuf:"bytes,10,opt,name=str" json:"str,omitempty"`
+	Byt       *google_protobuf6.BytesValue  `protobuf:"bytes,11,opt,name=byt" json:"byt,omitempty"`
+	Json      []*google_protobuf5.Value     `protobuf:"bytes,12,rep,name=json" json:"json,omitempty"`
+	Extras    []*google_protobuf2.Any       `protobuf:"bytes,13,rep,name=extras" json:"extras,omitempty"`
 }
 
 func (m *TestWellKnownTypes) Reset()                    { *m = TestWellKnownTypes{} }
@@ -38,91 +38,91 @@ func (m *TestWellKnownTypes) String() string            { return proto.CompactTe
 func (*TestWellKnownTypes) ProtoMessage()               {}
 func (*TestWellKnownTypes) Descriptor() ([]byte, []int) { return fileDescriptor8, []int{0} }
 
-func (m *TestWellKnownTypes) GetStartTime() *google_protobuf3.Timestamp {
+func (m *TestWellKnownTypes) GetStartTime() *google_protobuf4.Timestamp {
 	if m != nil {
 		return m.StartTime
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetElapsed() *google_protobuf2.Duration {
+func (m *TestWellKnownTypes) GetElapsed() *google_protobuf3.Duration {
 	if m != nil {
 		return m.Elapsed
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetDbl() *google_protobuf5.DoubleValue {
+func (m *TestWellKnownTypes) GetDbl() *google_protobuf6.DoubleValue {
 	if m != nil {
 		return m.Dbl
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetFlt() *google_protobuf5.FloatValue {
+func (m *TestWellKnownTypes) GetFlt() *google_protobuf6.FloatValue {
 	if m != nil {
 		return m.Flt
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetBl() *google_protobuf5.BoolValue {
+func (m *TestWellKnownTypes) GetBl() *google_protobuf6.BoolValue {
 	if m != nil {
 		return m.Bl
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetI32() *google_protobuf5.Int32Value {
+func (m *TestWellKnownTypes) GetI32() *google_protobuf6.Int32Value {
 	if m != nil {
 		return m.I32
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetI64() *google_protobuf5.Int64Value {
+func (m *TestWellKnownTypes) GetI64() *google_protobuf6.Int64Value {
 	if m != nil {
 		return m.I64
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetU32() *google_protobuf5.UInt32Value {
+func (m *TestWellKnownTypes) GetU32() *google_protobuf6.UInt32Value {
 	if m != nil {
 		return m.U32
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetU64() *google_protobuf5.UInt64Value {
+func (m *TestWellKnownTypes) GetU64() *google_protobuf6.UInt64Value {
 	if m != nil {
 		return m.U64
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetStr() *google_protobuf5.StringValue {
+func (m *TestWellKnownTypes) GetStr() *google_protobuf6.StringValue {
 	if m != nil {
 		return m.Str
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetByt() *google_protobuf5.BytesValue {
+func (m *TestWellKnownTypes) GetByt() *google_protobuf6.BytesValue {
 	if m != nil {
 		return m.Byt
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetJson() []*google_protobuf4.Value {
+func (m *TestWellKnownTypes) GetJson() []*google_protobuf5.Value {
 	if m != nil {
 		return m.Json
 	}
 	return nil
 }
 
-func (m *TestWellKnownTypes) GetExtras() []*google_protobuf1.Any {
+func (m *TestWellKnownTypes) GetExtras() []*google_protobuf2.Any {
 	if m != nil {
 		return m.Extras
 	}

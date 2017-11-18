@@ -114,6 +114,15 @@ func (m SourceInfoMap) Put(path []int32, loc *dpb.SourceCodeInfo_Location) {
 	m[asMapKey(path)] = loc
 }
 
+func (m SourceInfoMap) PutIfAbsent(path []int32, loc *dpb.SourceCodeInfo_Location) bool {
+	k := asMapKey(path)
+	if _, ok := m[k]; ok {
+		return false
+	}
+	m[k] = loc
+	return true
+}
+
 func asMapKey(slice []int32) string {
 	// NB: arrays should be usable as map keys, but this does not
 	// work due to a bug: https://github.com/golang/go/issues/22605

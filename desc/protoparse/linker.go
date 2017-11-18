@@ -248,23 +248,30 @@ func (l *linker) resolveReferences() error {
 			}
 		}
 		for _, ed := range fd.EnumType {
-			enumFqn := prefix + ed.GetName()
-			if ed.Options != nil {
-				if err := l.resolveOptions(r, fd, "enum", enumFqn, proto.MessageName(ed.Options), ed.Options.UninterpretedOption, scopes); err != nil {
-					return err
-				}
-			}
-			for _, evd := range ed.Value {
-				if evd.Options != nil {
-					evFqn := enumFqn + "." + evd.GetName()
-					if err := l.resolveOptions(r, fd, "enum value", evFqn, proto.MessageName(evd.Options), evd.Options.UninterpretedOption, scopes); err != nil {
-						return err
-					}
-				}
+			if err := l.resolveEnumTypes(r, fd, prefix, ed, scopes); err != nil {
+				return err
 			}
 		}
 		for _, sd := range fd.Service {
 			if err := l.resolveServiceTypes(r, fd, prefix, sd, scopes); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (l *linker) resolveEnumTypes(r *parseResult, fd *dpb.FileDescriptorProto, prefix string, ed *dpb.EnumDescriptorProto, scopes []scope) error {
+	enumFqn := prefix + ed.GetName()
+	if ed.Options != nil {
+		if err := l.resolveOptions(r, fd, "enum", enumFqn, proto.MessageName(ed.Options), ed.Options.UninterpretedOption, scopes); err != nil {
+			return err
+		}
+	}
+	for _, evd := range ed.Value {
+		if evd.Options != nil {
+			evFqn := enumFqn + "." + evd.GetName()
+			if err := l.resolveOptions(r, fd, "enum value", evFqn, proto.MessageName(evd.Options), evd.Options.UninterpretedOption, scopes); err != nil {
 				return err
 			}
 		}
@@ -286,6 +293,11 @@ func (l *linker) resolveMessageTypes(r *parseResult, fd *dpb.FileDescriptorProto
 
 	for _, nmd := range md.NestedType {
 		if err := l.resolveMessageTypes(r, fd, prefix, nmd, scopes); err != nil {
+			return err
+		}
+	}
+	for _, ned := range md.EnumType {
+		if err := l.resolveEnumTypes(r, fd, prefix, ned, scopes); err != nil {
 			return err
 		}
 	}

@@ -2,15 +2,25 @@
 syntax = "proto2";
 // Syntax trailer.
 
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
 // And now the package declaration
 package foo.bar;
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+import "desc_test_options.proto";
+
+import "google/protobuf/descriptor.proto";
+
+import "google/protobuf/empty.proto";
 
 // We need a request for our RPC service below.
 message Request {
+   option deprecated = true;
+
+   option (testprotos.mfubar) = true;
+
    // A field comment
-   repeated int32 ids = 1 [json_name = "|foo|", packed = true];
+   repeated int32 ids = 1 [json_name = "|foo|", packed = true, (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"];
    // field trailer #1...
 
    // label comment
@@ -18,6 +28,10 @@ message Request {
 
    // Group comment
    optional group Extras = 3 {
+      option no_standard_descriptor_accessor = false;
+
+      option (testprotos.mfubar) = false;
+
       optional double dbl = 1;
 
       optional float flt = 2;
@@ -27,7 +41,37 @@ message Request {
       // Trailing comment...
    }
 
+   enum MarioCharacters {
+      option allow_alias = true;
+
+      option (testprotos.efubar) = 123;
+
+      option (testprotos.efubars) = -321;
+
+      MARIO = 1 [(testprotos.evfubar) = 278, (testprotos.evfubars) = -314];
+
+      LUIGI = 2 [(testprotos.evfubaru) = 200, (testprotos.evfubaruf) = 100];
+
+      PEACH = 3;
+
+      BOWSER = 4;
+
+      WARIO = 5;
+
+      WALUIGI = 6;
+
+      HEY_HO = 7;
+
+      SHY_GUY = 7 [(testprotos.evfubarsf) = 10101];
+
+      KAMEK = 8;
+
+      MAGIKOOPA = 8;
+   }
+
    extensions 100 to 200;
+
+   extensions 201 to 250 [(testprotos.exfubar) = "splat!", (testprotos.exfubarb) = "\000\001\002\003\004\005\006\007"];
 
    reserved 10 to 20, 30 to 50;
 
@@ -36,8 +80,22 @@ message Request {
 
 // Service comment
 service RpcService {
+   option deprecated = false;
+
+   option (testprotos.sfubar) = { id:100 name:"bob" };
+
+   option (testprotos.sfubare) = VALUE;
+
    // Method comment
    rpc StreamingRpc ( stream Request ) returns ( Request );
+
+   rpc UnaryRpc ( Request ) returns ( google.protobuf.Empty ) {
+      option deprecated = true;
+
+      option (testprotos.mtfubar) = 12.340000;
+
+      option (testprotos.mtfubard) = 123.456000;
+   }
 }
 
 extend Request {

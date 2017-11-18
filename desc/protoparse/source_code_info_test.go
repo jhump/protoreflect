@@ -18,8 +18,8 @@ import (
 const regenerateMode = false
 
 func TestSourceCodeInfo(t *testing.T) {
-	p := Parser{IncludeSourceCodeInfo: true}
-	fds, err := p.ParseFiles("../../internal/testprotos/desc_test_comments.proto")
+	p := Parser{ImportPaths: []string{"../../internal/testprotos"}, IncludeSourceCodeInfo: true}
+	fds, err := p.ParseFiles("desc_test_comments.proto")
 	testutil.Ok(t, err)
 	fd := fds[0]
 
@@ -29,6 +29,8 @@ func TestSourceCodeInfo(t *testing.T) {
 		testutil.Ok(t, err)
 		err = ioutil.WriteFile("test-source-info.bin", b, 0666)
 		testutil.Ok(t, err)
+
+		printSourceCodeInfo(t, fd)
 	}
 
 	b, err := ioutil.ReadFile("test-source-info.bin")
@@ -113,7 +115,11 @@ func findLocation(mf *dynamic.MessageFactory, msg *dynamic.Message, md *desc.Mes
 					next = msg.GetRepeatedField(fld, idx).(proto.Message)
 				}
 			} else {
-				next = msg.GetField(fld).(proto.Message)
+				if m, ok := msg.GetField(fld).(proto.Message); ok {
+					next = m
+				} else {
+					panic(fmt.Sprintf("path traverses into non-message type %T: %s -> %v", msg.GetField(fld), buf.String(), path))
+				}
 			}
 		}
 

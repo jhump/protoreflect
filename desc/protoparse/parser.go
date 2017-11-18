@@ -919,7 +919,8 @@ func (r *parseResult) generateSourceCodeInfoForOptions(sci *sourceCodeInfo, elem
 				// used by "default" and "json_name" field pseudo-options
 				// to attribute path to parent element (since those are
 				// stored directly on the descriptor, not its options)
-				p = path[:len(path)-1]
+				p = make([]int32, len(path)-1)
+				copy(p, path)
 				optPath = optPath[1:]
 			}
 			sci.newLoc(on, append(p, optPath...))

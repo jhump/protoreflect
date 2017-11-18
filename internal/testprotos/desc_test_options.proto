@@ -49,3 +49,8 @@ message ReallySimpleMessage {
 enum ReallySimpleEnum {
 	VALUE = 1;
 }
+
+extend google.protobuf.ExtensionRangeOptions {
+	repeated string exfubar = 10101;
+	optional bytes exfubarb = 10102;
+}

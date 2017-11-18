@@ -1,10 +1,10 @@
 syntax = "proto2";
 
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
 package foo.bar;
 
 import "google/protobuf/descriptor.proto";
-
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 message Simple {
   optional string name = 1;
@@ -39,8 +39,9 @@ message Test {
     }
 
     message _NestedNested {
-      option (foo.bar.rept) = { foo:"goo" [foo.bar.Test.Nested._NestedNested._garblez]:"boo" };
       option (foo.bar.Test.Nested.fooblez) = 10101;
+
+      option (foo.bar.rept) = { foo:"goo" [foo.bar.Test.Nested._NestedNested._garblez]:"boo" };
 
       enum EEE {
         OK = 0;
@@ -80,11 +81,13 @@ extend google.protobuf.MessageOptions {
 }
 
 message Another {
+  option (foo.bar.a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765> m:<key:"bar" value:200> m:<key:"foo" value:100>> fff:OK };
+
+  option (foo.bar.eee) = V1;
+
   option (foo.bar.rept) = { foo:"abc" array:1 array:2 array:3 s:<name:"foo" id:123> r:<name:"f"> r:<name:"s"> r:<id:456> };
   option (foo.bar.rept) = { foo:"def" array:3 array:2 array:1 s:<name:"bar" id:321> r:<name:"g"> r:<name:"s"> };
   option (foo.bar.rept) = { foo:"def" };
-  option (foo.bar.eee) = V1;
-  option (foo.bar.a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765> m:<key:"bar" value:200> m:<key:"foo" value:100>> fff:OK };
 
   optional Test test = 1;
 
