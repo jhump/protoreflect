@@ -6,7 +6,7 @@ package testprotos
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
-import google_protobuf "github.com/golang/protobuf/protoc-gen-go/descriptor"
+import google_protobuf1 "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 import (
 	context "golang.org/x/net/context"
@@ -211,7 +211,7 @@ func (*Test_Nested) ProtoMessage()               {}
 func (*Test_Nested) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{1, 1} }
 
 var E_Test_Nested_Fooblez = &proto.ExtensionDesc{
-	ExtendedType:  (*google_protobuf.MessageOptions)(nil),
+	ExtendedType:  (*google_protobuf1.MessageOptions)(nil),
 	ExtensionType: (*int32)(nil),
 	Field:         20003,
 	Name:          "foo.bar.Test.Nested.fooblez",
@@ -338,7 +338,7 @@ func (m *Validator_Permission) GetEntity() string {
 }
 
 var E_Label = &proto.ExtensionDesc{
-	ExtendedType:  (*google_protobuf.ExtensionRangeOptions)(nil),
+	ExtendedType:  (*google_protobuf1.ExtensionRangeOptions)(nil),
 	ExtensionType: (*string)(nil),
 	Field:         20000,
 	Name:          "foo.bar.label",
@@ -347,7 +347,7 @@ var E_Label = &proto.ExtensionDesc{
 }
 
 var E_Rept = &proto.ExtensionDesc{
-	ExtendedType:  (*google_protobuf.MessageOptions)(nil),
+	ExtendedType:  (*google_protobuf1.MessageOptions)(nil),
 	ExtensionType: ([]*Test)(nil),
 	Field:         20002,
 	Name:          "foo.bar.rept",
@@ -356,7 +356,7 @@ var E_Rept = &proto.ExtensionDesc{
 }
 
 var E_Eee = &proto.ExtensionDesc{
-	ExtendedType:  (*google_protobuf.MessageOptions)(nil),
+	ExtendedType:  (*google_protobuf1.MessageOptions)(nil),
 	ExtensionType: (*Test_Nested__NestedNested_EEE)(nil),
 	Field:         20010,
 	Name:          "foo.bar.eee",
@@ -365,7 +365,7 @@ var E_Eee = &proto.ExtensionDesc{
 }
 
 var E_A = &proto.ExtensionDesc{
-	ExtendedType:  (*google_protobuf.MessageOptions)(nil),
+	ExtendedType:  (*google_protobuf1.MessageOptions)(nil),
 	ExtensionType: (*Another)(nil),
 	Field:         20020,
 	Name:          "foo.bar.a",
@@ -374,7 +374,7 @@ var E_A = &proto.ExtensionDesc{
 }
 
 var E_Validator = &proto.ExtensionDesc{
-	ExtendedType:  (*google_protobuf.MethodOptions)(nil),
+	ExtendedType:  (*google_protobuf1.MethodOptions)(nil),
 	ExtensionType: (*Validator)(nil),
 	Field:         12345,
 	Name:          "foo.bar.validator",

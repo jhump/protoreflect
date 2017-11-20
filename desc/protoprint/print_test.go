@@ -90,8 +90,8 @@ func checkFile(t *testing.T, pr *Printer, fd *desc.FileDescriptor, goldenFile st
 }
 
 func TestParseAndPrintPreservesAsMuchAsPossible(t *testing.T) {
-	pa := protoparse.Parser{IncludeSourceCodeInfo: true}
-	fds, err := pa.ParseFiles("../../internal/testprotos/desc_test_comments.proto")
+	pa := protoparse.Parser{ImportPaths: []string{"../../internal/testprotos"}, IncludeSourceCodeInfo: true}
+	fds, err := pa.ParseFiles("desc_test_comments.proto")
 	testutil.Ok(t, err)
 	fd := fds[0]
 	checkFile(t, &Printer{}, fd, "test-preserve-comments.proto")
