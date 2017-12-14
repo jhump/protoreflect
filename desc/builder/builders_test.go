@@ -602,149 +602,147 @@ func checkDescriptors(t *testing.T, d1, d2 desc.Descriptor) {
 }
 
 func TestAddRemoveMoveBuilders(t *testing.T) {
+	// add field to one-of
+	fld1 := NewField("foo", FieldTypeInt32())
+	oo1 := NewOneOf("oofoo")
+	oo1.AddChoice(fld1)
+	checkChildren(t, oo1, fld1)
+	testutil.Eq(t, oo1.GetChoice("foo"), fld1)
 
-	t.Run("add", func(t *testing.T) {
-		// add field to one-of
-		fld1 := NewField("foo", FieldTypeInt32())
-		oo1 := NewOneOf("oofoo")
-		oo1.AddChoice(fld1)
-		checkChildren(t, oo1, fld1)
-		testutil.Eq(t, oo1.GetChoice("foo"), fld1)
+	// add one-of w/ field to a message
+	msg1 := NewMessage("foo")
+	msg1.AddOneOf(oo1)
+	checkChildren(t, msg1, oo1)
+	testutil.Eq(t, msg1.GetOneOf("oofoo"), oo1)
+	// field remains unchanged
+	testutil.Eq(t, fld1.GetParent(), oo1)
+	testutil.Eq(t, oo1.GetChoice("foo"), fld1)
+	// field also now registered with msg1
+	testutil.Eq(t, msg1.GetField("foo"), fld1)
 
-		// add one-of w/ field to a message
-		msg1 := NewMessage("foo")
-		msg1.AddOneOf(oo1)
-		checkChildren(t, msg1, oo1)
-		testutil.Eq(t, msg1.GetOneOf("oofoo"), oo1)
-		// field remains unchanged
-		testutil.Eq(t, fld1.GetParent(), oo1)
-		testutil.Eq(t, oo1.GetChoice("foo"), fld1)
-		// field also now registered with msg1
-		testutil.Eq(t, msg1.GetField("foo"), fld1)
+	// add empty one-of to message
+	oo2 := NewOneOf("oobar")
+	msg1.AddOneOf(oo2)
+	checkChildren(t, msg1, oo1, oo2)
+	testutil.Eq(t, msg1.GetOneOf("oobar"), oo2)
+	// now add field to that one-of
+	fld2 := NewField("bar", FieldTypeInt32())
+	oo2.AddChoice(fld2)
+	checkChildren(t, oo2, fld2)
+	testutil.Eq(t, oo2.GetChoice("bar"), fld2)
+	// field also now registered with msg1
+	testutil.Eq(t, msg1.GetField("bar"), fld2)
 
-		// add empty one-of to message
-		oo2 := NewOneOf("oobar")
-		msg1.AddOneOf(oo2)
-		checkChildren(t, msg1, oo1, oo2)
-		testutil.Eq(t, msg1.GetOneOf("oobar"), oo2)
-		// now add field to that one-of
-		fld2 := NewField("bar", FieldTypeInt32())
-		oo2.AddChoice(fld2)
-		checkChildren(t, oo2, fld2)
-		testutil.Eq(t, oo2.GetChoice("bar"), fld2)
-		// field also now registered with msg1
-		testutil.Eq(t, msg1.GetField("bar"), fld2)
+	// add fails due to name collisions
+	fld1 = NewField("foo", FieldTypeInt32())
+	err := oo1.TryAddChoice(fld1)
+	checkFailedAdd(t, err, oo1, fld1, "already contains field")
+	fld2 = NewField("bar", FieldTypeInt32())
+	err = msg1.TryAddField(fld2)
+	checkFailedAdd(t, err, msg1, fld2, "already contains element")
+	msg2 := NewMessage("oofoo")
+	// name collision can be different type
+	// (here, nested message conflicts with a one-of)
+	err = msg1.TryAddNestedMessage(msg2)
+	checkFailedAdd(t, err, msg1, msg2, "already contains element")
 
-		// add fails due to name collisions
-		fld1 = NewField("foo", FieldTypeInt32())
-		err := oo1.TryAddChoice(fld1)
-		checkFailedAdd(t, err, oo1, fld1, "already contains field")
-		fld2 = NewField("bar", FieldTypeInt32())
-		err = msg1.TryAddField(fld2)
-		checkFailedAdd(t, err, msg1, fld2, "already contains element")
-		msg2 := NewMessage("oofoo")
-		// name collision can be different type
-		// (here, nested message conflicts with a one-of)
-		err = msg1.TryAddNestedMessage(msg2)
-		checkFailedAdd(t, err, msg1, msg2, "already contains element")
+	msg2 = NewMessage("baz")
+	msg1.AddNestedMessage(msg2)
+	checkChildren(t, msg1, oo1, oo2, msg2)
+	testutil.Eq(t, msg1.GetNestedMessage("baz"), msg2)
 
-		msg2 = NewMessage("baz")
-		msg1.AddNestedMessage(msg2)
-		checkChildren(t, msg1, oo1, oo2, msg2)
-		testutil.Eq(t, msg1.GetNestedMessage("baz"), msg2)
+	// can't add extension, group, or map fields to one-of
+	ext1 := NewExtension("abc", 123, FieldTypeInt32(), msg1)
+	err = oo1.TryAddChoice(ext1)
+	checkFailedAdd(t, err, oo1, ext1, "is an extension, not a regular field")
+	err = msg1.TryAddField(ext1)
+	checkFailedAdd(t, err, msg1, ext1, "is an extension, not a regular field")
+	mapField := NewMapField("abc", FieldTypeInt32(), FieldTypeString())
+	err = oo1.TryAddChoice(mapField)
+	checkFailedAdd(t, err, oo1, mapField, "cannot add a group or map field")
+	groupMsg := NewMessage("Group")
+	groupField := NewGroupField(groupMsg)
+	err = oo1.TryAddChoice(groupField)
+	checkFailedAdd(t, err, oo1, groupField, "cannot add a group or map field")
+	// adding map and group to msg succeeds
+	msg1.AddField(groupField)
+	msg1.AddField(mapField)
+	checkChildren(t, msg1, oo1, oo2, msg2, groupField, mapField)
+	// messages associated with map and group fields are not children of the
+	// message, but are in its scope and accessible via GetNestedMessage
+	testutil.Eq(t, msg1.GetNestedMessage("Group"), groupMsg)
+	testutil.Eq(t, msg1.GetNestedMessage("AbcEntry"), mapField.GetType().localMsgType)
 
-		// can't add extension, group, or map fields to one-of
-		ext1 := NewExtension("abc", 123, FieldTypeInt32(), msg1)
-		err = oo1.TryAddChoice(ext1)
-		checkFailedAdd(t, err, oo1, ext1, "is an extension, not a regular field")
-		err = msg1.TryAddField(ext1)
-		checkFailedAdd(t, err, msg1, ext1, "is an extension, not a regular field")
-		mapField := NewMapField("abc", FieldTypeInt32(), FieldTypeString())
-		err = oo1.TryAddChoice(mapField)
-		checkFailedAdd(t, err, oo1, mapField, "cannot add a group or map field")
-		groupMsg := NewMessage("Group")
-		groupField := NewGroupField(groupMsg)
-		err = oo1.TryAddChoice(groupField)
-		checkFailedAdd(t, err, oo1, groupField, "cannot add a group or map field")
-		// adding map and group to msg succeeds
-		msg1.AddField(groupField)
-		msg1.AddField(mapField)
-		checkChildren(t, msg1, oo1, oo2, msg2, groupField, mapField)
-		// messages associated with map and group fields are not children of the
-		// message, but are in its scope and accessible via GetNestedMessage
-		testutil.Eq(t, msg1.GetNestedMessage("Group"), groupMsg)
-		testutil.Eq(t, msg1.GetNestedMessage("AbcEntry"), mapField.GetType().localMsgType)
+	// adding extension to message
+	ext2 := NewExtension("xyz", 234, FieldTypeInt32(), msg1)
+	msg1.AddNestedExtension(ext2)
+	checkChildren(t, msg1, oo1, oo2, msg2, groupField, mapField, ext2)
+	err = msg1.TryAddNestedExtension(ext1) // name collision
+	checkFailedAdd(t, err, msg1, ext1, "already contains element")
+	fld3 := NewField("ijk", FieldTypeString())
+	err = msg1.TryAddNestedExtension(fld3)
+	checkFailedAdd(t, err, msg1, fld3, "is not an extension")
 
-		// adding extension to message
-		ext2 := NewExtension("xyz", 234, FieldTypeInt32(), msg1)
-		msg1.AddNestedExtension(ext2)
-		checkChildren(t, msg1, oo1, oo2, msg2, groupField, mapField, ext2)
-		err = msg1.TryAddNestedExtension(ext1) // name collision
-		checkFailedAdd(t, err, msg1, ext1, "already contains element")
-		fld3 := NewField("ijk", FieldTypeString())
-		err = msg1.TryAddNestedExtension(fld3)
-		checkFailedAdd(t, err, msg1, fld3, "is not an extension")
+	// add enum values to enum
+	enumVal1 := NewEnumValue("A")
+	enum1 := NewEnum("bazel")
+	enum1.AddValue(enumVal1)
+	checkChildren(t, enum1, enumVal1)
+	testutil.Eq(t, enum1.GetValue("A"), enumVal1)
+	enumVal2 := NewEnumValue("B")
+	enum1.AddValue(enumVal2)
+	checkChildren(t, enum1, enumVal1, enumVal2)
+	testutil.Eq(t, enum1.GetValue("B"), enumVal2)
+	// fail w/ name collision
+	enumVal3 := NewEnumValue("B")
+	err = enum1.TryAddValue(enumVal3)
+	checkFailedAdd(t, err, enum1, enumVal3, "already contains value")
 
-		// add enum values to enum
-		enumVal1 := NewEnumValue("A")
-		enum1 := NewEnum("bazel")
-		enum1.AddValue(enumVal1)
-		checkChildren(t, enum1, enumVal1)
-		testutil.Eq(t, enum1.GetValue("A"), enumVal1)
-		enumVal2 := NewEnumValue("B")
-		enum1.AddValue(enumVal2)
-		checkChildren(t, enum1, enumVal1, enumVal2)
-		testutil.Eq(t, enum1.GetValue("B"), enumVal2)
-		// fail w/ name collision
-		enumVal3 := NewEnumValue("B")
-		err = enum1.TryAddValue(enumVal3)
-		checkFailedAdd(t, err, enum1, enumVal3, "already contains value")
+	msg2.AddNestedEnum(enum1)
+	checkChildren(t, msg2, enum1)
+	testutil.Eq(t, msg2.GetNestedEnum("bazel"), enum1)
+	ext3 := NewExtension("bazel", 987, FieldTypeString(), msg2)
+	err = msg2.TryAddNestedExtension(ext3)
+	checkFailedAdd(t, err, msg2, ext3, "already contains element")
 
-		msg2.AddNestedEnum(enum1)
-		checkChildren(t, msg2, enum1)
-		testutil.Eq(t, msg2.GetNestedEnum("bazel"), enum1)
-		ext3 := NewExtension("bazel", 987, FieldTypeString(), msg2)
-		err = msg2.TryAddNestedExtension(ext3)
-		checkFailedAdd(t, err, msg2, ext3, "already contains element")
+	// services and methods
+	mtd1 := NewMethod("foo", RpcTypeMessage(msg1, false), RpcTypeMessage(msg1, false))
+	svc1 := NewService("FooService")
+	svc1.AddMethod(mtd1)
+	checkChildren(t, svc1, mtd1)
+	testutil.Eq(t, svc1.GetMethod("foo"), mtd1)
+	mtd2 := NewMethod("foo", RpcTypeMessage(msg1, false), RpcTypeMessage(msg1, false))
+	err = svc1.TryAddMethod(mtd2)
+	checkFailedAdd(t, err, svc1, mtd2, "already contains method")
 
-		// services and methods
-		mtd1 := NewMethod("foo", RpcTypeMessage(msg1, false), RpcTypeMessage(msg1, false))
-		svc1 := NewService("FooService")
-		svc1.AddMethod(mtd1)
-		checkChildren(t, svc1, mtd1)
-		testutil.Eq(t, svc1.GetMethod("foo"), mtd1)
-		mtd2 := NewMethod("foo", RpcTypeMessage(msg1, false), RpcTypeMessage(msg1, false))
-		err = svc1.TryAddMethod(mtd2)
-		checkFailedAdd(t, err, svc1, mtd2, "already contains method")
+	// finally, test adding things to  a file
+	fb := NewFile("")
+	fb.AddMessage(msg1)
+	checkChildren(t, fb, msg1)
+	testutil.Eq(t, fb.GetMessage("foo"), msg1)
+	fb.AddService(svc1)
+	checkChildren(t, fb, msg1, svc1)
+	testutil.Eq(t, fb.GetService("FooService"), svc1)
+	enum2 := NewEnum("fizzle")
+	fb.AddEnum(enum2)
+	checkChildren(t, fb, msg1, svc1, enum2)
+	testutil.Eq(t, fb.GetEnum("fizzle"), enum2)
+	ext3 = NewExtension("foosball", 123, FieldTypeInt32(), msg1)
+	fb.AddExtension(ext3)
+	checkChildren(t, fb, msg1, svc1, enum2, ext3)
+	testutil.Eq(t, fb.GetExtension("foosball"), ext3)
 
-		// finally, test adding things to  a file
-		fb := NewFile("")
-		fb.AddMessage(msg1)
-		checkChildren(t, fb, msg1)
-		testutil.Eq(t, fb.GetMessage("foo"), msg1)
-		fb.AddService(svc1)
-		checkChildren(t, fb, msg1, svc1)
-		testutil.Eq(t, fb.GetService("FooService"), svc1)
-		enum2 := NewEnum("fizzle")
-		fb.AddEnum(enum2)
-		checkChildren(t, fb, msg1, svc1, enum2)
-		testutil.Eq(t, fb.GetEnum("fizzle"), enum2)
-		ext3 = NewExtension("foosball", 123, FieldTypeInt32(), msg1)
-		fb.AddExtension(ext3)
-		checkChildren(t, fb, msg1, svc1, enum2, ext3)
-		testutil.Eq(t, fb.GetExtension("foosball"), ext3)
+	// errors and name collisions
+	err = fb.TryAddExtension(fld3)
+	checkFailedAdd(t, err, fb, fld3, "is not an extension")
+	msg3 := NewMessage("fizzle")
+	err = fb.TryAddMessage(msg3)
+	checkFailedAdd(t, err, fb, msg3, "already contains element")
+	enum3 := NewEnum("foosball")
+	err = fb.TryAddEnum(enum3)
+	checkFailedAdd(t, err, fb, enum3, "already contains element")
 
-		// errors and name collisions
-		err = fb.TryAddExtension(fld3)
-		checkFailedAdd(t, err, fb, fld3, "is not an extension")
-		msg3 := NewMessage("fizzle")
-		err = fb.TryAddMessage(msg3)
-		checkFailedAdd(t, err, fb, msg3, "already contains element")
-		enum3 := NewEnum("foosball")
-		err = fb.TryAddEnum(enum3)
-		checkFailedAdd(t, err, fb, enum3, "already contains element")
-	})
-
+	// TODO: test moving and removing, too
 }
 
 func checkChildren(t *testing.T, parent Builder, children ...Builder) {
