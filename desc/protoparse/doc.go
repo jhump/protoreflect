@@ -2,10 +2,6 @@
 // into descriptors that can be used with other protoreflect packages, like
 // dynamic messages and dynamic GRPC clients.
 //
-// The file descriptors produced by this package do not include the
-// source_code_info field. As such, comments and location information (like
-// where in the file an element is declared) are not available (...yet!).
-//
 // This package links in other packages that include compiled descriptors for
 // the various "google/protobuf/*.proto" files that are included with protoc.
 // That way, like when invoking protoc, programs need not supply copies of these
