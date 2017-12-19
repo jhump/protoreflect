@@ -347,11 +347,11 @@ func TestJSONWellKnownType(t *testing.T) {
 	// right value and type (e.g. generated well-known-type, not dynamic message)
 	ts, ok := dm.GetFieldByNumber(1).(*timestamp.Timestamp)
 	testutil.Require(t, ok)
-	testutil.Eq(t, *wkts.StartTime, *ts)
+	testutil.Ceq(t, wkts.StartTime, ts, eqpm)
 
 	dur, ok := dm.GetFieldByNumber(2).(*duration.Duration)
 	testutil.Require(t, ok)
-	testutil.Eq(t, *wkts.Elapsed, *dur)
+	testutil.Ceq(t, wkts.Elapsed, dur, eqpm)
 
 	dbl, ok := dm.GetFieldByNumber(3).(*wrappers.DoubleValue)
 	testutil.Require(t, ok)
