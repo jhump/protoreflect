@@ -3,6 +3,7 @@ package grpcreflect
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"reflect"
 	"runtime"
 	"sync"
@@ -494,6 +495,12 @@ func (cr *Client) Reset() {
 func (cr *Client) resetLocked() {
 	if cr.stream != nil {
 		cr.stream.CloseSend()
+		for {
+			_, err := cr.stream.Recv()
+			if err == io.EOF || err != nil {
+				break
+			}
+		}
 		cr.stream = nil
 	}
 	if cr.cancel != nil {
