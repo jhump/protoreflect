@@ -494,6 +494,12 @@ func (cr *Client) Reset() {
 func (cr *Client) resetLocked() {
 	if cr.stream != nil {
 		cr.stream.CloseSend()
+		for {
+			// drain the stream, this covers io.EOF too
+			if _, err := cr.stream.Recv(); err != nil {
+				break
+			}
+		}
 		cr.stream = nil
 	}
 	if cr.cancel != nil {
