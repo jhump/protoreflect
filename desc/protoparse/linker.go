@@ -511,24 +511,22 @@ func isType(m proto.Message) bool {
 type scope func(string) (string, proto.Message)
 
 func fileScope(fd *dpb.FileDescriptorProto, l *linker) scope {
-	// we search symbols in this file, but also symbols in other files
-	// that have the same package as this file
-	pkg := fd.GetPackage()
+	// we search symbols in this file, but also symbols in other files that have
+	// the same package as this file or a "parent" package (in protobuf,
+	// packages are a hierarchy like C++ namespaces)
+	prefixes := internal.CreatePrefixList(fd.GetPackage())
 	return func(name string) (string, proto.Message) {
-		var n string
-		if pkg == "" {
-			n = name
-		} else {
-			n = pkg + "." + name
-		}
-		d := l.findSymbol(fd, n, false, map[*dpb.FileDescriptorProto]struct{}{})
-		if d != nil {
-			return n, d
-		}
-		// maybe name is already fully-qualified, just without a leading dot
-		d = l.findSymbol(fd, name, false, map[*dpb.FileDescriptorProto]struct{}{})
-		if d != nil {
-			return name, d
+		for _, prefix := range prefixes {
+			var n string
+			if prefix == "" {
+				n = name
+			} else {
+				n = prefix + "." + name
+			}
+			d := l.findSymbol(fd, n, false, map[*dpb.FileDescriptorProto]struct{}{})
+			if d != nil {
+				return n, d
+			}
 		}
 		return "", nil
 	}

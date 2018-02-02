@@ -1560,17 +1560,19 @@ func pathAsKey(path []int32) string {
 type scope func(string) Descriptor
 
 func fileScope(fd *FileDescriptor) scope {
-	// we search symbols in this file, but also symbols in other files
-	// that have the same package as this file
-	pkg := fd.proto.GetPackage()
+	// we search symbols in this file, but also symbols in other files that have
+	// the same package as this file or a "parent" package (in protobuf,
+	// packages are a hierarchy like C++ namespaces)
+	prefixes := CreatePrefixList(fd.proto.GetPackage())
 	return func(name string) Descriptor {
-		n := merge(pkg, name)
-		d := findSymbol(fd, n, false)
-		if d == nil {
-			// maybe name is already fully-qualified, just without a leading dot
-			d = findSymbol(fd, name, false)
+		for _, prefix := range prefixes {
+			n := merge(prefix, name)
+			d := findSymbol(fd, n, false)
+			if d != nil {
+				return d
+			}
 		}
-		return d
+		return nil
 	}
 }
 
