@@ -1562,7 +1562,7 @@ func (m *Message) mergeInto(pm proto.Message) error {
 			continue
 		}
 		oov := reflect.New(oop.Type.Elem())
-		f := oov.FieldByName(prop.Name)
+		f := oov.Elem().FieldByName(prop.Name)
 		mergeVal(reflect.ValueOf(v), f)
 		target.Field(oop.Field).Set(oov)
 	}
