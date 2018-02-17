@@ -15,13 +15,14 @@ case "${PROTOC_OS}" in
     exit 1
 esac
 
-rm -rf ./protoc
-mkdir -p protoc
-
-curl -L "https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${PROTOC_OS}-${PROTOC_ARCH}.zip" > protoc/protoc.zip
-cd ./protoc && unzip protoc.zip && cd ..
-
 PROTOC="./protoc/bin/protoc"
+
+if [ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc ${PROTOC_VERSION}" ]; then
+  rm -rf ./protoc
+  mkdir -p protoc
+  curl -L "https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${PROTOC_OS}-${PROTOC_ARCH}.zip" > protoc/protoc.zip
+  cd ./protoc && unzip protoc.zip && cd ..
+fi
 
 # Output directory will effectively be GOPATH/src.
 outdir="../../../../.."
