@@ -18,9 +18,37 @@ import (
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	// link in the well-known-types that have a special JSON format
+	_ "github.com/golang/protobuf/ptypes/any"
+	_ "github.com/golang/protobuf/ptypes/duration"
+	_ "github.com/golang/protobuf/ptypes/empty"
+	_ "github.com/golang/protobuf/ptypes/struct"
+	_ "github.com/golang/protobuf/ptypes/timestamp"
+	_ "github.com/golang/protobuf/ptypes/wrappers"
 
 	"github.com/jhump/protoreflect/desc"
 )
+
+var wellKnownTypeNames = map[string]struct{}{
+	"google.protobuf.Any":       {},
+	"google.protobuf.Empty":     {},
+	"google.protobuf.Duration":  {},
+	"google.protobuf.Timestamp": {},
+	// struct.proto
+	"google.protobuf.Struct":    {},
+	"google.protobuf.Value":     {},
+	"google.protobuf.ListValue": {},
+	// wrappers.proto
+	"google.protobuf.DoubleValue": {},
+	"google.protobuf.FloatValue":  {},
+	"google.protobuf.Int64Value":  {},
+	"google.protobuf.UInt64Value": {},
+	"google.protobuf.Int32Value":  {},
+	"google.protobuf.UInt32Value": {},
+	"google.protobuf.BoolValue":   {},
+	"google.protobuf.StringValue": {},
+	"google.protobuf.BytesValue":  {},
+}
 
 func (m *Message) MarshalJSONPB(opts *jsonpb.Marshaler) ([]byte, error) {
 	var b indentBuffer
@@ -50,6 +78,10 @@ func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
 		newOpts := *opts
 		newOpts.AnyResolver = r
 		opts = &newOpts
+	}
+
+	if ok, err := marshalWellKnownType(m, b, opts); ok {
+		return err
 	}
 
 	err := b.WriteByte('{')
@@ -99,6 +131,26 @@ func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
 	}
 
 	return nil
+}
+
+func marshalWellKnownType(m *Message, b *indentBuffer, opts *jsonpb.Marshaler) (bool, error) {
+	fqn := m.md.GetFullyQualifiedName()
+	if _, ok := wellKnownTypeNames[fqn]; !ok {
+		return false, nil
+	}
+
+	msgType := proto.MessageType(fqn)
+	if msgType == nil {
+		// wtf?
+		panic(fmt.Sprintf("could not find registered message type for %q", fqn))
+	}
+
+	// convert dynamic message to well-known type and let jsonpb marshal it
+	msg := reflect.New(msgType.Elem()).Interface().(proto.Message)
+	if err := m.MergeInto(msg); err != nil {
+		return true, err
+	}
+	return true, opts.Marshal(b, msg)
 }
 
 func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts *jsonpb.Marshaler) error {
@@ -352,6 +404,10 @@ func (m *Message) UnmarshalJSON(js []byte) error {
 }
 
 func (m *Message) UnmarshalMergeJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
+	if ok, err := unmarshalWellKnownType(m, opts, js); ok {
+		return err
+	}
+
 	r := newJsReader(js)
 	err := m.unmarshalJson(r, opts)
 	if err != nil {
@@ -363,6 +419,32 @@ func (m *Message) UnmarshalMergeJSONPB(opts *jsonpb.Unmarshaler, js []byte) erro
 		return fmt.Errorf("Superfluous data found after JSON object: %q", s)
 	}
 	return nil
+}
+
+func unmarshalWellKnownType(m *Message, opts *jsonpb.Unmarshaler, js []byte) (bool, error) {
+	fqn := m.md.GetFullyQualifiedName()
+	if _, ok := wellKnownTypeNames[fqn]; !ok {
+		return false, nil
+	}
+
+	if r, changed := wrapResolver(opts.AnyResolver, m.mf, m.md.GetFile()); changed {
+		newOpts := *opts
+		newOpts.AnyResolver = r
+		opts = &newOpts
+	}
+
+	msgType := proto.MessageType(fqn)
+	if msgType == nil {
+		// wtf?
+		panic(fmt.Sprintf("could not find registered message type for %q", fqn))
+	}
+
+	// convert dynamic message to well-known type and let jsonpb unmarshal it
+	msg := reflect.New(msgType.Elem()).Interface().(proto.Message)
+	if err := m.MergeInto(msg); err != nil {
+		return true, err
+	}
+	return true, opts.Unmarshal(bytes.NewReader(js), msg)
 }
 
 func (m *Message) UnmarshalMergeJSON(js []byte) error {
