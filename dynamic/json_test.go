@@ -3,6 +3,7 @@ package dynamic
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"strings"
 	"testing"
 	"time"
@@ -407,6 +408,28 @@ func TestJSONWellKnownType(t *testing.T) {
 		testutil.Eq(t, wkts.Extras[i].TypeUrl, v.TypeUrl)
 		testutil.Eq(t, wkts.Extras[i].Value, v.Value)
 	}
+}
+
+func TestJSONWellKnownTypeFromFileDescriptorSet(t *testing.T) {
+	dur := &duration.Duration{Seconds: 30303, Nanos: 40404}
+
+	jsm := jsonpb.Marshaler{}
+	js, err := jsm.MarshalToString(dur)
+	testutil.Ok(t, err)
+
+	data, err := ioutil.ReadFile("../internal/testprotos/duration.protoset")
+	testutil.Ok(t, err)
+	fds := &descriptor.FileDescriptorSet{}
+	err = proto.Unmarshal(data, fds)
+	testutil.Ok(t, err)
+
+	fd, err := desc.CreateFileDescriptorFromSet(fds)
+	testutil.Ok(t, err)
+	md := fd.FindMessage("google.protobuf.Duration")
+	testutil.Neq(t, nil, md)
+	dm := NewMessage(md)
+	err = dm.UnmarshalJSON([]byte(js))
+	testutil.Ok(t, err)
 }
 
 func jsonTranslationParty(t *testing.T, msg proto.Message) {
