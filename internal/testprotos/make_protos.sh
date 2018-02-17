@@ -9,7 +9,7 @@ PROTOC_OS="$(uname -s)"
 PROTOC_ARCH="$(uname -m)"
 case "${PROTOC_OS}" in
   Darwin) PROTOC_OS="osx" ;;
-  Linux) PROTOC_OS=linux ;;
+  Linux) PROTOC_OS="linux" ;;
   *)
     echo "Invalid value for uname -s: ${PROTOC_OS}" >&2
     exit 1
