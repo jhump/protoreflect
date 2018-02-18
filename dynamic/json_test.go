@@ -411,25 +411,34 @@ func TestJSONWellKnownType(t *testing.T) {
 }
 
 func TestJSONWellKnownTypeFromFileDescriptorSet(t *testing.T) {
-	dur := &duration.Duration{Seconds: 30303, Nanos: 40404}
-
-	jsm := jsonpb.Marshaler{}
-	js, err := jsm.MarshalToString(dur)
-	testutil.Ok(t, err)
+	// TODO: generalize this so it tests all well-known types, not just duration
 
 	data, err := ioutil.ReadFile("../internal/testprotos/duration.protoset")
 	testutil.Ok(t, err)
 	fds := &descriptor.FileDescriptorSet{}
 	err = proto.Unmarshal(data, fds)
 	testutil.Ok(t, err)
-
 	fd, err := desc.CreateFileDescriptorFromSet(fds)
 	testutil.Ok(t, err)
 	md := fd.FindMessage("google.protobuf.Duration")
 	testutil.Neq(t, nil, md)
+
+	dur := &duration.Duration{Seconds: 30303, Nanos: 40404}
+
+	// marshal duration to JSON
+	jsm := jsonpb.Marshaler{}
+	js, err := jsm.MarshalToString(dur)
+	testutil.Ok(t, err)
+
+	// make sure we can unmarshal it
 	dm := NewMessage(md)
 	err = dm.UnmarshalJSON([]byte(js))
 	testutil.Ok(t, err)
+
+	// and then marshal it again with same output as original
+	dynJs, err := jsm.MarshalToString(dm)
+	testutil.Ok(t, err)
+	testutil.Eq(t, js, dynJs)
 }
 
 func jsonTranslationParty(t *testing.T, msg proto.Message) {

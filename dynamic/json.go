@@ -439,12 +439,12 @@ func unmarshalWellKnownType(m *Message, opts *jsonpb.Unmarshaler, js []byte) (bo
 		panic(fmt.Sprintf("could not find registered message type for %q", fqn))
 	}
 
-	// convert dynamic message to well-known type and let jsonpb unmarshal it
+	// unmarshal into well-known type and then convert to dynamic message
 	msg := reflect.New(msgType.Elem()).Interface().(proto.Message)
-	if err := m.MergeInto(msg); err != nil {
+	if err := opts.Unmarshal(bytes.NewReader(js), msg); err != nil {
 		return true, err
 	}
-	return true, opts.Unmarshal(bytes.NewReader(js), msg)
+	return true, m.MergeFrom(msg)
 }
 
 func (m *Message) UnmarshalMergeJSON(js []byte) error {
