@@ -3,6 +3,7 @@ package grpcreflect
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"reflect"
 	"runtime"
 	"sync"
@@ -454,6 +455,10 @@ func (cr *Client) doSendLocked(retry bool, req *rpb.ServerReflectionRequest) (*r
 	}
 
 	if err := cr.stream.Send(req); err != nil {
+		if err == io.EOF {
+			// if send returns EOF, must call Recv to get real underlying error
+			_, err = cr.stream.Recv()
+		}
 		cr.resetLocked()
 		if retry {
 			return cr.doSendLocked(false, req)
