@@ -411,34 +411,69 @@ func TestJSONWellKnownType(t *testing.T) {
 }
 
 func TestJSONWellKnownTypeFromFileDescriptorSet(t *testing.T) {
-	// TODO: generalize this so it tests all well-known types, not just duration
+	for _, tt := range []struct {
+		TestName     string
+		ProtosetPath string
+		TypeName     string
+		Message      proto.Message
+	}{
+		{
+			TestName:     "duration_nanos",
+			ProtosetPath: "../internal/testprotos/duration.protoset",
+			TypeName:     "google.protobuf.Duration",
+			Message:      &duration.Duration{Seconds: 30303, Nanos: 40404},
+		},
+		{
+			TestName:     "duration",
+			ProtosetPath: "../internal/testprotos/duration.protoset",
+			TypeName:     "google.protobuf.Duration",
+			Message:      &duration.Duration{Seconds: 30303},
+		},
+		{
+			TestName:     "has_wkt_nanos",
+			ProtosetPath: "../internal/testprotos/desc_test_wkt.protoset",
+			TypeName:     "testprotos.HasWKT",
+			Message: &testprotos.HasWKT{
+				Duration: &duration.Duration{Seconds: 30303, Nanos: 40404},
+			},
+		},
+		{
+			TestName:     "has_wkt",
+			ProtosetPath: "../internal/testprotos/desc_test_wkt.protoset",
+			TypeName:     "testprotos.HasWKT",
+			Message: &testprotos.HasWKT{
+				Duration: &duration.Duration{Seconds: 10},
+			},
+		},
+	} {
+		t.Run(tt.TestName, func(t *testing.T) {
+			data, err := ioutil.ReadFile(tt.ProtosetPath)
+			testutil.Ok(t, err)
+			fds := &descriptor.FileDescriptorSet{}
+			err = proto.Unmarshal(data, fds)
+			testutil.Ok(t, err)
+			fd, err := desc.CreateFileDescriptorFromSet(fds)
+			testutil.Ok(t, err)
+			md := fd.FindMessage(tt.TypeName)
+			testutil.Neq(t, nil, md)
 
-	data, err := ioutil.ReadFile("../internal/testprotos/duration.protoset")
-	testutil.Ok(t, err)
-	fds := &descriptor.FileDescriptorSet{}
-	err = proto.Unmarshal(data, fds)
-	testutil.Ok(t, err)
-	fd, err := desc.CreateFileDescriptorFromSet(fds)
-	testutil.Ok(t, err)
-	md := fd.FindMessage("google.protobuf.Duration")
-	testutil.Neq(t, nil, md)
+			// marshal duration to JSON
+			jsm := jsonpb.Marshaler{}
+			js, err := jsm.MarshalToString(tt.Message)
+			testutil.Ok(t, err)
+			fmt.Println(js)
 
-	dur := &duration.Duration{Seconds: 30303, Nanos: 40404}
+			// make sure we can unmarshal it
+			dm := NewMessage(md)
+			err = dm.UnmarshalJSON([]byte(js))
+			testutil.Ok(t, err)
 
-	// marshal duration to JSON
-	jsm := jsonpb.Marshaler{}
-	js, err := jsm.MarshalToString(dur)
-	testutil.Ok(t, err)
-
-	// make sure we can unmarshal it
-	dm := NewMessage(md)
-	err = dm.UnmarshalJSON([]byte(js))
-	testutil.Ok(t, err)
-
-	// and then marshal it again with same output as original
-	dynJs, err := jsm.MarshalToString(dm)
-	testutil.Ok(t, err)
-	testutil.Eq(t, js, dynJs)
+			// and then marshal it again with same output as original
+			dynJs, err := jsm.MarshalToString(dm)
+			testutil.Ok(t, err)
+			testutil.Eq(t, js, dynJs)
+		})
+	}
 }
 
 func jsonTranslationParty(t *testing.T, msg proto.Message) {

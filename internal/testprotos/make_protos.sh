@@ -36,4 +36,6 @@ ${PROTOC} --descriptor_set_out=./desc_test_comments.protoset --include_source_in
 ${PROTOC} --descriptor_set_out=./desc_test_complex.protoset -I. desc_test_complex.proto
 ${PROTOC} --descriptor_set_out=./desc_test_complex_source_info.protoset --include_source_info --include_imports -I. desc_test_complex.proto
 ${PROTOC} --descriptor_set_out=./descriptor.protoset --include_source_info --include_imports -I../../../../ ../../../../golang/protobuf/protoc-gen-go/descriptor/descriptor.proto
-${PROTOC} --descriptor_set_out=./duration.protoset -I../../../../ ../../../../golang/protobuf/ptypes/duration/duration.proto
+
+${PROTOC} --descriptor_set_out=./duration.protoset -I protoc/include google/protobuf/duration.proto
+${PROTOC} --descriptor_set_out=./desc_test_wkt.protoset --include_imports -I protoc/include -I . desc_test_wkt.proto

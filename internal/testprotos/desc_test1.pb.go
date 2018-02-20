@@ -14,6 +14,7 @@ It is generated from these files:
 	desc_test_options.proto
 	desc_test_proto3.proto
 	desc_test_wellknowntypes.proto
+	desc_test_wkt.proto
 
 It has these top-level messages:
 	TestMessage
@@ -39,6 +40,7 @@ It has these top-level messages:
 	TestRequest
 	TestResponse
 	TestWellKnownTypes
+	HasWKT
 */
 package testprotos
 

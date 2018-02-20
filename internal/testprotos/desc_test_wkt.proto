@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
+package testprotos;
+
+import "google/protobuf/duration.proto";
+
+message HasWKT {
+  google.protobuf.Duration duration = 1;
+}
