@@ -1,0 +1,12 @@
+
+ó
+google/protobuf/duration.protogoogle.protobuf":
+Duration
+seconds (Rseconds
+nanos (RnanosB|
+com.google.protobufBDurationProtoPZ*github.com/golang/protobuf/ptypes/durationø¢GPBªGoogle.Protobuf.WellKnownTypesbproto3
+¿
+desc_test_wkt.proto
+testprotosgoogle/protobuf/duration.proto"?
+HasWKT5
+duration (2.google.protobuf.DurationRdurationB3Z1github.com/jhump/protoreflect/internal/testprotosbproto3
