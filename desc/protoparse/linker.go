@@ -281,7 +281,7 @@ func (l *linker) resolveEnumTypes(r *parseResult, fd *dpb.FileDescriptorProto, p
 
 func (l *linker) resolveMessageTypes(r *parseResult, fd *dpb.FileDescriptorProto, prefix string, md *dpb.DescriptorProto, scopes []scope) error {
 	fqn := prefix + md.GetName()
-	scope := messageScope(fqn, l.descriptorPool[fd])
+	scope := messageScope(fqn, isProto3(fd), l.descriptorPool[fd])
 	scopes = append(scopes, scope)
 	prefix = fqn + "."
 
@@ -328,7 +328,7 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 	node := r.getFieldNode(fld)
 	elemType := "field"
 	if fld.GetExtendee() != "" {
-		fqn, dsc := l.resolve(fd, fld.GetExtendee(), isMessage, scopes)
+		fqn, dsc, _ := l.resolve(fd, fld.GetExtendee(), isMessage, scopes)
 		if dsc == nil {
 			return ErrorWithSourcePos{Pos: node.fieldExtendee().start(), Underlying: fmt.Errorf("unknown extendee type %s", fld.GetExtendee())}
 		}
@@ -374,7 +374,7 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 		return nil
 	}
 
-	fqn, dsc := l.resolve(fd, fld.GetTypeName(), isType, scopes)
+	fqn, dsc, proto3 := l.resolve(fd, fld.GetTypeName(), isType, scopes)
 	if dsc == nil {
 		return ErrorWithSourcePos{Pos: node.fieldType().start(), Underlying: fmt.Errorf("%s: unknown type %s", scope, fld.GetTypeName())}
 	}
@@ -382,8 +382,12 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 	case *dpb.DescriptorProto:
 		fld.TypeName = proto.String("." + fqn)
 	case *dpb.EnumDescriptorProto:
+		if fld.GetExtendee() == "" && isProto3(fd) && !proto3 {
+			// fields in a proto3 message cannot refer to proto2 enums
+			return ErrorWithSourcePos{Pos: node.fieldType().start(), Underlying: fmt.Errorf("%s: cannot use proto2 enum %s in a proto3 message", scope, fld.GetTypeName())}
+		}
 		fld.TypeName = proto.String("." + fqn)
-		// we tentatively set type to message, but now we know it's actually an enum
+		// the type was tentatively set to message, but now we know it's actually an enum
 		fld.Type = dpb.FieldDescriptorProto_TYPE_ENUM.Enum()
 	default:
 		otherType := descriptorType(dsc)
@@ -408,7 +412,7 @@ func (l *linker) resolveServiceTypes(r *parseResult, fd *dpb.FileDescriptorProto
 		}
 		scope := fmt.Sprintf("method %s.%s", thisName, mtd.GetName())
 		node := r.getMethodNode(mtd)
-		fqn, dsc := l.resolve(fd, mtd.GetInputType(), isMessage, scopes)
+		fqn, dsc, _ := l.resolve(fd, mtd.GetInputType(), isMessage, scopes)
 		if dsc == nil {
 			return ErrorWithSourcePos{Pos: node.getInputType().start(), Underlying: fmt.Errorf("%s: unknown request type %s", scope, mtd.GetInputType())}
 		}
@@ -418,7 +422,7 @@ func (l *linker) resolveServiceTypes(r *parseResult, fd *dpb.FileDescriptorProto
 		}
 		mtd.InputType = proto.String("." + fqn)
 
-		fqn, dsc = l.resolve(fd, mtd.GetOutputType(), isMessage, scopes)
+		fqn, dsc, _ = l.resolve(fd, mtd.GetOutputType(), isMessage, scopes)
 		if dsc == nil {
 			return ErrorWithSourcePos{Pos: node.getOutputType().start(), Underlying: fmt.Errorf("%s: unknown response type %s", scope, mtd.GetOutputType())}
 		}
@@ -440,7 +444,7 @@ func (l *linker) resolveOptions(r *parseResult, fd *dpb.FileDescriptorProto, ele
 		for _, nm := range opt.Name {
 			if nm.GetIsExtension() {
 				node := r.getOptionNamePartNode(nm)
-				fqn, dsc := l.resolve(fd, nm.GetNamePart(), isField, scopes)
+				fqn, dsc, _ := l.resolve(fd, nm.GetNamePart(), isField, scopes)
 				if dsc == nil {
 					return ErrorWithSourcePos{Pos: node.start(), Underlying: fmt.Errorf("%sunknown extension %s", scope, nm.GetNamePart())}
 				}
@@ -457,35 +461,37 @@ func (l *linker) resolveOptions(r *parseResult, fd *dpb.FileDescriptorProto, ele
 	return nil
 }
 
-func (l *linker) resolve(fd *dpb.FileDescriptorProto, name string, allowed func(proto.Message) bool, scopes []scope) (string, proto.Message) {
+func (l *linker) resolve(fd *dpb.FileDescriptorProto, name string, allowed func(proto.Message) bool, scopes []scope) (fqn string, element proto.Message, proto3 bool) {
 	if strings.HasPrefix(name, ".") {
 		// already fully-qualified
-		d := l.findSymbol(fd, name[1:], false, map[*dpb.FileDescriptorProto]struct{}{})
+		d, proto3 := l.findSymbol(fd, name[1:], false, map[*dpb.FileDescriptorProto]struct{}{})
 		if d != nil {
-			return name[1:], d
+			return name[1:], d, proto3
 		}
 	} else {
 		// unqualified, so we look in the enclosing (last) scope first and move
 		// towards outermost (first) scope, trying to resolve the symbol
 		var bestGuess proto.Message
 		var bestGuessFqn string
+		var bestGuessProto3 bool
 		for i := len(scopes) - 1; i >= 0; i-- {
-			fqn, d := scopes[i](name)
+			fqn, d, proto3 := scopes[i](name)
 			if d != nil {
 				if allowed(d) {
-					return fqn, d
+					return fqn, d, proto3
 				} else if bestGuess == nil {
 					bestGuess = d
 					bestGuessFqn = fqn
+					bestGuessProto3 = proto3
 				}
 			}
 		}
 		// we return best guess, even though it was not an allowed kind of
 		// descriptor, so caller can print a better error message (e.g.
 		// indicating that the name was found but that it's the wrong type)
-		return bestGuessFqn, bestGuess
+		return bestGuessFqn, bestGuess, bestGuessProto3
 	}
-	return "", nil
+	return "", nil, false
 }
 
 func isField(m proto.Message) bool {
@@ -508,14 +514,14 @@ func isType(m proto.Message) bool {
 
 // scope represents a lexical scope in a proto file in which messages and enums
 // can be declared.
-type scope func(string) (string, proto.Message)
+type scope func(symbol string) (fqn string, element proto.Message, proto3 bool)
 
 func fileScope(fd *dpb.FileDescriptorProto, l *linker) scope {
 	// we search symbols in this file, but also symbols in other files that have
 	// the same package as this file or a "parent" package (in protobuf,
 	// packages are a hierarchy like C++ namespaces)
 	prefixes := internal.CreatePrefixList(fd.GetPackage())
-	return func(name string) (string, proto.Message) {
+	return func(name string) (string, proto.Message, bool) {
 		for _, prefix := range prefixes {
 			var n string
 			if prefix == "" {
@@ -523,34 +529,34 @@ func fileScope(fd *dpb.FileDescriptorProto, l *linker) scope {
 			} else {
 				n = prefix + "." + name
 			}
-			d := l.findSymbol(fd, n, false, map[*dpb.FileDescriptorProto]struct{}{})
+			d, proto3 := l.findSymbol(fd, n, false, map[*dpb.FileDescriptorProto]struct{}{})
 			if d != nil {
-				return n, d
+				return n, d, proto3
 			}
 		}
-		return "", nil
+		return "", nil, false
 	}
 }
 
-func messageScope(messageName string, filePool map[string]proto.Message) scope {
-	return func(name string) (string, proto.Message) {
+func messageScope(messageName string, proto3 bool, filePool map[string]proto.Message) scope {
+	return func(name string) (string, proto.Message, bool) {
 		n := messageName + "." + name
 		if d, ok := filePool[n]; ok {
-			return n, d
+			return n, d, proto3
 		}
-		return "", nil
+		return "", nil, false
 	}
 }
 
-func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, name string, public bool, checked map[*dpb.FileDescriptorProto]struct{}) proto.Message {
+func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, name string, public bool, checked map[*dpb.FileDescriptorProto]struct{}) (element proto.Message, proto3 bool) {
 	if _, ok := checked[fd]; ok {
 		// already checked this one
-		return nil
+		return nil, false
 	}
 	checked[fd] = struct{}{}
 	d := l.descriptorPool[fd][name]
 	if d != nil {
-		return d
+		return d, isProto3(fd)
 	}
 
 	// When public = false, we are searching only directly imported symbols. But we
@@ -563,8 +569,8 @@ func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, name string, public boo
 				// we'll catch this error later
 				continue
 			}
-			if d = l.findSymbol(depres.fd, name, true, checked); d != nil {
-				return d
+			if d, proto3 := l.findSymbol(depres.fd, name, true, checked); d != nil {
+				return d, proto3
 			}
 		}
 	} else {
@@ -574,13 +580,17 @@ func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, name string, public boo
 				// we'll catch this error later
 				continue
 			}
-			if d = l.findSymbol(depres.fd, name, true, checked); d != nil {
-				return d
+			if d, proto3 := l.findSymbol(depres.fd, name, true, checked); d != nil {
+				return d, proto3
 			}
 		}
 	}
 
-	return nil
+	return nil, false
+}
+
+func isProto3(fd *dpb.FileDescriptorProto) bool {
+	return fd.GetSyntax() == "proto3"
 }
 
 func (l *linker) createdLinkedDescriptors() (map[string]*desc.FileDescriptor, error) {
