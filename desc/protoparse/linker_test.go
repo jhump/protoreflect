@@ -332,8 +332,58 @@ func TestLinkerValidation(t *testing.T) {
 		_, err := Parser{Accessor: acc}.ParseFiles(names...)
 		if err == nil {
 			t.Errorf("case %d: expecting validation error %q; instead got no error", i, tc.errMsg)
-		} else if !strings.Contains(err.Error(), tc.errMsg) {
+		} else if err.Error() != tc.errMsg {
 			t.Errorf("case %d: expecting validation error %q; instead got: %q", i, tc.errMsg, err)
+		}
+	}
+}
+
+func TestProto3Enums(t *testing.T) {
+	file1 := `syntax = "<SYNTAX>"; enum bar { A = 0; B = 1; }`
+	file2 := `syntax = "<SYNTAX>"; import "f1.proto"; message foo { <LABEL> bar bar = 1; }`
+	getFileContents := func(file, syntax string) string {
+		contents := strings.Replace(file, "<SYNTAX>", syntax, 1)
+		label := ""
+		if syntax == "proto2" {
+			label = "optional"
+		}
+		return strings.Replace(contents, "<LABEL>", label, 1)
+	}
+
+	syntaxOptions := []string{"proto2", "proto3"}
+	for _, o1 := range syntaxOptions {
+		fc1 := getFileContents(file1, o1)
+
+		for _, o2 := range syntaxOptions {
+			fc2 := getFileContents(file2, o2)
+
+			// now parse the protos
+			acc := func(filename string) (io.ReadCloser, error) {
+				var data string
+				switch filename {
+				case "f1.proto":
+					data = fc1
+				case "f2.proto":
+					data = fc2
+				default:
+					return nil, fmt.Errorf("file not found: %s", filename)
+				}
+				return ioutil.NopCloser(strings.NewReader(data)), nil
+			}
+			_, err := Parser{Accessor: acc}.ParseFiles("f1.proto", "f2.proto")
+
+			if o1 != o2 && o2 == "proto3" {
+				expected := "f2.proto:1:54: field foo.bar: cannot use proto2 enum bar in a proto3 message"
+				if err == nil {
+					t.Errorf("expecting validation error; instead got no error")
+				} else if err.Error() != expected {
+					t.Errorf("expecting validation error %q; instead got: %q", expected, err)
+				}
+			} else {
+				// other cases succeed (okay to for proto2 to use enum from proto3 file and
+				// obviously okay for proto2 importing proto2 and proto3 importing proto3)
+				testutil.Ok(t, err)
+			}
 		}
 	}
 }
