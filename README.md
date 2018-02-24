@@ -32,6 +32,8 @@ you to easily extract those embedded descriptors.
 Descriptors can also be acquired directly from `.proto` source files (using the `protoprint` sub-package)
 or by programmatically constructing them (using the `builder` sub-package).
 
+*[Read more ≫](https://godoc.org/github.com/jhump/protoreflect/desc)*
+
 ```go
 import "github.com/jhump/protoreflect/desc/protoparse"
 ```
@@ -41,6 +43,8 @@ this package, you must invoke `protoc` to either generate a file descriptor set 
 Go code (which has descriptor information embedded in it). This package allows reading the source
 directly without having to invoke `protoc`.
 
+*[Read more ≫](https://godoc.org/github.com/jhump/protoreflect/desc/protoparse)*
+
 ```go
 import "github.com/jhump/protoreflect/desc/protoprint"
 ```
@@ -48,6 +52,8 @@ import "github.com/jhump/protoreflect/desc/protoprint"
 The `protoprint` package allows for printing of descriptors to `.proto` source files. This is
 effectively the inverse of the `protoparse` package. Combined with the `builder` package, this
 is a useful tool for programmatically generating protocol buffer sources.
+
+*[Read more ≫](https://godoc.org/github.com/jhump/protoreflect/desc/protoprint)*
 
 ```go
 import "github.com/jhump/protoreflect/desc/builder"
@@ -61,6 +67,8 @@ trivial task.
 So this package provides generous API to greatly simplify that task. It also allows for converting
 rich descriptors into builders, which allows for programmatically modifying/tweaking existing
 descriptors.
+
+*[Read more ≫](https://godoc.org/github.com/jhump/protoreflect/desc/builder)*
 
 ----
 ## Dynamic Messages and Stubs
@@ -76,12 +84,16 @@ in Go code for every kind of message. This is particularly useful for general-pu
 need to operate on arbitrary protocol buffer schemas. This is made possible by having the tools load
 descriptors at runtime.
 
+*[Read more ≫](https://godoc.org/github.com/jhump/protoreflect/dynamic)*
+
 ```go
 import "github.com/jhump/protoreflect/dynamic/grpcdynamic"
 ```
 
 There is also sub-package named `grpcdynamic`, which provides a dynamic stub implementation. The stub can
 be used to issue RPC methods using method descriptors instead of generated client interfaces.
+
+*[Read more ≫](https://godoc.org/github.com/jhump/protoreflect/dynamic/grpcdynamic)*
 
 ----
 ## GRPC Service Reflection
@@ -96,3 +108,5 @@ making it much easier to query for and work with the schemas of remote services.
 
 It also provides some helper methods for querying for rich service descriptors for the
 services registered in a GRPC server.
+
+*[Read more ≫](https://godoc.org/github.com/jhump/protoreflect/grpcreflect)*
