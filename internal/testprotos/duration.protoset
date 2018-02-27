@@ -1,6 +1,6 @@
 
-ƒ
-.golang/protobuf/ptypes/duration/duration.protogoogle.protobuf":
+ó
+google/protobuf/duration.protogoogle.protobuf":
 Duration
 seconds (Rseconds
 nanos (RnanosB|
