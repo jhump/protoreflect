@@ -27,6 +27,8 @@ It has these top-level messages:
 	Test
 	Another
 	Validator
+	KeywordCollisions
+	KeywordCollisionOptions
 	PrimitiveDefaults
 	StringAndBytesDefaults
 	EnumDefaults

@@ -357,7 +357,7 @@ aggField : aggName ':' scalarConstant {
 		$$ = []*aggregateEntryNode{a}
 	}
 
-aggName : _NAME {
+aggName : name {
 		$$ = &aggregateNameNode{name: $1}
 		$$.setRange($1, $1)
 	}

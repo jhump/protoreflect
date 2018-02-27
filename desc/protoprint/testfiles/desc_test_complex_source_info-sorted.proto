@@ -20,6 +20,84 @@ message Another {
    optional Test.Nested._NestedNested.EEE fff = 2 [default = V1];
 }
 
+message KeywordCollisionOptions {
+   optional uint64 id = 1 [(foo.bar.bool) = true, (foo.bar.bytes) = "bytes", (foo.bar.default) = 222, (foo.bar.double) = 3.141590, (foo.bar.enum) = true, (foo.bar.extend) = true, (foo.bar.extensions) = true, (foo.bar.false) = -111, (foo.bar.fixed32) = 3232, (foo.bar.fixed64) = 6464, (foo.bar.float) = 3.140000, (foo.bar.import) = true, (foo.bar.int32) = 32, (foo.bar.int64) = 64, (foo.bar.message) = true, (foo.bar.option) = true, (foo.bar.optional) = true, (foo.bar.package) = true, (foo.bar.public) = true, (foo.bar.repeated) = true, (foo.bar.required) = true, (foo.bar.reserved) = true, (foo.bar.rpc) = true, (foo.bar.service) = true, (foo.bar.sfixed32) = -3232, (foo.bar.sfixed64) = -6464, (foo.bar.sint32) = -32, (foo.bar.sint64) = -64, (foo.bar.string) = "string", (foo.bar.syntax) = true, (foo.bar.to) = true, (foo.bar.true) = 111, (foo.bar.uint32) = 3200, (foo.bar.uint64) = 6400, (foo.bar.weak) = true];
+
+   optional string name = 2 [(foo.bar.boom) = { syntax:true import:true public:true weak:true package:true string:"string" bytes:"bytes" int32:32 int64:64 uint32:3200 uint64:6400 sint32:-32 sint64:-64 fixed32:3232 fixed64:6464 sfixed32:-3232 sfixed64:-6464 bool:true float:3.14 double:3.14159 optional:true repeated:true required:true message:true enum:true service:true rpc:true option:true extend:true extensions:true reserved:true to:true true:111 false:-111 default:222 }];
+}
+
+message KeywordCollisions {
+   optional bool syntax = 1;
+
+   optional bool import = 2;
+
+   optional bool public = 3;
+
+   optional bool weak = 4;
+
+   optional bool package = 5;
+
+   optional string string = 6;
+
+   optional bytes bytes = 7;
+
+   optional int32 int32 = 8;
+
+   optional int64 int64 = 9;
+
+   optional uint32 uint32 = 10;
+
+   optional uint64 uint64 = 11;
+
+   optional sint32 sint32 = 12;
+
+   optional sint64 sint64 = 13;
+
+   optional fixed32 fixed32 = 14;
+
+   optional fixed64 fixed64 = 15;
+
+   optional sfixed32 sfixed32 = 16;
+
+   optional sfixed64 sfixed64 = 17;
+
+   optional bool bool = 18;
+
+   optional float float = 19;
+
+   optional double double = 20;
+
+   optional bool optional = 21;
+
+   optional bool repeated = 22;
+
+   optional bool required = 23;
+
+   optional bool message = 24;
+
+   optional bool enum = 25;
+
+   optional bool service = 26;
+
+   optional bool rpc = 27;
+
+   optional bool option = 28;
+
+   optional bool extend = 29;
+
+   optional bool extensions = 30;
+
+   optional bool reserved = 31;
+
+   optional bool to = 32;
+
+   optional int32 true = 33;
+
+   optional int32 false = 34;
+
+   optional int32 default = 35;
+}
+
 message Simple {
    optional string name = 1;
 
@@ -114,6 +192,80 @@ service TestTestService {
 
 extend google.protobuf.ExtensionRangeOptions {
    optional string label = 20000;
+}
+
+extend google.protobuf.FieldOptions {
+   optional bool syntax = 20001;
+
+   optional bool import = 20002;
+
+   optional bool public = 20003;
+
+   optional bool weak = 20004;
+
+   optional bool package = 20005;
+
+   optional string string = 20006;
+
+   optional bytes bytes = 20007;
+
+   optional int32 int32 = 20008;
+
+   optional int64 int64 = 20009;
+
+   optional uint32 uint32 = 20010;
+
+   optional uint64 uint64 = 20011;
+
+   optional sint32 sint32 = 20012;
+
+   optional sint64 sint64 = 20013;
+
+   optional fixed32 fixed32 = 20014;
+
+   optional fixed64 fixed64 = 20015;
+
+   optional sfixed32 sfixed32 = 20016;
+
+   optional sfixed64 sfixed64 = 20017;
+
+   optional bool bool = 20018;
+
+   optional float float = 20019;
+
+   optional double double = 20020;
+
+   optional bool optional = 20021;
+
+   optional bool repeated = 20022;
+
+   optional bool required = 20023;
+
+   optional bool message = 20024;
+
+   optional bool enum = 20025;
+
+   optional bool service = 20026;
+
+   optional bool rpc = 20027;
+
+   optional bool option = 20028;
+
+   optional bool extend = 20029;
+
+   optional bool extensions = 20030;
+
+   optional bool reserved = 20031;
+
+   optional bool to = 20032;
+
+   optional int32 true = 20033;
+
+   optional int32 false = 20034;
+
+   optional int32 default = 20035;
+
+   optional KeywordCollisions boom = 20036;
 }
 
 extend google.protobuf.MessageOptions {
