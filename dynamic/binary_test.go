@@ -11,7 +11,8 @@ import (
 )
 
 func TestBinaryUnaryFields(t *testing.T) {
-	binaryTranslationParty(t, unaryFieldsMsg)
+	binaryTranslationParty(t, unaryFieldsPosMsg)
+	binaryTranslationParty(t, unaryFieldsNegMsg)
 }
 
 func TestBinaryRepeatedFields(t *testing.T) {

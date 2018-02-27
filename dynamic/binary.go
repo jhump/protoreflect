@@ -410,25 +410,24 @@ func unmarshalSimpleField(fd *desc.FieldDescriptor, v uint64) (interface{}, erro
 		return uint32(v), nil
 
 	case descriptor.FieldDescriptorProto_TYPE_INT32,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED32:
+		descriptor.FieldDescriptorProto_TYPE_ENUM:
 		s := int64(v)
 		if s > math.MaxInt32 || s < math.MinInt32 {
 			return nil, NumericOverflowError
 		}
 		return int32(s), nil
 
+	case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
+		if v > math.MaxUint32 {
+			return nil, NumericOverflowError
+		}
+		return int32(v), nil
+
 	case descriptor.FieldDescriptorProto_TYPE_SINT32:
 		if v > math.MaxUint32 {
 			return nil, NumericOverflowError
 		}
 		return decodeZigZag32(v), nil
-
-	case descriptor.FieldDescriptorProto_TYPE_ENUM:
-		s := int64(v)
-		if s > math.MaxInt32 || s < 0 {
-			return nil, NumericOverflowError
-		}
-		return int32(s), nil
 
 	case descriptor.FieldDescriptorProto_TYPE_UINT64,
 		descriptor.FieldDescriptorProto_TYPE_FIXED64:

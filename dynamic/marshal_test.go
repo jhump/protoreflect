@@ -14,7 +14,7 @@ import (
 // Shared stuff for marshalling and unmarshalling tests. This is used for the binary format, the text
 // format, and the JSON format.
 
-var unaryFieldsMsg = &testprotos.UnaryFields{
+var unaryFieldsPosMsg = &testprotos.UnaryFields{
 	I: proto.Int32(1),
 	J: proto.Int64(2),
 	K: proto.Int32(3),
@@ -31,12 +31,39 @@ var unaryFieldsMsg = &testprotos.UnaryFields{
 	V: proto.String("foobar"),
 	W: proto.Bool(true),
 	X: &testprotos.RepeatedFields{
-		I: []int32{-3},
+		I: []int32{3},
 		V: []string{"baz"},
 	},
 	Groupy: &testprotos.UnaryFields_GroupY{
 		Ya: proto.String("bedazzle"),
 		Yb: proto.Int32(42),
+	},
+	Z: testprotos.TestEnum_SECOND.Enum(),
+}
+
+var unaryFieldsNegMsg = &testprotos.UnaryFields{
+	I: proto.Int32(-1),
+	J: proto.Int64(-2),
+	K: proto.Int32(-3),
+	L: proto.Int64(-4),
+	M: proto.Uint32(5),
+	N: proto.Uint64(6),
+	O: proto.Uint32(7),
+	P: proto.Uint64(8),
+	Q: proto.Int32(-9),
+	R: proto.Int64(-10),
+	S: proto.Float32(-11),
+	T: proto.Float64(-12),
+	U: []byte{0, 1, 2, 3, 4, 5, 6, 7},
+	V: proto.String("foobar"),
+	W: proto.Bool(true),
+	X: &testprotos.RepeatedFields{
+		I: []int32{-3},
+		V: []string{"baz"},
+	},
+	Groupy: &testprotos.UnaryFields_GroupY{
+		Ya: proto.String("bedazzle"),
+		Yb: proto.Int32(-42),
 	},
 	Z: testprotos.TestEnum_SECOND.Enum(),
 }

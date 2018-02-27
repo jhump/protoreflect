@@ -7,7 +7,8 @@ import (
 )
 
 func TestTextUnaryFields(t *testing.T) {
-	textTranslationParty(t, unaryFieldsMsg)
+	textTranslationParty(t, unaryFieldsPosMsg)
+	textTranslationParty(t, unaryFieldsNegMsg)
 }
 
 func TestTextRepeatedFields(t *testing.T) {
