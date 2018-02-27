@@ -24,7 +24,8 @@ import (
 )
 
 func TestJSONUnaryFields(t *testing.T) {
-	jsonTranslationParty(t, unaryFieldsMsg)
+	jsonTranslationParty(t, unaryFieldsPosMsg)
+	jsonTranslationParty(t, unaryFieldsNegMsg)
 }
 
 func TestJSONRepeatedFields(t *testing.T) {
