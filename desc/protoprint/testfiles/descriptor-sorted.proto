@@ -1,5 +1,7 @@
 syntax = "proto2";
 
+option cc_enable_arenas = true;
+
 option csharp_namespace = "Google.Protobuf.Reflection";
 
 option go_package = "github.com/golang/protobuf/protoc-gen-go/descriptor;descriptor";
@@ -65,6 +67,29 @@ message EnumDescriptorProto {
    repeated EnumValueDescriptorProto value = 2;
 
    optional EnumOptions options = 3;
+
+   // Range of reserved numeric values. Reserved numeric values may not be used
+   // by enum values in the same enum declaration. Reserved ranges may not
+   // overlap.
+   repeated EnumReservedRange reserved_range = 4;
+
+   // Reserved enum value names, which may not be reused. A given name may only
+   // be reserved once.
+   repeated string reserved_name = 5;
+
+   // Range of reserved numeric values. Reserved values may not be used by
+   // entries in the same enum. Reserved ranges may not overlap.
+   //
+   // Note that this is distinct from DescriptorProto.ReservedRange in that it
+   // is inclusive such that it can appropriately represent the entire int32
+   // domain.
+   message EnumReservedRange {
+      optional int32 start = 1;
+      // Inclusive.
+
+      optional int32 end = 2;
+      // Inclusive.
+   }
 }
 
 message EnumOptions {
@@ -451,7 +476,8 @@ message FileOptions {
 
    optional bool php_generic_services = 42 [default = false];
 
-   // The parser stores options it doesn't recognize here. See above.
+   // The parser stores options it doesn't recognize here.
+   // See the documentation for the "Options" section above.
    repeated UninterpretedOption uninterpreted_option = 999;
 
    // Generated classes can be optimized for speed or code size.
