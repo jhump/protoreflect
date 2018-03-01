@@ -71,7 +71,7 @@ import (
 %type <ui>        intLit
 %type <f>         floatLit
 %type <sl>        constantList
-%type <agg>       aggFields aggField
+%type <agg>       aggFields aggField aggFieldEntry
 %type <fld>       field oneofField
 %type <oo>        oneof
 %type <grp>       group
@@ -306,14 +306,16 @@ aggFields : aggField
 	| aggFields aggField {
 		$$ = append($1, $2...)
 	}
-	| aggFields ',' aggField {
-		$$ = append($1, $3...)
-	}
 	| {
 		$$ = nil
 	}
 
-aggField : aggName ':' scalarConstant {
+aggField : aggFieldEntry
+	| aggFieldEntry ',' {
+		$$ = $1
+	}
+
+aggFieldEntry : aggName ':' scalarConstant {
 		a := &aggregateEntryNode{name: $1, val: $3}
 		a.setRange($1, $3)
 		$$ = []*aggregateEntryNode{a}

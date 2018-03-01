@@ -63,7 +63,7 @@ extend google.protobuf.MessageOptions {
 }
 
 message Another {
-    option (.foo.bar.rept) = { foo: "abc" s < name: "foo", id: 123 >, array: [1, 2 ,3], r:[<name:"f">, {name:"s"}, {id:456} ]};
+    option (.foo.bar.rept) = { foo: "abc" s < name: "foo", id: 123 >, array: [1, 2 ,3], r:[<name:"f">, {name:"s"}, {id:456} ], };
     option (foo.bar.rept) = { foo: "def" s { name: "bar", id: 321 }, array: [3, 2 ,1], r:{name:"g"} r:{name:"s"}};
     option (rept) = { foo: "def" };
     option (eee) = V1;
@@ -118,6 +118,42 @@ service TestTestService {
 			}
 		};
 	}
+}
+
+message Rule {
+  message StringRule {
+    optional string pattern = 1;
+    optional bool allow_empty = 2;
+    optional int32 min_len = 3;
+    optional int32 max_len = 4;
+  }
+  message IntRule {
+    optional int64 min_val = 1;
+    optional uint64 max_val = 2;
+  }
+  message RepeatedRule {
+    optional bool allow_empty = 1;
+    optional int32 min_items = 2;
+    optional int32 max_items = 3;
+    optional Rule items = 4;
+  }
+  oneof rule {
+    StringRule string = 1;
+    RepeatedRule repeated = 2;
+    IntRule int = 3;
+  }
+}
+
+extend google.protobuf.FieldOptions {
+  optional Rule rules = 1234;
+}
+
+message IsAuthorizedReq {
+    repeated string subjects = 1
+      [(rules).repeated = {
+        min_items: 1,
+        items: { string: { pattern: "^(?:(?:team:(?:local|ldap))|user):[[:alnum:]_-]+$" } },
+       }];
 }
 
 // tests cases where field names collide with keywords

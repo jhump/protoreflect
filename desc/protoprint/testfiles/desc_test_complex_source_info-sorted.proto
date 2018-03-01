@@ -20,6 +20,10 @@ message Another {
    optional Test.Nested._NestedNested.EEE fff = 2 [default = V1];
 }
 
+message IsAuthorizedReq {
+   repeated string subjects = 1 [(foo.bar.rules) = { repeated:<min_items:1 items:<string:<pattern:"^(?:(?:team:(?:local|ldap))|user):[[:alnum:]_-]+$">>> }];
+}
+
 message KeywordCollisionOptions {
    optional uint64 id = 1 [(foo.bar.bool) = true, (foo.bar.bytes) = "bytes", (foo.bar.default) = 222, (foo.bar.double) = 3.141590, (foo.bar.enum) = true, (foo.bar.extend) = true, (foo.bar.extensions) = true, (foo.bar.false) = -111, (foo.bar.fixed32) = 3232, (foo.bar.fixed64) = 6464, (foo.bar.float) = 3.140000, (foo.bar.import) = true, (foo.bar.int32) = 32, (foo.bar.int64) = 64, (foo.bar.message) = true, (foo.bar.option) = true, (foo.bar.optional) = true, (foo.bar.package) = true, (foo.bar.public) = true, (foo.bar.repeated) = true, (foo.bar.required) = true, (foo.bar.reserved) = true, (foo.bar.rpc) = true, (foo.bar.service) = true, (foo.bar.sfixed32) = -3232, (foo.bar.sfixed64) = -6464, (foo.bar.sint32) = -32, (foo.bar.sint64) = -64, (foo.bar.string) = "string", (foo.bar.syntax) = true, (foo.bar.to) = true, (foo.bar.true) = 111, (foo.bar.uint32) = 3200, (foo.bar.uint64) = 6400, (foo.bar.weak) = true];
 
@@ -96,6 +100,44 @@ message KeywordCollisions {
    optional int32 false = 34;
 
    optional int32 default = 35;
+}
+
+message Rule {
+   oneof rule {
+      StringRule string = 1;
+
+      RepeatedRule repeated = 2;
+
+      IntRule int = 3;
+   }
+
+
+
+   message IntRule {
+      optional int64 min_val = 1;
+
+      optional uint64 max_val = 2;
+   }
+
+   message RepeatedRule {
+      optional bool allow_empty = 1;
+
+      optional int32 min_items = 2;
+
+      optional int32 max_items = 3;
+
+      optional Rule items = 4;
+   }
+
+   message StringRule {
+      optional string pattern = 1;
+
+      optional bool allow_empty = 2;
+
+      optional int32 min_len = 3;
+
+      optional int32 max_len = 4;
+   }
 }
 
 message Simple {
@@ -195,6 +237,8 @@ extend google.protobuf.ExtensionRangeOptions {
 }
 
 extend google.protobuf.FieldOptions {
+   optional Rule rules = 1234;
+
    optional bool syntax = 20001;
 
    optional bool import = 20002;
