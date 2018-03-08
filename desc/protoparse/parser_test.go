@@ -191,6 +191,38 @@ func TestBasicValidation(t *testing.T) {
 			errMsg:   `test.proto:1:16: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
+			contents: `enum Foo { V = 0; reserved 5000000000 }`,
+			errMsg:   `test.proto:1:28: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved -5000000000 }`,
+			errMsg:   `test.proto:1:28: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved 5000000000 to 5 }`,
+			errMsg:   `test.proto:1:28: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved 5 to 5000000000 }`,
+			errMsg:   `test.proto:1:33: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved -5000000000 to -5 }`,
+			errMsg:   `test.proto:1:28: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved -5 to -5000000000 }`,
+			errMsg:   `test.proto:1:34: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved -5000000000 to 5 }`,
+			errMsg:   `test.proto:1:28: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved -5 to 5000000000 }`,
+			errMsg:   `test.proto:1:34: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
 			contents: `enum Foo { }`,
 			errMsg:   `test.proto:1:1: enums must define at least one value`,
 		},
@@ -324,7 +356,7 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `message Foo { reserved "foo", "foo"; }`,
-			errMsg:   `test.proto:1:31: field "foo" is reserved multiple times`,
+			errMsg:   `test.proto:1:31: name "foo" is reserved multiple times`,
 		},
 		{
 			contents: `message Foo { reserved "foo"; optional string foo = 1; }`,

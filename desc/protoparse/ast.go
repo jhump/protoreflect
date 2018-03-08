@@ -711,15 +711,16 @@ type extensionRangeNode struct {
 
 type rangeNode struct {
 	basicCompositeNode
-	st, en *intLiteralNode
+	stNode, enNode node
+	st, en         int32
 }
 
 func (n *rangeNode) rangeStart() node {
-	return n.st
+	return n.stNode
 }
 
 func (n *rangeNode) rangeEnd() node {
-	return n.en
+	return n.enNode
 }
 
 type reservedNode struct {

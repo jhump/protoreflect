@@ -25,6 +25,7 @@ It has these top-level messages:
 	Request
 	Simple
 	Test
+	MessageWithReservations
 	Another
 	Validator
 	Rule

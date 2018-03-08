@@ -80,8 +80,8 @@ import (
 %type <msgDecls>  messageItem messageBody
 %type <ooDecls>   oneofItem oneofBody
 %type <names>     fieldNames
-%type <resvd>     reserved
-%type <rngs>      range ranges
+%type <resvd>     msgReserved enumReserved reservedNames
+%type <rngs>      tagRange tagRanges enumRange enumRanges
 %type <ext>       extensions
 %type <en>        enum
 %type <enDecls>   enumItem enumBody
@@ -98,10 +98,10 @@ import (
 %token <ui>  _INT_LIT
 %token <f>   _FLOAT_LIT
 %token <id>  _NAME _FQNAME _TYPENAME
-%token <id>   _SYNTAX _IMPORT _WEAK _PUBLIC _PACKAGE _OPTION _TRUE _FALSE _INF _NAN _REPEATED _OPTIONAL _REQUIRED
-%token <id>   _DOUBLE _FLOAT _INT32 _INT64 _UINT32 _UINT64 _SINT32 _SINT64 _FIXED32 _FIXED64 _SFIXED32 _SFIXED64
-%token <id>   _BOOL _STRING _BYTES _GROUP _ONEOF _MAP _EXTENSIONS _TO _MAX _RESERVED _ENUM _MESSAGE _EXTEND
-%token <id>   _SERVICE _RPC _STREAM _RETURNS
+%token <id>  _SYNTAX _IMPORT _WEAK _PUBLIC _PACKAGE _OPTION _TRUE _FALSE _INF _NAN _REPEATED _OPTIONAL _REQUIRED
+%token <id>  _DOUBLE _FLOAT _INT32 _INT64 _UINT32 _UINT64 _SINT32 _SINT64 _FIXED32 _FIXED64 _SFIXED32 _SFIXED64
+%token <id>  _BOOL _STRING _BYTES _GROUP _ONEOF _MAP _EXTENSIONS _TO _MAX _RESERVED _ENUM _MESSAGE _EXTEND
+%token <id>  _SERVICE _RPC _STREAM _RETURNS
 %token <err> _ERROR
 // we define all of these, even ones that aren't used, to improve error messages
 // so it shows the unexpected symbol instead of showing "$unk"
@@ -554,25 +554,25 @@ keyType : _INT32
 	| _BOOL
 	| _STRING
 
-extensions : _EXTENSIONS ranges ';' {
+extensions : _EXTENSIONS tagRanges ';' {
 		$$ = &extensionRangeNode{ranges: $2}
 		$$.setRange($1, $3)
 	}
-	| _EXTENSIONS ranges '[' fieldOptions ']' ';' {
+	| _EXTENSIONS tagRanges '[' fieldOptions ']' ';' {
 		$$ = &extensionRangeNode{ranges: $2, options: $4}
 		$$.setRange($1, $6)
 	}
 
-ranges : ranges ',' range {
+tagRanges : tagRanges ',' tagRange {
 		$$ = append($1, $3...)
 	}
-	| range
+	| tagRange
 
-range : _INT_LIT {
+tagRange : _INT_LIT {
 		if $1.val > internal.MaxTag {
 			lexError(protolex, $1.start(), fmt.Sprintf("range includes out-of-range tag: %d (should be between 0 and %d)", $1.val, internal.MaxTag))
 		}
-		r := &rangeNode{st: $1, en: $1}
+		r := &rangeNode{stNode: $1, enNode: $1, st: int32($1.val), en: int32($1.val)}
 		r.setRange($1, $1)
 		$$ = []*rangeNode{r}
 	}
@@ -586,7 +586,7 @@ range : _INT_LIT {
 		if $1.val > $3.val {
 			lexError(protolex, $1.start(), fmt.Sprintf("range, %d to %d, is invalid: start must be <= end", $1.val, $3.val))
 		}
-		r := &rangeNode{st: $1, en: $3}
+		r := &rangeNode{stNode: $1, enNode: $3, st: int32($1.val), en: int32($3.val)}
 		r.setRange($1, $3)
 		$$ = []*rangeNode{r}
 	}
@@ -594,21 +594,85 @@ range : _INT_LIT {
 		if $1.val > internal.MaxTag {
 			lexError(protolex, $1.start(), fmt.Sprintf("range start is out-of-range tag: %d (should be between 0 and %d)", $1.val, internal.MaxTag))
 		}
-		m := &intLiteralNode{basicNode: $3.basicNode, val: internal.MaxTag}
-		r := &rangeNode{st: $1, en: m}
+		r := &rangeNode{stNode: $1, enNode: $3, st: int32($1.val), en: internal.MaxTag}
 		r.setRange($1, $3)
 		$$ = []*rangeNode{r}
 	}
 
-reserved : _RESERVED ranges ';' {
+enumRanges : enumRanges ',' enumRange {
+		$$ = append($1, $3...)
+	}
+	| enumRange
+
+enumRange : _INT_LIT {
+		checkUint64InInt32Range(protolex, $1.start(), $1.val)
+		r := &rangeNode{stNode: $1, enNode: $1, st: int32($1.val), en: int32($1.val)}
+		r.setRange($1, $1)
+		$$ = []*rangeNode{r}
+	}
+	| negIntLit {
+		checkInt64InInt32Range(protolex, $1.start(), $1.val)
+		r := &rangeNode{stNode: $1, enNode: $1, st: int32($1.val), en: int32($1.val)}
+		r.setRange($1, $1)
+		$$ = []*rangeNode{r}
+	}
+	| _INT_LIT _TO _INT_LIT {
+		checkUint64InInt32Range(protolex, $1.start(), $1.val)
+		checkUint64InInt32Range(protolex, $3.start(), $3.val)
+		if $1.val > $3.val {
+			lexError(protolex, $1.start(), fmt.Sprintf("range, %d to %d, is invalid: start must be <= end", $1.val, $3.val))
+		}
+		r := &rangeNode{stNode: $1, enNode: $3, st: int32($1.val), en: int32($3.val)}
+		r.setRange($1, $3)
+		$$ = []*rangeNode{r}
+	}
+	| negIntLit _TO negIntLit {
+		checkInt64InInt32Range(protolex, $1.start(), $1.val)
+		checkInt64InInt32Range(protolex, $3.start(), $3.val)
+		if $1.val > $3.val {
+			lexError(protolex, $1.start(), fmt.Sprintf("range, %d to %d, is invalid: start must be <= end", $1.val, $3.val))
+		}
+		r := &rangeNode{stNode: $1, enNode: $3, st: int32($1.val), en: int32($3.val)}
+		r.setRange($1, $3)
+		$$ = []*rangeNode{r}
+	}
+	| negIntLit _TO _INT_LIT {
+		checkInt64InInt32Range(protolex, $1.start(), $1.val)
+		checkUint64InInt32Range(protolex, $3.start(), $3.val)
+		r := &rangeNode{stNode: $1, enNode: $3, st: int32($1.val), en: int32($3.val)}
+		r.setRange($1, $3)
+		$$ = []*rangeNode{r}
+	}
+	| _INT_LIT _TO _MAX {
+		checkUint64InInt32Range(protolex, $1.start(), $1.val)
+		r := &rangeNode{stNode: $1, enNode: $3, st: int32($1.val), en: math.MaxInt32}
+		r.setRange($1, $3)
+		$$ = []*rangeNode{r}
+	}
+	| negIntLit _TO _MAX {
+		checkInt64InInt32Range(protolex, $1.start(), $1.val)
+		r := &rangeNode{stNode: $1, enNode: $3, st: int32($1.val), en: math.MaxInt32}
+		r.setRange($1, $3)
+		$$ = []*rangeNode{r}
+	}
+
+msgReserved : _RESERVED tagRanges ';' {
 		$$ = &reservedNode{ranges: $2}
 		$$.setRange($1, $3)
 	}
-	| _RESERVED fieldNames ';' {
+	| reservedNames
+
+enumReserved : _RESERVED enumRanges ';' {
+		$$ = &reservedNode{ranges: $2}
+		$$.setRange($1, $3)
+	}
+	| reservedNames
+
+reservedNames : _RESERVED fieldNames ';' {
 		rsvd := map[string]struct{}{}
 		for _, n := range $2 {
 			if _, ok := rsvd[n.val]; ok {
-				lexError(protolex, n.start(), fmt.Sprintf("field %q is reserved multiple times", n.val))
+				lexError(protolex, n.start(), fmt.Sprintf("name %q is reserved multiple times", n.val))
 				break
 			}
 			rsvd[n.val] = struct{}{}
@@ -652,19 +716,19 @@ enumItem : option {
 	| enumField {
 		$$ = []*enumElement{{value: $1}}
 	}
-	| reserved {
+	| enumReserved {
 		$$ = []*enumElement{{reserved: $1}}
 	}
 	| ';' {
 		$$ = []*enumElement{{empty: $1}}
 	}
 
-enumField : name '=' intLit ';' {
+enumField : name '=' _INT_LIT ';' {
 		checkUint64InInt32Range(protolex, $3.start(), $3.val)
 		$$ = &enumValueNode{name: $1, number: $3}
 		$$.setRange($1, $4)
 	}
-	|  name '=' intLit '[' fieldOptions ']' ';' {
+	|  name '=' _INT_LIT '[' fieldOptions ']' ';' {
 		checkUint64InInt32Range(protolex, $3.start(), $3.val)
 		$$ = &enumValueNode{name: $1, number: $3, options: $5}
 		$$.setRange($1, $7)
@@ -720,7 +784,7 @@ messageItem : field {
 	| mapField {
 		$$ = []*messageElement{{mapField: $1}}
 	}
-	| reserved {
+	| msgReserved {
 		$$ = []*messageElement{{reserved: $1}}
 	}
 	| ';' {
