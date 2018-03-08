@@ -732,6 +732,13 @@ type enumNode struct {
 	basicCompositeNode
 	name  *identNode
 	decls []*enumElement
+
+	// This field is populated after parsing, to make it easier to find them
+	// without searching decls. The parse result has a map of descriptors to
+	// nodes which makes the other declarations easily discoverable. But these
+	// elements do not map to descriptors -- they are just stored as strings in
+	// the message descriptor.
+	reserved []*stringLiteralNode
 }
 
 type enumElement struct {

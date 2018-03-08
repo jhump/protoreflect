@@ -430,7 +430,7 @@ func (r *parseResult) putExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRang
 	r.nodes[e] = n
 }
 
-func (r *parseResult) putReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange, n *rangeNode) {
+func (r *parseResult) putMessageReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange, n *rangeNode) {
 	r.nodes[rr] = n
 }
 
@@ -440,6 +440,10 @@ func (r *parseResult) putEnumNode(e *dpb.EnumDescriptorProto, n *enumNode) {
 
 func (r *parseResult) putEnumValueNode(e *dpb.EnumValueDescriptorProto, n *enumValueNode) {
 	r.nodes[e] = n
+}
+
+func (r *parseResult) putEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumReservedRange, n *rangeNode) {
+	r.nodes[rr] = n
 }
 
 func (r *parseResult) putServiceNode(s *dpb.ServiceDescriptorProto, n *serviceNode) {
@@ -771,9 +775,26 @@ func (r *parseResult) asEnumDescriptor(en *enumNode) *dpb.EnumDescriptorProto {
 			ed.Options.UninterpretedOption = append(ed.Options.UninterpretedOption, r.asUninterpretedOption(decl.option))
 		} else if decl.value != nil {
 			ed.Value = append(ed.Value, r.asEnumValue(decl.value))
+		} else if decl.reserved != nil {
+			for _, n := range decl.reserved.names {
+				en.reserved = append(en.reserved, n)
+				ed.ReservedName = append(ed.ReservedName, n.val)
+			}
+			for _, rng := range decl.reserved.ranges {
+				ed.ReservedRange = append(ed.ReservedRange, r.asEnumReservedRange(rng))
+			}
 		}
 	}
 	return ed
+}
+
+func (r *parseResult) asEnumReservedRange(rng *rangeNode) *dpb.EnumDescriptorProto_EnumReservedRange {
+	rr := &dpb.EnumDescriptorProto_EnumReservedRange{
+		Start: proto.Int32(int32(rng.st.val)),
+		End:   proto.Int32(int32(rng.en.val)),
+	}
+	r.putEnumReservedRangeNode(rr, rng)
+	return rr
 }
 
 func (r *parseResult) asMessageDescriptor(node *messageNode, isProto3 bool) *dpb.DescriptorProto {
@@ -831,18 +852,18 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, reservedNames *
 				msgd.ReservedName = append(msgd.ReservedName, n.val)
 			}
 			for _, rng := range decl.reserved.ranges {
-				msgd.ReservedRange = append(msgd.ReservedRange, r.asReservedRange(rng))
+				msgd.ReservedRange = append(msgd.ReservedRange, r.asMessageReservedRange(rng))
 			}
 		}
 	}
 }
 
-func (r *parseResult) asReservedRange(rng *rangeNode) *dpb.DescriptorProto_ReservedRange {
+func (r *parseResult) asMessageReservedRange(rng *rangeNode) *dpb.DescriptorProto_ReservedRange {
 	rr := &dpb.DescriptorProto_ReservedRange{
 		Start: proto.Int32(int32(rng.st.val)),
 		End:   proto.Int32(int32(rng.en.val + 1)),
 	}
-	r.putReservedRangeNode(rr, rng)
+	r.putMessageReservedRangeNode(rr, rng)
 	return rr
 }
 
