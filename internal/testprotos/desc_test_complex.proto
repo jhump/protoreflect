@@ -41,6 +41,8 @@ message Test {
 				V4 = 4;
 				V5 = 5;
 				V6 = 6;
+				reserved 7, 8, 9, 10;
+				reserved "V7", "V8", "V9", "V10";
 			}
 			option (fooblez) = 10101;
 			extend Test {

@@ -367,7 +367,7 @@ func (r *parseResult) getExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRang
 	return r.nodes[e].(rangeDecl)
 }
 
-func (r *parseResult) getReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange) rangeDecl {
+func (r *parseResult) getMessageReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange) rangeDecl {
 	if r.nodes == nil {
 		return noSourceNode{pos: unknownPos(r.fd.GetName())}
 	}
@@ -386,6 +386,13 @@ func (r *parseResult) getEnumValueNode(e *dpb.EnumValueDescriptorProto) enumValu
 		return noSourceNode{pos: unknownPos(r.fd.GetName())}
 	}
 	return r.nodes[e].(enumValueDecl)
+}
+
+func (r *parseResult) getEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumReservedRange) rangeDecl {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[rr].(rangeDecl)
 }
 
 func (r *parseResult) getServiceNode(s *dpb.ServiceDescriptorProto) node {
@@ -963,7 +970,6 @@ func (r *parseResult) generateSourceCodeInfo() *dpb.SourceCodeInfo {
 			}, mtd.Options.GetUninterpretedOption(), append(mtdPath, internal.Method_optionsTag))
 		}
 	}
-
 	return &dpb.SourceCodeInfo{Location: sci.locs}
 }
 
@@ -1116,7 +1122,7 @@ func (r *parseResult) generateSourceCodeInfoForMessage(sci *sourceCodeInfo, msg 
 	// reserved ranges
 	for i, rr := range msg.ReservedRange {
 		rangePath := append(path, internal.Message_reservedRangeTag, int32(i))
-		rn := r.getReservedRangeNode(rr).(*rangeNode)
+		rn := r.getMessageReservedRangeNode(rr).(*rangeNode)
 		sci.newLoc(rn, rangePath)
 		sci.newLoc(rn.st, append(rangePath, internal.ReservedRange_startTag))
 		if rn.st != rn.en {
@@ -1152,6 +1158,22 @@ func (r *parseResult) generateSourceCodeInfoForEnum(sci *sourceCodeInfo, enum *d
 		r.generateSourceCodeInfoForOptions(sci, evn.options, func(n interface{}) *optionNode {
 			return n.(*optionNode)
 		}, ev.Options.GetUninterpretedOption(), append(evPath, internal.EnumVal_optionsTag))
+	}
+
+	// reserved ranges
+	for i, rr := range enum.GetReservedRange() {
+		rangePath := append(path, internal.Enum_reservedRangeTag, int32(i))
+		rn := r.getEnumReservedRangeNode(rr).(*rangeNode)
+		sci.newLoc(rn, rangePath)
+		sci.newLoc(rn.st, append(rangePath, internal.ReservedRange_startTag))
+		if rn.st != rn.en {
+			sci.newLoc(rn.en, append(rangePath, internal.ReservedRange_endTag))
+		}
+	}
+
+	// reserved names
+	for i, rn := range n.reserved {
+		sci.newLoc(rn, append(path, internal.Enum_reservedNameTag, int32(i)))
 	}
 }
 
@@ -1501,7 +1523,7 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	// reserved ranges should not overlap
 	rsvd := make(tagRanges, len(md.ReservedRange))
 	for i, r := range md.ReservedRange {
-		n := res.getReservedRangeNode(r)
+		n := res.getMessageReservedRangeNode(r)
 		rsvd[i] = tagRange{start: r.GetStart(), end: r.GetEnd(), node: n}
 
 	}
