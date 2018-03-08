@@ -652,6 +652,9 @@ enumItem : option {
 	| enumField {
 		$$ = []*enumElement{{value: $1}}
 	}
+	| reserved {
+		$$ = []*enumElement{{reserved: $1}}
+	}
 	| ';' {
 		$$ = []*enumElement{{empty: $1}}
 	}

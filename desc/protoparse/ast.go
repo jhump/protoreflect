@@ -736,9 +736,10 @@ type enumNode struct {
 
 type enumElement struct {
 	// a discriminated union: only one field will be set
-	option *optionNode
-	value  *enumValueNode
-	empty  *basicNode
+	option   *optionNode
+	value    *enumValueNode
+	reserved *reservedNode
+	empty    *basicNode
 }
 
 func (n *enumElement) start() *SourcePos {
