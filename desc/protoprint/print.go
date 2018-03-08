@@ -1550,7 +1550,7 @@ func (a elementAddrs) at(addr elementAddr) interface{} {
 			return dsc.AsDescriptorProto().GetExtensionRange()[addr.elementIndex]
 		case internal.Message_reservedRangeTag:
 			rng := dsc.AsDescriptorProto().GetReservedRange()[addr.elementIndex]
-			return reservedRange{start: rng.GetStart(), end: rng.GetEnd()-1}
+			return reservedRange{start: rng.GetStart(), end: rng.GetEnd() - 1}
 		case internal.Message_reservedNameTag:
 			return dsc.AsDescriptorProto().GetReservedName()[addr.elementIndex]
 		}

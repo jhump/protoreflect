@@ -1593,8 +1593,9 @@ func (mb *MessageBuilder) AddReservedRange(start, end int32) *MessageBuilder {
 // SetReservedRanges replaces all of this message's reserved ranges with the
 // given slice of ranges. Unlike AddReservedRange and unlike the way ranges are
 // defined in proto IDL source, a DescriptorProto_ReservedRange struct treats
-// the end of the range as *exclusive*. So the range is inclusive of the start
-// but exclusive of the end. This returns the message, for method chaining.
+// the end of the range as *exclusive* (so it would be the value defined in the
+// IDL plus one). So the range is inclusive of the start but exclusive of the
+// end. This returns the message, for method chaining.
 func (mb *MessageBuilder) SetReservedRanges(ranges []*dpb.DescriptorProto_ReservedRange) *MessageBuilder {
 	mb.ReservedRanges = ranges
 	return mb
@@ -2366,7 +2367,9 @@ func (oob *OneOfBuilder) Build() (*desc.OneOfDescriptor, error) {
 type EnumBuilder struct {
 	baseBuilder
 
-	Options *dpb.EnumOptions
+	Options        *dpb.EnumOptions
+	ReservedRanges []*dpb.EnumDescriptorProto_EnumReservedRange
+	ReservedNames  []string
 
 	values  []*EnumValueBuilder
 	symbols map[string]*EnumValueBuilder
@@ -2392,6 +2395,8 @@ func FromEnum(ed *desc.EnumDescriptor) (*EnumBuilder, error) {
 func fromEnum(ed *desc.EnumDescriptor, localEnums map[*desc.EnumDescriptor]*EnumBuilder) (*EnumBuilder, error) {
 	eb := NewEnum(ed.GetName())
 	eb.Options = ed.GetEnumOptions()
+	eb.ReservedRanges = ed.AsEnumDescriptorProto().GetReservedRange()
+	eb.ReservedNames = ed.AsEnumDescriptorProto().GetReservedName()
 	setComments(&eb.comments, ed.GetSourceInfo())
 
 	localEnums[ed] = eb
@@ -2503,6 +2508,39 @@ func (eb *EnumBuilder) TryAddValue(evb *EnumValueBuilder) error {
 	return nil
 }
 
+// AddReservedRange adds the given reserved range to this message. The range is
+// inclusive of both the start and end, just like defining a range in proto IDL
+// source. This returns the message, for method chaining.
+func (eb *EnumBuilder) AddReservedRange(start, end int32) *EnumBuilder {
+	rr := &dpb.EnumDescriptorProto_EnumReservedRange{
+		Start: proto.Int32(start),
+		End:   proto.Int32(end),
+	}
+	eb.ReservedRanges = append(eb.ReservedRanges, rr)
+	return eb
+}
+
+// SetReservedRanges replaces all of this enum's reserved ranges with the
+// given slice of ranges. This returns the enum, for method chaining.
+func (eb *EnumBuilder) SetReservedRanges(ranges []*dpb.EnumDescriptorProto_EnumReservedRange) *EnumBuilder {
+	eb.ReservedRanges = ranges
+	return eb
+}
+
+// AddReservedName adds the given name to the list of reserved value names for
+// this enum. This returns the enum, for method chaining.
+func (eb *EnumBuilder) AddReservedName(name string) *EnumBuilder {
+	eb.ReservedNames = append(eb.ReservedNames, name)
+	return eb
+}
+
+// SetReservedNames replaces all of this enum's reserved value names with the
+// given slice of names. This returns the enum, for method chaining.
+func (eb *EnumBuilder) SetReservedNames(names []string) *EnumBuilder {
+	eb.ReservedNames = names
+	return eb
+}
+
 func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.EnumDescriptorProto, error) {
 	addCommentsTo(sourceInfo, path, &eb.comments)
 
@@ -2548,9 +2586,11 @@ func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) 
 	}
 
 	return &dpb.EnumDescriptorProto{
-		Name:    proto.String(eb.name),
-		Options: eb.Options,
-		Value:   values,
+		Name:          proto.String(eb.name),
+		Options:       eb.Options,
+		Value:         values,
+		ReservedRange: eb.ReservedRanges,
+		ReservedName:  eb.ReservedNames,
 	}, nil
 }
 
