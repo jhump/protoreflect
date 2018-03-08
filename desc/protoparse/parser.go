@@ -1641,6 +1641,37 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 		}
 	}
 
+	// reserved ranges should not overlap
+	rsvd := make(tagRanges, len(ed.ReservedRange))
+	for i, r := range ed.ReservedRange {
+		n := res.getEnumReservedRangeNode(r)
+		rsvd[i] = tagRange{start: r.GetStart(), end: r.GetEnd(), node: n}
+	}
+	sort.Sort(rsvd)
+	for i := 1; i < len(rsvd); i++ {
+		if rsvd[i].start <= rsvd[i-1].end {
+			return ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end, rsvd[i].start, rsvd[i].end)}
+		}
+	}
+
+	// now, check that fields don't re-use tags and don't try to use extension
+	// or reserved ranges or reserved names
+	rsvdNames := map[string]struct{}{}
+	for _, n := range ed.ReservedName {
+		rsvdNames[n] = struct{}{}
+	}
+	for _, ev := range ed.Value {
+		evn := res.getEnumValueNode(ev)
+		if _, ok := rsvdNames[ev.GetName()]; ok {
+			return ErrorWithSourcePos{Pos: evn.getName().start(), Underlying: fmt.Errorf("%s: value %s is using a reserved name", scope, ev.GetName())}
+		}
+		// check reserved ranges
+		r := sort.Search(len(rsvd), func(index int) bool { return rsvd[index].end >= ev.GetNumber() })
+		if r < len(rsvd) && rsvd[r].start <= ev.GetNumber() {
+			return ErrorWithSourcePos{Pos: evn.getNumber().start(), Underlying: fmt.Errorf("%s: value %s is using number %d which is in reserved range %d to %d", scope, ev.GetName(), ev.GetNumber(), rsvd[r].start, rsvd[r].end)}
+		}
+	}
+
 	return nil
 }
 
