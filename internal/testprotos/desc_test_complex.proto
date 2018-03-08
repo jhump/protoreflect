@@ -60,11 +60,11 @@ enum EnumWithReservations {
 	X = 2;
 	Y = 3;
 	Z = 4;
-	reserved -5 to -3;
+	reserved 1000 to max;
 	reserved -2 to 1;
 	reserved 5 to 10, 12 to 15, 18;
-	reserved 1000 to max;
-	reserved "A", "B", "C";
+	reserved -5 to -3;
+	reserved "C", "B", "A";
 }
 
 message MessageWithReservations {
