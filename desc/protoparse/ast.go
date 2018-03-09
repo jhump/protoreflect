@@ -462,6 +462,12 @@ type fieldNode struct {
 }
 
 func (n *fieldNode) fieldLabel() node {
+	// proto3 fields and fields inside one-ofs will not have a label and we need
+	// this check in order to return a nil node -- otherwise we'd return a
+	// non-nil node that has a nil pointer value in it :/
+	if n.label == nil {
+		return nil
+	}
 	return n.label
 }
 
