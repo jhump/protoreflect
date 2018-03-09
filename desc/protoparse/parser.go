@@ -23,6 +23,49 @@ import (
 
 func init() {
 	protoErrorVerbose = true
+
+	// fix up the generated "token name" array so that error messages are nicer
+	setTokenName(_STRING_LIT, "string literal")
+	setTokenName(_INT_LIT, "int literal")
+	setTokenName(_FLOAT_LIT, "float literal")
+	setTokenName(_NAME, "identifier")
+	setTokenName(_FQNAME, "fully-qualified name")
+	setTokenName(_TYPENAME, "type name")
+	setTokenName(_TYPENAME, "error")
+	// for keywords, just show the keyword itself wrapped in quotes
+	for str, i := range keywords {
+		setTokenName(i, fmt.Sprintf(`"%s"`, str))
+	}
+}
+
+func setTokenName(token int, text string) {
+	// NB: this is based on logic in generated parse code that translates the
+	// int returned from the lexer into an internal token number.
+	var intern int
+	if token < len(protoTok1) {
+		intern = protoTok1[token]
+	} else {
+		if token >= protoPrivate {
+			if token < protoPrivate+len(protoTok2) {
+				intern = protoTok2[token-protoPrivate]
+			}
+		}
+		if intern == 0 {
+			for i := 0; i+1 < len(protoTok3); i += 2 {
+				if protoTok3[i] == token {
+					intern = protoTok3[i+1]
+					break
+				}
+			}
+		}
+	}
+
+	if intern >= 1 && intern-1 < len(protoToknames) {
+		protoToknames[intern-1] = text
+		return
+	}
+
+	panic(fmt.Sprintf("Unknown token value: %d", token))
 }
 
 // FileAccessor is an abstraction for opening proto source files. It takes the

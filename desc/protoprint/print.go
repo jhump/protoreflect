@@ -313,7 +313,7 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 	for i, el := range elements.addrs {
 		d := elements.at(el)
 		// skip[d] will panic if d is a slice (which it could be for []option),
-		// so just ignore since don't try to skip options
+		// so just ignore it since we don't try to skip options
 		if reflect.TypeOf(d).Kind() != reflect.Slice && skip[d] {
 			// skip this element
 			continue
