@@ -149,12 +149,16 @@ func (m *Message) Descriptor() ([]byte, []int) {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to get encoded descriptor for %s", m.md.GetFile().GetName()))
 	}
+	err = w.Close()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to get an encoded descriptor for %s", m.md.GetFile().GetName()))
+	}
 
 	// and path to message
 	path := []int{}
 	var d desc.Descriptor
 	name := m.md.GetFullyQualifiedName()
-	for d = m.md; d != nil; d = d.GetParent() {
+	for d = m.md.GetParent(); d != nil; d = d.GetParent() {
 		found := false
 		switch d := d.(type) {
 		case (*desc.FileDescriptor):
@@ -178,7 +182,7 @@ func (m *Message) Descriptor() ([]byte, []int) {
 	}
 	// reverse the path
 	i := 0
-	j := len(path)
+	j := len(path) - 1
 	for i < j {
 		path[i], path[j] = path[j], path[i]
 		i++
