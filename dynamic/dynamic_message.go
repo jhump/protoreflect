@@ -166,6 +166,9 @@ func (m *Message) Descriptor() ([]byte, []int) {
 				if md.GetFullyQualifiedName() == name {
 					found = true
 					path = append(path, i)
+					if p := md.GetParent(); p != nil {
+						name = p.GetFullyQualifiedName()
+					}
 				}
 			}
 		case (*desc.MessageDescriptor):
@@ -173,6 +176,9 @@ func (m *Message) Descriptor() ([]byte, []int) {
 				if md.GetFullyQualifiedName() == name {
 					found = true
 					path = append(path, i)
+					if p := md.GetParent(); p != nil {
+						name = p.GetFullyQualifiedName()
+					}
 				}
 			}
 		}
