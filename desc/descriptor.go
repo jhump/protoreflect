@@ -1751,6 +1751,14 @@ func LoadMessageDescriptorForType(messageType reflect.Type) (*MessageDescriptor,
 // returned by message.Descriptor(). If the given type is not recognized, then a nil
 // descriptor is returned.
 func LoadMessageDescriptorForMessage(message proto.Message) (*MessageDescriptor, error) {
+	// efficiently handle dynamic messages
+	type descriptorable interface {
+		GetMessageDescriptor() *MessageDescriptor
+	}
+	if d, ok := message.(descriptorable); ok {
+		return d.GetMessageDescriptor(), nil
+	}
+
 	name := proto.MessageName(message)
 	if name == "" {
 		return nil, nil
