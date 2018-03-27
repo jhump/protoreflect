@@ -1971,6 +1971,30 @@ func TestBuiltMessage(t *testing.T) {
 	}
 }
 
+func TestBuiltNestedMessage(t *testing.T) {
+	submb := builder.NewMessage("Limb").
+		AddField(builder.NewField("length", builder.FieldTypeUInt32()))
+
+	md, err := builder.NewMessage("Person").
+		AddField(builder.NewField("name", builder.FieldTypeString())).
+		AddNestedMessage(submb).
+		Build()
+
+	if err != nil {
+		t.Fatalf("error building Person: %v", err)
+	}
+
+	nmt := md.GetNestedMessageTypes()[0]
+
+	msg := NewMessage(nmt)
+	msg.SetFieldByNumber(1, uint32(40))
+
+	_, err = desc.LoadMessageDescriptorForMessage(msg)
+	if err != nil {
+		t.Fatalf("error loading Person.Limb's message descriptor: %v", err)
+	}
+}
+
 type panicError struct {
 	panic interface{}
 }
