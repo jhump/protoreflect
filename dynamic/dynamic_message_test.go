@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/builder"
 	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
@@ -1950,6 +1951,24 @@ func TestMergeInto(t *testing.T) {
 
 func TestMergeFrom(t *testing.T) {
 	// TODO
+}
+
+func TestBuiltMessage(t *testing.T) {
+	md, err := builder.NewMessage("Person").
+		AddField(builder.NewField("name", builder.FieldTypeString())).
+		Build()
+
+	if err != nil {
+		t.Fatalf("error building Person: %v", err)
+	}
+
+	msg := NewMessage(md)
+	msg.SetFieldByNumber(1, "Cailin")
+
+	_, err = desc.LoadMessageDescriptorForMessage(msg)
+	if err != nil {
+		t.Fatalf("error loading Person's message descriptor: %v", err)
+	}
 }
 
 type panicError struct {
