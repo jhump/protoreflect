@@ -1959,7 +1959,7 @@ func TestGetDescriptor(t *testing.T) {
 		Descriptor() ([]byte, []int)
 	}
 
-	testCases := []struct{
+	testCases := []struct {
 		name   string
 		genMsg generatedMessage
 	}{
