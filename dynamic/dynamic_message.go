@@ -158,7 +158,7 @@ func (m *Message) Descriptor() ([]byte, []int) {
 	path := []int{}
 	var d desc.Descriptor
 	name := m.md.GetFullyQualifiedName()
-	for d = m.md.GetParent(); d != nil; d = d.GetParent() {
+	for d = m.md.GetParent(); d != nil; name, d = d.GetFullyQualifiedName(), d.GetParent() {
 		found := false
 		switch d := d.(type) {
 		case (*desc.FileDescriptor):
@@ -166,9 +166,6 @@ func (m *Message) Descriptor() ([]byte, []int) {
 				if md.GetFullyQualifiedName() == name {
 					found = true
 					path = append(path, i)
-					if p := md.GetParent(); p != nil {
-						name = p.GetFullyQualifiedName()
-					}
 				}
 			}
 		case (*desc.MessageDescriptor):
@@ -176,9 +173,6 @@ func (m *Message) Descriptor() ([]byte, []int) {
 				if md.GetFullyQualifiedName() == name {
 					found = true
 					path = append(path, i)
-					if p := md.GetParent(); p != nil {
-						name = p.GetFullyQualifiedName()
-					}
 				}
 			}
 		}

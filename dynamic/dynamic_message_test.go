@@ -9,6 +9,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/builder"
+	"github.com/jhump/protoreflect/internal"
 	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
@@ -1957,18 +1958,17 @@ func TestBuiltMessage(t *testing.T) {
 	md, err := builder.NewMessage("Person").
 		AddField(builder.NewField("name", builder.FieldTypeString())).
 		Build()
-
-	if err != nil {
-		t.Fatalf("error building Person: %v", err)
-	}
+	testutil.Ok(t, err, "failed to build message")
 
 	msg := NewMessage(md)
-	msg.SetFieldByNumber(1, "Cailin")
+	gzipped, actualPath := msg.Descriptor()
+	_, expectedPath := (*testprotos.TestMessage)(nil).Descriptor()
+	testutil.Eq(t, expectedPath, actualPath, "descriptor paths are not the same")
 
-	_, err = desc.LoadMessageDescriptorForMessage(msg)
-	if err != nil {
-		t.Fatalf("error loading Person's message descriptor: %v", err)
-	}
+	actualFd, err := internal.DecodeFileDescriptor("test", gzipped)
+	testutil.Ok(t, err, "failed to decode gzipped descriptor")
+
+	testutil.Ceq(t, md.GetFile().AsFileDescriptorProto(), actualFd, eqpm, "file descriptors are not the same")
 }
 
 func TestBuiltNestedMessage(t *testing.T) {
@@ -1979,20 +1979,18 @@ func TestBuiltNestedMessage(t *testing.T) {
 		AddField(builder.NewField("name", builder.FieldTypeString())).
 		AddNestedMessage(submb).
 		Build()
-
-	if err != nil {
-		t.Fatalf("error building Person: %v", err)
-	}
+	testutil.Ok(t, err, "failed to build message")
 
 	nmt := md.GetNestedMessageTypes()[0]
-
 	msg := NewMessage(nmt)
-	msg.SetFieldByNumber(1, uint32(40))
+	gzipped, actualPath := msg.Descriptor()
+	_, expectedPath := (*testprotos.TestMessage_NestedMessage)(nil).Descriptor()
+	testutil.Eq(t, expectedPath, actualPath, "descriptor paths are not the same")
 
-	_, err = desc.LoadMessageDescriptorForMessage(msg)
-	if err != nil {
-		t.Fatalf("error loading Person.Limb's message descriptor: %v", err)
-	}
+	actualFd, err := internal.DecodeFileDescriptor("test", gzipped)
+	testutil.Ok(t, err, "failed to decode gzipped descriptor")
+
+	testutil.Ceq(t, md.GetFile().AsFileDescriptorProto(), actualFd, eqpm, "file descriptors are not the same")
 }
 
 type panicError struct {
