@@ -8,6 +8,8 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/builder"
+	"github.com/jhump/protoreflect/internal"
 	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
@@ -1950,6 +1952,45 @@ func TestMergeInto(t *testing.T) {
 
 func TestMergeFrom(t *testing.T) {
 	// TODO
+}
+
+func TestBuiltMessage(t *testing.T) {
+	md, err := builder.NewMessage("Person").
+		AddField(builder.NewField("name", builder.FieldTypeString())).
+		Build()
+	testutil.Ok(t, err, "failed to build message")
+
+	msg := NewMessage(md)
+	gzipped, actualPath := msg.Descriptor()
+	_, expectedPath := (*testprotos.TestMessage)(nil).Descriptor()
+	testutil.Eq(t, expectedPath, actualPath, "descriptor paths are not the same")
+
+	actualFd, err := internal.DecodeFileDescriptor("test", gzipped)
+	testutil.Ok(t, err, "failed to decode gzipped descriptor")
+
+	testutil.Ceq(t, md.GetFile().AsFileDescriptorProto(), actualFd, eqpm, "file descriptors are not the same")
+}
+
+func TestBuiltNestedMessage(t *testing.T) {
+	submb := builder.NewMessage("Limb").
+		AddField(builder.NewField("length", builder.FieldTypeUInt32()))
+
+	md, err := builder.NewMessage("Person").
+		AddField(builder.NewField("name", builder.FieldTypeString())).
+		AddNestedMessage(submb).
+		Build()
+	testutil.Ok(t, err, "failed to build message")
+
+	nmt := md.GetNestedMessageTypes()[0]
+	msg := NewMessage(nmt)
+	gzipped, actualPath := msg.Descriptor()
+	_, expectedPath := (*testprotos.TestMessage_NestedMessage)(nil).Descriptor()
+	testutil.Eq(t, expectedPath, actualPath, "descriptor paths are not the same")
+
+	actualFd, err := internal.DecodeFileDescriptor("test", gzipped)
+	testutil.Ok(t, err, "failed to decode gzipped descriptor")
+
+	testutil.Ceq(t, md.GetFile().AsFileDescriptorProto(), actualFd, eqpm, "file descriptors are not the same")
 }
 
 type panicError struct {
