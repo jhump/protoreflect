@@ -8,7 +8,6 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/builder"
 	"github.com/jhump/protoreflect/internal"
 	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
@@ -1954,43 +1953,37 @@ func TestMergeFrom(t *testing.T) {
 	// TODO
 }
 
-func TestBuiltMessage(t *testing.T) {
-	md, err := builder.NewMessage("Person").
-		AddField(builder.NewField("name", builder.FieldTypeString())).
-		Build()
-	testutil.Ok(t, err, "failed to build message")
+func TestGetDescriptor(t *testing.T) {
+	type generatedMessage interface {
+		proto.Message
+		Descriptor() ([]byte, []int)
+	}
 
-	msg := NewMessage(md)
-	gzipped, actualPath := msg.Descriptor()
-	_, expectedPath := (*testprotos.TestMessage)(nil).Descriptor()
-	testutil.Eq(t, expectedPath, actualPath, "descriptor paths are not the same")
+	testCases := []struct{
+		name   string
+		genMsg generatedMessage
+	}{
+		{name: "top-level message", genMsg: (*testprotos.TestMessage)(nil)},
+		{name: "nested message", genMsg: (*testprotos.TestMessage_NestedMessage)(nil)},
+		{name: "deeply nested message", genMsg: (*testprotos.TestMessage_NestedMessage_AnotherNestedMessage_YetAnotherNestedMessage)(nil)},
+	}
+	for _, testCase := range testCases {
+		md, err := desc.LoadMessageDescriptorForMessage(testCase.genMsg)
+		testutil.Ok(t, err, "%s: failed to load descriptor", testCase.name)
 
-	actualFd, err := internal.DecodeFileDescriptor("test", gzipped)
-	testutil.Ok(t, err, "failed to decode gzipped descriptor")
+		dynMsg := NewMessage(md)
+		actualBytes, actualPath := dynMsg.Descriptor()
 
-	testutil.Ceq(t, md.GetFile().AsFileDescriptorProto(), actualFd, eqpm, "file descriptors are not the same")
-}
+		expectedBytes, expectedPath := testCase.genMsg.Descriptor()
+		testutil.Eq(t, expectedPath, actualPath, "%s: descriptor paths are not the same", testCase.name)
 
-func TestBuiltNestedMessage(t *testing.T) {
-	submb := builder.NewMessage("Limb").
-		AddField(builder.NewField("length", builder.FieldTypeUInt32()))
+		actualFd, err := internal.DecodeFileDescriptor("TestMessage", actualBytes)
+		testutil.Ok(t, err, "%s: failed to decode descriptor from bytes", testCase.name)
+		expectedFd, err := internal.DecodeFileDescriptor("TestMessage", expectedBytes)
+		testutil.Ok(t, err, "%s: failed to decode descriptor from bytes", testCase.name)
 
-	md, err := builder.NewMessage("Person").
-		AddField(builder.NewField("name", builder.FieldTypeString())).
-		AddNestedMessage(submb).
-		Build()
-	testutil.Ok(t, err, "failed to build message")
-
-	nmt := md.GetNestedMessageTypes()[0]
-	msg := NewMessage(nmt)
-	gzipped, actualPath := msg.Descriptor()
-	_, expectedPath := (*testprotos.TestMessage_NestedMessage)(nil).Descriptor()
-	testutil.Eq(t, expectedPath, actualPath, "descriptor paths are not the same")
-
-	actualFd, err := internal.DecodeFileDescriptor("test", gzipped)
-	testutil.Ok(t, err, "failed to decode gzipped descriptor")
-
-	testutil.Ceq(t, md.GetFile().AsFileDescriptorProto(), actualFd, eqpm, "file descriptors are not the same")
+		testutil.Ceq(t, expectedFd, actualFd, eqpm, "%s: descriptors do not match", testCase.name)
+	}
 }
 
 type panicError struct {

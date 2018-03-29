@@ -141,17 +141,15 @@ func (m *Message) Descriptor() ([]byte, []int) {
 	// get encoded file descriptor
 	b, err := proto.Marshal(m.md.GetFile().AsProto())
 	if err != nil {
-		panic(fmt.Sprintf("Failed to get encoded descriptor for %s", m.md.GetFile().GetName()))
+		panic(fmt.Sprintf("Failed to get encoded descriptor for %s: %v", m.md.GetFile().GetName(), err))
 	}
 	var zippedBytes bytes.Buffer
 	w := gzip.NewWriter(&zippedBytes)
-	_, err = w.Write(b)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to get encoded descriptor for %s", m.md.GetFile().GetName()))
+	if _, err := w.Write(b); err != nil {
+		panic(fmt.Sprintf("Failed to get encoded descriptor for %s: %v", m.md.GetFile().GetName(), err))
 	}
-	err = w.Close()
-	if err != nil {
-		panic(fmt.Sprintf("Failed to get an encoded descriptor for %s", m.md.GetFile().GetName()))
+	if err := w.Close(); err != nil {
+		panic(fmt.Sprintf("Failed to get an encoded descriptor for %s: %v", m.md.GetFile().GetName(), err))
 	}
 
 	// and path to message
@@ -177,7 +175,7 @@ func (m *Message) Descriptor() ([]byte, []int) {
 			}
 		}
 		if !found {
-			panic(fmt.Sprintf("Failed to get descriptor path for %s", m.md.GetFullyQualifiedName()))
+			panic(fmt.Sprintf("Failed to compute descriptor path for %s", m.md.GetFullyQualifiedName()))
 		}
 	}
 	// reverse the path
