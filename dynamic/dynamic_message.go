@@ -86,6 +86,15 @@ func NewMessage(md *desc.MessageDescriptor) *Message {
 	return newMessageWithMessageFactory(md, nil)
 }
 
+// NewMessageWithExtensionRegistry creates a new dynamic message for the type
+// represented by the given message descriptor. During de-serialization, the given
+// ExtensionRegistry is used to parse extension fields and nested messages will be
+// instantiated using dynamic.NewMessageFactoryWithExtensionRegistry(er).
+func NewMessageWithExtensionRegistry(md *desc.MessageDescriptor, er *ExtensionRegistry) *Message {
+	mf := NewMessageFactoryWithExtensionRegistry(er)
+	return newMessageWithMessageFactory(md, mf)
+}
+
 func newMessageWithMessageFactory(md *desc.MessageDescriptor, mf *MessageFactory) *Message {
 	var er *ExtensionRegistry
 	if mf != nil {
