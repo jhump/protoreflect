@@ -510,12 +510,12 @@ func (m *Message) unmarshalText(tr *txtReader, end tokenType) error {
 		if tok.tokTyp == tokenEOF {
 			return io.ErrUnexpectedEOF
 		}
-		if fd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP {
-			if tok.tokTyp != tokenOpenBrace {
-				return textError(tok, "Expecting a brace '{'; instead got %q", tok.txt)
-			}
+		if (fd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP ||
+			fd.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE) &&
+			tok.tokTyp == tokenOpenBrace {
+
 			// TODO: use mf.NewMessage and, if not a dynamic message, use proto.UnmarshalText to unmarshal it
-			g := newMessageWithMessageFactory(fd.GetMessageType(), m.mf)
+			g := m.mf.NewDynamicMessage(fd.GetMessageType())
 			if err := g.unmarshalText(tr, tokenCloseBrace); err != nil {
 				return err
 			}
@@ -688,10 +688,19 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 			}
 		}
 		expected = fmt.Sprintf("enum %s value", fd.GetEnumType().GetFullyQualifiedName())
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		if tok.tokTyp == tokenOpenAngle {
+	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
+		descriptor.FieldDescriptorProto_TYPE_GROUP:
+
+		var endTok tokenType
+		switch tok.tokTyp {
+		case tokenOpenAngle:
+			endTok = tokenCloseAngle
+		case tokenOpenBrace:
+			endTok = tokenCloseBrace
+		}
+		if endTok != 0 {
 			dm := newMessageWithMessageFactory(fd.GetMessageType(), m.mf)
-			if err := dm.unmarshalText(tr, tokenCloseAngle); err != nil {
+			if err := dm.unmarshalText(tr, endTok); err != nil {
 				return err
 			}
 			// TODO: ideally we would use mf.NewMessage and, if not a dynamic message, use
