@@ -481,8 +481,8 @@ func (m *Message) unmarshalText(tr *txtReader, end tokenType) error {
 					return textError(tok, "Expecting a colon ':' or brace '{'; instead got %q", tok.txt)
 				}
 				tok = tr.peek()
-				if tok.tokTyp == tokenComma {
-					tr.next() // consume tok
+				if tok.tokTyp.IsSep() {
+					tr.next() // consume separator
 				}
 				continue
 			}
@@ -512,11 +512,11 @@ func (m *Message) unmarshalText(tr *txtReader, end tokenType) error {
 		}
 		if (fd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP ||
 			fd.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE) &&
-			tok.tokTyp == tokenOpenBrace {
+			tok.tokTyp.EndToken() != tokenError {
 
 			// TODO: use mf.NewMessage and, if not a dynamic message, use proto.UnmarshalText to unmarshal it
 			g := m.mf.NewDynamicMessage(fd.GetMessageType())
-			if err := g.unmarshalText(tr, tokenCloseBrace); err != nil {
+			if err := g.unmarshalText(tr, tok.tokTyp.EndToken()); err != nil {
 				return err
 			}
 			if fd.IsRepeated() {
@@ -537,8 +537,8 @@ func (m *Message) unmarshalText(tr *txtReader, end tokenType) error {
 			}
 		}
 		tok = tr.peek()
-		if tok.tokTyp == tokenComma {
-			tr.next() // consume tok
+		if tok.tokTyp.IsSep() {
+			tr.next() // consume separator
 		}
 	}
 	return nil
@@ -574,8 +574,8 @@ func (m *Message) unmarshalFieldValueText(fd *desc.FieldDescriptor, tr *txtReade
 			if tok.tokTyp == tokenCloseBracket {
 				tr.next() // consume tok
 				return nil
-			} else if tok.tokTyp == tokenComma {
-				tr.next() // consume tok
+			} else if tok.tokTyp.IsSep() {
+				tr.next() // consume separator
 			}
 		}
 	}
@@ -691,14 +691,8 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
 		descriptor.FieldDescriptorProto_TYPE_GROUP:
 
-		var endTok tokenType
-		switch tok.tokTyp {
-		case tokenOpenAngle:
-			endTok = tokenCloseAngle
-		case tokenOpenBrace:
-			endTok = tokenCloseBrace
-		}
-		if endTok != 0 {
+		endTok := tok.tokTyp.EndToken()
+		if endTok != tokenError {
 			dm := newMessageWithMessageFactory(fd.GetMessageType(), m.mf)
 			if err := dm.unmarshalText(tr, endTok); err != nil {
 				return err
@@ -794,9 +788,10 @@ func skipFieldValueText(tr *txtReader) error {
 			if tok.tokTyp == tokenCloseBracket {
 				tr.next() // consume tok
 				return nil
-			} else if tok.tokTyp == tokenComma {
-				tr.next() // consume tok
+			} else if tok.tokTyp.IsSep() {
+				tr.next() // consume separator
 			}
+
 		}
 	}
 	return skipFieldElementText(tr)
@@ -849,8 +844,8 @@ func skipMessageText(tr *txtReader, isGroup bool) error {
 		}
 
 		tok = tr.peek()
-		if tok.tokTyp == tokenComma {
-			tr.next() // consume comma
+		if tok.tokTyp.IsSep() {
+			tr.next() // consume separator
 		}
 	}
 }
@@ -866,6 +861,7 @@ const (
 	tokenFloat
 	tokenColon
 	tokenComma
+	tokenSemiColon
 	tokenOpenBrace
 	tokenCloseBrace
 	tokenOpenBracket
@@ -875,6 +871,21 @@ const (
 	tokenOpenParen
 	tokenCloseParen
 )
+
+func (t tokenType) IsSep() bool {
+	return t == tokenComma || t == tokenSemiColon
+}
+
+func (t tokenType) EndToken() tokenType {
+	switch t {
+	case tokenOpenAngle:
+		return tokenCloseAngle
+	case tokenOpenBrace:
+		return tokenCloseBrace
+	default:
+		return tokenError
+	}
+}
 
 type token struct {
 	tokTyp tokenType
@@ -978,6 +989,9 @@ func (p *txtReader) processToken(t rune, text string, pos scanner.Position) erro
 	case ',':
 		p.peeked.tokTyp = tokenComma
 		p.peeked.val = ','
+	case ';':
+		p.peeked.tokTyp = tokenSemiColon
+		p.peeked.val = ';'
 	case '{':
 		p.peeked.tokTyp = tokenOpenBrace
 		p.peeked.val = '{'

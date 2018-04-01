@@ -69,18 +69,28 @@ func TestTextLenientParsing(t *testing.T) {
 			expected: expectedTestMsg,
 		},
 		{
+			// angle bracket but no colon
+			text:     `ne: VALUE1 ne: VALUE2 anm<yanm<foo:"bar" bar:42 baz:"foo">>`,
+			expected: expectedTestMsg,
+		},
+		{
 			// refer to field by tag
 			text:     `4: VALUE1 4: VALUE2 2:<1:<1:"bar" 2:42 3:"foo">>`,
 			expected: expectedTestMsg,
 		},
 		{
 			// repeated fields w/ array syntax, no commas
-			text:     `ne: [VALUE1, VALUE2] anm:<yanm:<foo:"bar" bar:42 baz:"foo">>`,
+			text:     `ne: [VALUE1 VALUE2] anm:<yanm:<foo:"bar" bar:42 baz:"foo">>`,
 			expected: expectedTestMsg,
 		},
 		{
 			// repeated fields w/ array syntax, commas
 			text:     `ne: [VALUE1, VALUE2], anm:<yanm:<foo:"bar", bar:42, baz:"foo",>>`,
+			expected: expectedTestMsg,
+		},
+		{
+			// repeated fields w/ array syntax, semicolons
+			text:     `ne: [VALUE1; VALUE2]; anm:<yanm:<foo:"bar"; bar:42; baz:"foo";>>`,
 			expected: expectedTestMsg,
 		},
 		{
