@@ -314,6 +314,9 @@ aggField : aggFieldEntry
 	| aggFieldEntry ',' {
 		$$ = $1
 	}
+	| aggFieldEntry ';' {
+		$$ = $1
+	}
 
 aggFieldEntry : aggName ':' scalarConstant {
 		a := &aggregateEntryNode{name: $1, val: $3}
@@ -374,12 +377,20 @@ constantList : constant {
 	| constantList ',' constant {
 		$$ = append($1, $3)
 	}
+	| constantList ';' constant {
+		$$ = append($1, $3)
+	}
 	| '<' aggFields '>' {
 		s := &aggregateLiteralNode{elements: $2}
 		s.setRange($1, $3)
 		$$ = []valueNode{s}
 	}
 	| constantList ','  '<' aggFields '>' {
+		s := &aggregateLiteralNode{elements: $4}
+		s.setRange($3, $5)
+		$$ = append($1, s)
+	}
+	| constantList ';'  '<' aggFields '>' {
 		s := &aggregateLiteralNode{elements: $4}
 		s.setRange($3, $5)
 		$$ = append($1, s)
