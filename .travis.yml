@@ -3,11 +3,21 @@ sudo: false
 
 matrix:
   include:
-    - go: 1.6
-    - go: 1.7
-    - go: 1.8
-    - go: 1.9
+    - go: "1.7"
+    - go: "1.8"
+    - go: "1.9"
+    - go: "1.10"
     - go: tip
 
+before_install:
+  - mkdir -p $TRAVIS_BUILD_DIR $GOPATH/src/github.com/jhump
+  - test ! -d $GOPATH/src/github.com/jhump/protoreflect && mv $TRAVIS_BUILD_DIR $GOPATH/src/github.com/jhump/protoreflect || true
+
+install:
+  - make install
+
 script:
-  - ./ci.sh
+  - make test
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash) -f coverage.out
