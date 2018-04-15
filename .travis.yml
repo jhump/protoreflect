@@ -9,15 +9,10 @@ matrix:
     - go: "1.10"
     - go: tip
 
+# accomodate forks
 before_install:
   - mkdir -p $TRAVIS_BUILD_DIR $GOPATH/src/github.com/jhump
   - test ! -d $GOPATH/src/github.com/jhump/protoreflect && mv $TRAVIS_BUILD_DIR $GOPATH/src/github.com/jhump/protoreflect || true
 
-install:
-  - make deps
-
 script:
-  - make ci
-
-after_success:
-  - bash <(curl -s https://codecov.io/bash) -f coverage.out
+  - make
