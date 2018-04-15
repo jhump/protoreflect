@@ -14,10 +14,10 @@ before_install:
   - test ! -d $GOPATH/src/github.com/jhump/protoreflect && mv $TRAVIS_BUILD_DIR $GOPATH/src/github.com/jhump/protoreflect || true
 
 install:
-  - make install
+  - make deps
 
 script:
-  - make test
+  - make ci
 
 after_success:
   - bash <(curl -s https://codecov.io/bash) -f coverage.out
