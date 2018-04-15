@@ -19,9 +19,12 @@ install:
 
 .PHONY: checkgofmt
 checkgofmt:
-		gofmt -s -l .
-		@if [ -n "$$(gofmt -s -l .)"  ]; then \
-			exit 1; \
+		@if [ -n "$$(go version | awk '{ print $$3 }' | grep -v devel)" ]; then \
+			gofmt -s -l . ; \
+			if [ -n "$$(gofmt -s -l .)"  ]; then \
+				echo "Run gofmt on the above files!"; \
+				exit 1; \
+			fi; \
 		fi
 
 # workaround https://github.com/golang/protobuf/issues/214 until in master
