@@ -17,7 +17,7 @@ type runeReader struct {
 	err    error
 }
 
-func (rr *runeReader) ReadRune() (r rune, size int, err error) {
+func (rr *runeReader) readRune() (r rune, size int, err error) {
 	if rr.err != nil {
 		return 0, 0, rr.err
 	}
@@ -33,7 +33,7 @@ func (rr *runeReader) ReadRune() (r rune, size int, err error) {
 	return r, sz, err
 }
 
-func (rr *runeReader) UnreadRune(r rune) {
+func (rr *runeReader) unreadRune(r rune) {
 	rr.unread = append(rr.unread, r)
 }
 
@@ -253,7 +253,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 	}
 
 	for {
-		c, n, err := l.input.ReadRune()
+		c, n, err := l.input.readRune()
 		if err == io.EOF {
 			// we're not actually returning a rune, but this will associate
 			// accumulated comments as a trailing comment on last symbol
@@ -284,7 +284,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 
 		if c == '.' {
 			// tokens that start with a dot include type names and decimal literals
-			cn, _, err := l.input.ReadRune()
+			cn, _, err := l.input.readRune()
 			if err != nil {
 				setRune()
 				return int(c)
@@ -308,7 +308,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 				setFloat(f)
 				return _FLOAT_LIT
 			}
-			l.input.UnreadRune(cn)
+			l.input.unreadRune(cn)
 			setRune()
 			return int(c)
 		}
@@ -333,15 +333,15 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 		if c >= '0' && c <= '9' {
 			// integer or float literal
 			if c == '0' {
-				cn, _, err := l.input.ReadRune()
+				cn, _, err := l.input.readRune()
 				if err != nil {
 					setInt(0)
 					return _INT_LIT
 				}
 				if cn == 'x' || cn == 'X' {
-					cnn, _, err := l.input.ReadRune()
+					cnn, _, err := l.input.readRune()
 					if err != nil {
-						l.input.UnreadRune(cn)
+						l.input.unreadRune(cn)
 						setInt(0)
 						return _INT_LIT
 					}
@@ -358,12 +358,12 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 						setInt(ui)
 						return _INT_LIT
 					}
-					l.input.UnreadRune(cnn)
-					l.input.UnreadRune(cn)
+					l.input.unreadRune(cnn)
+					l.input.unreadRune(cn)
 					setInt(0)
 					return _INT_LIT
 				} else {
-					l.input.UnreadRune(cn)
+					l.input.unreadRune(cn)
 				}
 			}
 			token := []rune{c}
@@ -402,7 +402,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 
 		if c == '/' {
 			// comment
-			cn, _, err := l.input.ReadRune()
+			cn, _, err := l.input.readRune()
 			if err != nil {
 				setRune()
 				return int(c)
@@ -429,7 +429,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 				}
 				continue
 			}
-			l.input.UnreadRune(cn)
+			l.input.unreadRune(cn)
 		}
 
 		setRune()
@@ -440,24 +440,24 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 func (l *protoLex) readNumber(sofar []rune, allowDot bool, allowExp bool) []rune {
 	token := sofar
 	for {
-		c, _, err := l.input.ReadRune()
+		c, _, err := l.input.readRune()
 		if err != nil {
 			break
 		}
 		if c == '.' {
 			if !allowDot {
-				l.input.UnreadRune(c)
+				l.input.unreadRune(c)
 				break
 			}
 			allowDot = false
-			cn, _, err := l.input.ReadRune()
+			cn, _, err := l.input.readRune()
 			if err != nil {
-				l.input.UnreadRune(c)
+				l.input.unreadRune(c)
 				break
 			}
 			if cn < '0' || cn > '9' {
-				l.input.UnreadRune(cn)
-				l.input.UnreadRune(c)
+				l.input.unreadRune(cn)
+				l.input.unreadRune(c)
 				break
 			}
 			l.colNo++
@@ -465,26 +465,26 @@ func (l *protoLex) readNumber(sofar []rune, allowDot bool, allowExp bool) []rune
 			c = cn
 		} else if c == 'e' || c == 'E' {
 			if !allowExp {
-				l.input.UnreadRune(c)
+				l.input.unreadRune(c)
 				break
 			}
 			allowExp = false
-			cn, _, err := l.input.ReadRune()
+			cn, _, err := l.input.readRune()
 			if err != nil {
-				l.input.UnreadRune(c)
+				l.input.unreadRune(c)
 				break
 			}
 			if cn == '-' || cn == '+' {
-				cnn, _, err := l.input.ReadRune()
+				cnn, _, err := l.input.readRune()
 				if err != nil {
-					l.input.UnreadRune(cn)
-					l.input.UnreadRune(c)
+					l.input.unreadRune(cn)
+					l.input.unreadRune(c)
 					break
 				}
 				if cnn < '0' || cnn > '9' {
-					l.input.UnreadRune(cnn)
-					l.input.UnreadRune(cn)
-					l.input.UnreadRune(c)
+					l.input.unreadRune(cnn)
+					l.input.unreadRune(cn)
+					l.input.unreadRune(c)
 					break
 				}
 				l.colNo++
@@ -492,15 +492,15 @@ func (l *protoLex) readNumber(sofar []rune, allowDot bool, allowExp bool) []rune
 				c = cn
 				cn = cnn
 			} else if cn < '0' || cn > '9' {
-				l.input.UnreadRune(cn)
-				l.input.UnreadRune(c)
+				l.input.unreadRune(cn)
+				l.input.unreadRune(c)
 				break
 			}
 			l.colNo++
 			token = append(token, c)
 			c = cn
 		} else if c < '0' || c > '9' {
-			l.input.UnreadRune(c)
+			l.input.unreadRune(c)
 			break
 		}
 		l.colNo++
@@ -512,12 +512,12 @@ func (l *protoLex) readNumber(sofar []rune, allowDot bool, allowExp bool) []rune
 func (l *protoLex) readHexNumber(sofar []rune) []rune {
 	token := sofar
 	for {
-		c, _, err := l.input.ReadRune()
+		c, _, err := l.input.readRune()
 		if err != nil {
 			break
 		}
 		if (c < 'a' || c > 'f') && (c < 'A' || c > 'F') && (c < '0' || c > '9') {
-			l.input.UnreadRune(c)
+			l.input.unreadRune(c)
 			break
 		}
 		l.colNo++
@@ -529,26 +529,26 @@ func (l *protoLex) readHexNumber(sofar []rune) []rune {
 func (l *protoLex) readIdentifier(sofar []rune) []rune {
 	token := sofar
 	for {
-		c, _, err := l.input.ReadRune()
+		c, _, err := l.input.readRune()
 		if err != nil {
 			break
 		}
 		if c == '.' {
-			cn, _, err := l.input.ReadRune()
+			cn, _, err := l.input.readRune()
 			if err != nil {
-				l.input.UnreadRune(c)
+				l.input.unreadRune(c)
 				break
 			}
 			if cn != '_' && (cn < 'a' || cn > 'z') && (cn < 'A' || cn > 'Z') {
-				l.input.UnreadRune(cn)
-				l.input.UnreadRune(c)
+				l.input.unreadRune(cn)
+				l.input.unreadRune(c)
 				break
 			}
 			l.colNo++
 			token = append(token, c)
 			c = cn
 		} else if c != '_' && (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') {
-			l.input.UnreadRune(c)
+			l.input.unreadRune(c)
 			break
 		}
 		l.colNo++
@@ -560,7 +560,7 @@ func (l *protoLex) readIdentifier(sofar []rune) []rune {
 func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 	var buf bytes.Buffer
 	for {
-		c, _, err := l.input.ReadRune()
+		c, _, err := l.input.readRune()
 		if err != nil {
 			if err == io.EOF {
 				err = io.ErrUnexpectedEOF
@@ -581,25 +581,25 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 		}
 		if c == '\\' {
 			// escape sequence
-			c, _, err = l.input.ReadRune()
+			c, _, err = l.input.readRune()
 			if err != nil {
 				return "", err
 			}
 			l.colNo++
 			if c == 'x' || c == 'X' {
 				// hex escape
-				c, _, err := l.input.ReadRune()
+				c, _, err := l.input.readRune()
 				if err != nil {
 					return "", err
 				}
 				l.colNo++
-				c2, _, err := l.input.ReadRune()
+				c2, _, err := l.input.readRune()
 				if err != nil {
 					return "", err
 				}
 				var hex string
 				if (c2 < '0' || c2 > '9') && (c2 < 'a' || c2 > 'f') && (c2 < 'A' || c2 > 'F') {
-					l.input.UnreadRune(c2)
+					l.input.unreadRune(c2)
 					hex = string(c)
 				} else {
 					l.colNo++
@@ -613,22 +613,22 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 
 			} else if c >= '0' && c <= '7' {
 				// octal escape
-				c2, _, err := l.input.ReadRune()
+				c2, _, err := l.input.readRune()
 				if err != nil {
 					return "", err
 				}
 				var octal string
 				if c2 < '0' || c2 > '7' {
-					l.input.UnreadRune(c2)
+					l.input.unreadRune(c2)
 					octal = string(c)
 				} else {
 					l.colNo++
-					c3, _, err := l.input.ReadRune()
+					c3, _, err := l.input.readRune()
 					if err != nil {
 						return "", err
 					}
 					if c3 < '0' || c3 > '7' {
-						l.input.UnreadRune(c3)
+						l.input.unreadRune(c3)
 						octal = string([]rune{c, c2})
 					} else {
 						l.colNo++
@@ -648,7 +648,7 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 				// short unicode escape
 				u := make([]rune, 4)
 				for i := range u {
-					c, _, err := l.input.ReadRune()
+					c, _, err := l.input.readRune()
 					if err != nil {
 						return "", err
 					}
@@ -665,7 +665,7 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 				// long unicode escape
 				u := make([]rune, 8)
 				for i := range u {
-					c, _, err := l.input.ReadRune()
+					c, _, err := l.input.readRune()
 					if err != nil {
 						return "", err
 					}
@@ -716,7 +716,7 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 func (l *protoLex) skipToEndOfLineComment() (bool, string) {
 	txt := []rune{'/', '/'}
 	for {
-		c, _, err := l.input.ReadRune()
+		c, _, err := l.input.readRune()
 		if err != nil {
 			return false, string(txt)
 		}
@@ -731,7 +731,7 @@ func (l *protoLex) skipToEndOfLineComment() (bool, string) {
 func (l *protoLex) skipToEndOfBlockComment() (string, bool) {
 	txt := []rune{'/', '*'}
 	for {
-		c, _, err := l.input.ReadRune()
+		c, _, err := l.input.readRune()
 		if err != nil {
 			return "", false
 		}
@@ -743,7 +743,7 @@ func (l *protoLex) skipToEndOfBlockComment() (string, bool) {
 		}
 		txt = append(txt, c)
 		if c == '*' {
-			c, _, err := l.input.ReadRune()
+			c, _, err := l.input.readRune()
 			if err != nil {
 				return "", false
 			}
@@ -752,7 +752,7 @@ func (l *protoLex) skipToEndOfBlockComment() (string, bool) {
 				txt = append(txt, c)
 				return string(txt), true
 			}
-			l.input.UnreadRune(c)
+			l.input.unreadRune(c)
 		}
 	}
 }

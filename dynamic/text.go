@@ -430,7 +430,6 @@ func marshalUnknownGroupText(b *indentBuffer, in *codedBuffer, topLevel bool) er
 			}
 		}
 	}
-	return nil
 }
 
 func (m *Message) UnmarshalText(text []byte) error {
@@ -541,7 +540,6 @@ func (m *Message) unmarshalText(tr *txtReader, end tokenType) error {
 			tr.next() // consume separator
 		}
 	}
-	return nil
 }
 
 func textError(tok *token, format string, args ...interface{}) error {

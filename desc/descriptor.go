@@ -422,7 +422,9 @@ func createMessageDescriptor(fd *FileDescriptor, parent Descriptor, enclosing st
 		// proto.ExtensionRange is inclusive (and that's how extension ranges are defined in code).
 		// but protoc converts range to exclusive end in descriptor, so we must convert back
 		end := r.GetEnd() - 1
-		ret.extRanges = append(ret.extRanges, proto.ExtensionRange{r.GetStart(), end})
+		ret.extRanges = append(ret.extRanges, proto.ExtensionRange{
+			Start: r.GetStart(),
+			End:   end})
 	}
 	sort.Sort(ret.extRanges)
 	ret.isProto3 = fd.isProto3

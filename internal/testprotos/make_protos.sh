@@ -24,6 +24,8 @@ if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc ${PROTOC_VERSION}" ]]; 
   cd ./protoc && unzip protoc.zip && cd ..
 fi
 
+go install github.com/golang/protobuf/protoc-gen-go 
+
 # Output directory will effectively be GOPATH/src.
 outdir="../../../../.."
 ${PROTOC} "--go_out=plugins=grpc:$outdir" -I. *.proto

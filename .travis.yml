@@ -3,11 +3,16 @@ sudo: false
 
 matrix:
   include:
-    - go: 1.6
-    - go: 1.7
-    - go: 1.8
-    - go: 1.9
+    - go: "1.7"
+    - go: "1.8"
+    - go: "1.9"
+    - go: "1.10"
     - go: tip
 
+# accomodate forks
+before_install:
+  - mkdir -p $TRAVIS_BUILD_DIR $GOPATH/src/github.com/jhump
+  - test ! -d $GOPATH/src/github.com/jhump/protoreflect && mv $TRAVIS_BUILD_DIR $GOPATH/src/github.com/jhump/protoreflect || true
+
 script:
-  - ./ci.sh
+  - make
