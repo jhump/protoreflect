@@ -629,6 +629,18 @@ func (m *Message) TryGetMapField(fd *desc.FieldDescriptor, key interface{}) (int
 	return m.getMapField(fd, key)
 }
 
+func (m *Message) HasMapField(fd *desc.FieldDescriptor, key interface{}) bool {
+	if v, err := m.TryHasMapField(fd, key); err != nil {
+		panic(err.Error())
+	} else {
+		return v
+	}
+}
+
+func (m *Message) TryHasMapField(fd *desc.FieldDescriptor, key interface{}) (bool, error) {
+	return m.hasMapField(fd, key)
+}
+
 func (m *Message) GetMapFieldByName(name string, key interface{}) interface{} {
 	if v, err := m.TryGetMapFieldByName(name, key); err != nil {
 		panic(err.Error())
@@ -645,6 +657,22 @@ func (m *Message) TryGetMapFieldByName(name string, key interface{}) (interface{
 	return m.getMapField(fd, key)
 }
 
+func (m *Message) HasMapFieldByName(name string, key interface{}) bool {
+	if v, err := m.TryHasMapFieldByName(name, key); err != nil {
+		panic(err.Error())
+	} else {
+		return v
+	}
+}
+
+func (m *Message) TryHasMapFieldByName(name string, key interface{}) (bool, error) {
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return false, UnknownFieldNameError
+	}
+	return m.hasMapField(fd, key)
+}
+
 func (m *Message) GetMapFieldByNumber(tagNumber int, key interface{}) interface{} {
 	if v, err := m.TryGetMapFieldByNumber(tagNumber, key); err != nil {
 		panic(err.Error())
@@ -659,6 +687,22 @@ func (m *Message) TryGetMapFieldByNumber(tagNumber int, key interface{}) (interf
 		return nil, UnknownTagNumberError
 	}
 	return m.getMapField(fd, key)
+}
+
+func (m *Message) HasMapFieldByNumber(tagNumber int, key interface{}) bool {
+	if v, err := m.TryHasMapFieldByNumber(tagNumber, key); err != nil {
+		panic(err.Error())
+	} else {
+		return v
+	}
+}
+
+func (m *Message) TryHasMapFieldByNumber(tagNumber int, key interface{}) (bool, error) {
+	fd := m.FindFieldDescriptor(int32(tagNumber))
+	if fd == nil {
+		return false, UnknownTagNumberError
+	}
+	return m.hasMapField(fd, key)
 }
 
 func (m *Message) getMapField(fd *desc.FieldDescriptor, key interface{}) (interface{}, error) {
@@ -679,6 +723,27 @@ func (m *Message) getMapField(fd *desc.FieldDescriptor, key interface{}) (interf
 		}
 	}
 	return mp.(map[interface{}]interface{})[ki], nil
+}
+
+func (m *Message) hasMapField(fd *desc.FieldDescriptor, key interface{}) (bool, error) {
+	if !fd.IsMap() {
+		return false, FieldIsNotMapError
+	}
+	kfd := fd.GetMessageType().GetFields()[0]
+	ki, err := validElementFieldValue(kfd, key)
+	if err != nil {
+		return false, err
+	}
+	mp := m.values[fd.GetNumber()]
+	if mp == nil {
+		if mp, err = m.parseUnknownField(fd); err != nil {
+			return false, err
+		} else if mp == nil {
+			return false, nil
+		}
+	}
+	_, ok := mp.(map[interface{}]interface{})[ki]
+	return ok, nil
 }
 
 func (m *Message) PutMapField(fd *desc.FieldDescriptor, key interface{}, val interface{}) {
