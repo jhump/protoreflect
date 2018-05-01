@@ -77,7 +77,7 @@ generate:
 
 .PHONY: testcover
 testcover:
-	@echo go test -covermode=atomic ./... 
+	@echo go test -race -covermode=atomic ./...
 	@echo "mode: atomic" > coverage.out
 	@for dir in $$(go list ./...); do \
 		go test -race -coverprofile profile.out -covermode=atomic $$dir ; \
