@@ -52,6 +52,8 @@ const (
 	Enum_nameTag              = 1
 	Enum_valuesTag            = 2
 	Enum_optionsTag           = 3
+	Enum_reservedRangeTag     = 4
+	Enum_reservedNameTag      = 5
 	EnumVal_nameTag           = 1
 	EnumVal_numberTag         = 2
 	EnumVal_optionsTag        = 3

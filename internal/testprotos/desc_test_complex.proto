@@ -56,6 +56,23 @@ message Test {
 	}
 }
 
+enum EnumWithReservations {
+	X = 2;
+	Y = 3;
+	Z = 4;
+	reserved 1000 to max;
+	reserved -2 to 1;
+	reserved 5 to 10, 12 to 15, 18;
+	reserved -5 to -3;
+	reserved "C", "B", "A";
+}
+
+message MessageWithReservations {
+	reserved 5 to 10, 12 to 15, 18;
+	reserved 1000 to max;
+	reserved "A", "B", "C";
+}
+
 extend google.protobuf.MessageOptions {
 	repeated Test rept = 20002;
 	optional Test.Nested._NestedNested.EEE eee = 20010;

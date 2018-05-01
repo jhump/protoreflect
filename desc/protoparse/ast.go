@@ -711,15 +711,16 @@ type extensionRangeNode struct {
 
 type rangeNode struct {
 	basicCompositeNode
-	st, en *intLiteralNode
+	stNode, enNode node
+	st, en         int32
 }
 
 func (n *rangeNode) rangeStart() node {
-	return n.st
+	return n.stNode
 }
 
 func (n *rangeNode) rangeEnd() node {
-	return n.en
+	return n.enNode
 }
 
 type reservedNode struct {
@@ -732,13 +733,21 @@ type enumNode struct {
 	basicCompositeNode
 	name  *identNode
 	decls []*enumElement
+
+	// This field is populated after parsing, to make it easier to find them
+	// without searching decls. The parse result has a map of descriptors to
+	// nodes which makes the other declarations easily discoverable. But these
+	// elements do not map to descriptors -- they are just stored as strings in
+	// the message descriptor.
+	reserved []*stringLiteralNode
 }
 
 type enumElement struct {
 	// a discriminated union: only one field will be set
-	option *optionNode
-	value  *enumValueNode
-	empty  *basicNode
+	option   *optionNode
+	value    *enumValueNode
+	reserved *reservedNode
+	empty    *basicNode
 }
 
 func (n *enumElement) start() *SourcePos {

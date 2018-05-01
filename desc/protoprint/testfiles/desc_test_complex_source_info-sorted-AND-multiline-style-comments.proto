@@ -104,6 +104,12 @@ message KeywordCollisions {
   optional int32 default = 35;
 }
 
+message MessageWithReservations {
+  reserved 5 to 10, 12 to 15, 18, 1000 to max;
+
+  reserved "A", "B", "C";
+}
+
 message Rule {
   oneof rule {
     StringRule string = 1;
@@ -222,6 +228,18 @@ message Validator {
 
     WRITE = 2;
   }
+}
+
+enum EnumWithReservations {
+  X = 2;
+
+  Y = 3;
+
+  Z = 4;
+
+  reserved -5 to -3, -2 to 1, 5 to 10, 12 to 15, 18, 1000 to max;
+
+  reserved "A", "B", "C";
 }
 
 service TestTestService {

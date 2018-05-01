@@ -191,6 +191,38 @@ func TestBasicValidation(t *testing.T) {
 			errMsg:   `test.proto:1:16: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
+			contents: `enum Foo { V = 0; reserved 5000000000 }`,
+			errMsg:   `test.proto:1:28: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved -5000000000 }`,
+			errMsg:   `test.proto:1:28: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved 5000000000 to 5 }`,
+			errMsg:   `test.proto:1:28: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved 5 to 5000000000 }`,
+			errMsg:   `test.proto:1:33: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved -5000000000 to -5 }`,
+			errMsg:   `test.proto:1:28: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved -5 to -5000000000 }`,
+			errMsg:   `test.proto:1:34: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved -5000000000 to 5 }`,
+			errMsg:   `test.proto:1:28: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
+			contents: `enum Foo { V = 0; reserved -5 to 5000000000 }`,
+			errMsg:   `test.proto:1:34: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+		},
+		{
 			contents: `enum Foo { }`,
 			errMsg:   `test.proto:1:1: enums must define at least one value`,
 		},
@@ -251,6 +283,30 @@ func TestBasicValidation(t *testing.T) {
 			succeeds: true,
 		},
 		{
+			contents: `syntax = "proto3"; enum Foo { V1 = 0; reserved 1 to 20; reserved "V2"; }`,
+			succeeds: true,
+		},
+		{
+			contents: `enum Foo { V1 = 1; reserved 1 to 20; reserved "V2"; }`,
+			errMsg:   `test.proto:1:17: enum Foo: value V1 is using number 1 which is in reserved range 1 to 20`,
+		},
+		{
+			contents: `enum Foo { V1 = 20; reserved 1 to 20; reserved "V2"; }`,
+			errMsg:   `test.proto:1:17: enum Foo: value V1 is using number 20 which is in reserved range 1 to 20`,
+		},
+		{
+			contents: `enum Foo { V2 = 0; reserved 1 to 20; reserved "V2"; }`,
+			errMsg:   `test.proto:1:12: enum Foo: value V2 is using a reserved name`,
+		},
+		{
+			contents: `enum Foo { V0 = 0; reserved 1 to 20; reserved 21 to 40; reserved "V2"; }`,
+			succeeds: true,
+		},
+		{
+			contents: `enum Foo { V0 = 0; reserved 1 to 20; reserved 20 to 40; reserved "V2"; }`,
+			errMsg:   `test.proto:1:47: enum Foo: reserved ranges overlap: 1 to 20 and 20 to 40`,
+		},
+		{
 			contents: `syntax = "proto3"; enum Foo { FIRST = 1; }`,
 			errMsg:   `test.proto:1:39: enum Foo: proto3 requires that first value in enum have numeric value of 0`,
 		},
@@ -300,7 +356,7 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `message Foo { reserved "foo", "foo"; }`,
-			errMsg:   `test.proto:1:31: field "foo" is reserved multiple times`,
+			errMsg:   `test.proto:1:31: name "foo" is reserved multiple times`,
 		},
 		{
 			contents: `message Foo { reserved "foo"; optional string foo = 1; }`,
