@@ -18,19 +18,31 @@ import (
 
 // Stub is an RPC client stub, used for dynamically dispatching RPCs to a server.
 type Stub struct {
-	conn *grpc.ClientConn
-	mf   *dynamic.MessageFactory
+	channel Channel
+	mf      *dynamic.MessageFactory
 }
 
-// NewStub creates a new RPC stub that uses the given connection for communicating with a server.
-func NewStub(conn *grpc.ClientConn) Stub {
-	return NewStubWithMessageFactory(conn, nil)
+// Channel represents the operations necessary to issue RPCs via gRPC. The
+// *grpc.ClientConn type provides this interface and will typically the concrete
+// type used to construct Stubs. But the use of this interface allows
+// construction of stubs that use alternate concrete types as the transport for
+// RPC operations.
+type Channel interface {
+	Invoke(ctx context.Context, method string, args, reply interface{}, opts ...grpc.CallOption) error
+	NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
 }
 
-// NewStubWithMessageFactory creates a new RPC stub that uses the given connection for
-// communicating with a server and the given MessageFactory for creating response messages.
-func NewStubWithMessageFactory(conn *grpc.ClientConn, mf *dynamic.MessageFactory) Stub {
-	return Stub{conn: conn, mf: mf}
+var _ Channel = (*grpc.ClientConn)(nil)
+
+// NewStub creates a new RPC stub that uses the given channel for dispatching RPCs.
+func NewStub(channel Channel) Stub {
+	return NewStubWithMessageFactory(channel, nil)
+}
+
+// NewStubWithMessageFactory creates a new RPC stub that uses the given channel for
+// dispatching RPCs and the given MessageFactory for creating response messages.
+func NewStubWithMessageFactory(channel Channel, mf *dynamic.MessageFactory) Stub {
+	return Stub{channel: channel, mf: mf}
 }
 
 func requestMethod(md *desc.MethodDescriptor) string {
@@ -46,7 +58,7 @@ func (s Stub) InvokeRpc(ctx context.Context, method *desc.MethodDescriptor, requ
 		return nil, err
 	}
 	resp := s.mf.NewMessage(method.GetOutputType())
-	if err := grpc.Invoke(ctx, requestMethod(method), request, resp, s.conn, opts...); err != nil {
+	if err := s.channel.Invoke(ctx, requestMethod(method), request, resp, opts...); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -66,7 +78,7 @@ func (s Stub) InvokeRpcServerStream(ctx context.Context, method *desc.MethodDesc
 		ServerStreams: method.IsServerStreaming(),
 		ClientStreams: method.IsClientStreaming(),
 	}
-	if cs, err := grpc.NewClientStream(ctx, &sd, s.conn, requestMethod(method), opts...); err != nil {
+	if cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...); err != nil {
 		return nil, err
 	} else {
 		err = cs.SendMsg(request)
@@ -95,7 +107,7 @@ func (s Stub) InvokeRpcClientStream(ctx context.Context, method *desc.MethodDesc
 		ServerStreams: method.IsServerStreaming(),
 		ClientStreams: method.IsClientStreaming(),
 	}
-	if cs, err := grpc.NewClientStream(ctx, &sd, s.conn, requestMethod(method), opts...); err != nil {
+	if cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...); err != nil {
 		return nil, err
 	} else {
 		return &ClientStream{cs, method, s.mf, cancel}, nil
@@ -113,7 +125,7 @@ func (s Stub) InvokeRpcBidiStream(ctx context.Context, method *desc.MethodDescri
 		ServerStreams: method.IsServerStreaming(),
 		ClientStreams: method.IsClientStreaming(),
 	}
-	if cs, err := grpc.NewClientStream(ctx, &sd, s.conn, requestMethod(method), opts...); err != nil {
+	if cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...); err != nil {
 		return nil, err
 	} else {
 		return &BidiStream{cs, method.GetInputType(), method.GetOutputType(), s.mf}, nil
