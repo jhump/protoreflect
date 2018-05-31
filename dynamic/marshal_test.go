@@ -197,6 +197,7 @@ func doTranslationParty(t *testing.T, msg proto.Message,
 	testutil.Ok(t, err)
 	dm4 := NewMessage(md)
 	err = unmarshalDm(dm4, b2a)
+	testutil.Ok(t, err)
 
 	testutil.Ceq(t, dm, dm3, eqdm)
 	testutil.Ceq(t, dm, dm4, eqdm)

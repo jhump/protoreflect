@@ -119,6 +119,7 @@ func TestServerStreamingRpc(t *testing.T) {
 
 func TestBidiStreamingRpc(t *testing.T) {
 	bds, err := stub.InvokeRpcBidiStream(context.Background(), bidiStreamingMd)
+	testutil.Ok(t, err)
 	req := &grpc_testing.StreamingOutputCallRequest{Payload: payload}
 	for i := 0; i < 3; i++ {
 		err = bds.SendMsg(req)

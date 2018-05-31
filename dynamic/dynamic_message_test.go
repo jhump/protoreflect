@@ -90,9 +90,9 @@ func TestGetSetClearScalarFields(t *testing.T) {
 			testutil.Ok(t, err)
 			testutil.Eq(t, zero, v)
 
-			v, err = dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
+			_, err = dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
 			testutil.Eq(t, FieldIsNotRepeatedError, err)
-			v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
+			_, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
 			testutil.Eq(t, FieldIsNotRepeatedError, err)
 
 			err = dm.TrySetRepeatedFieldByNumber(c.tagNumber, 0, i.input)
@@ -100,9 +100,9 @@ func TestGetSetClearScalarFields(t *testing.T) {
 			err = dm.TrySetRepeatedFieldByName(c.fieldName, 0, i.input)
 			testutil.Eq(t, FieldIsNotRepeatedError, err)
 
-			v, err = dm.TryGetMapFieldByNumber(c.tagNumber, "foo")
+			_, err = dm.TryGetMapFieldByNumber(c.tagNumber, "foo")
 			testutil.Eq(t, FieldIsNotMapError, err)
-			v, err = dm.TryGetMapFieldByName(c.fieldName, "foo")
+			_, err = dm.TryGetMapFieldByName(c.fieldName, "foo")
 			testutil.Eq(t, FieldIsNotMapError, err)
 
 			err = dm.TryPutMapFieldByNumber(c.tagNumber, "foo", i.input)
@@ -410,15 +410,15 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 
 			testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
 
-			v, err := dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
+			_, err := dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
 			testutil.Eq(t, IndexOutOfRangeError, err)
-			v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
+			_, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
 			testutil.Eq(t, IndexOutOfRangeError, err)
 
 			err = dm.TryAddRepeatedFieldByNumber(c.tagNumber, i.input1)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
+				v, err := dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
@@ -427,21 +427,21 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			err = dm.TryAddRepeatedFieldByNumber(c.tagNumber, i.input2)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetRepeatedFieldByNumber(c.tagNumber, 1)
+				v, err := dm.TryGetRepeatedFieldByNumber(c.tagNumber, 1)
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 			}
 
-			var e1, e2 interface{}
+			var exp interface{}
 			if !allowed {
 				// adds above failed (because wrong kind), so go ahead and add
 				// correct values so we can test Set* methods
-				e1, e2 = zero, zero
-				dm.AddRepeatedFieldByNumber(c.tagNumber, e1)
-				dm.AddRepeatedFieldByNumber(c.tagNumber, e2)
+				dm.AddRepeatedFieldByNumber(c.tagNumber, zero)
+				exp = zero
+				dm.AddRepeatedFieldByNumber(c.tagNumber, exp)
 			} else {
-				e1, e2 = coerce(i.input1, c.kind), coerce(i.input2, c.kind)
+				exp = coerce(i.input2, c.kind)
 			}
 			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByNumber(c.tagNumber)).Len())
 
@@ -450,20 +450,20 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			err = dm.TrySetRepeatedFieldByNumber(c.tagNumber, 0, i.input2)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
+				v, err := dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 				// and value at other index is unchanged
 				v, err = dm.TryGetRepeatedFieldByNumber(c.tagNumber, 1)
 				testutil.Ok(t, err)
-				testutil.Eq(t, e2, v)
+				testutil.Eq(t, exp, v)
 			}
 
 			err = dm.TrySetRepeatedFieldByNumber(c.tagNumber, 1, i.input1)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetRepeatedFieldByNumber(c.tagNumber, 1)
+				v, err := dm.TryGetRepeatedFieldByNumber(c.tagNumber, 1)
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
@@ -477,7 +477,7 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			err = dm.TryAddRepeatedFieldByName(c.fieldName, i.input1)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
+				v, err := dm.TryGetRepeatedFieldByName(c.fieldName, 0)
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
@@ -485,7 +485,7 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			err = dm.TryAddRepeatedFieldByName(c.fieldName, i.input2)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 1)
+				v, err := dm.TryGetRepeatedFieldByName(c.fieldName, 1)
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
@@ -494,11 +494,11 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			if !allowed {
 				// adds above failed (because wrong kind), so go ahead and add
 				// correct values so we can test Set* methods
-				e1, e2 = zero, zero
-				dm.AddRepeatedFieldByName(c.fieldName, e1)
-				dm.AddRepeatedFieldByName(c.fieldName, e2)
+				dm.AddRepeatedFieldByName(c.fieldName, zero)
+				exp = zero
+				dm.AddRepeatedFieldByName(c.fieldName, exp)
 			} else {
-				e1, e2 = coerce(i.input1, c.kind), coerce(i.input2, c.kind)
+				exp = coerce(i.input2, c.kind)
 			}
 			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
 
@@ -507,20 +507,20 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			err = dm.TrySetRepeatedFieldByName(c.fieldName, 0, i.input2)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
+				v, err := dm.TryGetRepeatedFieldByName(c.fieldName, 0)
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
 				// and value at other index is unchanged
 				v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 1)
 				testutil.Ok(t, err)
-				testutil.Eq(t, e2, v)
+				testutil.Eq(t, exp, v)
 			}
 
 			err = dm.TrySetRepeatedFieldByName(c.fieldName, 1, i.input1)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 1)
+				v, err := dm.TryGetRepeatedFieldByName(c.fieldName, 1)
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
@@ -539,7 +539,7 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			err = catchPanic(func() { dm.AddRepeatedFieldByNumber(c.tagNumber, i.input1) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetRepeatedFieldByNumber(c.tagNumber, 0)
+				v := dm.GetRepeatedFieldByNumber(c.tagNumber, 0)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 			}
@@ -547,7 +547,7 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			err = catchPanic(func() { dm.AddRepeatedFieldByNumber(c.tagNumber, i.input2) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetRepeatedFieldByNumber(c.tagNumber, 1)
+				v := dm.GetRepeatedFieldByNumber(c.tagNumber, 1)
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 			}
@@ -555,8 +555,8 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			if !allowed {
 				// adds above failed (because wrong kind), so go ahead and add
 				// correct values so we can test Set* methods
-				dm.AddRepeatedFieldByNumber(c.tagNumber, e1)
-				dm.AddRepeatedFieldByNumber(c.tagNumber, e2)
+				dm.AddRepeatedFieldByNumber(c.tagNumber, zero)
+				dm.AddRepeatedFieldByNumber(c.tagNumber, exp)
 			}
 			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByNumber(c.tagNumber)).Len())
 
@@ -566,18 +566,18 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			err = catchPanic(func() { dm.SetRepeatedFieldByNumber(c.tagNumber, 0, i.input2) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetRepeatedFieldByNumber(c.tagNumber, 0)
+				v := dm.GetRepeatedFieldByNumber(c.tagNumber, 0)
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 				// and value at other index is unchanged
 				v = dm.GetRepeatedFieldByNumber(c.tagNumber, 1)
-				testutil.Eq(t, e2, v)
+				testutil.Eq(t, exp, v)
 			}
 
 			err = catchPanic(func() { dm.SetRepeatedFieldByNumber(c.tagNumber, 1, i.input1) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetRepeatedFieldByNumber(c.tagNumber, 1)
+				v := dm.GetRepeatedFieldByNumber(c.tagNumber, 1)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 			}
@@ -593,7 +593,7 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			err = catchPanic(func() { dm.AddRepeatedFieldByName(c.fieldName, i.input1) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetRepeatedFieldByName(c.fieldName, 0)
+				v := dm.GetRepeatedFieldByName(c.fieldName, 0)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
 			}
@@ -601,7 +601,7 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			err = catchPanic(func() { dm.AddRepeatedFieldByName(c.fieldName, i.input2) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetRepeatedFieldByName(c.fieldName, 1)
+				v := dm.GetRepeatedFieldByName(c.fieldName, 1)
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
 			}
@@ -609,8 +609,8 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			if !allowed {
 				// adds above failed (because wrong kind), so go ahead and add
 				// correct values so we can test Set* methods
-				dm.AddRepeatedFieldByName(c.fieldName, e1)
-				dm.AddRepeatedFieldByName(c.fieldName, e2)
+				dm.AddRepeatedFieldByName(c.fieldName, zero)
+				dm.AddRepeatedFieldByName(c.fieldName, exp)
 			}
 			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
 
@@ -620,25 +620,24 @@ func TestGetSetAtIndexAddRepeatedFields(t *testing.T) {
 			err = catchPanic(func() { dm.SetRepeatedFieldByName(c.fieldName, 0, i.input2) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetRepeatedFieldByName(c.fieldName, 0)
+				v := dm.GetRepeatedFieldByName(c.fieldName, 0)
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
 				// and value at other index is unchanged
 				v = dm.GetRepeatedFieldByName(c.fieldName, 1)
-				testutil.Eq(t, e2, v)
+				testutil.Eq(t, exp, v)
 			}
 
 			err = catchPanic(func() { dm.SetRepeatedFieldByName(c.fieldName, 1, i.input1) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetRepeatedFieldByName(c.fieldName, 1)
+				v := dm.GetRepeatedFieldByName(c.fieldName, 1)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
 			}
 
 			dm.ClearFieldByName(c.fieldName)
 			testutil.Require(t, !dm.HasFieldName(c.fieldName))
-
 		}
 	}
 }
@@ -997,15 +996,15 @@ func TestGetPutDeleteMapFields(t *testing.T) {
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 			}
 
-			var e1, e2 interface{}
+			var exp interface{}
 			if !allowed {
 				// adds above failed (because wrong kind), so go ahead and add
 				// correct values so we can test Set* methods
-				e1, e2 = zero, zero
-				dm.PutMapFieldByNumber(c.tagNumber, "foo", e1)
-				dm.PutMapFieldByNumber(c.tagNumber, "bar", e2)
+				dm.PutMapFieldByNumber(c.tagNumber, "foo", zero)
+				exp = zero
+				dm.PutMapFieldByNumber(c.tagNumber, "bar", exp)
 			} else {
-				e1, e2 = coerce(i.input1, c.kind), coerce(i.input2, c.kind)
+				exp = coerce(i.input2, c.kind)
 			}
 			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByNumber(c.tagNumber)).Len())
 
@@ -1024,7 +1023,7 @@ func TestGetPutDeleteMapFields(t *testing.T) {
 			// other key not affected
 			v, err = dm.TryGetMapFieldByNumber(c.tagNumber, "bar")
 			testutil.Ok(t, err)
-			testutil.Eq(t, e2, v)
+			testutil.Eq(t, exp, v)
 
 			err = dm.TryRemoveMapFieldByNumber(c.tagNumber, "bar")
 			testutil.Ok(t, err)
@@ -1058,11 +1057,11 @@ func TestGetPutDeleteMapFields(t *testing.T) {
 			if !allowed {
 				// adds above failed (because wrong kind), so go ahead and add
 				// correct values so we can test Set* methods
-				e1, e2 = zero, zero
-				dm.PutMapFieldByName(c.fieldName, "foo", e1)
-				dm.PutMapFieldByName(c.fieldName, "bar", e2)
+				dm.PutMapFieldByName(c.fieldName, "foo", zero)
+				exp = zero
+				dm.PutMapFieldByName(c.fieldName, "bar", exp)
 			} else {
-				e1, e2 = coerce(i.input1, c.kind), coerce(i.input2, c.kind)
+				exp = coerce(i.input2, c.kind)
 			}
 			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
 
@@ -1081,7 +1080,7 @@ func TestGetPutDeleteMapFields(t *testing.T) {
 			// other key not affected
 			v, err = dm.TryGetMapFieldByName(c.fieldName, "bar")
 			testutil.Ok(t, err)
-			testutil.Eq(t, e2, v)
+			testutil.Eq(t, exp, v)
 
 			err = dm.TryRemoveMapFieldByName(c.fieldName, "bar")
 			testutil.Ok(t, err)
@@ -1111,8 +1110,8 @@ func TestGetPutDeleteMapFields(t *testing.T) {
 			if !allowed {
 				// adds above failed (because wrong kind), so go ahead and add
 				// correct values so we can test Set* methods
-				dm.PutMapFieldByNumber(c.tagNumber, "foo", e1)
-				dm.PutMapFieldByNumber(c.tagNumber, "bar", e2)
+				dm.PutMapFieldByNumber(c.tagNumber, "foo", zero)
+				dm.PutMapFieldByNumber(c.tagNumber, "bar", exp)
 			}
 			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByNumber(c.tagNumber)).Len())
 
@@ -1129,7 +1128,7 @@ func TestGetPutDeleteMapFields(t *testing.T) {
 			testutil.Require(t, v == nil)
 			// other key not affected
 			v = dm.GetMapFieldByNumber(c.tagNumber, "bar")
-			testutil.Eq(t, e2, v)
+			testutil.Eq(t, exp, v)
 
 			err = catchPanic(func() { dm.RemoveMapFieldByNumber(c.tagNumber, "bar") })
 			testutil.Ok(t, err)
@@ -1158,8 +1157,8 @@ func TestGetPutDeleteMapFields(t *testing.T) {
 			if !allowed {
 				// adds above failed (because wrong kind), so go ahead and add
 				// correct values so we can test Set* methods
-				dm.PutMapFieldByName(c.fieldName, "foo", e1)
-				dm.PutMapFieldByName(c.fieldName, "bar", e2)
+				dm.PutMapFieldByName(c.fieldName, "foo", zero)
+				dm.PutMapFieldByName(c.fieldName, "bar", exp)
 			}
 			testutil.Eq(t, 2, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
 
@@ -1176,13 +1175,12 @@ func TestGetPutDeleteMapFields(t *testing.T) {
 			testutil.Require(t, v == nil)
 			// other key not affected
 			v = dm.GetMapFieldByName(c.fieldName, "bar")
-			testutil.Eq(t, e2, v)
+			testutil.Eq(t, exp, v)
 
 			err = catchPanic(func() { dm.RemoveMapFieldByName(c.fieldName, "bar") })
 			testutil.Ok(t, err)
 			testutil.Require(t, !dm.HasFieldName(c.fieldName))
 			testutil.Eq(t, 0, reflect.ValueOf(dm.GetFieldByName(c.fieldName)).Len())
-
 		}
 	}
 }
@@ -1266,13 +1264,13 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 
 			testutil.Require(t, !dm.HasFieldNumber(c.tagNumber))
 
-			v, err := dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
+			_, err := dm.TryGetRepeatedFieldByNumber(c.tagNumber, 0)
 			testutil.Eq(t, FieldIsNotRepeatedError, err)
 
 			err = dm.TryAddRepeatedFieldByNumber(c.tagNumber, input1)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetMapFieldByNumber(c.tagNumber, "foo")
+				v, err := dm.TryGetMapFieldByNumber(c.tagNumber, "foo")
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
@@ -1281,7 +1279,7 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			err = dm.TryAddRepeatedFieldByNumber(c.tagNumber, input2)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetMapFieldByNumber(c.tagNumber, "bar")
+				v, err := dm.TryGetMapFieldByNumber(c.tagNumber, "bar")
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
@@ -1297,7 +1295,7 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			err = dm.TrySetFieldByNumber(c.tagNumber, []interface{}{input1, input2})
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure values stuck
-				v, err = dm.TryGetMapFieldByNumber(c.tagNumber, "foo")
+				v, err := dm.TryGetMapFieldByNumber(c.tagNumber, "foo")
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				v, err = dm.TryGetMapFieldByNumber(c.tagNumber, "bar")
@@ -1313,13 +1311,13 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			// Now use the try ByName methods
 			testutil.Require(t, !dm.HasFieldName(c.fieldName))
 
-			v, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
+			_, err = dm.TryGetRepeatedFieldByName(c.fieldName, 0)
 			testutil.Eq(t, FieldIsNotRepeatedError, err)
 
 			err = dm.TryAddRepeatedFieldByName(c.fieldName, input1)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetMapFieldByName(c.fieldName, "foo")
+				v, err := dm.TryGetMapFieldByName(c.fieldName, "foo")
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
@@ -1328,7 +1326,7 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			err = dm.TryAddRepeatedFieldByName(c.fieldName, input2)
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v, err = dm.TryGetMapFieldByName(c.fieldName, "bar")
+				v, err := dm.TryGetMapFieldByName(c.fieldName, "bar")
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
@@ -1344,7 +1342,7 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			err = dm.TrySetFieldByName(c.fieldName, []interface{}{input1, input2})
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure values stuck
-				v, err = dm.TryGetMapFieldByName(c.fieldName, "foo")
+				v, err := dm.TryGetMapFieldByName(c.fieldName, "foo")
 				testutil.Ok(t, err)
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				v, err = dm.TryGetMapFieldByName(c.fieldName, "bar")
@@ -1365,7 +1363,7 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			err = catchPanic(func() { dm.AddRepeatedFieldByNumber(c.tagNumber, input1) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetMapFieldByNumber(c.tagNumber, "foo")
+				v := dm.GetMapFieldByNumber(c.tagNumber, "foo")
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 			}
@@ -1373,7 +1371,7 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			err = catchPanic(func() { dm.AddRepeatedFieldByNumber(c.tagNumber, input2) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetMapFieldByNumber(c.tagNumber, "bar")
+				v := dm.GetMapFieldByNumber(c.tagNumber, "bar")
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldNumber(c.tagNumber))
 			}
@@ -1387,7 +1385,7 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			err = catchPanic(func() { dm.SetFieldByNumber(c.tagNumber, []interface{}{input1, input2}) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure values stuck
-				v = dm.GetMapFieldByNumber(c.tagNumber, "foo")
+				v := dm.GetMapFieldByNumber(c.tagNumber, "foo")
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				v = dm.GetMapFieldByNumber(c.tagNumber, "bar")
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
@@ -1404,7 +1402,7 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			err = catchPanic(func() { dm.AddRepeatedFieldByName(c.fieldName, input1) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetMapFieldByName(c.fieldName, "foo")
+				v := dm.GetMapFieldByName(c.fieldName, "foo")
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
 			}
@@ -1412,7 +1410,7 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			err = catchPanic(func() { dm.AddRepeatedFieldByName(c.fieldName, input2) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure value stuck
-				v = dm.GetMapFieldByName(c.fieldName, "bar")
+				v := dm.GetMapFieldByName(c.fieldName, "bar")
 				testutil.Eq(t, coerce(i.input2, c.kind), v)
 				testutil.Require(t, dm.HasFieldName(c.fieldName))
 			}
@@ -1426,7 +1424,7 @@ func TestMapFields_AsIfRepeatedFieldOfEntries(t *testing.T) {
 			err = catchPanic(func() { dm.SetFieldByName(c.fieldName, []interface{}{input1, input2}) })
 			if shouldTestValue(t, err, allowed, k, c.kind, idx) {
 				// make sure values stuck
-				v = dm.GetMapFieldByName(c.fieldName, "foo")
+				v := dm.GetMapFieldByName(c.fieldName, "foo")
 				testutil.Eq(t, coerce(i.input1, c.kind), v)
 				v = dm.GetMapFieldByName(c.fieldName, "bar")
 				testutil.Eq(t, coerce(i.input2, c.kind), v)

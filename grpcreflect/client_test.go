@@ -47,7 +47,7 @@ func TestMain(m *testing.M) {
 	defer svr.Stop()
 
 	// create grpc client
-	addr := fmt.Sprintf(l.Addr().String())
+	addr := l.Addr().String()
 	cconn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))

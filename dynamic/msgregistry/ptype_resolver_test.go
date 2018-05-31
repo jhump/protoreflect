@@ -80,9 +80,9 @@ func TestCachingTypeFetcher_MismatchType(t *testing.T) {
 	testutil.Eq(t, "fee.fi.fo.Foo", en.Name)
 
 	// now ask for same URL, but swapped types
-	pm, err = fetcher("blah.blah.blah/fee.fi.fo.Fum", true)
+	_, err = fetcher("blah.blah.blah/fee.fi.fo.Fum", true)
 	testutil.Require(t, err != nil && strings.Contains(err.Error(), "wanted enum, got message"))
-	pm, err = fetcher("blah.blah.blah/fee.fi.fo.Foo", false)
+	_, err = fetcher("blah.blah.blah/fee.fi.fo.Foo", false)
 	testutil.Require(t, err != nil && strings.Contains(err.Error(), "wanted message, got enum"))
 }
 

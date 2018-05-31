@@ -896,7 +896,6 @@ type txtReader struct {
 	scanner    scanner.Scanner
 	peeked     token
 	havePeeked bool
-	err        error
 }
 
 func newReader(text []byte) *txtReader {

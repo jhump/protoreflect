@@ -177,8 +177,8 @@ func (b *codedBuffer) decodeTagAndWireType() (tag int32, wireType int8, err erro
 	wireType = int8(v & 7)
 	// rest is int32 tag number
 	v = v >> 3
-	if v < 0 || v > math.MaxInt32 {
-		err = fmt.Errorf("Tag number out of range: %d", v)
+	if v > math.MaxInt32 {
+		err = fmt.Errorf("tag number out of range: %d", v)
 		return
 	}
 	tag = int32(v)

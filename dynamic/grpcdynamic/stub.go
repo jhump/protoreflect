@@ -133,7 +133,7 @@ func (s Stub) InvokeRpcBidiStream(ctx context.Context, method *desc.MethodDescri
 }
 
 func methodType(md *desc.MethodDescriptor) string {
-	if md.IsClientStreaming() && md.IsClientStreaming() {
+	if md.IsClientStreaming() && md.IsServerStreaming() {
 		return "bidi-streaming"
 	} else if md.IsClientStreaming() {
 		return "client-streaming"

@@ -1285,6 +1285,9 @@ func validElementFieldValue(fd *desc.FieldDescriptor, val interface{}) (interfac
 func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interface{}, error) {
 	t := fd.GetType()
 	typeName := strings.ToLower(t.String())
+	if !val.IsValid() {
+		return nil, fmt.Errorf("%s field %s is not compatible with nil value", typeName, fd.GetFullyQualifiedName())
+	}
 	switch t {
 	case descriptor.FieldDescriptorProto_TYPE_SFIXED32,
 		descriptor.FieldDescriptorProto_TYPE_INT32,
