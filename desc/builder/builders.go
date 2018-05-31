@@ -13,10 +13,8 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc"
-	. "github.com/jhump/protoreflect/desc/internal"
+	"github.com/jhump/protoreflect/desc/internal"
 )
-
-// TODO: finish writing Go doc for all types and methods
 
 // Builder is the core interface implemented by all descriptor builders. It
 // exposes some basic information about the descriptor hierarchy's structure.
@@ -64,6 +62,11 @@ type Builder interface {
 	// defined on this interface because its return type varies with the type of
 	// the descriptor builder.
 	GetComments() *Comments
+
+	// BuildDescriptor is a generic form of the Build method. Its declared
+	// return type is general so that it can be included in this interface and
+	// implemented by all concrete builder types.
+	BuildDescriptor() (desc.Descriptor, error)
 
 	// findChild returns the child builder with the given name or nil if this
 	// builder has no such child.
@@ -238,6 +241,7 @@ func checkName(name string) error {
 	return nil
 }
 
+// GetName returns the name of the element that will be built by this builder.
 func (b *baseBuilder) GetName() string {
 	return b.name
 }
@@ -261,6 +265,15 @@ func (b *baseBuilder) setName(fullBuilder Builder, newName string) error {
 	return nil
 }
 
+// GetParent returns the parent builder to which this builder has been added. If
+// the builder has not been added to another, this returns nil.
+//
+// The parents of message builders will be file builders or other message
+// builders. Same for the parents of extension field builders and enum builders.
+// One-of builders and non-extension field builders will return a message
+// builder. Method builders' parents are service builders; enum value builders'
+// parents are enum builders. Finally, service builders will always return file
+// builders as their parent.
 func (b *baseBuilder) GetParent() Builder {
 	return b.parent
 }
@@ -269,8 +282,14 @@ func (b *baseBuilder) setParent(newParent Builder) {
 	b.parent = newParent
 }
 
+// GetFile returns the file to which this builder is assigned. This examines the
+// builder's parent, and its parent, and so on, until it reaches a file builder
+// or nil.
+//
+// If the builder is not assigned to a file (even transitively), this method
+// returns nil.
 func (b *baseBuilder) GetFile() *FileBuilder {
-	var p Builder = b.parent
+	p := b.parent
 	for p != nil {
 		if fb, ok := p.(*FileBuilder); ok {
 			return fb
@@ -280,6 +299,8 @@ func (b *baseBuilder) GetFile() *FileBuilder {
 	return nil
 }
 
+// GetComments returns comments associated with the element that will be built
+// by this builder.
 func (b *baseBuilder) GetComments() *Comments {
 	return &b.comments
 }
@@ -391,6 +412,8 @@ func makeUnique(name string, existingNames map[string]struct{}) string {
 // be associated with a synthesized file that contains only the built descriptor
 // and its ancestors. This means that such descriptors will have no associated
 // package name.
+//
+// To create a new FileBuilder, use NewFile.
 type FileBuilder struct {
 	name string
 
@@ -419,8 +442,10 @@ func NewFile(name string) *FileBuilder {
 }
 
 // FromFile returns a FileBuilder that is effectively a copy of the given
-// descriptor. (Note that builders do not retain source code info, even if the
-// given descriptor included it.)
+// descriptor. Note that builders do not retain full source code info, even if
+// the given descriptor included it. Instead, comments are extracted from the
+// given descriptor's source info (if present) and, when built, the resulting
+// descriptor will have just the comment info (no location information).
 func FromFile(fd *desc.FileDescriptor) (*FileBuilder, error) {
 	fb := NewFile(fd.GetName())
 	fb.IsProto3 = fd.IsProto3()
@@ -431,9 +456,9 @@ func FromFile(fd *desc.FileDescriptor) (*FileBuilder, error) {
 	// find syntax and package comments, too
 	for _, loc := range fd.AsFileDescriptorProto().GetSourceCodeInfo().GetLocation() {
 		if len(loc.Path) == 1 {
-			if loc.Path[0] == File_syntaxTag {
+			if loc.Path[0] == internal.File_syntaxTag {
 				setComments(&fb.SyntaxComments, loc)
-			} else if loc.Path[0] == File_packageTag {
+			} else if loc.Path[0] == internal.File_packageTag {
 				setComments(&fb.PackageComments, loc)
 			}
 		}
@@ -541,23 +566,29 @@ func updateLocalRefsInRpcType(rpcType *RpcType, localMessages map[*desc.MessageD
 	}
 }
 
+// GetName returns the name of the file. It may include relative path
+// information, too.
 func (fb *FileBuilder) GetName() string {
 	return fb.name
 }
 
-// SetName changes this file's name, returning the file for method chaining. If
-// there is an error that prevents the rename from succeeding, this method will
-// panic.
+// SetName changes this file's name, returning the file builder for method
+// chaining.
 func (fb *FileBuilder) SetName(newName string) *FileBuilder {
 	fb.name = newName
 	return fb
 }
 
+// TrySetName changes this file's name. It always returns nil since renaming
+// a file cannot fail. (It is specified to return error to satisfy the Builder
+// interface.)
 func (fb *FileBuilder) TrySetName(newName string) error {
 	fb.name = newName
 	return nil
 }
 
+// GetParent always returns nil since files are the roots of builder
+// hierarchies.
 func (fb *FileBuilder) GetParent() Builder {
 	return nil
 }
@@ -568,20 +599,32 @@ func (fb *FileBuilder) setParent(parent Builder) {
 	}
 }
 
+// GetComments returns comments associated with the file itself and not any
+// particular element therein. (Note that such a comment will not be rendered by
+// the protoprint package.)
 func (fb *FileBuilder) GetComments() *Comments {
 	return &fb.comments
 }
 
+// SetComments sets the comments associated with the file itself, not any
+// particular element therein. (Note that such a comment will not be rendered by
+// the protoprint package.) This method returns the file, for method chaining.
 func (fb *FileBuilder) SetComments(c Comments) *FileBuilder {
 	fb.comments = c
 	return fb
 }
 
+// SetSyntaxComments sets the comments associated with the syntax declaration
+// element (which, if present, is required to be the first element in a proto
+// file). This method returns the file, for method chaining.
 func (fb *FileBuilder) SetSyntaxComments(c Comments) *FileBuilder {
 	fb.SyntaxComments = c
 	return fb
 }
 
+// SetPackageComments sets the comments associated with the package declaration
+// element. (This comment will not be rendered if the file's declared package is
+// empty.) This method returns the file, for method chaining.
 func (fb *FileBuilder) SetPackageComments(c Comments) *FileBuilder {
 	fb.PackageComments = c
 	return fb
@@ -592,6 +635,8 @@ func (fb *FileBuilder) GetFile() *FileBuilder {
 	return fb
 }
 
+// GetChildren returns builders for all nested elements, including all top-level
+// messages, enums, extensions, and services.
 func (fb *FileBuilder) GetChildren() []Builder {
 	var ch []Builder
 	for _, mb := range fb.messages {
@@ -921,12 +966,12 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 	path := make([]int32, 0, 10)
 	sourceInfo := dpb.SourceCodeInfo{}
 	addCommentsTo(&sourceInfo, path, &fb.comments)
-	addCommentsTo(&sourceInfo, append(path, File_syntaxTag), &fb.SyntaxComments)
-	addCommentsTo(&sourceInfo, append(path, File_packageTag), &fb.PackageComments)
+	addCommentsTo(&sourceInfo, append(path, internal.File_syntaxTag), &fb.SyntaxComments)
+	addCommentsTo(&sourceInfo, append(path, internal.File_packageTag), &fb.PackageComments)
 
 	messages := make([]*dpb.DescriptorProto, 0, len(fb.messages))
 	for _, mb := range fb.messages {
-		path := append(path, File_messagesTag, int32(len(messages)))
+		path := append(path, internal.File_messagesTag, int32(len(messages)))
 		if md, err := mb.buildProto(path, &sourceInfo); err != nil {
 			return nil, err
 		} else {
@@ -936,7 +981,7 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 
 	enums := make([]*dpb.EnumDescriptorProto, 0, len(fb.enums))
 	for _, eb := range fb.enums {
-		path := append(path, File_enumsTag, int32(len(enums)))
+		path := append(path, internal.File_enumsTag, int32(len(enums)))
 		if ed, err := eb.buildProto(path, &sourceInfo); err != nil {
 			return nil, err
 		} else {
@@ -946,7 +991,7 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 
 	extensions := make([]*dpb.FieldDescriptorProto, 0, len(fb.extensions))
 	for _, exb := range fb.extensions {
-		path := append(path, File_extensionsTag, int32(len(extensions)))
+		path := append(path, internal.File_extensionsTag, int32(len(extensions)))
 		if exd, err := exb.buildProto(path, &sourceInfo); err != nil {
 			return nil, err
 		} else {
@@ -956,7 +1001,7 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 
 	services := make([]*dpb.ServiceDescriptorProto, 0, len(fb.services))
 	for _, sb := range fb.services {
-		path := append(path, File_servicesTag, int32(len(services)))
+		path := append(path, internal.File_servicesTag, int32(len(services)))
 		if sd, err := sb.buildProto(path, &sourceInfo); err != nil {
 			return nil, err
 		} else {
@@ -985,12 +1030,22 @@ func (fb *FileBuilder) Build() (*desc.FileDescriptor, error) {
 	return newResolver().resolveElement(fb, nil)
 }
 
+// BuildDescriptor constructs a file descriptor based on the contents of this
+// file builder. Most usages will prefer Build() instead, whose return type is a
+// concrete descriptor type. This method is present to satisfy the Builder
+// interface.
+func (fb *FileBuilder) BuildDescriptor() (desc.Descriptor, error) {
+	return fb.Build()
+}
+
 // MessageBuilder is a builder used to construct a desc.MessageDescriptor. A
 // message builder can define nested messages, enums, and extensions in addition
 // to defining the message's fields.
 //
 // Note that when building a descriptor from a MessageBuilder, not all protobuf
 // validation rules are enforced. See the package documentation for more info.
+//
+// To create a new MessageBuilder, use NewMessage.
 type MessageBuilder struct {
 	baseBuilder
 
@@ -1106,9 +1161,9 @@ func fromMessage(md *desc.MessageDescriptor,
 	return mb, nil
 }
 
-// SetName changes this message's name, returning the message for method
-// chaining. If there is an error that prevents the rename from succeeding, this
-// method will panic.
+// SetName changes this message's name, returning the message builder for method
+// chaining. If the given new name is not valid (e.g. TrySetName would have
+// returned an error) then this method will panic.
 func (mb *MessageBuilder) SetName(newName string) *MessageBuilder {
 	if err := mb.TrySetName(newName); err != nil {
 		panic(err)
@@ -1116,6 +1171,15 @@ func (mb *MessageBuilder) SetName(newName string) *MessageBuilder {
 	return mb
 }
 
+// TrySetName changes this message's name. It will return an error if the given
+// new name is not a valid protobuf identifier or if the parent builder already
+// has an element with the given name.
+//
+// If the message is a map or group type whose parent is the corresponding map
+// or group field, the parent field's enclosing message is checked for elements
+// with a conflicting name. Despite the fact that these message types are
+// modeled as children of their associated field builder, in the protobuf IDL
+// they are actually all defined in the enclosing message's namespace.
 func (mb *MessageBuilder) TrySetName(newName string) error {
 	if p, ok := mb.parent.(*FieldBuilder); ok && p.fieldType.fieldType != dpb.FieldDescriptorProto_TYPE_GROUP {
 		return fmt.Errorf("cannot change name of map entry %s; change name of field instead", GetFullyQualifiedName(mb))
@@ -1133,11 +1197,16 @@ func (mb *MessageBuilder) setNameInternal(newName string) {
 	}
 }
 
+// SetComments sets the comments associated with the message. This method
+// returns the message builder, for method chaining.
 func (mb *MessageBuilder) SetComments(c Comments) *MessageBuilder {
 	mb.comments = c
 	return mb
 }
 
+// GetChildren returns any builders assigned to this message builder. These will
+// include the message's fields and one-ofs as well as any nested messages,
+// extensions, and enums.
 func (mb *MessageBuilder) GetChildren() []Builder {
 	var ch []Builder
 	for _, b := range mb.fieldsAndOneOfs {
@@ -1417,7 +1486,7 @@ func (mb *MessageBuilder) TryRemoveNestedMessage(name string) bool {
 	return false
 }
 
-// AddNestedMessage adds the given message as nested child of this message. If
+// AddNestedMessage adds the given message as a nested child of this message. If
 // an error prevents the message from being added, this method panics. This
 // returns the message builder, for method chaining.
 func (mb *MessageBuilder) AddNestedMessage(nmb *MessageBuilder) *MessageBuilder {
@@ -1460,6 +1529,10 @@ func (mb *MessageBuilder) isPresentButNotChild(b Builder) bool {
 	return mb.symbols[b.GetName()] == b
 }
 
+// GetNestedExtension returns the nested extension with the given name. If no
+// such extension exists, nil is returned. The named extension must be in this
+// message's scope. If the extension is nested more deeply, this will return
+// nil. This means the extension must be a direct child of this message.
 func (mb *MessageBuilder) GetNestedExtension(name string) *FieldBuilder {
 	b := mb.symbols[name]
 	if exb, ok := b.(*FieldBuilder); ok && exb.IsExtension() {
@@ -1469,11 +1542,16 @@ func (mb *MessageBuilder) GetNestedExtension(name string) *FieldBuilder {
 	}
 }
 
+// RemoveNestedExtension removes the nested extension with the given name. If no
+// such extension exists, this is a no-op. This returns the message builder, for
+// method chaining.
 func (mb *MessageBuilder) RemoveNestedExtension(name string) *MessageBuilder {
 	mb.TryRemoveNestedExtension(name)
 	return mb
 }
 
+// TryRemoveNestedExtension removes the nested extension with the given name and
+// returns false if this message has no nested extension with that name.
 func (mb *MessageBuilder) TryRemoveNestedExtension(name string) bool {
 	b := mb.symbols[name]
 	if exb, ok := b.(*FieldBuilder); ok && exb.IsExtension() {
@@ -1483,6 +1561,9 @@ func (mb *MessageBuilder) TryRemoveNestedExtension(name string) bool {
 	return false
 }
 
+// AddNestedExtension adds the given extension as a nested child of this
+// message. If an error prevents the extension from being added, this method
+// panics. This returns the message builder, for method chaining.
 func (mb *MessageBuilder) AddNestedExtension(exb *FieldBuilder) *MessageBuilder {
 	if err := mb.TryAddNestedExtension(exb); err != nil {
 		panic(err)
@@ -1490,6 +1571,9 @@ func (mb *MessageBuilder) AddNestedExtension(exb *FieldBuilder) *MessageBuilder 
 	return mb
 }
 
+// TryAddNestedExtension adds the given extension as a nested child of this
+// message, returning any error that prevents the extension from being added
+// (such as a name collision with another element already added to the message).
 func (mb *MessageBuilder) TryAddNestedExtension(exb *FieldBuilder) error {
 	if !exb.IsExtension() {
 		return fmt.Errorf("field %s is not an extension", exb.GetName())
@@ -1503,6 +1587,10 @@ func (mb *MessageBuilder) TryAddNestedExtension(exb *FieldBuilder) error {
 	return nil
 }
 
+// GetNestedEnum returns the nested enum with the given name. If no such enum
+// exists, nil is returned. The named enum must be in this message's scope. If
+// the enum is nested more deeply, this will return nil. This means the enum
+// must be a direct child of this message.
 func (mb *MessageBuilder) GetNestedEnum(name string) *EnumBuilder {
 	b := mb.symbols[name]
 	if eb, ok := b.(*EnumBuilder); ok {
@@ -1512,11 +1600,16 @@ func (mb *MessageBuilder) GetNestedEnum(name string) *EnumBuilder {
 	}
 }
 
+// RemoveNestedEnum removes the nested enum with the given name. If no such enum
+// exists, this is a no-op. This returns the message builder, for method
+// chaining.
 func (mb *MessageBuilder) RemoveNestedEnum(name string) *MessageBuilder {
 	mb.TryRemoveNestedEnum(name)
 	return mb
 }
 
+// TryRemoveNestedEnum removes the nested enum with the given name and returns
+// false if this message has no nested enum with that name.
 func (mb *MessageBuilder) TryRemoveNestedEnum(name string) bool {
 	b := mb.symbols[name]
 	if eb, ok := b.(*EnumBuilder); ok {
@@ -1526,6 +1619,9 @@ func (mb *MessageBuilder) TryRemoveNestedEnum(name string) bool {
 	return false
 }
 
+// AddNestedEnum adds the given enum as a nested child of this message. If an
+// error prevents the enum from being added, this method panics. This returns
+// the message builder, for method chaining.
 func (mb *MessageBuilder) AddNestedEnum(eb *EnumBuilder) *MessageBuilder {
 	if err := mb.TryAddNestedEnum(eb); err != nil {
 		panic(err)
@@ -1533,6 +1629,9 @@ func (mb *MessageBuilder) AddNestedEnum(eb *EnumBuilder) *MessageBuilder {
 	return mb
 }
 
+// TryAddNestedEnum adds the given enum as a nested child of this message,
+// returning any error that prevents the enum from being added (such as a name
+// collision with another element already added to the message).
 func (mb *MessageBuilder) TryAddNestedEnum(eb *EnumBuilder) error {
 	if err := mb.addSymbol(eb); err != nil {
 		return err
@@ -1543,6 +1642,8 @@ func (mb *MessageBuilder) TryAddNestedEnum(eb *EnumBuilder) error {
 	return nil
 }
 
+// SetOptions sets the message options for this message and returns the message,
+// for method chaining.
 func (mb *MessageBuilder) SetOptions(options *dpb.MessageOptions) *MessageBuilder {
 	mb.Options = options
 	return mb
@@ -1630,7 +1731,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 	oneOfs := make([]*dpb.OneofDescriptorProto, 0, oneOfCount)
 	for _, b := range mb.fieldsAndOneOfs {
 		if flb, ok := b.(*FieldBuilder); ok {
-			fldpath := append(path, Message_fieldsTag, int32(len(fields)))
+			fldpath := append(path, internal.Message_fieldsTag, int32(len(fields)))
 			fld, err := flb.buildProto(fldpath, sourceInfo)
 			if err != nil {
 				return nil, err
@@ -1640,7 +1741,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 				needTagsAssigned = append(needTagsAssigned, fld)
 			}
 			if flb.msgType != nil {
-				nmpath := append(path, Message_nestedMessagesTag, int32(len(nestedMessages)))
+				nmpath := append(path, internal.Message_nestedMessagesTag, int32(len(nestedMessages)))
 				if entry, err := flb.msgType.buildProto(nmpath, sourceInfo); err != nil {
 					return nil, err
 				} else {
@@ -1648,7 +1749,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 				}
 			}
 		} else {
-			oopath := append(path, Message_oneOfsTag, int32(len(oneOfs)))
+			oopath := append(path, internal.Message_oneOfsTag, int32(len(oneOfs)))
 			oob := b.(*OneOfBuilder)
 			oobIndex := len(oneOfs)
 			ood, err := oob.buildProto(oopath, sourceInfo)
@@ -1657,7 +1758,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 			}
 			oneOfs = append(oneOfs, ood)
 			for _, flb := range oob.choices {
-				path := append(path, Message_fieldsTag, int32(len(fields)))
+				path := append(path, internal.Message_fieldsTag, int32(len(fields)))
 				fld, err := flb.buildProto(path, sourceInfo)
 				if err != nil {
 					return nil, err
@@ -1693,7 +1794,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 	}
 
 	for _, nmb := range mb.nestedMessages {
-		path := append(path, Message_nestedMessagesTag, int32(len(nestedMessages)))
+		path := append(path, internal.Message_nestedMessagesTag, int32(len(nestedMessages)))
 		if nmd, err := nmb.buildProto(path, sourceInfo); err != nil {
 			return nil, err
 		} else {
@@ -1703,7 +1804,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 
 	nestedExtensions := make([]*dpb.FieldDescriptorProto, 0, len(mb.nestedExtensions))
 	for _, exb := range mb.nestedExtensions {
-		path := append(path, Message_extensionsTag, int32(len(nestedExtensions)))
+		path := append(path, internal.Message_extensionsTag, int32(len(nestedExtensions)))
 		if exd, err := exb.buildProto(path, sourceInfo); err != nil {
 			return nil, err
 		} else {
@@ -1713,7 +1814,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 
 	nestedEnums := make([]*dpb.EnumDescriptorProto, 0, len(mb.nestedEnums))
 	for _, eb := range mb.nestedEnums {
-		path := append(path, Message_enumsTag, int32(len(nestedEnums)))
+		path := append(path, internal.Message_enumsTag, int32(len(nestedEnums)))
 		if ed, err := eb.buildProto(path, sourceInfo); err != nil {
 			return nil, err
 		} else {
@@ -1747,6 +1848,23 @@ func (mb *MessageBuilder) Build() (*desc.MessageDescriptor, error) {
 	return d.(*desc.MessageDescriptor), nil
 }
 
+// BuildDescriptor constructs a message descriptor based on the contents of this
+// message builder. Most usages will prefer Build() instead, whose return type
+// is a concrete descriptor type. This method is present to satisfy the Builder
+// interface.
+func (mb *MessageBuilder) BuildDescriptor() (desc.Descriptor, error) {
+	return mb.Build()
+}
+
+// FieldBuilder is a builder used to construct a desc.FieldDescriptor. A field
+// builder is used to create fields and extensions as well as map entry
+// messages. It is also used to link groups (defined via a message builder) into
+// an enclosing message, associating it with a group field.  A non-extension
+// field builder *must* be added to a message before calling its Build() method.
+//
+// To create a new FieldBuilder, use NewField, NewMapField, NewGroupField,
+// NewExtension, or NewExtensionImported (depending on the type of field being
+// built).
 type FieldBuilder struct {
 	baseBuilder
 	number int32
@@ -1767,6 +1885,14 @@ type FieldBuilder struct {
 	localExtendee   *MessageBuilder
 }
 
+// NewField creates a new FieldBuilder for a non-extension field with the given
+// name and type. To create a map or group field, see NewMapField or
+// NewGroupField respectively.
+//
+// The new field will be optional. See SetLabel, SetRepeated, and SetRequired
+// for changing this aspect of the field. The new field's tag will be zero,
+// which means it will be auto-assigned when the descriptor is built. Use
+// SetNumber or TrySetNumber to assign an explicit tag number.
 func NewField(name string, typ *FieldType) *FieldBuilder {
 	flb := &FieldBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -1775,6 +1901,18 @@ func NewField(name string, typ *FieldType) *FieldBuilder {
 	return flb
 }
 
+// NewMapField creates a new FieldBuilder for a non-extension field with the
+// given name and whose type is a map of the given key and value types. Map keys
+// can be any of the scalar integer types, booleans, or strings. If any other
+// type is specified, this function will panic. Map values cannot be groups: if
+// a group type is specified, this function will panic.
+//
+// When this field is added to a message, the associated map entry message type
+// will also be added.
+//
+// The new field's tag will be zero, which means it will be auto-assigned when
+// the descriptor is built. Use SetNumber or TrySetNumber to assign an explicit
+// tag number.
 func NewMapField(name string, keyTyp, valTyp *FieldType) *FieldBuilder {
 	switch keyTyp.fieldType {
 	case dpb.FieldDescriptorProto_TYPE_BOOL,
@@ -1807,6 +1945,19 @@ func NewMapField(name string, keyTyp, valTyp *FieldType) *FieldBuilder {
 	return flb
 }
 
+// NewGroupField creates a new FieldBuilder for a non-extension field whose type
+// is a group with the given definition. The given message's name must start
+// with a capital letter, and the resulting field will have the same name but
+// converted to all lower-case. If a message is given with a name that starts
+// with a lower-case letter, this function will panic.
+//
+// When this field is added to a message, the associated group message type will
+// also be added.
+//
+// The new field will be optional. See SetLabel, SetRepeated, and SetRequired
+// for changing this aspect of the field. The new field's tag will be zero,
+// which means it will be auto-assigned when the descriptor is built. Use
+// SetNumber or TrySetNumber to assign an explicit tag number.
 func NewGroupField(mb *MessageBuilder) *FieldBuilder {
 	if !unicode.IsUpper(rune(mb.name[0])) {
 		panic(fmt.Sprintf("group name %s must start with a capital letter", mb.name))
@@ -1824,6 +1975,11 @@ func NewGroupField(mb *MessageBuilder) *FieldBuilder {
 	return flb
 }
 
+// NewExtension creates a new FieldBuilder for an extension field with the given
+// name, tag, type, and extendee. The extendee given is a message builder.
+//
+// The new field will be optional. See SetLabel and SetRepeated for changing
+// this aspect of the field.
 func NewExtension(name string, tag int32, typ *FieldType, extendee *MessageBuilder) *FieldBuilder {
 	if extendee == nil {
 		panic("extendee cannot be nil")
@@ -1833,6 +1989,12 @@ func NewExtension(name string, tag int32, typ *FieldType, extendee *MessageBuild
 	return flb
 }
 
+// NewExtensionImported creates a new FieldBuilder for an extension field with
+// the given name, tag, type, and extendee. The extendee given is a message
+// descriptor.
+//
+// The new field will be optional. See SetLabel and SetRepeated for changing
+// this aspect of the field.
 func NewExtensionImported(name string, tag int32, typ *FieldType, extendee *desc.MessageDescriptor) *FieldBuilder {
 	if extendee == nil {
 		panic("extendee cannot be nil")
@@ -1842,6 +2004,17 @@ func NewExtensionImported(name string, tag int32, typ *FieldType, extendee *desc
 	return flb
 }
 
+// FromField returns a FieldBuilder that is effectively a copy of the given
+// descriptor.
+//
+// Note that it is not just the given field that is copied but its entire file.
+// So the caller can get the parent element of the returned builder and the
+// result would be a builder that is effectively a copy of the field
+// descriptor's parent.
+//
+// This means that field builders created from descriptors do not need to be
+// explicitly assigned to a file in order to preserve the original field's
+// package name.
 func FromField(fld *desc.FieldDescriptor) (*FieldBuilder, error) {
 	if fb, err := FromFile(fld.GetFile()); err != nil {
 		return nil, err
@@ -1880,6 +2053,9 @@ func fromField(fld *desc.FieldDescriptor) (*FieldBuilder, error) {
 	return flb, nil
 }
 
+// SetName changes this field's name, returning the field builder for method
+// chaining. If the given new name is not valid (e.g. TrySetName would have
+// returned an error) then this method will panic.
 func (flb *FieldBuilder) SetName(newName string) *FieldBuilder {
 	if err := flb.TrySetName(newName); err != nil {
 		panic(err)
@@ -1887,6 +2063,14 @@ func (flb *FieldBuilder) SetName(newName string) *FieldBuilder {
 	return flb
 }
 
+// TrySetName changes this field's name. It will return an error if the given
+// new name is not a valid protobuf identifier or if the parent builder already
+// has an element with the given name.
+//
+// If the field is a non-extension whose parent is a one-of, the one-of's
+// enclosing message is checked for elements with a conflicting name. Despite
+// the fact that one-of choices are modeled as children of the one-of builder,
+// in the protobuf IDL they are actually all defined in the message's namespace.
 func (flb *FieldBuilder) TrySetName(newName string) error {
 	var oldMsgName string
 	if flb.msgType != nil {
@@ -1920,6 +2104,8 @@ func (flb *FieldBuilder) setNameInternal(newName string) {
 	}
 }
 
+// SetComments sets the comments associated with the field. This method returns
+// the field builder, for method chaining.
 func (flb *FieldBuilder) SetComments(c Comments) *FieldBuilder {
 	flb.comments = c
 	return flb
@@ -1929,6 +2115,9 @@ func (flb *FieldBuilder) setParent(newParent Builder) {
 	flb.baseBuilder.setParent(newParent)
 }
 
+// GetChildren returns any builders assigned to this field builder. The only
+// kind of children a field can have are message types, that correspond to the
+// field's map entry type or group type (for map and group fields respectively).
 func (flb *FieldBuilder) GetChildren() []Builder {
 	if flb.msgType != nil {
 		return []Builder{flb.msgType}
@@ -1979,10 +2168,15 @@ func (flb *FieldBuilder) renamedChild(b Builder, oldName string) error {
 	return nil
 }
 
+// GetNumber returns this field's tag number, or zero if the tag number will be
+// auto-assigned when the field descriptor is built.
 func (flb *FieldBuilder) GetNumber() int32 {
 	return flb.number
 }
 
+// SetNumber changes the numeric tag for this field and then returns the field,
+// for method chaining. If the given new tag is not valid (e.g. TrySetNumber
+// would have returned an error) then this method will panic.
 func (flb *FieldBuilder) SetNumber(tag int32) *FieldBuilder {
 	if err := flb.TrySetNumber(tag); err != nil {
 		panic(err)
@@ -1990,6 +2184,13 @@ func (flb *FieldBuilder) SetNumber(tag int32) *FieldBuilder {
 	return flb
 }
 
+// TrySetNumber changes this field's tag number. It will return an error if the
+// given new tag is out of valid range or (for non-extension fields) if the
+// enclosing message already includes a field with the given tag.
+//
+// Non-extension fields can be set to zero, which means a proper tag number will
+// be auto-assigned when the descriptor is built. Extension field tags, however,
+// must be set to a valid non-zero value.
 func (flb *FieldBuilder) TrySetNumber(tag int32) error {
 	if tag == flb.number {
 		return nil // no change
@@ -2000,14 +2201,18 @@ func (flb *FieldBuilder) TrySetNumber(tag int32) error {
 	if tag == 0 && flb.IsExtension() {
 		return fmt.Errorf("cannot set tag number for extension %s; only regular fields can be auto-assigned", GetFullyQualifiedName(flb))
 	}
-	if tag >= SpecialReservedStart && tag <= SpecialReservedEnd {
-		return fmt.Errorf("tag for field %s cannot be in special reserved range %d-%d", GetFullyQualifiedName(flb), SpecialReservedStart, SpecialReservedEnd)
+	if tag >= internal.SpecialReservedStart && tag <= internal.SpecialReservedEnd {
+		return fmt.Errorf("tag for field %s cannot be in special reserved range %d-%d", GetFullyQualifiedName(flb), internal.SpecialReservedStart, internal.SpecialReservedEnd)
 	}
-	if tag > MaxTag {
-		return fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), MaxTag)
+	if tag > internal.MaxTag {
+		return fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), internal.MaxTag)
 	}
 	oldTag := flb.number
 	flb.number = tag
+	if flb.IsExtension() {
+		// extension tags are not tracked by builders, so no more to do
+		return nil
+	}
 	switch p := flb.parent.(type) {
 	case *OneOfBuilder:
 		m := p.parent()
@@ -2028,36 +2233,56 @@ func (flb *FieldBuilder) TrySetNumber(tag int32) error {
 	return nil
 }
 
+// SetOptions sets the field options for this field and returns the field, for
+// method chaining.
 func (flb *FieldBuilder) SetOptions(options *dpb.FieldOptions) *FieldBuilder {
 	flb.Options = options
 	return flb
 }
 
+// SetLabel sets the label for this field, which can be optional, repeated, or
+// required. It returns the field builder, for method chaining.
 func (flb *FieldBuilder) SetLabel(lbl dpb.FieldDescriptorProto_Label) *FieldBuilder {
 	flb.Label = lbl
 	return flb
 }
 
+// SetRepeated sets the label for this field to repeated. It returns the field
+// builder, for method chaining.
 func (flb *FieldBuilder) SetRepeated() *FieldBuilder {
 	return flb.SetLabel(dpb.FieldDescriptorProto_LABEL_REPEATED)
 }
 
+// SetRequired sets the label for this field to required. It returns the field
+// builder, for method chaining.
 func (flb *FieldBuilder) SetRequired() *FieldBuilder {
 	return flb.SetLabel(dpb.FieldDescriptorProto_LABEL_REQUIRED)
 }
 
+// SetOptional sets the label for this field to optional. It returns the field
+// builder, for method chaining.
 func (flb *FieldBuilder) SetOptional() *FieldBuilder {
 	return flb.SetLabel(dpb.FieldDescriptorProto_LABEL_OPTIONAL)
 }
 
+// IsRepeated returns true if this field's label is repeated. Fields created via
+// NewMapField will be repeated (since map's are represented "under the hood" as
+// a repeated field of map entry messages).
 func (flb *FieldBuilder) IsRepeated() bool {
 	return flb.Label == dpb.FieldDescriptorProto_LABEL_REPEATED
 }
 
+// IsRequired returns true if this field's label is required.
 func (flb *FieldBuilder) IsRequired() bool {
 	return flb.Label == dpb.FieldDescriptorProto_LABEL_REQUIRED
 }
 
+// IsOptional returns true if this field's label is optional.
+func (flb *FieldBuilder) IsOptional() bool {
+	return flb.Label == dpb.FieldDescriptorProto_LABEL_OPTIONAL
+}
+
+// IsMap returns true if this field is a map field.
 func (flb *FieldBuilder) IsMap() bool {
 	return flb.IsRepeated() &&
 		flb.msgType != nil &&
@@ -2066,10 +2291,13 @@ func (flb *FieldBuilder) IsMap() bool {
 		flb.msgType.Options.GetMapEntry()
 }
 
+// GetType returns the field's type.
 func (flb *FieldBuilder) GetType() *FieldType {
 	return flb.fieldType
 }
 
+// SetType changes the field's type and returns the field builder, for method
+// chaining.
 func (flb *FieldBuilder) SetType(ft *FieldType) *FieldBuilder {
 	flb.fieldType = ft
 	if flb.msgType != nil && flb.msgType != ft.localMsgType {
@@ -2078,20 +2306,27 @@ func (flb *FieldBuilder) SetType(ft *FieldType) *FieldBuilder {
 	return flb
 }
 
+// SetDefaultValue changes the field's type and returns the field builder, for
+// method chaining.
 func (flb *FieldBuilder) SetDefaultValue(defValue string) *FieldBuilder {
 	flb.Default = defValue
 	return flb
 }
 
+// SetJsonName sets the name used in the field's JSON representation and then
+// returns the field builder, for method chaining.
 func (flb *FieldBuilder) SetJsonName(jsonName string) *FieldBuilder {
 	flb.JsonName = jsonName
 	return flb
 }
 
+// IsExtension returns true if this is an extension field.
 func (flb *FieldBuilder) IsExtension() bool {
 	return flb.localExtendee != nil || flb.foreignExtendee != nil
 }
 
+// GetExtendeeTypeName returns the fully qualified name of the extended message
+// or it returns an empty string if this is not an extension field.
 func (flb *FieldBuilder) GetExtendeeTypeName() string {
 	if flb.foreignExtendee != nil {
 		return flb.foreignExtendee.GetFullyQualifiedName()
@@ -2120,7 +2355,7 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 	}
 	jsName := flb.JsonName
 	if jsName == "" {
-		jsName = JsonName(flb.name)
+		jsName = internal.JsonName(flb.name)
 	}
 	var def *string
 	if flb.Default != "" {
@@ -2140,6 +2375,10 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 	}, nil
 }
 
+// Build constructs a field descriptor based on the contents of this field
+// builder. If there are any problems constructing the descriptor, including
+// resolving symbols referenced by the builder or failing to meet certain
+// validation rules, an error is returned.
 func (flb *FieldBuilder) Build() (*desc.FieldDescriptor, error) {
 	d, err := doBuild(flb)
 	if err != nil {
@@ -2148,6 +2387,18 @@ func (flb *FieldBuilder) Build() (*desc.FieldDescriptor, error) {
 	return d.(*desc.FieldDescriptor), nil
 }
 
+// BuildDescriptor constructs a field descriptor based on the contents of this
+// field builder. Most usages will prefer Build() instead, whose return type is
+// a concrete descriptor type. This method is present to satisfy the Builder
+// interface.
+func (flb *FieldBuilder) BuildDescriptor() (desc.Descriptor, error) {
+	return flb.Build()
+}
+
+// OneOfBuilder is a builder used to construct a desc.OneOfDescriptor. A one-of
+// builder *must* be added to a message before calling its Build() method.
+//
+// To create a new OneOfBuilder, use NewOneOf.
 type OneOfBuilder struct {
 	baseBuilder
 
@@ -2157,6 +2408,7 @@ type OneOfBuilder struct {
 	symbols map[string]*FieldBuilder
 }
 
+// NewOneOf creates a new OneOfBuilder for a one-of with the given name.
 func NewOneOf(name string) *OneOfBuilder {
 	return &OneOfBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -2164,6 +2416,17 @@ func NewOneOf(name string) *OneOfBuilder {
 	}
 }
 
+// FromOneOf returns a OneOfBuilder that is effectively a copy of the given
+// descriptor.
+//
+// Note that it is not just the given one-of that is copied but its entire file.
+// So the caller can get the parent element of the returned builder and the
+// result would be a builder that is effectively a copy of the one-of
+// descriptor's parent message.
+//
+// This means that one-of builders created from descriptors do not need to be
+// explicitly assigned to a file in order to preserve the original one-of's
+// package name.
 func FromOneOf(ood *desc.OneOfDescriptor) (*OneOfBuilder, error) {
 	if fb, err := FromFile(ood.GetFile()); err != nil {
 		return nil, err
@@ -2190,6 +2453,9 @@ func fromOneOf(ood *desc.OneOfDescriptor) (*OneOfBuilder, error) {
 	return oob, nil
 }
 
+// SetName changes this one-of's name, returning the one-of builder for method
+// chaining. If the given new name is not valid (e.g. TrySetName would have
+// returned an error) then this method will panic.
 func (oob *OneOfBuilder) SetName(newName string) *OneOfBuilder {
 	if err := oob.TrySetName(newName); err != nil {
 		panic(err)
@@ -2197,15 +2463,22 @@ func (oob *OneOfBuilder) SetName(newName string) *OneOfBuilder {
 	return oob
 }
 
+// TrySetName changes this one-of's name. It will return an error if the given
+// new name is not a valid protobuf identifier or if the parent message builder
+// already has an element with the given name.
 func (oob *OneOfBuilder) TrySetName(newName string) error {
 	return oob.baseBuilder.setName(oob, newName)
 }
 
+// SetComments sets the comments associated with the one-of. This method
+// returns the one-of builder, for method chaining.
 func (oob *OneOfBuilder) SetComments(c Comments) *OneOfBuilder {
 	oob.comments = c
 	return oob
 }
 
+// GetChildren returns any builders assigned to this one-of builder. These will
+// be choices for the one-of, each of which will be a field builder.
 func (oob *OneOfBuilder) GetChildren() []Builder {
 	var ch []Builder
 	for _, evb := range oob.choices {
@@ -2275,15 +2548,22 @@ func (oob *OneOfBuilder) addSymbol(b *FieldBuilder) error {
 	return nil
 }
 
+// GetChoice returns the field with the given name. If no such field exists in
+// the one-of, nil is returned.
 func (oob *OneOfBuilder) GetChoice(name string) *FieldBuilder {
 	return oob.symbols[name]
 }
 
+// RemoveChoice removes the field with the given name. If no such field exists
+// in the one-of, this is a no-op. This returns the one-of builder, for method
+// chaining.
 func (oob *OneOfBuilder) RemoveChoice(name string) *OneOfBuilder {
 	oob.TryRemoveChoice(name)
 	return oob
 }
 
+// TryRemoveChoice removes the field with the given name and returns false if
+// the one-of has no such field.
 func (oob *OneOfBuilder) TryRemoveChoice(name string) bool {
 	if flb, ok := oob.symbols[name]; ok {
 		oob.removeChild(flb)
@@ -2292,6 +2572,11 @@ func (oob *OneOfBuilder) TryRemoveChoice(name string) bool {
 	return false
 }
 
+// AddChoice adds the given field to this one-of. If an error prevents the field
+// from being added, this method panics. If the given field is an extension,
+// this method panics. If the given field is a group or map field or if it is
+// not optional (e.g. it is required or repeated), this method panics. This
+// returns the one-of builder, for method chaining.
 func (oob *OneOfBuilder) AddChoice(flb *FieldBuilder) *OneOfBuilder {
 	if err := oob.TryAddChoice(flb); err != nil {
 		panic(err)
@@ -2299,6 +2584,11 @@ func (oob *OneOfBuilder) AddChoice(flb *FieldBuilder) *OneOfBuilder {
 	return oob
 }
 
+// TryAddChoice adds the given field to this one-of, returning any error that
+// prevents the field from being added (such as a name collision with another
+// element already added to the enclosing message). An error is returned if the
+// given field is an extension field, a map or group field, or repeated or
+// required.
 func (oob *OneOfBuilder) TryAddChoice(flb *FieldBuilder) error {
 	if flb.IsExtension() {
 		return fmt.Errorf("field %s is an extension, not a regular field", flb.GetName())
@@ -2336,6 +2626,8 @@ func (oob *OneOfBuilder) TryAddChoice(flb *FieldBuilder) error {
 	return nil
 }
 
+// SetOptions sets the one-of options for this one-of and returns the one-of,
+// for method chaining.
 func (oob *OneOfBuilder) SetOptions(options *dpb.OneofOptions) *OneOfBuilder {
 	oob.Options = options
 	return oob
@@ -2356,6 +2648,10 @@ func (oob *OneOfBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 	}, nil
 }
 
+// Build constructs a one-of descriptor based on the contents of this one-of
+// builder. If there are any problems constructing the descriptor, including
+// resolving symbols referenced by the builder or failing to meet certain
+// validation rules, an error is returned.
 func (oob *OneOfBuilder) Build() (*desc.OneOfDescriptor, error) {
 	d, err := doBuild(oob)
 	if err != nil {
@@ -2364,6 +2660,17 @@ func (oob *OneOfBuilder) Build() (*desc.OneOfDescriptor, error) {
 	return d.(*desc.OneOfDescriptor), nil
 }
 
+// BuildDescriptor constructs a one-of descriptor based on the contents of this
+// one-of builder. Most usages will prefer Build() instead, whose return type is
+// a concrete descriptor type. This method is present to satisfy the Builder
+// interface.
+func (oob *OneOfBuilder) BuildDescriptor() (desc.Descriptor, error) {
+	return oob.Build()
+}
+
+// EnumBuilder is a builder used to construct a desc.EnumDescriptor.
+//
+// To create a new EnumBuilder, use NewEnum.
 type EnumBuilder struct {
 	baseBuilder
 
@@ -2375,6 +2682,10 @@ type EnumBuilder struct {
 	symbols map[string]*EnumValueBuilder
 }
 
+// NewEnum creates a new EnumBuilder for an enum with the given name. Since the
+// new message has no parent element, it also has no package name (e.g. it is in
+// the unnamed package, until it is assigned to a file builder that defines a
+// package name).
 func NewEnum(name string) *EnumBuilder {
 	return &EnumBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -2382,6 +2693,17 @@ func NewEnum(name string) *EnumBuilder {
 	}
 }
 
+// FromEnum returns an EnumBuilder that is effectively a copy of the given
+// descriptor.
+//
+// Note that it is not just the given enum that is copied but its entire file.
+// So the caller can get the parent element of the returned builder and the
+// result would be a builder that is effectively a copy of the enum descriptor's
+// parent.
+//
+// This means that enum builders created from descriptors do not need to be
+// explicitly assigned to a file in order to preserve the original enum's
+// package name.
 func FromEnum(ed *desc.EnumDescriptor) (*EnumBuilder, error) {
 	if fb, err := FromFile(ed.GetFile()); err != nil {
 		return nil, err
@@ -2412,6 +2734,9 @@ func fromEnum(ed *desc.EnumDescriptor, localEnums map[*desc.EnumDescriptor]*Enum
 	return eb, nil
 }
 
+// SetName changes this enum's name, returning the enum builder for method
+// chaining. If the given new name is not valid (e.g. TrySetName would have
+// returned an error) then this method will panic.
 func (eb *EnumBuilder) SetName(newName string) *EnumBuilder {
 	if err := eb.TrySetName(newName); err != nil {
 		panic(err)
@@ -2419,15 +2744,22 @@ func (eb *EnumBuilder) SetName(newName string) *EnumBuilder {
 	return eb
 }
 
+// TrySetName changes this enum's name. It will return an error if the given new
+// name is not a valid protobuf identifier or if the parent builder already has
+// an element with the given name.
 func (eb *EnumBuilder) TrySetName(newName string) error {
 	return eb.baseBuilder.setName(eb, newName)
 }
 
+// SetComments sets the comments associated with the enum. This method returns
+// the enum builder, for method chaining.
 func (eb *EnumBuilder) SetComments(c Comments) *EnumBuilder {
 	eb.comments = c
 	return eb
 }
 
+// GetChildren returns any builders assigned to this enum builder. These will be
+// the enum's values.
 func (eb *EnumBuilder) GetChildren() []Builder {
 	var ch []Builder
 	for _, evb := range eb.values {
@@ -2469,20 +2801,29 @@ func (eb *EnumBuilder) addSymbol(b *EnumValueBuilder) error {
 	return nil
 }
 
+// SetOptions sets the enum options for this enum and returns the enum, for
+// method chaining.
 func (eb *EnumBuilder) SetOptions(options *dpb.EnumOptions) *EnumBuilder {
 	eb.Options = options
 	return eb
 }
 
+// GetValue returns the enum value with the given name. If no such value exists
+// in the enum, nil is returned.
 func (eb *EnumBuilder) GetValue(name string) *EnumValueBuilder {
 	return eb.symbols[name]
 }
 
+// RemoveValue removes the enum value with the given name. If no such value
+// exists in the enum, this is a no-op. This returns the enum builder, for
+// method chaining.
 func (eb *EnumBuilder) RemoveValue(name string) *EnumBuilder {
 	eb.TryRemoveValue(name)
 	return eb
 }
 
+// TryRemoveValue removes the enum value with the given name and returns false
+// if the enum has no such value.
 func (eb *EnumBuilder) TryRemoveValue(name string) bool {
 	if evb, ok := eb.symbols[name]; ok {
 		eb.removeChild(evb)
@@ -2491,6 +2832,9 @@ func (eb *EnumBuilder) TryRemoveValue(name string) bool {
 	return false
 }
 
+// AddValue adds the given enum value to this enum. If an error prevents the
+// value from being added, this method panics. This returns the enum builder,
+// for method chaining.
 func (eb *EnumBuilder) AddValue(evb *EnumValueBuilder) *EnumBuilder {
 	if err := eb.TryAddValue(evb); err != nil {
 		panic(err)
@@ -2498,6 +2842,9 @@ func (eb *EnumBuilder) AddValue(evb *EnumValueBuilder) *EnumBuilder {
 	return eb
 }
 
+// TryAddValue adds the given enum value to this enum, returning any error that
+// prevents the value from being added (such as a name collision with another
+// value already added to the enum).
 func (eb *EnumBuilder) TryAddValue(evb *EnumValueBuilder) error {
 	if err := eb.addSymbol(evb); err != nil {
 		return err
@@ -2547,7 +2894,7 @@ func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) 
 	var needNumbersAssigned []*dpb.EnumValueDescriptorProto
 	values := make([]*dpb.EnumValueDescriptorProto, 0, len(eb.values))
 	for _, evb := range eb.values {
-		path := append(path, Enum_valuesTag, int32(len(values)))
+		path := append(path, internal.Enum_valuesTag, int32(len(values)))
 		evp, err := evb.buildProto(path, sourceInfo)
 		if err != nil {
 			return nil, err
@@ -2594,6 +2941,10 @@ func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) 
 	}, nil
 }
 
+// Build constructs an enum descriptor based on the contents of this enum
+// builder. If there are any problems constructing the descriptor, including
+// resolving symbols referenced by the builder or failing to meet certain
+// validation rules, an error is returned.
 func (eb *EnumBuilder) Build() (*desc.EnumDescriptor, error) {
 	d, err := doBuild(eb)
 	if err != nil {
@@ -2602,18 +2953,46 @@ func (eb *EnumBuilder) Build() (*desc.EnumDescriptor, error) {
 	return d.(*desc.EnumDescriptor), nil
 }
 
+// BuildDescriptor constructs an enum descriptor based on the contents of this
+// enum builder. Most usages will prefer Build() instead, whose return type
+// is a concrete descriptor type. This method is present to satisfy the Builder
+// interface.
+func (eb *EnumBuilder) BuildDescriptor() (desc.Descriptor, error) {
+	return eb.Build()
+}
+
+// EnumValueBuilder is a builder used to construct a desc.EnumValueDescriptor.
+// A enum value builder *must* be added to an enum before calling its Build()
+// method.
+//
+// To create a new EnumValueBuilder, use NewEnumValue.
 type EnumValueBuilder struct {
 	baseBuilder
 
-	Number    int32
+	number    int32
 	numberSet bool
 	Options   *dpb.EnumValueOptions
 }
 
+// NewEnumValue creates a new EnumValueBuilder for an enum value with the given
+// name. The return value's numeric value will not be set, which means it will
+// be auto-assigned when the descriptor is built, unless explicitly set with a
+// call to SetNumber.
 func NewEnumValue(name string) *EnumValueBuilder {
 	return &EnumValueBuilder{baseBuilder: baseBuilderWithName(name)}
 }
 
+// FromEnumValue returns an EnumValueBuilder that is effectively a copy of the
+// given descriptor.
+//
+// Note that it is not just the given enum value that is copied but its entire
+// file. So the caller can get the parent element of the returned builder and
+// the result would be a builder that is effectively a copy of the enum value
+// descriptor's parent enum.
+//
+// This means that enum value builders created from descriptors do not need to
+// be explicitly assigned to a file in order to preserve the original enum
+// value's package name.
 func FromEnumValue(evd *desc.EnumValueDescriptor) (*EnumValueBuilder, error) {
 	if fb, err := FromFile(evd.GetFile()); err != nil {
 		return nil, err
@@ -2627,13 +3006,16 @@ func FromEnumValue(evd *desc.EnumValueDescriptor) (*EnumValueBuilder, error) {
 func fromEnumValue(evd *desc.EnumValueDescriptor) (*EnumValueBuilder, error) {
 	evb := NewEnumValue(evd.GetName())
 	evb.Options = evd.GetEnumValueOptions()
-	evb.Number = evd.GetNumber()
+	evb.number = evd.GetNumber()
 	evb.numberSet = true
 	setComments(&evb.comments, evd.GetSourceInfo())
 
 	return evb, nil
 }
 
+// SetName changes this enum value's name, returning the enum value builder for
+// method chaining. If the given new name is not valid (e.g. TrySetName would
+// have returned an error) then this method will panic.
 func (evb *EnumValueBuilder) SetName(newName string) *EnumValueBuilder {
 	if err := evb.TrySetName(newName); err != nil {
 		panic(err)
@@ -2641,15 +3023,22 @@ func (evb *EnumValueBuilder) SetName(newName string) *EnumValueBuilder {
 	return evb
 }
 
+// TrySetName changes this enum value's name. It will return an error if the
+// given new name is not a valid protobuf identifier or if the parent enum
+// builder already has an enum value with the given name.
 func (evb *EnumValueBuilder) TrySetName(newName string) error {
 	return evb.baseBuilder.setName(evb, newName)
 }
 
+// SetComments sets the comments associated with the enum value. This method
+// returns the enum value builder, for method chaining.
 func (evb *EnumValueBuilder) SetComments(c Comments) *EnumValueBuilder {
 	evb.comments = c
 	return evb
 }
 
+// GetChildren returns nil, since enum values cannot have child elements. It is
+// present to satisfy the Builder interface.
 func (evb *EnumValueBuilder) GetChildren() []Builder {
 	// enum values do not have children
 	return nil
@@ -2669,13 +3058,39 @@ func (evb *EnumValueBuilder) renamedChild(b Builder, oldName string) error {
 	return nil
 }
 
+// SetOptions sets the enum value options for this enum value and returns the
+// enum value, for method chaining.
 func (evb *EnumValueBuilder) SetOptions(options *dpb.EnumValueOptions) *EnumValueBuilder {
 	evb.Options = options
 	return evb
 }
 
+// GetNumber returns the enum value's numeric value. If the number has not been
+// set this returns zero.
+func (evb *EnumValueBuilder) GetNumber() int32 {
+	return evb.number
+}
+
+// HasNumber returns whether or not the enum value's numeric value has been set.
+// If it has not been set, it is auto-assigned when the descriptor is built.
+func (evb *EnumValueBuilder) HasNumber() bool {
+	return evb.numberSet
+}
+
+// ClearNumber clears this enum value's numeric value and then returns the enum
+// value builder, for method chaining. After being cleared, the number will be
+// auto-assigned when the descriptor is built, unless explicitly set by a
+// subsequent call to SetNumber.
+func (evb *EnumValueBuilder) ClearNumber() *EnumValueBuilder {
+	evb.number = 0
+	evb.numberSet = false
+	return evb
+}
+
+// SetNumber changes the numeric value for this enum value and then returns the
+// enum value, for method chaining.
 func (evb *EnumValueBuilder) SetNumber(number int32) *EnumValueBuilder {
-	evb.Number = number
+	evb.number = number
 	evb.numberSet = true
 	return evb
 }
@@ -2685,11 +3100,15 @@ func (evb *EnumValueBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCode
 
 	return &dpb.EnumValueDescriptorProto{
 		Name:    proto.String(evb.name),
-		Number:  proto.Int32(evb.Number),
+		Number:  proto.Int32(evb.number),
 		Options: evb.Options,
 	}, nil
 }
 
+// Build constructs an enum value descriptor based on the contents of this enum
+// value builder. If there are any problems constructing the descriptor,
+// including resolving symbols referenced by the builder or failing to meet
+// certain validation rules, an error is returned.
 func (evb *EnumValueBuilder) Build() (*desc.EnumValueDescriptor, error) {
 	d, err := doBuild(evb)
 	if err != nil {
@@ -2698,6 +3117,17 @@ func (evb *EnumValueBuilder) Build() (*desc.EnumValueDescriptor, error) {
 	return d.(*desc.EnumValueDescriptor), nil
 }
 
+// BuildDescriptor constructs an enum value descriptor based on the contents of
+// this enum value builder. Most usages will prefer Build() instead, whose
+// return type is a concrete descriptor type. This method is present to satisfy
+// the Builder interface.
+func (evb *EnumValueBuilder) BuildDescriptor() (desc.Descriptor, error) {
+	return evb.Build()
+}
+
+// ServiceBuilder is a builder used to construct a desc.ServiceDescriptor.
+//
+// To create a new ServiceBuilder, use NewService.
 type ServiceBuilder struct {
 	baseBuilder
 
@@ -2707,6 +3137,7 @@ type ServiceBuilder struct {
 	symbols map[string]*MethodBuilder
 }
 
+// NewService creates a new ServiceBuilder for a service with the given name.
 func NewService(name string) *ServiceBuilder {
 	return &ServiceBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -2714,6 +3145,17 @@ func NewService(name string) *ServiceBuilder {
 	}
 }
 
+// FromService returns a ServiceBuilder that is effectively a copy of the given
+// descriptor.
+//
+// Note that it is not just the given service that is copied but its entire
+// file. So the caller can get the parent element of the returned builder and
+// the result would be a builder that is effectively a copy of the service
+// descriptor's parent file.
+//
+// This means that service builders created from descriptors do not need to be
+// explicitly assigned to a file in order to preserve the original service's
+// package name.
 func FromService(sd *desc.ServiceDescriptor) (*ServiceBuilder, error) {
 	if fb, err := FromFile(sd.GetFile()); err != nil {
 		return nil, err
@@ -2740,6 +3182,9 @@ func fromService(sd *desc.ServiceDescriptor) (*ServiceBuilder, error) {
 	return sb, nil
 }
 
+// SetName changes this service's name, returning the service builder for method
+// chaining. If the given new name is not valid (e.g. TrySetName would have
+// returned an error) then this method will panic.
 func (sb *ServiceBuilder) SetName(newName string) *ServiceBuilder {
 	if err := sb.TrySetName(newName); err != nil {
 		panic(err)
@@ -2747,15 +3192,22 @@ func (sb *ServiceBuilder) SetName(newName string) *ServiceBuilder {
 	return sb
 }
 
+// TrySetName changes this service's name. It will return an error if the given
+// new name is not a valid protobuf identifier or if the parent file builder
+// already has an element with the given name.
 func (sb *ServiceBuilder) TrySetName(newName string) error {
 	return sb.baseBuilder.setName(sb, newName)
 }
 
+// SetComments sets the comments associated with the service. This method
+// returns the service builder, for method chaining.
 func (sb *ServiceBuilder) SetComments(c Comments) *ServiceBuilder {
 	sb.comments = c
 	return sb
 }
 
+// GetChildren returns any builders assigned to this service builder. These will
+// be the service's methods.
 func (sb *ServiceBuilder) GetChildren() []Builder {
 	var ch []Builder
 	for _, mtb := range sb.methods {
@@ -2797,15 +3249,22 @@ func (sb *ServiceBuilder) addSymbol(b *MethodBuilder) error {
 	return nil
 }
 
+// GetMethod returns the method with the given name. If no such method exists in
+// the service, nil is returned.
 func (sb *ServiceBuilder) GetMethod(name string) *MethodBuilder {
 	return sb.symbols[name]
 }
 
+// RemoveMethod removes the method with the given name. If no such method exists
+// in the service, this is a no-op. This returns the service builder, for method
+// chaining.
 func (sb *ServiceBuilder) RemoveMethod(name string) *ServiceBuilder {
 	sb.TryRemoveMethod(name)
 	return sb
 }
 
+// TryRemoveMethod removes the method with the given name and returns false if
+// the service has no such method.
 func (sb *ServiceBuilder) TryRemoveMethod(name string) bool {
 	if mtb, ok := sb.symbols[name]; ok {
 		sb.removeChild(mtb)
@@ -2814,6 +3273,9 @@ func (sb *ServiceBuilder) TryRemoveMethod(name string) bool {
 	return false
 }
 
+// AddMethod adds the given method to this servuce. If an error prevents the
+// method  from being added, this method panics. This returns the service
+// builder, for method chaining.
 func (sb *ServiceBuilder) AddMethod(mtb *MethodBuilder) *ServiceBuilder {
 	if err := sb.TryAddMethod(mtb); err != nil {
 		panic(err)
@@ -2821,6 +3283,9 @@ func (sb *ServiceBuilder) AddMethod(mtb *MethodBuilder) *ServiceBuilder {
 	return sb
 }
 
+// TryAddMethod adds the given field to this service, returning any error that
+// prevents the field from being added (such as a name collision with another
+// method already added to the service).
 func (sb *ServiceBuilder) TryAddMethod(mtb *MethodBuilder) error {
 	if err := sb.addSymbol(mtb); err != nil {
 		return err
@@ -2831,6 +3296,8 @@ func (sb *ServiceBuilder) TryAddMethod(mtb *MethodBuilder) error {
 	return nil
 }
 
+// SetOptions sets the service options for this service and returns the service,
+// for method chaining.
 func (sb *ServiceBuilder) SetOptions(options *dpb.ServiceOptions) *ServiceBuilder {
 	sb.Options = options
 	return sb
@@ -2841,7 +3308,7 @@ func (sb *ServiceBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 
 	methods := make([]*dpb.MethodDescriptorProto, 0, len(sb.methods))
 	for _, mtb := range sb.methods {
-		path := append(path, Service_methodsTag, int32(len(methods)))
+		path := append(path, internal.Service_methodsTag, int32(len(methods)))
 		if mtd, err := mtb.buildProto(path, sourceInfo); err != nil {
 			return nil, err
 		} else {
@@ -2856,6 +3323,10 @@ func (sb *ServiceBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 	}, nil
 }
 
+// Build constructs a service descriptor based on the contents of this service
+// builder. If there are any problems constructing the descriptor, including
+// resolving symbols referenced by the builder or failing to meet certain
+// validation rules, an error is returned.
 func (sb *ServiceBuilder) Build() (*desc.ServiceDescriptor, error) {
 	d, err := doBuild(sb)
 	if err != nil {
@@ -2864,6 +3335,19 @@ func (sb *ServiceBuilder) Build() (*desc.ServiceDescriptor, error) {
 	return d.(*desc.ServiceDescriptor), nil
 }
 
+// BuildDescriptor constructs a service descriptor based on the contents of this
+// service builder. Most usages will prefer Build() instead, whose return type
+// is a concrete descriptor type. This method is present to satisfy the Builder
+// interface.
+func (sb *ServiceBuilder) BuildDescriptor() (desc.Descriptor, error) {
+	return sb.Build()
+}
+
+// MethodBuilder is a builder used to construct a desc.MethodDescriptor. A
+// method builder *must* be added to a service before calling its Build()
+// method.
+//
+// To create a new MethodBuilder, use NewMethod.
 type MethodBuilder struct {
 	baseBuilder
 
@@ -2872,6 +3356,8 @@ type MethodBuilder struct {
 	RespType *RpcType
 }
 
+// NewMethod creates a new MethodBuilder for a method with the given name and
+// request and response types.
 func NewMethod(name string, req, resp *RpcType) *MethodBuilder {
 	return &MethodBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -2880,6 +3366,17 @@ func NewMethod(name string, req, resp *RpcType) *MethodBuilder {
 	}
 }
 
+// FromMethod returns a MethodBuilder that is effectively a copy of the given
+// descriptor.
+//
+// Note that it is not just the given method that is copied but its entire file.
+// So the caller can get the parent element of the returned builder and the
+// result would be a builder that is effectively a copy of the method
+// descriptor's parent service.
+//
+// This means that method builders created from descriptors do not need to be
+// explicitly assigned to a file in order to preserve the original method's
+// package name.
 func FromMethod(mtd *desc.MethodDescriptor) (*MethodBuilder, error) {
 	if fb, err := FromFile(mtd.GetFile()); err != nil {
 		return nil, err
@@ -2900,6 +3397,9 @@ func fromMethod(mtd *desc.MethodDescriptor) (*MethodBuilder, error) {
 	return mtb, nil
 }
 
+// SetName changes this method's name, returning the method builder for method
+// chaining. If the given new name is not valid (e.g. TrySetName would have
+// returned an error) then this method will panic.
 func (mtb *MethodBuilder) SetName(newName string) *MethodBuilder {
 	if err := mtb.TrySetName(newName); err != nil {
 		panic(err)
@@ -2907,15 +3407,22 @@ func (mtb *MethodBuilder) SetName(newName string) *MethodBuilder {
 	return mtb
 }
 
+// TrySetName changes this method's name. It will return an error if the given
+// new name is not a valid protobuf identifier or if the parent service builder
+// already has a method with the given name.
 func (mtb *MethodBuilder) TrySetName(newName string) error {
 	return mtb.baseBuilder.setName(mtb, newName)
 }
 
+// SetComments sets the comments associated with the method. This method
+// returns the method builder, for method chaining.
 func (mtb *MethodBuilder) SetComments(c Comments) *MethodBuilder {
 	mtb.comments = c
 	return mtb
 }
 
+// GetChildren returns nil, since methods cannot have child elements. It is
+// present to satisfy the Builder interface.
 func (mtb *MethodBuilder) GetChildren() []Builder {
 	// methods do not have children
 	return nil
@@ -2935,16 +3442,22 @@ func (mtb *MethodBuilder) renamedChild(b Builder, oldName string) error {
 	return nil
 }
 
+// SetOptions sets the method options for this method and returns the method,
+// for method chaining.
 func (mtb *MethodBuilder) SetOptions(options *dpb.MethodOptions) *MethodBuilder {
 	mtb.Options = options
 	return mtb
 }
 
+// SetRequestType changes the request type for the method and then returns the
+// method builder, for method chaining.
 func (mtb *MethodBuilder) SetRequestType(t *RpcType) *MethodBuilder {
 	mtb.ReqType = t
 	return mtb
 }
 
+// SetResponseType changes the response type for the method and then returns the
+// method builder, for method chaining.
 func (mtb *MethodBuilder) SetResponseType(t *RpcType) *MethodBuilder {
 	mtb.RespType = t
 	return mtb
@@ -2969,6 +3482,10 @@ func (mtb *MethodBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 	return mtd, nil
 }
 
+// Build constructs a method descriptor based on the contents of this method
+// builder. If there are any problems constructing the descriptor, including
+// resolving symbols referenced by the builder or failing to meet certain
+// validation rules, an error is returned.
 func (mtb *MethodBuilder) Build() (*desc.MethodDescriptor, error) {
 	d, err := doBuild(mtb)
 	if err != nil {
@@ -2977,6 +3494,14 @@ func (mtb *MethodBuilder) Build() (*desc.MethodDescriptor, error) {
 	return d.(*desc.MethodDescriptor), nil
 }
 
+// BuildDescriptor constructs a method descriptor based on the contents of this
+// method builder. Most usages will prefer Build() instead, whose return type is
+// a concrete descriptor type. This method is present to satisfy the Builder
+// interface.
+func (mtb *MethodBuilder) BuildDescriptor() (desc.Descriptor, error) {
+	return mtb.Build()
+}
+
 func entryTypeName(fieldName string) string {
-	return InitCap(JsonName(fieldName)) + "Entry"
+	return internal.InitCap(internal.JsonName(fieldName)) + "Entry"
 }

@@ -4,11 +4,14 @@ import "fmt"
 
 // This file defines all of the nodes in the proto AST.
 
+// ErrorWithSourcePos is an error about a proto source file includes information
+// about the location in the file that caused the error.
 type ErrorWithSourcePos struct {
 	Underlying error
 	Pos        *SourcePos
 }
 
+// Error implements the error interface
 func (e ErrorWithSourcePos) Error() string {
 	if e.Pos.Line <= 0 || e.Pos.Col <= 0 {
 		return fmt.Sprintf("%s: %v", e.Pos.Filename, e.Underlying)
@@ -16,6 +19,7 @@ func (e ErrorWithSourcePos) Error() string {
 	return fmt.Sprintf("%s:%d:%d: %v", e.Pos.Filename, e.Pos.Line, e.Pos.Col, e.Underlying)
 }
 
+// SourcePos identifies a location in a proto source file.
 type SourcePos struct {
 	Filename  string
 	Line, Col int

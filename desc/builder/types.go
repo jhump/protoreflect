@@ -10,6 +10,13 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
+// FieldType represents the type of a field or extension. It can represent a
+// message or enum type or any of the scalar types supported by protobufs.
+//
+// Message and enum types can reference a message or enum builder. A type that
+// refers to a built message or enum descriptor is called an "imported" type.
+//
+// There are numerous factory methods for creating FieldType instances.
 type FieldType struct {
 	fieldType       dpb.FieldDescriptorProto_Type
 	foreignMsgType  *desc.MessageDescriptor
@@ -18,10 +25,16 @@ type FieldType struct {
 	localEnumType   *EnumBuilder
 }
 
+// GetType returns the enum value indicating the type of the field. If the type
+// is a message (or group) or enum type, GetTypeName provides the name of the
+// referenced type.
 func (ft *FieldType) GetType() dpb.FieldDescriptorProto_Type {
 	return ft.fieldType
 }
 
+// GetTypeName returns the fully-qualified name of the referenced message or
+// enum type. It returns an empty string if this type does not represent a
+// message or enum type.
 func (ft *FieldType) GetTypeName() string {
 	if ft.foreignMsgType != nil {
 		return ft.foreignMsgType.GetFullyQualifiedName()
@@ -54,6 +67,9 @@ var scalarTypes = map[dpb.FieldDescriptorProto_Type]*FieldType{
 	dpb.FieldDescriptorProto_TYPE_BYTES:    {fieldType: dpb.FieldDescriptorProto_TYPE_BYTES},
 }
 
+// FieldTypeScalar returns a FieldType for the given scalar type. If the given
+// type is not scalar (e.g. it is a message, group, or enum) than this function
+// will panic.
 func FieldTypeScalar(t dpb.FieldDescriptorProto_Type) *FieldType {
 	if ft, ok := scalarTypes[t]; ok {
 		return ft
@@ -61,66 +77,82 @@ func FieldTypeScalar(t dpb.FieldDescriptorProto_Type) *FieldType {
 	panic(fmt.Sprintf("field %v is not scalar", t))
 }
 
+// FieldTypeInt32 returns a FieldType for the int32 scalar type.
 func FieldTypeInt32() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_INT32)
 }
 
+// FieldTypeUInt32 returns a FieldType for the uint32 scalar type.
 func FieldTypeUInt32() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_UINT32)
 }
 
+// FieldTypeSInt32 returns a FieldType for the sint32 scalar type.
 func FieldTypeSInt32() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_SINT32)
 }
 
+// FieldTypeFixed32 returns a FieldType for the fixed32 scalar type.
 func FieldTypeFixed32() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_FIXED32)
 }
 
+// FieldTypeSFixed32 returns a FieldType for the sfixed32 scalar type.
 func FieldTypeSFixed32() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_SFIXED32)
 }
 
+// FieldTypeInt64 returns a FieldType for the int64 scalar type.
 func FieldTypeInt64() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_INT64)
 }
 
+// FieldTypeUInt64 returns a FieldType for the uint64 scalar type.
 func FieldTypeUInt64() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_UINT64)
 }
 
+// FieldTypeSInt64 returns a FieldType for the sint64 scalar type.
 func FieldTypeSInt64() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_SINT64)
 }
 
+// FieldTypeFixed64 returns a FieldType for the fixed64 scalar type.
 func FieldTypeFixed64() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_FIXED64)
 }
 
+// FieldTypeSFixed64 returns a FieldType for the sfixed64 scalar type.
 func FieldTypeSFixed64() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_SFIXED64)
 }
 
+// FieldTypeFloat returns a FieldType for the float scalar type.
 func FieldTypeFloat() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_FLOAT)
 }
 
+// FieldTypeDouble returns a FieldType for the double scalar type.
 func FieldTypeDouble() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_DOUBLE)
 }
 
+// FieldTypeBool returns a FieldType for the bool scalar type.
 func FieldTypeBool() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_BOOL)
 }
 
+// FieldTypeString returns a FieldType for the string scalar type.
 func FieldTypeString() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_STRING)
 }
 
+// FieldTypeBytes returns a FieldType for the bytes scalar type.
 func FieldTypeBytes() *FieldType {
 	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_BYTES)
 }
 
+// FieldTypeMessage returns a FieldType for the given message type.
 func FieldTypeMessage(mb *MessageBuilder) *FieldType {
 	return &FieldType{
 		fieldType:    dpb.FieldDescriptorProto_TYPE_MESSAGE,
@@ -128,6 +160,8 @@ func FieldTypeMessage(mb *MessageBuilder) *FieldType {
 	}
 }
 
+// FieldTypeImportedMessage returns a FieldType that references the given
+// message descriptor.
 func FieldTypeImportedMessage(md *desc.MessageDescriptor) *FieldType {
 	return &FieldType{
 		fieldType:      dpb.FieldDescriptorProto_TYPE_MESSAGE,
@@ -135,6 +169,7 @@ func FieldTypeImportedMessage(md *desc.MessageDescriptor) *FieldType {
 	}
 }
 
+// FieldTypeEnum returns a FieldType for the given enum type.
 func FieldTypeEnum(eb *EnumBuilder) *FieldType {
 	return &FieldType{
 		fieldType:     dpb.FieldDescriptorProto_TYPE_ENUM,
@@ -142,6 +177,8 @@ func FieldTypeEnum(eb *EnumBuilder) *FieldType {
 	}
 }
 
+// FieldTypeImportedEnum returns a FieldType that references the given enum
+// descriptor.
 func FieldTypeImportedEnum(ed *desc.EnumDescriptor) *FieldType {
 	return &FieldType{
 		fieldType:       dpb.FieldDescriptorProto_TYPE_ENUM,
@@ -149,6 +186,13 @@ func FieldTypeImportedEnum(ed *desc.EnumDescriptor) *FieldType {
 	}
 }
 
+// RpcType represents the type of an RPC request or response. The only allowed
+// types are messages, but can be streams or unary messages.
+//
+// Message types can reference a message builder. A type that refers to a built
+// message descriptor is called an "imported" type.
+//
+// To create an RpcType, see RpcTypeMessage and RpcTypeImportedMessage.
 type RpcType struct {
 	IsStream bool
 
@@ -156,6 +200,7 @@ type RpcType struct {
 	localType   *MessageBuilder
 }
 
+// RpcTypeMessage creates an RpcType that refers to the given message builder.
 func RpcTypeMessage(mb *MessageBuilder, stream bool) *RpcType {
 	return &RpcType{
 		IsStream:  stream,
@@ -163,6 +208,8 @@ func RpcTypeMessage(mb *MessageBuilder, stream bool) *RpcType {
 	}
 }
 
+// RpcTypeImportedMessage creates an RpcType that refers to the given message
+// descriptor.
 func RpcTypeImportedMessage(md *desc.MessageDescriptor, stream bool) *RpcType {
 	return &RpcType{
 		IsStream:    stream,
@@ -170,6 +217,8 @@ func RpcTypeImportedMessage(md *desc.MessageDescriptor, stream bool) *RpcType {
 	}
 }
 
+// GetTypeName returns the fully qualified name of the message type to which
+// this RpcType refers.
 func (rt *RpcType) GetTypeName() string {
 	if rt.foreignType != nil {
 		return rt.foreignType.GetFullyQualifiedName()

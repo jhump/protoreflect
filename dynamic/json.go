@@ -50,6 +50,56 @@ var wellKnownTypeNames = map[string]struct{}{
 	"google.protobuf.BytesValue":  {},
 }
 
+// MarshalJSON serializes this message to bytes in JSON format, returning an
+// error if the operation fails. The resulting bytes will be a valid UTF8
+// string.
+//
+// This method uses a compact form: no newlines, and spaces between fields and
+// between field identifiers and values are elided.
+//
+// This method is convenient shorthand for invoking MarshalJSONPB with a default
+// (zero value) marshaler:
+//
+//    m.MarshalJSONPB(&jsonpb.Marshaler{})
+//
+// So enums are serialized using enum value name strings, and values that are
+// not present (including those with default/zero value for messages defined in
+// "proto3" syntax) are omitted.
+func (m *Message) MarshalJSON() ([]byte, error) {
+	return m.MarshalJSONPB(&jsonpb.Marshaler{})
+}
+
+// MarshalJSONIndent serializes this message to bytes in JSON format, returning
+// an error if the operation fails. The resulting bytes will be a valid UTF8
+// string.
+//
+// This method uses a "pretty-printed" form, with each field on its own line and
+// spaces between field identifiers and values. Indentation of two spaces is
+// used.
+//
+// This method is convenient shorthand for invoking MarshalJSONPB with a default
+// (zero value) marshaler:
+//
+//    m.MarshalJSONPB(&jsonpb.Marshaler{Indent: "  "})
+//
+// So enums are serialized using enum value name strings, and values that are
+// not present (including those with default/zero value for messages defined in
+// "proto3" syntax) are omitted.
+func (m *Message) MarshalJSONIndent() ([]byte, error) {
+	return m.MarshalJSONPB(&jsonpb.Marshaler{Indent: "  "})
+}
+
+// MarshalJSONPB serializes this message to bytes in JSON format, returning an
+// error if the operation fails. The resulting bytes will be a valid UTF8
+// string. The given marshaler is used to convey options used during marshaling.
+//
+// If this message contains nested messages that are generated message types (as
+// opposed to dynamic messages), the given marshaler is used to marshal it.
+//
+// When marshaling any nested messages, any jsonpb.AnyResolver configured in the
+// given marshaler is augmented with knowledge of message types known to this
+// message's descriptor (and its enclosing file and set of transitive
+// dependencies).
 func (m *Message) MarshalJSONPB(opts *jsonpb.Marshaler) ([]byte, error) {
 	var b indentBuffer
 	b.indent = opts.Indent
@@ -61,16 +111,6 @@ func (m *Message) MarshalJSONPB(opts *jsonpb.Marshaler) ([]byte, error) {
 		return nil, err
 	}
 	return b.Bytes(), nil
-}
-
-func (m *Message) MarshalJSON() ([]byte, error) {
-	b, err := m.MarshalJSONPB(&jsonpb.Marshaler{})
-	return b, err
-}
-
-func (m *Message) MarshalJSONIndent() ([]byte, error) {
-	b, err := m.MarshalJSONPB(&jsonpb.Marshaler{Indent: "  "})
-	return b, err
 }
 
 func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
@@ -391,6 +431,49 @@ func writeJsonString(b *indentBuffer, s string) error {
 	}
 }
 
+// UnmarshalJSON de-serializes the message that is present, in JSON format, in
+// the given bytes into this message. It first resets the current message. It
+// returns an error if the given bytes do not contain a valid encoding of this
+// message type in JSON format.
+//
+// This method is shorthand for invoking UnmarshalJSONPB with a default (zero
+// value) unmarshaler:
+//
+//    m.UnmarshalMergeJSONPB(&jsonpb.Unmarshaler{}, js)
+//
+// So unknown fields will result in an error, and no provided jsonpb.AnyResolver
+// will be used when parsing google.protobuf.Any messages.
+func (m *Message) UnmarshalJSON(js []byte) error {
+	return m.UnmarshalJSONPB(&jsonpb.Unmarshaler{}, js)
+}
+
+// UnmarshalMergeJSON de-serializes the message that is present, in JSON format,
+// in the given bytes into this message. Unlike UnmarshalJSON, it does not first
+// reset the message, instead merging the data in the given bytes into the
+// existing data in this message.
+func (m *Message) UnmarshalMergeJSON(js []byte) error {
+	return m.UnmarshalMergeJSONPB(&jsonpb.Unmarshaler{}, js)
+}
+
+// UnmarshalJSONPB de-serializes the message that is present, in JSON format, in
+// the given bytes into this message. The given unmarshaler conveys options used
+// when parsing the JSON. This function first resets the current message. It
+// returns an error if the given bytes do not contain a valid encoding of this
+// message type in JSON format.
+//
+// The decoding is lenient:
+//  1. The JSON can refer to fields either by their JSON name or by their
+//     declared name.
+//  2. The JSON can use either numeric values or string names for enum values.
+//
+// When instantiating nested messages, if this message's associated factory
+// returns a generated message type (as opposed to a dynamic message), the given
+// unmarshaler is used to unmarshal it.
+//
+// When unmarshaling any nested messages, any jsonpb.AnyResolver configured in
+// the given unmarshaler is augmented with knowledge of message types known to
+// this message's descriptor (and its enclosing file and set of transitive
+// dependencies).
 func (m *Message) UnmarshalJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
 	m.Reset()
 	if err := m.UnmarshalMergeJSONPB(opts, js); err != nil {
@@ -399,10 +482,11 @@ func (m *Message) UnmarshalJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
 	return m.Validate()
 }
 
-func (m *Message) UnmarshalJSON(js []byte) error {
-	return m.UnmarshalJSONPB(&jsonpb.Unmarshaler{}, js)
-}
-
+// UnmarshalMergeJSONPB de-serializes the message that is present, in JSON
+// format, in the given bytes into this message. The given unmarshaler conveys
+// options used when parsing the JSON. Unlike UnmarshalJSONPB, it does not first
+// reset the message, instead merging the data in the given bytes into the
+// existing data in this message.
 func (m *Message) UnmarshalMergeJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
 	if ok, err := unmarshalWellKnownType(m, opts, js); ok {
 		return err
@@ -445,10 +529,6 @@ func unmarshalWellKnownType(m *Message, opts *jsonpb.Unmarshaler, js []byte) (bo
 		return true, err
 	}
 	return true, m.MergeFrom(msg)
-}
-
-func (m *Message) UnmarshalMergeJSON(js []byte) error {
-	return m.UnmarshalMergeJSONPB(&jsonpb.Unmarshaler{}, js)
 }
 
 func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
@@ -956,7 +1036,7 @@ func (r *concatReader) Read(p []byte) (n int, err error) {
 // AnyResolver returns a jsonpb.AnyResolver that uses the given file descriptors
 // to resolve message names. It uses the given factory, which may be nil, to
 // instantiate messages. The messages that it returns when resolving a type name
-// will often be dynamic messages.
+// may often be dynamic messages.
 func AnyResolver(mf *MessageFactory, files ...*desc.FileDescriptor) jsonpb.AnyResolver {
 	return &anyResolver{mf: mf, files: files}
 }

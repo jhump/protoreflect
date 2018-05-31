@@ -2,6 +2,7 @@ package protoparse
 
 import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	// link in packages that include the standard protos included with protoc
 	_ "github.com/golang/protobuf/protoc-gen-go/plugin"
 	_ "github.com/golang/protobuf/ptypes/any"
 	_ "github.com/golang/protobuf/ptypes/duration"

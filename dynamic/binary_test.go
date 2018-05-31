@@ -25,9 +25,9 @@ func TestBinaryPackedRepeatedFields(t *testing.T) {
 
 func TestBinaryMapKeyFields(t *testing.T) {
 	// translation party wants deterministic marshalling to bytes
-	sortMapKeys = true
+	defaultDeterminism = true
 	defer func() {
-		sortMapKeys = false
+		defaultDeterminism = false
 	}()
 
 	binaryTranslationParty(t, mapKeyFieldsMsg)
@@ -35,9 +35,9 @@ func TestBinaryMapKeyFields(t *testing.T) {
 
 func TestMarshalMapValueFields(t *testing.T) {
 	// translation party wants deterministic marshalling to bytes
-	sortMapKeys = true
+	defaultDeterminism = true
 	defer func() {
-		sortMapKeys = false
+		defaultDeterminism = false
 	}()
 
 	binaryTranslationParty(t, mapValueFieldsMsg)

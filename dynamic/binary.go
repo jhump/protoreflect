@@ -15,26 +15,44 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
-// sortMapKeys, if true, will mean that map values' keys are sorted before
-// serialization, for deterministic output. This is set to true from tests.
-var sortMapKeys = false
+// defaultDeterminism, if true, will mean that calls to Marshal will produce
+// deterministic output. This is used to make the output of proto.Marshal(...)
+// deterministic (since there is no way to have that convey determinism intent).
+// **This is only used from tests.**
+var defaultDeterminism = false
 
+// Marshal serializes this message to bytes, returning an error if the operation
+// fails. The resulting bytes are in the standard protocol buffer binary format.
 func (m *Message) Marshal() ([]byte, error) {
 	var b codedBuffer
-	if err := m.marshal(&b); err != nil {
+	if err := m.marshal(&b, defaultDeterminism); err != nil {
 		return nil, err
 	}
 	return b.buf, nil
 }
 
-func (m *Message) marshal(b *codedBuffer) error {
-	if err := m.marshalKnownFields(b); err != nil {
+// MarshalDeterministic serializes this message to bytes in a deterministic way,
+// returning an error if the operation fails. This differs from Marshal in that
+// map keys will be sorted before serializing to bytes. The protobuf spec does
+// not define ordering for map entries, so Marshal will use standard Go map
+// iteration order (which will be random). But for cases where determinism is
+// more important than performance, use this method instead.
+func (m *Message) MarshalDeterministic() ([]byte, error) {
+	var b codedBuffer
+	if err := m.marshal(&b, true); err != nil {
+		return nil, err
+	}
+	return b.buf, nil
+}
+
+func (m *Message) marshal(b *codedBuffer, deterministic bool) error {
+	if err := m.marshalKnownFields(b, deterministic); err != nil {
 		return err
 	}
 	return m.marshalUnknownFields(b)
 }
 
-func (m *Message) marshalKnownFields(b *codedBuffer) error {
+func (m *Message) marshalKnownFields(b *codedBuffer, deterministic bool) error {
 	for _, tag := range m.knownFieldTags() {
 		itag := int32(tag)
 		val := m.values[itag]
@@ -42,7 +60,7 @@ func (m *Message) marshalKnownFields(b *codedBuffer) error {
 		if fd == nil {
 			panic(fmt.Sprintf("Couldn't find field for tag %d", itag))
 		}
-		if err := marshalField(itag, fd, val, b); err != nil {
+		if err := marshalField(itag, fd, val, b, deterministic); err != nil {
 			return err
 		}
 	}
@@ -87,14 +105,14 @@ func (m *Message) marshalUnknownFields(b *codedBuffer) error {
 	return nil
 }
 
-func marshalField(tag int32, fd *desc.FieldDescriptor, val interface{}, b *codedBuffer) error {
+func marshalField(tag int32, fd *desc.FieldDescriptor, val interface{}, b *codedBuffer, deterministic bool) error {
 	if fd.IsMap() {
 		mp := val.(map[interface{}]interface{})
 		entryType := fd.GetMessageType()
 		keyType := entryType.FindFieldByNumber(1)
 		valType := entryType.FindFieldByNumber(2)
 		var entryBuffer codedBuffer
-		if sortMapKeys {
+		if deterministic {
 			keys := make([]interface{}, 0, len(mp))
 			for k := range mp {
 				keys = append(keys, k)
@@ -103,10 +121,10 @@ func marshalField(tag int32, fd *desc.FieldDescriptor, val interface{}, b *coded
 			for _, k := range keys {
 				v := mp[k]
 				entryBuffer.reset()
-				if err := marshalFieldElement(1, keyType, k, &entryBuffer); err != nil {
+				if err := marshalFieldElement(1, keyType, k, &entryBuffer, deterministic); err != nil {
 					return err
 				}
-				if err := marshalFieldElement(2, valType, v, &entryBuffer); err != nil {
+				if err := marshalFieldElement(2, valType, v, &entryBuffer, deterministic); err != nil {
 					return err
 				}
 				if err := b.encodeTagAndWireType(tag, proto.WireBytes); err != nil {
@@ -119,10 +137,10 @@ func marshalField(tag int32, fd *desc.FieldDescriptor, val interface{}, b *coded
 		} else {
 			for k, v := range mp {
 				entryBuffer.reset()
-				if err := marshalFieldElement(1, keyType, k, &entryBuffer); err != nil {
+				if err := marshalFieldElement(1, keyType, k, &entryBuffer, deterministic); err != nil {
 					return err
 				}
-				if err := marshalFieldElement(2, valType, v, &entryBuffer); err != nil {
+				if err := marshalFieldElement(2, valType, v, &entryBuffer, deterministic); err != nil {
 					return err
 				}
 				if err := b.encodeTagAndWireType(tag, proto.WireBytes); err != nil {
@@ -145,7 +163,7 @@ func marshalField(tag int32, fd *desc.FieldDescriptor, val interface{}, b *coded
 			// packed repeated field
 			var packedBuffer codedBuffer
 			for _, v := range sl {
-				if err := marshalFieldValue(fd, v, &packedBuffer); err != nil {
+				if err := marshalFieldValue(fd, v, &packedBuffer, deterministic); err != nil {
 					return err
 				}
 			}
@@ -156,14 +174,14 @@ func marshalField(tag int32, fd *desc.FieldDescriptor, val interface{}, b *coded
 		} else {
 			// non-packed repeated field
 			for _, v := range sl {
-				if err := marshalFieldElement(tag, fd, v, b); err != nil {
+				if err := marshalFieldElement(tag, fd, v, b, deterministic); err != nil {
 					return err
 				}
 			}
 			return nil
 		}
 	} else {
-		return marshalFieldElement(tag, fd, val, b)
+		return marshalFieldElement(tag, fd, val, b, deterministic)
 	}
 }
 
@@ -210,7 +228,7 @@ func (s sortable) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func marshalFieldElement(tag int32, fd *desc.FieldDescriptor, val interface{}, b *codedBuffer) error {
+func marshalFieldElement(tag int32, fd *desc.FieldDescriptor, val interface{}, b *codedBuffer, deterministic bool) error {
 	wt, err := getWireType(fd.GetType())
 	if err != nil {
 		return err
@@ -218,7 +236,7 @@ func marshalFieldElement(tag int32, fd *desc.FieldDescriptor, val interface{}, b
 	if err := b.encodeTagAndWireType(tag, wt); err != nil {
 		return err
 	}
-	if err := marshalFieldValue(fd, val, b); err != nil {
+	if err := marshalFieldValue(fd, val, b, deterministic); err != nil {
 		return err
 	}
 	if wt == proto.WireStartGroup {
@@ -227,7 +245,7 @@ func marshalFieldElement(tag int32, fd *desc.FieldDescriptor, val interface{}, b
 	return nil
 }
 
-func marshalFieldValue(fd *desc.FieldDescriptor, val interface{}, b *codedBuffer) error {
+func marshalFieldValue(fd *desc.FieldDescriptor, val interface{}, b *codedBuffer, deterministic bool) error {
 	switch fd.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
 		v := val.(bool)
@@ -306,7 +324,7 @@ func marshalFieldValue(fd *desc.FieldDescriptor, val interface{}, b *codedBuffer
 		// just append the nested message to this buffer
 		dm, ok := val.(*Message)
 		if ok {
-			return dm.marshal(b)
+			return dm.marshal(b, deterministic)
 		} else {
 			m := val.(proto.Message)
 			return b.encodeMessage(m)
@@ -353,6 +371,9 @@ func getWireType(t descriptor.FieldDescriptorProto_Type) (int8, error) {
 	}
 }
 
+// Unmarshal de-serializes the message that is present in the given bytes into
+// this message. It first resets the current message. It returns an error if the
+// given bytes do not contain a valid encoding of this message type.
 func (m *Message) Unmarshal(b []byte) error {
 	m.Reset()
 	if err := m.UnmarshalMerge(b); err != nil {
@@ -361,6 +382,10 @@ func (m *Message) Unmarshal(b []byte) error {
 	return m.Validate()
 }
 
+// UnmarshalMerge de-serializes the message that is present in the given bytes
+// into this message. Unlike Unmarshal, it does not first reset the message,
+// instead merging the data in the given bytes into the existing data in this
+// message.
 func (m *Message) UnmarshalMerge(b []byte) error {
 	return m.unmarshal(newCodedBuffer(b), false)
 }
