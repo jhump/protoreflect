@@ -1,9 +1,6 @@
-# TODO: run golint, errcheck, staticcheck, unused
+# TODO: run golint, errcheck
 .PHONY: default
-default: deps checkgofmt vet predeclared test
-
-.PHONY: ci
-ci: deps checkgofmt vet predeclared testcover
+default: deps checkgofmt vet predeclared staticcheck unused ineffassign test
 
 .PHONY: deps
 deps:
@@ -20,8 +17,9 @@ install:
 .PHONY: checkgofmt
 checkgofmt:
 	@if [ -n "$$(go version | awk '{ print $$3 }' | grep -v devel)" ]; then \
-		gofmt -s -l . ; \
-		if [ -n "$$(gofmt -s -l .)"  ]; then \
+		output="$$(gofmt -s -l .)" ; \
+		if [ -n "$$output"  ]; then \
+		    echo "$$output"; \
 			echo "Run gofmt on the above files!"; \
 			exit 1; \
 		fi; \
@@ -31,24 +29,37 @@ checkgofmt:
 .PHONY: vet
 vet:
 	@echo go vet ./...  --ignore internal/testprotos
-	@for dir in $$(go list ./... | grep -v 'internal/testprotos'); do \
-		go vet $$dir ; \
-	done
+	@go vet $$(go list ./... | grep -v 'internal/testprotos')
 
+# goyacc generates assignments where LHS is never used, so we need to run
+# staticheck in a way that ignores the errors in that generated code
 .PHONY: staticcheck
 staticcheck:
+	@echo staticcheck ./... --ignore desc/protoparse/proto.y.go
 	@go get honnef.co/go/tools/cmd/staticcheck
-	staticcheck ./...
+	@staticcheck $$(go list ./... | grep -v 'desc/protoparse')
+	@output="$$(staticcheck ./desc/protoparse | grep -v '/proto.y.go' || true)" ; \
+	if [ -n "$$output"  ]; then \
+	    echo "$$output"; \
+	    exit 1; \
+	fi
 
 .PHONY: unused
 unused:
 	@go get honnef.co/go/tools/cmd/unused
 	unused ./...
 
+# same remarks as for staticcheck: we ignore errors in generated proto.y.go
 .PHONY: ineffassign
 ineffassign:
 	@go get github.com/gordonklaus/ineffassign
-	ineffassign .
+	@echo ineffassign . --ignore desc/protoparse/proto.y.go
+	@ineffassign -n $$(find . -type d | grep -v 'desc/protoparse')
+	@output="$$(ineffassign ./desc/protoparse | grep -v 'protoDollar' || true)" ; \
+	if [ -n "$$output"  ]; then \
+	    echo "$$output"; \
+	    exit 1; \
+	fi
 
 .PHONY: predeclared
 predeclared:
@@ -62,7 +73,7 @@ golint:
 	golint -min_confidence 0.9 -set_exit_status ./...
 
 # Intentionally omitted from CI, but target here for ad-hoc reports.
-.PHONY: errchack
+.PHONY: errcheck
 errcheck:
 	@go get github.com/kisielk/errcheck
 	errcheck ./...

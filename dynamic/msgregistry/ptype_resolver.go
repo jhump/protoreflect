@@ -169,8 +169,9 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 		}
 
 		// download the response, up to the given size limit, into a buffer
-		buf := bufferPool.Get().([]byte)
-		defer bufferPool.Put(buf)
+		bufptr := bufferPool.Get().(*[]byte)
+		defer bufferPool.Put(bufptr)
+		buf := *bufptr
 		var b bytes.Buffer
 		for {
 			n, err := resp.Body.Read(buf)
@@ -214,7 +215,8 @@ func ensureScheme(url string) string {
 }
 
 var bufferPool = sync.Pool{New: func() interface{} {
-	return make([]byte, 8192)
+	buf := make([]byte, 8192)
+	return &buf
 }}
 
 type semaphore struct {

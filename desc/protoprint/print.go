@@ -1063,20 +1063,6 @@ func inline(indent int) int {
 	return -indent - 2
 }
 
-type sortedFields []*desc.FieldDescriptor
-
-func (f sortedFields) Len() int {
-	return len(f)
-}
-
-func (f sortedFields) Swap(i, j int) {
-	f[i], f[j] = f[j], f[i]
-}
-
-func (f sortedFields) Less(i, j int) bool {
-	return f[i].GetNumber() < f[j].GetNumber()
-}
-
 func sortKeys(m map[interface{}]interface{}) []interface{} {
 	res := make(sortedKeys, len(m))
 	i := 0
@@ -1642,7 +1628,8 @@ func (a elementSrcOrder) Less(i, j int) bool {
 		swapped := false
 		if si != nil {
 			si, sj = sj, si
-			ti, tj = tj, ti
+			// no need to swap ti and tj because we don't use tj anywhere below
+			ti = tj
 			swapped = true
 		}
 		switch a.dsc.(type) {

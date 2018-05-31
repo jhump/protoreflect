@@ -1543,20 +1543,6 @@ func (od *OneOfDescriptor) GetChoices() []*FieldDescriptor {
 	return od.choices
 }
 
-func pathAsKey(path []int32) string {
-	var b bytes.Buffer
-	first := true
-	for _, i := range path {
-		if first {
-			first = false
-		} else {
-			b.WriteByte(',')
-		}
-		fmt.Fprintf(&b, "%d", i)
-	}
-	return string(b.Bytes())
-}
-
 // scope represents a lexical scope in a proto file in which messages and enums
 // can be declared.
 type scope func(string) Descriptor
