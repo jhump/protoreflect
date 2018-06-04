@@ -20,6 +20,12 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
+// MarshalText serializes this message to bytes in the standard text format,
+// returning an error if the operation fails. The resulting bytes will be a
+// valid UTF8 string.
+//
+// This method uses a compact form: no newlines, and spaces between field
+// identifiers and values are elided.
 func (m *Message) MarshalText() ([]byte, error) {
 	var b indentBuffer
 	b.indentCount = -1 // no indentation
@@ -29,6 +35,12 @@ func (m *Message) MarshalText() ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+// MarshalTextIndent serializes this message to bytes in the standard text
+// format, returning an error if the operation fails. The resulting bytes will
+// be a valid UTF8 string.
+//
+// This method uses a "pretty-printed" form, with each field on its own line and
+// spaces between field identifiers and values.
 func (m *Message) MarshalTextIndent() ([]byte, error) {
 	var b indentBuffer
 	b.indent = "  " // TODO: option for indent?
@@ -432,6 +444,10 @@ func marshalUnknownGroupText(b *indentBuffer, in *codedBuffer, topLevel bool) er
 	}
 }
 
+// UnmarshalText de-serializes the message that is present, in text format, in
+// the given bytes into this message. It first resets the current message. It
+// returns an error if the given bytes do not contain a valid encoding of this
+// message type in the standard text format
 func (m *Message) UnmarshalText(text []byte) error {
 	m.Reset()
 	if err := m.UnmarshalMergeText(text); err != nil {
@@ -440,6 +456,10 @@ func (m *Message) UnmarshalText(text []byte) error {
 	return m.Validate()
 }
 
+// UnmarshalMergeText de-serializes the message that is present, in text format,
+// in the given bytes into this message. Unlike UnmarshalText, it does not first
+// reset the message, instead merging the data in the given bytes into the
+// existing data in this message.
 func (m *Message) UnmarshalMergeText(text []byte) error {
 	return m.unmarshalText(newReader(text), tokenEOF)
 }

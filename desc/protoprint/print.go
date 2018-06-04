@@ -19,13 +19,49 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 )
 
+// Printer knows how to format file descriptors as proto source code. Its fields
+// provide some control over how the resulting source file is constructed and
+// formatted.
 type Printer struct {
+	// If true, comments are rendered using "/*" style comments. Otherwise, they
+	// are printed using "//" style line comments.
 	PreferMultiLineStyleComments bool
-	SortElements                 bool
-	Indent                       string
-	OmitDetachedComments         bool
+	// If true, elements are sorted into a canonical order.
+	//
+	// The canonical order for elements in a file follows:
+	//  1. Syntax
+	//  2. Options (sorted by name, standard options before custom options)
+	//  3. Package
+	//  4. Imports (sorted lexically)
+	//  5. Messages (sorted by name)
+	//  6. Enums (sorted by name)
+	//  7. Services (sorted by name)
+	//  8. Extensions (grouped by extendee, sorted by extendee+tag)
+	//
+	// The canonical order of elements in a message follows:
+	//  1. Options (sorted by name, standard options before custom options)
+	//  2. Fields and One-Ofs (sorted by tag; one-ofs interleaved based on the
+	//     minimum tag therein)
+	//  3. Nested Messages (sorted by name)
+	//  4. Nested Enums (sorted by name)
+	//  5. Extension ranges (sorted by starting tag number)
+	//  6. Nested Extensions (grouped by extendee, sorted by extendee+tag)
+	//  7. Reserved ranges (sorted by starting tag number)
+	//  8. Reserved names (sorted lexically)
+	//
+	// Methods are sorted within a service by name. Enum values are sorted
+	// within an enum first by numeric value then by name.
+	SortElements bool
+	// The indentation used. Any characters other spaces or tabs will be
+	// replaced with spaces. If unset/empty, two spaces will be used.
+	Indent string
+	// If true, detached comments (between elements) will be ignored.
+	OmitDetachedComments bool
 }
 
+// PrintProtoFiles prints all of the given file descriptors. The given open
+// function is given a file name and is responsible for creating the outputs and
+// returning the corresponding writer.
 func (p *Printer) PrintProtoFiles(fds []*desc.FileDescriptor, open func(name string) (io.WriteCloser, error)) error {
 	for _, fd := range fds {
 		w, err := open(fd.GetName())
@@ -43,6 +79,9 @@ func (p *Printer) PrintProtoFiles(fds []*desc.FileDescriptor, open func(name str
 	return nil
 }
 
+// PrintProtosToFileSystem prints all of the given file descriptors to files in
+// the given directory. If file names in the given descriptors include path
+// information, they will be relative to the given root.
 func (p *Printer) PrintProtosToFileSystem(fds []*desc.FileDescriptor, rootDir string) error {
 	return p.PrintProtoFiles(fds, func(name string) (io.WriteCloser, error) {
 		return os.OpenFile(filepath.Join(rootDir, name), os.O_CREATE|os.O_WRONLY, 0666)
@@ -69,6 +108,7 @@ type reservedRange struct {
 	start, end int32
 }
 
+// PrintProtoFile prints the given single file descriptor to the given writer.
 func (p *Printer) PrintProtoFile(fd *desc.FileDescriptor, w io.Writer) error {
 	out := &printer{Writer: w}
 	if p.Indent == "" {

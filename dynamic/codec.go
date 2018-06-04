@@ -25,38 +25,38 @@ func newCodedBuffer(buf []byte) *codedBuffer {
 	return &codedBuffer{buf: buf}
 }
 
-func (p *codedBuffer) reset() {
-	p.buf = []byte(nil)
-	p.index = 0
+func (cb *codedBuffer) reset() {
+	cb.buf = []byte(nil)
+	cb.index = 0
 }
 
-func (p *codedBuffer) eof() bool {
-	return p.index >= len(p.buf)
+func (cb *codedBuffer) eof() bool {
+	return cb.index >= len(cb.buf)
 }
 
-func (p *codedBuffer) skip(count int) bool {
-	newIndex := p.index + count
-	if newIndex > len(p.buf) {
+func (cb *codedBuffer) skip(count int) bool {
+	newIndex := cb.index + count
+	if newIndex > len(cb.buf) {
 		return false
 	}
-	p.index = newIndex
+	cb.index = newIndex
 	return true
 }
 
-func (p *codedBuffer) decodeVarintSlow() (x uint64, err error) {
-	i := p.index
-	l := len(p.buf)
+func (cb *codedBuffer) decodeVarintSlow() (x uint64, err error) {
+	i := cb.index
+	l := len(cb.buf)
 
 	for shift := uint(0); shift < 64; shift += 7 {
 		if i >= l {
 			err = io.ErrUnexpectedEOF
 			return
 		}
-		b := p.buf[i]
+		b := cb.buf[i]
 		i++
 		x |= (uint64(b) & 0x7F) << shift
 		if b < 0x80 {
-			p.index = i
+			cb.index = i
 			return
 		}
 	}
@@ -70,17 +70,17 @@ func (p *codedBuffer) decodeVarintSlow() (x uint64, err error) {
 // This is the format for the
 // int32, int64, uint32, uint64, bool, and enum
 // protocol buffer types.
-func (p *codedBuffer) decodeVarint() (uint64, error) {
-	i := p.index
-	buf := p.buf
+func (cb *codedBuffer) decodeVarint() (uint64, error) {
+	i := cb.index
+	buf := cb.buf
 
 	if i >= len(buf) {
 		return 0, io.ErrUnexpectedEOF
 	} else if buf[i] < 0x80 {
-		p.index++
+		cb.index++
 		return uint64(buf[i]), nil
 	} else if len(buf)-i < 10 {
-		return p.decodeVarintSlow()
+		return cb.decodeVarintSlow()
 	}
 
 	var b uint64
@@ -163,13 +163,13 @@ func (p *codedBuffer) decodeVarint() (uint64, error) {
 	return 0, ErrOverflow
 
 done:
-	p.index = i
+	cb.index = i
 	return x, nil
 }
 
-func (b *codedBuffer) decodeTagAndWireType() (tag int32, wireType int8, err error) {
+func (cb *codedBuffer) decodeTagAndWireType() (tag int32, wireType int8, err error) {
 	var v uint64
-	v, err = b.decodeVarint()
+	v, err = cb.decodeVarint()
 	if err != nil {
 		return
 	}
@@ -188,42 +188,42 @@ func (b *codedBuffer) decodeTagAndWireType() (tag int32, wireType int8, err erro
 // DecodeFixed64 reads a 64-bit integer from the Buffer.
 // This is the format for the
 // fixed64, sfixed64, and double protocol buffer types.
-func (p *codedBuffer) decodeFixed64() (x uint64, err error) {
+func (cb *codedBuffer) decodeFixed64() (x uint64, err error) {
 	// x, err already 0
-	i := p.index + 8
-	if i < 0 || i > len(p.buf) {
+	i := cb.index + 8
+	if i < 0 || i > len(cb.buf) {
 		err = io.ErrUnexpectedEOF
 		return
 	}
-	p.index = i
+	cb.index = i
 
-	x = uint64(p.buf[i-8])
-	x |= uint64(p.buf[i-7]) << 8
-	x |= uint64(p.buf[i-6]) << 16
-	x |= uint64(p.buf[i-5]) << 24
-	x |= uint64(p.buf[i-4]) << 32
-	x |= uint64(p.buf[i-3]) << 40
-	x |= uint64(p.buf[i-2]) << 48
-	x |= uint64(p.buf[i-1]) << 56
+	x = uint64(cb.buf[i-8])
+	x |= uint64(cb.buf[i-7]) << 8
+	x |= uint64(cb.buf[i-6]) << 16
+	x |= uint64(cb.buf[i-5]) << 24
+	x |= uint64(cb.buf[i-4]) << 32
+	x |= uint64(cb.buf[i-3]) << 40
+	x |= uint64(cb.buf[i-2]) << 48
+	x |= uint64(cb.buf[i-1]) << 56
 	return
 }
 
 // DecodeFixed32 reads a 32-bit integer from the Buffer.
 // This is the format for the
 // fixed32, sfixed32, and float protocol buffer types.
-func (p *codedBuffer) decodeFixed32() (x uint64, err error) {
+func (cb *codedBuffer) decodeFixed32() (x uint64, err error) {
 	// x, err already 0
-	i := p.index + 4
-	if i < 0 || i > len(p.buf) {
+	i := cb.index + 4
+	if i < 0 || i > len(cb.buf) {
 		err = io.ErrUnexpectedEOF
 		return
 	}
-	p.index = i
+	cb.index = i
 
-	x = uint64(p.buf[i-4])
-	x |= uint64(p.buf[i-3]) << 8
-	x |= uint64(p.buf[i-2]) << 16
-	x |= uint64(p.buf[i-1]) << 24
+	x = uint64(cb.buf[i-4])
+	x |= uint64(cb.buf[i-3]) << 8
+	x |= uint64(cb.buf[i-2]) << 16
+	x |= uint64(cb.buf[i-1]) << 24
 	return
 }
 
@@ -241,8 +241,8 @@ func decodeZigZag64(v uint64) int64 {
 // DecodeRawBytes reads a count-delimited byte buffer from the Buffer.
 // This is the format used for the bytes protocol buffer
 // type and for embedded messages.
-func (p *codedBuffer) decodeRawBytes(alloc bool) (buf []byte, err error) {
-	n, err := p.decodeVarint()
+func (cb *codedBuffer) decodeRawBytes(alloc bool) (buf []byte, err error) {
+	n, err := cb.decodeVarint()
 	if err != nil {
 		return nil, err
 	}
@@ -251,20 +251,20 @@ func (p *codedBuffer) decodeRawBytes(alloc bool) (buf []byte, err error) {
 	if nb < 0 {
 		return nil, fmt.Errorf("proto: bad byte length %d", nb)
 	}
-	end := p.index + nb
-	if end < p.index || end > len(p.buf) {
+	end := cb.index + nb
+	if end < cb.index || end > len(cb.buf) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
 	if !alloc {
-		buf = p.buf[p.index:end]
-		p.index += nb
+		buf = cb.buf[cb.index:end]
+		cb.index += nb
 		return
 	}
 
 	buf = make([]byte, nb)
-	copy(buf, p.buf[p.index:])
-	p.index += nb
+	copy(buf, cb.buf[cb.index:])
+	cb.index += nb
 	return
 }
 
@@ -272,18 +272,18 @@ func (p *codedBuffer) decodeRawBytes(alloc bool) (buf []byte, err error) {
 // This is the format for the
 // int32, int64, uint32, uint64, bool, and enum
 // protocol buffer types.
-func (p *codedBuffer) encodeVarint(x uint64) error {
+func (cb *codedBuffer) encodeVarint(x uint64) error {
 	for x >= 1<<7 {
-		p.buf = append(p.buf, uint8(x&0x7f|0x80))
+		cb.buf = append(cb.buf, uint8(x&0x7f|0x80))
 		x >>= 7
 	}
-	p.buf = append(p.buf, uint8(x))
+	cb.buf = append(cb.buf, uint8(x))
 	return nil
 }
 
-func (b *codedBuffer) encodeTagAndWireType(tag int32, wireType int8) error {
+func (cb *codedBuffer) encodeTagAndWireType(tag int32, wireType int8) error {
 	v := uint64((int64(tag) << 3) | int64(wireType))
-	return b.encodeVarint(v)
+	return cb.encodeVarint(v)
 }
 
 // TODO: decodeTagAndWireType
@@ -291,8 +291,8 @@ func (b *codedBuffer) encodeTagAndWireType(tag int32, wireType int8) error {
 // EncodeFixed64 writes a 64-bit integer to the Buffer.
 // This is the format for the
 // fixed64, sfixed64, and double protocol buffer types.
-func (p *codedBuffer) encodeFixed64(x uint64) error {
-	p.buf = append(p.buf,
+func (cb *codedBuffer) encodeFixed64(x uint64) error {
+	cb.buf = append(cb.buf,
 		uint8(x),
 		uint8(x>>8),
 		uint8(x>>16),
@@ -307,8 +307,8 @@ func (p *codedBuffer) encodeFixed64(x uint64) error {
 // EncodeFixed32 writes a 32-bit integer to the Buffer.
 // This is the format for the
 // fixed32, sfixed32, and float protocol buffer types.
-func (p *codedBuffer) encodeFixed32(x uint64) error {
-	p.buf = append(p.buf,
+func (cb *codedBuffer) encodeFixed32(x uint64) error {
+	cb.buf = append(cb.buf,
 		uint8(x),
 		uint8(x>>8),
 		uint8(x>>16),
@@ -327,13 +327,13 @@ func encodeZigZag32(v int32) uint64 {
 // EncodeRawBytes writes a count-delimited byte buffer to the Buffer.
 // This is the format used for the bytes protocol buffer
 // type and for embedded messages.
-func (p *codedBuffer) encodeRawBytes(b []byte) error {
-	p.encodeVarint(uint64(len(b)))
-	p.buf = append(p.buf, b...)
+func (cb *codedBuffer) encodeRawBytes(b []byte) error {
+	cb.encodeVarint(uint64(len(b)))
+	cb.buf = append(cb.buf, b...)
 	return nil
 }
 
-func (p *codedBuffer) encodeMessage(pm proto.Message) error {
+func (cb *codedBuffer) encodeMessage(pm proto.Message) error {
 	bytes, err := proto.Marshal(pm)
 	if err != nil {
 		return err
@@ -342,9 +342,9 @@ func (p *codedBuffer) encodeMessage(pm proto.Message) error {
 		return nil
 	}
 
-	if err := p.encodeVarint(uint64(len(bytes))); err != nil {
+	if err := cb.encodeVarint(uint64(len(bytes))); err != nil {
 		return err
 	}
-	p.buf = append(p.buf, bytes...)
+	cb.buf = append(cb.buf, bytes...)
 	return nil
 }
