@@ -35,14 +35,9 @@ vet:
 # staticheck in a way that ignores the errors in that generated code
 .PHONY: staticcheck
 staticcheck:
-	@echo staticcheck ./... --ignore desc/protoparse/proto.y.go
+	@echo staticcheck --ignore $$(go list ./... | grep protoparse)/proto.y.go:* ./...
 	@go get honnef.co/go/tools/cmd/staticcheck
-	@staticcheck $$(go list ./... | grep -v 'desc/protoparse')
-	@output="$$(staticcheck ./desc/protoparse | grep -v '/proto.y.go' || true)" ; \
-	if [ -n "$$output"  ]; then \
-	    echo "$$output"; \
-	    exit 1; \
-	fi
+	@staticcheck --ignore $$(go list ./... | grep protoparse)/proto.y.go:* ./...
 
 .PHONY: unused
 unused:
