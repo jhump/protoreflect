@@ -1321,8 +1321,8 @@ func (m *Message) getRepeatedField(fd *desc.FieldDescriptor, index int) (interfa
 	return res[index], nil
 }
 
-// AddRepeatedFieldByName appends the given value to the given repeated field.
-// It panics if an error is encountered. See TryAddRepeatedField.
+// AddRepeatedField appends the given value to the given repeated field. It
+// panics if an error is encountered. See TryAddRepeatedField.
 func (m *Message) AddRepeatedField(fd *desc.FieldDescriptor, val interface{}) {
 	if err := m.TryAddRepeatedField(fd, val); err != nil {
 		panic(err.Error())

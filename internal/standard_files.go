@@ -12,8 +12,8 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
-// These are standard protos included with protoc, but older versions of their
-// respective packages registered them using incorrect paths.
+// StdFileAliases are the standard protos included with protoc, but older versions of
+// their respective packages registered them using incorrect paths.
 var StdFileAliases = map[string]string{
 	// Files for the github.com/golang/protobuf/ptypes package at one point were
 	// registered using the path where the proto files are mirrored in GOPATH,

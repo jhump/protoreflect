@@ -194,6 +194,8 @@ func (s *ServerStream) RecvMsg() (proto.Message, error) {
 	}
 }
 
+// ClientStream represents a response stream from a client. Messages in the stream can be sent
+// and, when done, the unary server message and header and trailer metadata can be queried.
 type ClientStream struct {
 	stream grpc.ClientStream
 	method *desc.MethodDescriptor
@@ -226,7 +228,7 @@ func (s *ClientStream) SendMsg(m proto.Message) error {
 	return s.stream.SendMsg(m)
 }
 
-// CloseAndRecvMsg closes the outgoing request stream and then blocks for the server's response.
+// CloseAndReceive closes the outgoing request stream and then blocks for the server's response.
 func (s *ClientStream) CloseAndReceive() (proto.Message, error) {
 	if err := s.stream.CloseSend(); err != nil {
 		return nil, err
@@ -248,9 +250,8 @@ func (s *ClientStream) CloseAndReceive() (proto.Message, error) {
 }
 
 // BidiStream represents a bi-directional stream for sending messages to and receiving
-// messages from a server. For client-streaming operations (e.g. unary response), the
-// server will send back only one message, after which subsequent invocations of RecvMsg
-// return io.EOF.
+// messages from a server. The header and trailer metadata sent by the server can also be
+// queried.
 type BidiStream struct {
 	stream   grpc.ClientStream
 	reqType  *desc.MessageDescriptor
