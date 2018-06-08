@@ -1,5 +1,6 @@
 # Protocol Buffer and GRPC Reflection
 [![Build Status](https://travis-ci.org/jhump/protoreflect.svg?branch=master)](https://travis-ci.org/jhump/protoreflect/branches)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jhump/protoreflect)](https://goreportcard.com/report/github.com/jhump/protoreflect)
 
 This repo provides reflection APIs for protocol buffers (also known as "protobufs" for short)
 and GRPC. The core of reflection in protobufs is the
