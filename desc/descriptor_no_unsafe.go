@@ -1,5 +1,5 @@
 //+build appengine
-// TODO: other build tags for environments where unsafe package is unappropriate
+// TODO: other build tags for environments where unsafe package is inappropriate
 
 package desc
 
