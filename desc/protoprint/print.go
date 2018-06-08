@@ -84,7 +84,12 @@ func (p *Printer) PrintProtoFiles(fds []*desc.FileDescriptor, open func(name str
 // information, they will be relative to the given root.
 func (p *Printer) PrintProtosToFileSystem(fds []*desc.FileDescriptor, rootDir string) error {
 	return p.PrintProtoFiles(fds, func(name string) (io.WriteCloser, error) {
-		return os.OpenFile(filepath.Join(rootDir, name), os.O_CREATE|os.O_WRONLY, 0666)
+		fullPath := filepath.Join(rootDir, name)
+		dir := filepath.Dir(fullPath)
+		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+			return nil, err
+		}
+		return os.OpenFile(fullPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	})
 }
 
