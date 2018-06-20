@@ -1159,3 +1159,23 @@ func loadProtoset(path string) (*FileDescriptor, error) {
 	}
 	return CreateFileDescriptorFromSet(&fds)
 }
+
+func TestToFileDescriptorSet(t *testing.T) {
+	fd, err := LoadFileDescriptor("desc_test2.proto")
+	testutil.Ok(t, err, "failed to load descriptor")
+	fdset := ToFileDescriptorSet(fd)
+	expectedOrder := []string{
+		"desc_test1.proto",
+		"pkg/desc_test_pkg.proto",
+		"nopkg/desc_test_nopkg_new.proto",
+		"nopkg/desc_test_nopkg.proto",
+		"desc_test2.proto",
+	}
+	testutil.Eq(t, len(expectedOrder), len(fdset.File), "wrong number of files in set")
+	for i, f := range fdset.File {
+		testutil.Eq(t, expectedOrder[i], f.GetName(), "wrong file at index %d", i+1)
+		expectedFile, err := LoadFileDescriptor(f.GetName())
+		testutil.Ok(t, err, "failed to load descriptor for %q", f.GetName())
+		testutil.Eq(t, expectedFile.AsFileDescriptorProto(), f)
+	}
+}

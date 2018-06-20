@@ -168,6 +168,26 @@ func CreateFileDescriptors(fds []*dpb.FileDescriptorProto) (map[string]*FileDesc
 	return resolved, nil
 }
 
+// ToFileDescriptorSet creates a FileDescriptorSet proto that contains all of the given
+// file descriptors and their transitive dependencies. The files are topologically sorted
+// so that a file will always appear after its dependencies.
+func ToFileDescriptorSet(fds ...*FileDescriptor) *dpb.FileDescriptorSet {
+	var fdps []*dpb.FileDescriptorProto
+	addAllFiles(fds, &fdps, map[string]struct{}{})
+	return &dpb.FileDescriptorSet{File: fdps}
+}
+
+func addAllFiles(src []*FileDescriptor, results *[]*dpb.FileDescriptorProto, seen map[string]struct{}) {
+	for _, fd := range src {
+		if _, ok := seen[fd.GetName()]; ok {
+			continue
+		}
+		seen[fd.GetName()] = struct{}{}
+		addAllFiles(fd.GetDependencies(), results, seen)
+		*results = append(*results, fd.AsFileDescriptorProto())
+	}
+}
+
 // CreateFileDescriptorFromSet creates a descriptor from the given file descriptor set. The
 // set's *last* file will be the returned descriptor. The set's remaining files must comprise
 // the full set of transitive dependencies of that last file. This is the same format and
