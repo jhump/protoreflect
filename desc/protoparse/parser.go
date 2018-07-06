@@ -148,13 +148,15 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	if err != nil {
 		return nil, err
 	}
+	if p.IncludeSourceCodeInfo {
+		for _, fd := range linkedProtos {
+			pr := protos[fd.GetName()]
+			fd.AsFileDescriptorProto().SourceCodeInfo = pr.generateSourceCodeInfo()
+		}
+	}
 	fds := make([]*desc.FileDescriptor, len(filenames))
 	for i, name := range filenames {
 		fd := linkedProtos[name]
-		if p.IncludeSourceCodeInfo {
-			pr := protos[name]
-			fd.AsFileDescriptorProto().SourceCodeInfo = pr.generateSourceCodeInfo()
-		}
 		fds[i] = fd
 	}
 	return fds, nil
