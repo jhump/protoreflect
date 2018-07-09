@@ -682,7 +682,8 @@ func (m *Message) internalSetField(fd *desc.FieldDescriptor, val interface{}) {
 					}
 				}
 			}
-			if equal {
+
+			if equal && (fd.GetOneOf() == nil) {
 				if m.values != nil {
 					delete(m.values, fd.GetNumber())
 				}
