@@ -1861,6 +1861,48 @@ func loadExtension(t *testing.T, ed *proto.ExtensionDesc) *desc.FieldDescriptor 
 	return fd
 }
 
+func TestSetGetOneOfDefaultValue(t *testing.T) {
+	fd, err := desc.LoadFileDescriptor("desc_test_oneof.proto")
+	testutil.Ok(t, err)
+	md := fd.FindSymbol("testprotos.Value").(*desc.MessageDescriptor)
+
+	var testCases = []struct {
+		fieldName  string
+		fieldValue interface{}
+	}{
+		{"binary_value", []byte{}},
+		{"string_value", ""},
+		{"boolean_value", false},
+		{"int_value", int32(0)},
+		{"int64_value", int64(0)},
+		{"double_value", float64(0)},
+		{"float_value", float32(0)},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.fieldName, func(t *testing.T) {
+			dm := NewMessage(md)
+
+			field := md.FindFieldByName(tc.fieldName)
+			dm.SetField(field, tc.fieldValue)
+
+			oneof := md.GetFile().FindSymbol("testprotos.Value.value").(*desc.OneOfDescriptor)
+
+			// Ensure that the zero-value is set correctly
+			oneOfField, resultValue := dm.GetOneOfField(oneof)
+			testutil.Eq(t, tc.fieldValue, resultValue)
+			testutil.Eq(t, field, oneOfField)
+
+			// Ensure that clearing the field results in no field being set
+			dm.ClearField(field)
+			oneOfField, resultValue = dm.GetOneOfField(oneof)
+			testutil.Eq(t, nil, resultValue)
+			testutil.Eq(t, (*desc.FieldDescriptor)(nil), oneOfField)
+		})
+
+	}
+}
+
 func TestGetSetOneOfFields(t *testing.T) {
 	fd, err := desc.LoadFileDescriptor("desc_test2.proto")
 	testutil.Ok(t, err)
