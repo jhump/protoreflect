@@ -80,7 +80,8 @@ test:
 
 .PHONY: generate
 generate:
-	go generate github.com/jhump/protoreflect/internal/testprotos/
+	@go get golang.org/x/tools/cmd/goyacc
+	go generate ./...
 
 .PHONY: testcover
 testcover:

@@ -822,6 +822,27 @@ func (m *Message) TryGetOneOfField(od *desc.OneOfDescriptor) (*desc.FieldDescrip
 	return nil, nil, nil
 }
 
+// ClearOneOfField removes any value for any of the given one-of's fields. It
+// panics if an error is encountered. See TryClearOneOfField.
+func (m *Message) ClearOneOfField(od *desc.OneOfDescriptor) {
+	if err := m.TryClearOneOfField(od); err != nil {
+		panic(err.Error())
+	}
+}
+
+// TryClearOneOfField removes any value for any of the given one-of's fields. An
+// error is returned if the given one-of descriptor does not belong to the right
+// message type.
+func (m *Message) TryClearOneOfField(od *desc.OneOfDescriptor) error {
+	if od.GetOwner().GetFullyQualifiedName() != m.md.GetFullyQualifiedName() {
+		return fmt.Errorf("given one-of, %s, is for wrong message type: %s; expecting %s", od.GetName(), od.GetOwner().GetFullyQualifiedName(), m.md.GetFullyQualifiedName())
+	}
+	for _, fd := range od.GetChoices() {
+		m.clearField(fd)
+	}
+	return nil
+}
+
 // GetMapField returns the value for the given map field descriptor and given
 // key. It panics if an error is encountered. See TryGetMapField.
 func (m *Message) GetMapField(fd *desc.FieldDescriptor, key interface{}) interface{} {

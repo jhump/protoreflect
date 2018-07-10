@@ -51,11 +51,11 @@ func (Proto3Enum) EnumDescriptor() ([]byte, []int) {
 }
 
 type TestRequest struct {
-	Foo                  []Proto3Enum                                    `protobuf:"varint,1,rep,packed,name=foo,enum=testprotos.Proto3Enum" json:"foo,omitempty"`
-	Bar                  string                                          `protobuf:"bytes,2,opt,name=bar" json:"bar,omitempty"`
-	Baz                  *TestMessage                                    `protobuf:"bytes,3,opt,name=baz" json:"baz,omitempty"`
-	Snafu                *TestMessage_NestedMessage_AnotherNestedMessage `protobuf:"bytes,4,opt,name=snafu" json:"snafu,omitempty"`
-	Flags                map[string]bool                                 `protobuf:"bytes,5,rep,name=flags" json:"flags,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Foo                  []Proto3Enum                                    `protobuf:"varint,1,rep,packed,name=foo,proto3,enum=testprotos.Proto3Enum" json:"foo,omitempty"`
+	Bar                  string                                          `protobuf:"bytes,2,opt,name=bar,proto3" json:"bar,omitempty"`
+	Baz                  *TestMessage                                    `protobuf:"bytes,3,opt,name=baz,proto3" json:"baz,omitempty"`
+	Snafu                *TestMessage_NestedMessage_AnotherNestedMessage `protobuf:"bytes,4,opt,name=snafu,proto3" json:"snafu,omitempty"`
+	Flags                map[string]bool                                 `protobuf:"bytes,5,rep,name=flags,proto3" json:"flags,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}                                        `json:"-"`
 	XXX_unrecognized     []byte                                          `json:"-"`
 	XXX_sizecache        int32                                           `json:"-"`
@@ -121,8 +121,8 @@ func (m *TestRequest) GetFlags() map[string]bool {
 }
 
 type TestResponse struct {
-	Atm                  *AnotherTestMessage `protobuf:"bytes,1,opt,name=atm" json:"atm,omitempty"`
-	Vs                   []int32             `protobuf:"varint,2,rep,packed,name=vs" json:"vs,omitempty"`
+	Atm                  *AnotherTestMessage `protobuf:"bytes,1,opt,name=atm,proto3" json:"atm,omitempty"`
+	Vs                   []int32             `protobuf:"varint,2,rep,packed,name=vs,proto3" json:"vs,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_unrecognized     []byte              `json:"-"`
 	XXX_sizecache        int32               `json:"-"`
@@ -181,8 +181,9 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// Client API for TestService service
-
+// TestServiceClient is the client API for TestService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type TestServiceClient interface {
 	DoSomething(ctx context.Context, in *TestRequest, opts ...grpc.CallOption) (*pkg.Bar, error)
 	DoSomethingElse(ctx context.Context, opts ...grpc.CallOption) (TestService_DoSomethingElseClient, error)
@@ -200,7 +201,7 @@ func NewTestServiceClient(cc *grpc.ClientConn) TestServiceClient {
 
 func (c *testServiceClient) DoSomething(ctx context.Context, in *TestRequest, opts ...grpc.CallOption) (*pkg.Bar, error) {
 	out := new(pkg.Bar)
-	err := grpc.Invoke(ctx, "/testprotos.TestService/DoSomething", in, out, c.cc, opts...)
+	err := c.cc.Invoke(ctx, "/testprotos.TestService/DoSomething", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +209,7 @@ func (c *testServiceClient) DoSomething(ctx context.Context, in *TestRequest, op
 }
 
 func (c *testServiceClient) DoSomethingElse(ctx context.Context, opts ...grpc.CallOption) (TestService_DoSomethingElseClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_TestService_serviceDesc.Streams[0], c.cc, "/testprotos.TestService/DoSomethingElse", opts...)
+	stream, err := c.cc.NewStream(ctx, &_TestService_serviceDesc.Streams[0], "/testprotos.TestService/DoSomethingElse", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +243,7 @@ func (x *testServiceDoSomethingElseClient) CloseAndRecv() (*TestResponse, error)
 }
 
 func (c *testServiceClient) DoSomethingAgain(ctx context.Context, in *pkg.Bar, opts ...grpc.CallOption) (TestService_DoSomethingAgainClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_TestService_serviceDesc.Streams[1], c.cc, "/testprotos.TestService/DoSomethingAgain", opts...)
+	stream, err := c.cc.NewStream(ctx, &_TestService_serviceDesc.Streams[1], "/testprotos.TestService/DoSomethingAgain", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +275,7 @@ func (x *testServiceDoSomethingAgainClient) Recv() (*AnotherTestMessage, error) 
 }
 
 func (c *testServiceClient) DoSomethingForever(ctx context.Context, opts ...grpc.CallOption) (TestService_DoSomethingForeverClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_TestService_serviceDesc.Streams[2], c.cc, "/testprotos.TestService/DoSomethingForever", opts...)
+	stream, err := c.cc.NewStream(ctx, &_TestService_serviceDesc.Streams[2], "/testprotos.TestService/DoSomethingForever", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -304,8 +305,7 @@ func (x *testServiceDoSomethingForeverClient) Recv() (*TestResponse, error) {
 	return m, nil
 }
 
-// Server API for TestService service
-
+// TestServiceServer is the server API for TestService service.
 type TestServiceServer interface {
 	DoSomething(context.Context, *TestRequest) (*pkg.Bar, error)
 	DoSomethingElse(TestService_DoSomethingElseServer) error

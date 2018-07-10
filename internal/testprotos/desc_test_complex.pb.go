@@ -1770,8 +1770,9 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// Client API for TestTestService service
-
+// TestTestServiceClient is the client API for TestTestService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type TestTestServiceClient interface {
 	UserAuth(ctx context.Context, in *Test, opts ...grpc.CallOption) (*Test, error)
 	Get(ctx context.Context, in *Test, opts ...grpc.CallOption) (*Test, error)
@@ -1787,7 +1788,7 @@ func NewTestTestServiceClient(cc *grpc.ClientConn) TestTestServiceClient {
 
 func (c *testTestServiceClient) UserAuth(ctx context.Context, in *Test, opts ...grpc.CallOption) (*Test, error) {
 	out := new(Test)
-	err := grpc.Invoke(ctx, "/foo.bar.TestTestService/UserAuth", in, out, c.cc, opts...)
+	err := c.cc.Invoke(ctx, "/foo.bar.TestTestService/UserAuth", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1796,15 +1797,14 @@ func (c *testTestServiceClient) UserAuth(ctx context.Context, in *Test, opts ...
 
 func (c *testTestServiceClient) Get(ctx context.Context, in *Test, opts ...grpc.CallOption) (*Test, error) {
 	out := new(Test)
-	err := grpc.Invoke(ctx, "/foo.bar.TestTestService/Get", in, out, c.cc, opts...)
+	err := c.cc.Invoke(ctx, "/foo.bar.TestTestService/Get", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// Server API for TestTestService service
-
+// TestTestServiceServer is the server API for TestTestService service.
 type TestTestServiceServer interface {
 	UserAuth(context.Context, *Test) (*Test, error)
 	Get(context.Context, *Test) (*Test, error)
