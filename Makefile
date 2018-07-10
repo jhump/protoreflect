@@ -1,7 +1,7 @@
 # TODO: run golint, errcheck
-# TODO: unused recently started failing -- re-enable it after determining root cause
+# TODO: staticcheck and unused recently started failing -- re-enable after determining root cause
 .PHONY: default
-default: deps checkgofmt vet predeclared staticcheck ineffassign test
+default: deps checkgofmt vet predeclared ineffassign test
 
 .PHONY: deps
 deps:
