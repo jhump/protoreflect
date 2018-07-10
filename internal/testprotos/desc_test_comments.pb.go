@@ -250,8 +250,9 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// Client API for RpcService service
-
+// RpcServiceClient is the client API for RpcService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type RpcServiceClient interface {
 	// Method comment
 	StreamingRpc(ctx context.Context, opts ...grpc.CallOption) (RpcService_StreamingRpcClient, error)
@@ -267,7 +268,7 @@ func NewRpcServiceClient(cc *grpc.ClientConn) RpcServiceClient {
 }
 
 func (c *rpcServiceClient) StreamingRpc(ctx context.Context, opts ...grpc.CallOption) (RpcService_StreamingRpcClient, error) {
-	stream, err := grpc.NewClientStream(ctx, &_RpcService_serviceDesc.Streams[0], c.cc, "/foo.bar.RpcService/StreamingRpc", opts...)
+	stream, err := c.cc.NewStream(ctx, &_RpcService_serviceDesc.Streams[0], "/foo.bar.RpcService/StreamingRpc", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -303,15 +304,14 @@ func (x *rpcServiceStreamingRpcClient) CloseAndRecv() (*Request, error) {
 // Deprecated: Do not use.
 func (c *rpcServiceClient) UnaryRpc(ctx context.Context, in *Request, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
-	err := grpc.Invoke(ctx, "/foo.bar.RpcService/UnaryRpc", in, out, c.cc, opts...)
+	err := c.cc.Invoke(ctx, "/foo.bar.RpcService/UnaryRpc", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// Server API for RpcService service
-
+// RpcServiceServer is the server API for RpcService service.
 type RpcServiceServer interface {
 	// Method comment
 	StreamingRpc(RpcService_StreamingRpcServer) error

@@ -24,19 +24,19 @@ var _ = math.Inf
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 type TestWellKnownTypes struct {
-	StartTime            *timestamp.Timestamp  `protobuf:"bytes,1,opt,name=start_time,json=startTime" json:"start_time,omitempty"`
-	Elapsed              *duration.Duration    `protobuf:"bytes,2,opt,name=elapsed" json:"elapsed,omitempty"`
-	Dbl                  *wrappers.DoubleValue `protobuf:"bytes,3,opt,name=dbl" json:"dbl,omitempty"`
-	Flt                  *wrappers.FloatValue  `protobuf:"bytes,4,opt,name=flt" json:"flt,omitempty"`
-	Bl                   *wrappers.BoolValue   `protobuf:"bytes,5,opt,name=bl" json:"bl,omitempty"`
-	I32                  *wrappers.Int32Value  `protobuf:"bytes,6,opt,name=i32" json:"i32,omitempty"`
-	I64                  *wrappers.Int64Value  `protobuf:"bytes,7,opt,name=i64" json:"i64,omitempty"`
-	U32                  *wrappers.UInt32Value `protobuf:"bytes,8,opt,name=u32" json:"u32,omitempty"`
-	U64                  *wrappers.UInt64Value `protobuf:"bytes,9,opt,name=u64" json:"u64,omitempty"`
-	Str                  *wrappers.StringValue `protobuf:"bytes,10,opt,name=str" json:"str,omitempty"`
-	Byt                  *wrappers.BytesValue  `protobuf:"bytes,11,opt,name=byt" json:"byt,omitempty"`
-	Json                 []*_struct.Value      `protobuf:"bytes,12,rep,name=json" json:"json,omitempty"`
-	Extras               []*any.Any            `protobuf:"bytes,13,rep,name=extras" json:"extras,omitempty"`
+	StartTime            *timestamp.Timestamp  `protobuf:"bytes,1,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
+	Elapsed              *duration.Duration    `protobuf:"bytes,2,opt,name=elapsed,proto3" json:"elapsed,omitempty"`
+	Dbl                  *wrappers.DoubleValue `protobuf:"bytes,3,opt,name=dbl,proto3" json:"dbl,omitempty"`
+	Flt                  *wrappers.FloatValue  `protobuf:"bytes,4,opt,name=flt,proto3" json:"flt,omitempty"`
+	Bl                   *wrappers.BoolValue   `protobuf:"bytes,5,opt,name=bl,proto3" json:"bl,omitempty"`
+	I32                  *wrappers.Int32Value  `protobuf:"bytes,6,opt,name=i32,proto3" json:"i32,omitempty"`
+	I64                  *wrappers.Int64Value  `protobuf:"bytes,7,opt,name=i64,proto3" json:"i64,omitempty"`
+	U32                  *wrappers.UInt32Value `protobuf:"bytes,8,opt,name=u32,proto3" json:"u32,omitempty"`
+	U64                  *wrappers.UInt64Value `protobuf:"bytes,9,opt,name=u64,proto3" json:"u64,omitempty"`
+	Str                  *wrappers.StringValue `protobuf:"bytes,10,opt,name=str,proto3" json:"str,omitempty"`
+	Byt                  *wrappers.BytesValue  `protobuf:"bytes,11,opt,name=byt,proto3" json:"byt,omitempty"`
+	Json                 []*_struct.Value      `protobuf:"bytes,12,rep,name=json,proto3" json:"json,omitempty"`
+	Extras               []*any.Any            `protobuf:"bytes,13,rep,name=extras,proto3" json:"extras,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
 	XXX_unrecognized     []byte                `json:"-"`
 	XXX_sizecache        int32                 `json:"-"`

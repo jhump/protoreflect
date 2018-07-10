@@ -31,7 +31,7 @@ func init() {
 	setTokenName(_NAME, "identifier")
 	setTokenName(_FQNAME, "fully-qualified name")
 	setTokenName(_TYPENAME, "type name")
-	setTokenName(_TYPENAME, "error")
+	setTokenName(_ERROR, "error")
 	// for keywords, just show the keyword itself wrapped in quotes
 	for str, i := range keywords {
 		setTokenName(i, fmt.Sprintf(`"%s"`, str))
@@ -149,8 +149,8 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 		return nil, err
 	}
 	if p.IncludeSourceCodeInfo {
-		for _, fd := range linkedProtos {
-			pr := protos[fd.GetName()]
+		for name, fd := range linkedProtos {
+			pr := protos[name]
 			fd.AsFileDescriptorProto().SourceCodeInfo = pr.generateSourceCodeInfo()
 		}
 	}
