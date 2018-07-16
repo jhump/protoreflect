@@ -1,7 +1,6 @@
 # TODO: run golint, errcheck
-# TODO: staticcheck and unused recently started failing -- re-enable after determining root cause
 .PHONY: default
-default: deps checkgofmt vet predeclared ineffassign test
+default: deps checkgofmt vet predeclared staticcheck unused ineffassign test
 
 .PHONY: deps
 deps:
@@ -36,8 +35,8 @@ vet:
 # staticheck in a way that ignores the errors in that generated code
 .PHONY: staticcheck
 staticcheck:
-	@echo staticcheck --ignore $$(go list ./... | grep protoparse)/proto.y.go:* ./...
 	@go get honnef.co/go/tools/cmd/staticcheck
+	@echo staticcheck --ignore $$(go list ./... | grep protoparse)/proto.y.go:* ./...
 	@staticcheck --ignore $$(go list ./... | grep protoparse)/proto.y.go:* ./...
 
 .PHONY: unused
