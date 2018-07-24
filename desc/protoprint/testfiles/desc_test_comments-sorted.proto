@@ -9,8 +9,6 @@ package foo.bar;
 
 import "desc_test_options.proto";
 
-import "google/protobuf/descriptor.proto";
-
 import "google/protobuf/empty.proto";
 
 // We need a request for our RPC service below.
@@ -47,6 +45,8 @@ message Request {
       option (testprotos.efubar) = 123;
 
       option (testprotos.efubars) = -321;
+
+      SNIFIT = -101;
 
       MARIO = 1 [(testprotos.evfubar) = 278, (testprotos.evfubars) = -314];
 

@@ -15,8 +15,6 @@ package foo.bar;
 
 import "google/protobuf/empty.proto";
 
-import "google/protobuf/descriptor.proto";
-
 import "desc_test_options.proto";
 
 /*
@@ -92,6 +90,8 @@ message Request {
 		MAGIKOOPA = 8;
 
 		KAMEK = 8;
+
+		SNIFIT = -101;
 	}
 }
 

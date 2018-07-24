@@ -741,8 +741,8 @@ func (r *parseResult) asExtensionRanges(node *extensionRangeNode) []*dpb.Descrip
 
 func (r *parseResult) asEnumValue(ev *enumValueNode) *dpb.EnumValueDescriptorProto {
 	var num int32
-	if ev.number != nil {
-		num = int32(ev.number.val)
+	if ev.numberP != nil {
+		num = int32(ev.numberP.val)
 	} else {
 		num = int32(ev.numberN.val)
 	}
@@ -1154,7 +1154,7 @@ func (r *parseResult) generateSourceCodeInfoForEnum(sci *sourceCodeInfo, enum *d
 		evPath := append(path, internal.Enum_valuesTag, int32(j))
 		sci.newLoc(evn, evPath)
 		sci.newLoc(evn.name, append(evPath, internal.EnumVal_nameTag))
-		sci.newLoc(evn.number, append(evPath, internal.EnumVal_numberTag))
+		sci.newLoc(evn.getNumber(), append(evPath, internal.EnumVal_numberTag))
 
 		// enum value options
 		r.generateSourceCodeInfoForOptions(sci, evn.options, func(n interface{}) *optionNode {
