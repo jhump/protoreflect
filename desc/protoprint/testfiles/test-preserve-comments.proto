@@ -16,8 +16,6 @@ option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 import "google/protobuf/empty.proto";
 
-import "google/protobuf/descriptor.proto";
-
 import "desc_test_options.proto";
 
 // Multiple white space lines (like above) cannot
@@ -94,6 +92,8 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
     MAGIKOOPA = 8;
 
     KAMEK = 8;
+
+    SNIFIT = -101;
 
     option (testprotos.efubar) = 123;
   }

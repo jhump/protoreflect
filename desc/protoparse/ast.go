@@ -785,9 +785,11 @@ type enumValueNode struct {
 	basicCompositeNode
 	name    *identNode
 	options []*optionNode
-	// only one of these two will be set
-	number  *intLiteralNode
-	numberN *negativeIntLiteralNode
+
+	// only one of these two will be set:
+
+	numberP *intLiteralNode         // positive numeric value
+	numberN *negativeIntLiteralNode // negative numeric value
 }
 
 func (n *enumValueNode) getName() node {
@@ -795,8 +797,8 @@ func (n *enumValueNode) getName() node {
 }
 
 func (n *enumValueNode) getNumber() node {
-	if n.number != nil {
-		return n.number
+	if n.numberP != nil {
+		return n.numberP
 	}
 	return n.numberN
 }

@@ -725,12 +725,12 @@ enumItem : option {
 
 enumField : name '=' _INT_LIT ';' {
 		checkUint64InInt32Range(protolex, $3.start(), $3.val)
-		$$ = &enumValueNode{name: $1, number: $3}
+		$$ = &enumValueNode{name: $1, numberP: $3}
 		$$.setRange($1, $4)
 	}
 	|  name '=' _INT_LIT '[' fieldOptions ']' ';' {
 		checkUint64InInt32Range(protolex, $3.start(), $3.val)
-		$$ = &enumValueNode{name: $1, number: $3, options: $5}
+		$$ = &enumValueNode{name: $1, numberP: $3, options: $5}
 		$$.setRange($1, $7)
 	}
 	| name '=' negIntLit ';' {
