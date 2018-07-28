@@ -838,7 +838,7 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, reservedNames *
 			msgd.OneofDecl = append(msgd.OneofDecl, ood)
 			for _, oodecl := range decl.oneOf.decls {
 				if oodecl.option != nil {
-					if ood.Options != nil {
+					if ood.Options == nil {
 						ood.Options = &dpb.OneofOptions{}
 					}
 					ood.Options.UninterpretedOption = append(ood.Options.UninterpretedOption, r.asUninterpretedOption(oodecl.option))
