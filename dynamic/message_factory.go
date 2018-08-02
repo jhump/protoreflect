@@ -64,7 +64,7 @@ func (f *MessageFactory) NewMessage(md *desc.MessageDescriptor) proto.Message {
 	if m := ktr.CreateIfKnown(md.GetFullyQualifiedName()); m != nil {
 		return m
 	}
-	return newMessageWithMessageFactory(md, f)
+	return NewMessageWithMessageFactory(md, f)
 }
 
 // NewDynamicMessage creates a new empty dynamic message that corresponds to the given
@@ -75,7 +75,7 @@ func (f *MessageFactory) NewMessage(md *desc.MessageDescriptor) proto.Message {
 // this factory when creating other messages, like during de-serialization of fields
 // that are themselves message types.
 func (f *MessageFactory) NewDynamicMessage(md *desc.MessageDescriptor) *Message {
-	return newMessageWithMessageFactory(md, f)
+	return NewMessageWithMessageFactory(md, f)
 }
 
 // GetKnownTypeRegistry returns the known type registry that this factory uses to
