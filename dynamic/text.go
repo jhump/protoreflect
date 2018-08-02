@@ -711,7 +711,7 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 
 		endTok := tok.tokTyp.EndToken()
 		if endTok != tokenError {
-			dm := newMessageWithMessageFactory(fd.GetMessageType(), m.mf)
+			dm := NewMessageWithMessageFactory(fd.GetMessageType(), m.mf)
 			if err := dm.unmarshalText(tr, endTok); err != nil {
 				return err
 			}

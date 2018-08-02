@@ -101,7 +101,7 @@ type UnknownField struct {
 // instantiate any nested message fields and no extension fields will be parsed. To
 // use a custom MessageFactory or ExtensionRegistry, use MessageFactory.NewMessage.
 func NewMessage(md *desc.MessageDescriptor) *Message {
-	return newMessageWithMessageFactory(md, nil)
+	return NewMessageWithMessageFactory(md, nil)
 }
 
 // NewMessageWithExtensionRegistry creates a new dynamic message for the type
@@ -110,13 +110,13 @@ func NewMessage(md *desc.MessageDescriptor) *Message {
 // instantiated using dynamic.NewMessageFactoryWithExtensionRegistry(er).
 func NewMessageWithExtensionRegistry(md *desc.MessageDescriptor, er *ExtensionRegistry) *Message {
 	mf := NewMessageFactoryWithExtensionRegistry(er)
-	return newMessageWithMessageFactory(md, mf)
+	return NewMessageWithMessageFactory(md, mf)
 }
 
-// newMessageWithMessageFactory creates a new dynamic message for the type
+// NewMessageWithMessageFactory creates a new dynamic message for the type
 // represented by the given message descriptor. During de-serialization, the given
 // MessageFactory is used to instantiate nested messages.
-func newMessageWithMessageFactory(md *desc.MessageDescriptor, mf *MessageFactory) *Message {
+func NewMessageWithMessageFactory(md *desc.MessageDescriptor, mf *MessageFactory) *Message {
 	var er *ExtensionRegistry
 	if mf != nil {
 		er = mf.er
@@ -126,6 +126,40 @@ func newMessageWithMessageFactory(md *desc.MessageDescriptor, mf *MessageFactory
 		mf: mf,
 		er: er,
 	}
+}
+
+// AsDynamicMessage converts the given message to a dynamic message. If the
+// given message is dynamic, it is returned. Otherwise, a dynamic message is
+// created using NewMessage.
+func AsDynamicMessage(msg proto.Message) (*Message, error) {
+	return AsDynamicMessageWithMessageFactory(msg, nil)
+}
+
+// AsDynamicMessageWithExtensionRegistry converts the given message to a dynamic
+// message. If the given message is dynamic, it is returned. Otherwise, a
+// dynamic message is created using NewMessageWithExtensionRegistry.
+func AsDynamicMessageWithExtensionRegistry(msg proto.Message, er *ExtensionRegistry) (*Message, error) {
+	mf := NewMessageFactoryWithExtensionRegistry(er)
+	return AsDynamicMessageWithMessageFactory(msg, mf)
+}
+
+// AsDynamicMessageWithMessageFactory converts the given message to a dynamic
+// message. If the given message is dynamic, it is returned. Otherwise, a
+// dynamic message is created using NewMessageWithMessageFactory.
+func AsDynamicMessageWithMessageFactory(msg proto.Message, mf *MessageFactory) (*Message, error) {
+	if dm, ok := msg.(*Message); ok {
+		return dm, nil
+	}
+	md, err := desc.LoadMessageDescriptorForMessage(msg)
+	if err != nil {
+		return nil, err
+	}
+	dm := NewMessageWithMessageFactory(md, mf)
+	err = dm.mergeFrom(msg)
+	if err != nil {
+		return nil, err
+	}
+	return dm, nil
 }
 
 // GetMessageDescriptor returns a descriptor for this message's type.
