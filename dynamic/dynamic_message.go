@@ -401,9 +401,9 @@ func (m *Message) GetField(fd *desc.FieldDescriptor) interface{} {
 // returned if the given field descriptor does not belong to the right message
 // type.
 //
-// The Go type of the returned field is the same as protoc would generate for
-// the field (in a non-dynamic message). The table below lists the types for
-// scalar fields.
+// The Go type of the returned value, for scalar fields, is the same as protoc
+// would generate for the field (in a non-dynamic message). The table below
+// lists the scalar types and the corresponding Go types.
 //  +-------------------------+-----------+
 //  |       Declared Type     |  Go Type  |
 //  +-------------------------+-----------+
@@ -510,7 +510,8 @@ func (m *Message) doGetField(fd *desc.FieldDescriptor, nilIfAbsent bool) (interf
 		var err error
 		if res, err = m.parseUnknownField(fd); err != nil {
 			return nil, err
-		} else if res == nil {
+		}
+		if res == nil {
 			if nilIfAbsent {
 				return nil, nil
 			} else {
@@ -892,8 +893,8 @@ func (m *Message) GetMapField(fd *desc.FieldDescriptor, key interface{}) interfa
 // the right message type or if it is not a map field.
 //
 // If the map field does not contain the requested key, this method returns
-// nil, nil. The Go type of the value returned is the same as protoc would
-// generate for the field. (See TryGetField for more details on types).
+// nil, nil. The Go type of the value returned mirrors the type that protoc
+// would generate for the field. (See TryGetField for more details on types).
 //
 // If the given field descriptor is not known (e.g. not present in the message
 // descriptor) but corresponds to an unknown field, the unknown value will be
@@ -978,6 +979,116 @@ func (m *Message) getMapField(fd *desc.FieldDescriptor, key interface{}) (interf
 		}
 	}
 	return mp.(map[interface{}]interface{})[ki], nil
+}
+
+// ForEachMapFieldEntry executes the given function for each entry in the map
+// value for the given field descriptor. It stops iteration if the function
+// returns false. It panics if an error is encountered. See
+// TryForEachMapFieldEntry.
+func (m *Message) ForEachMapFieldEntry(fd *desc.FieldDescriptor, fn func(key, val interface{}) bool) {
+	if err := m.TryForEachMapFieldEntry(fd, fn); err != nil {
+		panic(err.Error())
+	}
+}
+
+// TryForEachMapFieldEntry executes the given function for each entry in the map
+// value for the given field descriptor. An error is returned if the given field
+// descriptor does not belong to the right message type or if it is not a  map
+// field.
+//
+// Iteration ends either when all entries have been examined or when the given
+// function returns false. So the function is expected to return true for normal
+// iteration and false to break out. If this message has no value for the given
+// field, it returns without invoking the given function.
+//
+// The Go type of the key and value supplied to the function mirrors the type
+// that protoc would generate for the field. (See TryGetField for more details
+// on types).
+//
+// If the given field descriptor is not known (e.g. not present in the message
+// descriptor) but corresponds to an unknown field, the unknown value will be
+// parsed and become known. The parsed value will be searched for the requested
+// key and any value returned. An error will be returned if the unknown value
+// cannot be parsed according to the field descriptor's type information.
+func (m *Message) TryForEachMapFieldEntry(fd *desc.FieldDescriptor, fn func(key, val interface{}) bool) error {
+	if err := m.checkField(fd); err != nil {
+		return err
+	}
+	return m.forEachMapFieldEntry(fd, fn)
+}
+
+// ForEachMapFieldEntryByName executes the given function for each entry in the
+// map value for the field with the given name. It stops iteration if the
+// function returns false. It panics if an error is encountered. See
+// TryForEachMapFieldEntryByName.
+func (m *Message) ForEachMapFieldEntryByName(name string, fn func(key, val interface{}) bool) {
+	if err := m.TryForEachMapFieldEntryByName(name, fn); err != nil {
+		panic(err.Error())
+	}
+}
+
+// TryForEachMapFieldEntryByName executes the given function for each entry in
+// the map value for the field with the given name. It stops iteration if the
+// function returns false. An error is returned if the given name is unknown or
+// if it names a field that is not a map field.
+//
+// If this message has no value for the given field, it returns without ever
+// invoking the given function.
+//
+// (See TryGetField for more info on types supplied to the function.)
+func (m *Message) TryForEachMapFieldEntryByName(name string, fn func(key, val interface{}) bool) error {
+	fd := m.FindFieldDescriptorByName(name)
+	if fd == nil {
+		return UnknownFieldNameError
+	}
+	return m.forEachMapFieldEntry(fd, fn)
+}
+
+// ForEachMapFieldEntryByNumber executes the given function for each entry in
+// the map value for the field with the given tag number. It stops iteration if
+// the function returns false. It panics if an error is encountered. See
+// TryForEachMapFieldEntryByNumber.
+func (m *Message) ForEachMapFieldEntryByNumber(tagNumber int, fn func(key, val interface{}) bool) {
+	if err := m.TryForEachMapFieldEntryByNumber(tagNumber, fn); err != nil {
+		panic(err.Error())
+	}
+}
+
+// TryForEachMapFieldEntryByNumber executes the given function for each entry in
+// the map value for the field with the given tag number. It stops iteration if
+// the function returns false. An error is returned if the given tag is unknown
+// or if it indicates a field that is not a map field.
+//
+// If this message has no value for the given field, it returns without ever
+// invoking the given function.
+//
+// (See TryGetField for more info on types supplied to the function.)
+func (m *Message) TryForEachMapFieldEntryByNumber(tagNumber int, fn func(key, val interface{}) bool) error {
+	fd := m.FindFieldDescriptor(int32(tagNumber))
+	if fd == nil {
+		return UnknownTagNumberError
+	}
+	return m.forEachMapFieldEntry(fd, fn)
+}
+
+func (m *Message) forEachMapFieldEntry(fd *desc.FieldDescriptor, fn func(key, val interface{}) bool) error {
+	if !fd.IsMap() {
+		return FieldIsNotMapError
+	}
+	mp := m.values[fd.GetNumber()]
+	if mp == nil {
+		if mp, err := m.parseUnknownField(fd); err != nil {
+			return err
+		} else if mp == nil {
+			return nil
+		}
+	}
+	for k, v := range mp.(map[interface{}]interface{}) {
+		if !fn(k, v) {
+			break
+		}
+	}
+	return nil
 }
 
 // PutMapField sets the value for the given map field descriptor and given key
@@ -1280,8 +1391,8 @@ func (m *Message) GetRepeatedField(fd *desc.FieldDescriptor, index int) interfac
 // are repeated fields, if the given field is a map field an error will result:
 // map representation does not lend itself to random access by index.
 //
-// The Go type of the value returned is the same as protoc would generate for
-// the field's element type. (See TryGetField for more details on types).
+// The Go type of the value returned mirrors the type that protoc would generate
+// for the field's element type. (See TryGetField for more details on types).
 //
 // If the given field descriptor is not known (e.g. not present in the message
 // descriptor) but corresponds to an unknown field, the unknown value will be
