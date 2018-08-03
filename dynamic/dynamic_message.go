@@ -2126,8 +2126,11 @@ func (m *Message) Merge(source proto.Message) {
 }
 
 func (m *Message) checkType(target proto.Message) error {
-	if dm, ok := target.(*Message); ok && dm.md.GetFullyQualifiedName() != m.md.GetFullyQualifiedName() {
-		return fmt.Errorf("given message has wrong type: %q; expecting %q", dm.md.GetFullyQualifiedName(), m.md.GetFullyQualifiedName())
+	if dm, ok := target.(*Message); ok {
+		if dm.md.GetFullyQualifiedName() != m.md.GetFullyQualifiedName() {
+			return fmt.Errorf("given message has wrong type: %q; expecting %q", dm.md.GetFullyQualifiedName(), m.md.GetFullyQualifiedName())
+		}
+		return nil
 	}
 
 	msgName := proto.MessageName(target)

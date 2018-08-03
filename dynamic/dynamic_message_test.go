@@ -1968,6 +1968,38 @@ func TestSetGetOneOfDefaultValue(t *testing.T) {
 	}
 }
 
+func TestForEachMapFieldEntry(t *testing.T) {
+	data := map[string]float64{
+		"pi":     3.14159,
+		"e":      2.71828,
+		"answer": 42,
+	}
+	msg := testprotos.MapValFields{
+		T: data,
+	}
+	dm, err := AsDynamicMessage(&msg)
+	testutil.Ok(t, err)
+
+	count := 0
+	entries := map[string]float64{}
+	dm.ForEachMapFieldEntryByName("t", func(k, v interface{}) bool {
+		count++
+		entries[k.(string)] = v.(float64)
+		return true
+	})
+	testutil.Eq(t, 3, count)
+	testutil.Eq(t, data, entries)
+
+	count = 0
+	dm.ForEachMapFieldEntryByName("t", func(k, v interface{}) bool {
+		count++
+		// break immediately
+		return false
+	})
+	// only saw first entry
+	testutil.Eq(t, 1, count)
+}
+
 func TestSetIntroducesNewField(t *testing.T) {
 	// TODO
 }
