@@ -2469,13 +2469,13 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 
 	// one-of fields
 	for _, oop := range props.OneofTypes {
-		oov := src.Field(oop.Field)
-		if oov.Type() != oop.Type {
+		oov := src.Field(oop.Field).Elem()
+		if !oov.IsValid() || oov.Type() != oop.Type {
 			// this field is unset (in other words, one-of message field is not currently set to this option)
 			continue
 		}
 		prop := oop.Prop
-		rv := oov.FieldByName(prop.Name)
+		rv := oov.Elem().FieldByName(prop.Name)
 		fd := m.FindFieldDescriptor(int32(prop.Tag))
 		if fd == nil {
 			// Our descriptor has different fields than this message object. So
