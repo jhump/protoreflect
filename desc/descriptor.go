@@ -360,6 +360,9 @@ func (fd *FileDescriptor) GetServices() []*ServiceDescriptor {
 // element with the given fully-qualified symbol name. If no such element
 // exists then this method returns nil.
 func (fd *FileDescriptor) FindSymbol(symbol string) Descriptor {
+	if symbol[0] == '.' {
+		symbol = symbol[1:]
+	}
 	return fd.symbols[symbol]
 }
 
