@@ -5,8 +5,7 @@
 /* This is a third. */
 
 /* Syntax comment... */
-syntax = "proto2";
-/* Syntax trailer. */
+syntax = "proto2"; /* Syntax trailer. */
 
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
@@ -29,8 +28,7 @@ message Request {
 	option (testprotos.mfubar) = true;
 
 	/* A field comment */
-	repeated int32 ids = 1 [json_name = "|foo|", packed = true, (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"];
-	/* field trailer #1... */
+	repeated int32 ids = 1 [json_name = "|foo|", packed = true, (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"]; /* field trailer #1... */
 
 	/* some detached comments */
 
@@ -60,8 +58,7 @@ message Request {
 		optional float flt = 2;
 
 		/* Leading comment... */
-		optional string str = 3;
-		/* Trailing comment... */
+		optional string str = 3; /* Trailing comment... */
 	}
 
 	enum MarioCharacters {

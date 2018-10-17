@@ -50,10 +50,8 @@ message FileDescriptorSet {
 }
 // Describes a complete .proto file.
 message FileDescriptorProto {
-  optional string name = 1;
-  // file name, relative to root of source tree
-  optional string package = 2;
-  // e.g. "foo", "foo.bar", etc.
+  optional string name = 1; // file name, relative to root of source tree
+  optional string package = 2; // e.g. "foo", "foo.bar", etc.
   // Names of files imported by this file.
   repeated string dependency = 3;
   // Indexes of the public imported files in the dependency list above.
@@ -95,10 +93,8 @@ message DescriptorProto {
   // fields or extension ranges in the same message. Reserved ranges may
   // not overlap.
   message ReservedRange {
-    optional int32 start = 1;
-    // Inclusive.
-    optional int32 end = 2;
-    // Exclusive.
+    optional int32 start = 1; // Inclusive.
+    optional int32 end = 2; // Exclusive.
   }
   repeated ReservedRange reserved_range = 9;
   // Reserved field names, which may not be used by fields in the same message.
@@ -133,18 +129,15 @@ message FieldDescriptorProto {
     // implementations should still be able to parse the group wire format and
     // treat group fields as unknown fields.
     TYPE_GROUP = 10;
-    TYPE_MESSAGE = 11;
-    // Length-delimited aggregate.
+    TYPE_MESSAGE = 11; // Length-delimited aggregate.
     // New in version 2.
     TYPE_BYTES = 12;
     TYPE_UINT32 = 13;
     TYPE_ENUM = 14;
     TYPE_SFIXED32 = 15;
     TYPE_SFIXED64 = 16;
-    TYPE_SINT32 = 17;
-    // Uses ZigZag encoding.
-    TYPE_SINT64 = 18;
-    // Uses ZigZag encoding.
+    TYPE_SINT32 = 17; // Uses ZigZag encoding.
+    TYPE_SINT64 = 18; // Uses ZigZag encoding.
   }
   enum Label {
     // 0 is reserved for errors
@@ -200,10 +193,8 @@ message EnumDescriptorProto {
   // is inclusive such that it can appropriately represent the entire int32
   // domain.
   message EnumReservedRange {
-    optional int32 start = 1;
-    // Inclusive.
-    optional int32 end = 2;
-    // Inclusive.
+    optional int32 start = 1; // Inclusive.
+    optional int32 end = 2; // Inclusive.
   }
   // Range of reserved numeric values. Reserved numeric values may not be used
   // by enum values in the same enum declaration. Reserved ranges may not
@@ -298,13 +289,10 @@ message FileOptions {
   optional bool java_string_check_utf8 = 27 [default = false];
   // Generated classes can be optimized for speed or code size.
   enum OptimizeMode {
-    SPEED = 1;
-    // Generate complete code for parsing, serialization,
+    SPEED = 1; // Generate complete code for parsing, serialization,
     // etc.
-    CODE_SIZE = 2;
-    // Use ReflectionOps to implement these methods.
-    LITE_RUNTIME = 3;
-    // Generate code using MessageLite and the lite runtime.
+    CODE_SIZE = 2; // Use ReflectionOps to implement these methods.
+    LITE_RUNTIME = 3; // Generate code using MessageLite and the lite runtime.
   }
   optional OptimizeMode optimize_for = 9 [default = SPEED];
   // Sets the Go package where structs generated from this .proto will be
@@ -551,10 +539,8 @@ message MethodOptions {
   // methods, and PUT verb for idempotent methods instead of the default POST.
   enum IdempotencyLevel {
     IDEMPOTENCY_UNKNOWN = 0;
-    NO_SIDE_EFFECTS = 1;
-    // implies idempotent
-    IDEMPOTENT = 2;
-    // idempotent, but may have side effects
+    NO_SIDE_EFFECTS = 1; // implies idempotent
+    IDEMPOTENT = 2; // idempotent, but may have side effects
   }
   optional IdempotencyLevel idempotency_level = 34 [default = IDEMPOTENCY_UNKNOWN];
   // The parser stores options it doesn't recognize here. See above.

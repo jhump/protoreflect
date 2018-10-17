@@ -5,8 +5,7 @@
 // This is a third.
 
 // Syntax comment...
-syntax = "proto2";
-// Syntax trailer.
+syntax = "proto2"; // Syntax trailer.
 
 // And now the package declaration
 package foo.bar;
@@ -30,12 +29,10 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
        * tag trailer
        * that spans multiple lines...
        * more than two.
-       */ [packed = true, json_name = "|foo|", (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"];
-  // field trailer #1...
+       */ [packed = true, json_name = "|foo|", (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"]; // field trailer #1...
 
   // lead mfubar
-  option (testprotos.mfubar) = true;
-  // trailing mfubar
+  option (testprotos.mfubar) = true; // trailing mfubar
 
   // some detached comments
 
@@ -64,8 +61,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
     option no_standard_descriptor_accessor = false;
 
     // Leading comment...
-    optional string str = 3;
-    // Trailing comment...
+    optional string str = 3; // Trailing comment...
   }
 
   enum MarioCharacters /* "super"! */ {
