@@ -29,6 +29,8 @@ func TestPrinter(t *testing.T) {
 	prs := map[string]*Printer{
 		"default":                  {},
 		"compact":                  {Compact: true},
+		"no-trailing-comments":     {OmitComments: CommentsTrailing},
+		"only-doc-comments":        {OmitComments: CommentsNonDoc},
 		"multiline-style-comments": {Indent: "\t", PreferMultiLineStyleComments: true},
 		"sorted":                   {Indent: "   ", SortElements: true, OmitDetachedComments: true},
 		"sorted-AND-multiline-style-comments": {PreferMultiLineStyleComments: true, SortElements: true},
@@ -96,4 +98,5 @@ func TestParseAndPrintPreservesAsMuchAsPossible(t *testing.T) {
 	testutil.Ok(t, err)
 	fd := fds[0]
 	checkFile(t, &Printer{}, fd, "test-preserve-comments.proto")
+	checkFile(t, &Printer{OmitComments: CommentsNonDoc}, fd, "test-preserve-doc-comments.proto")
 }

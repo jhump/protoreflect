@@ -389,7 +389,7 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 
 	path[0] = internal.File_syntaxTag
 	si := sourceInfo.Get(path)
-	p.printElement(si, w, 0, func(w *printer) {
+	p.printElement(false, si, w, 0, func(w *printer) {
 		syn := fdp.GetSyntax()
 		if syn == "" {
 			syn = "proto2"
@@ -462,12 +462,12 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 			switch d := d.(type) {
 			case pkg:
 				si := sourceInfo.Get(path)
-				p.printElement(si, w, 0, func(w *printer) {
+				p.printElement(false, si, w, 0, func(w *printer) {
 					fmt.Fprintf(w, "package %s;\n", d)
 				})
 			case imp:
 				si := sourceInfo.Get(path)
-				p.printElement(si, w, 0, func(w *printer) {
+				p.printElement(false, si, w, 0, func(w *printer) {
 					fmt.Fprintf(w, "import %q;\n", d)
 				})
 			case []option:
@@ -525,7 +525,7 @@ func getLocalName(pkg, scope, fqn string) string {
 
 func (p *Printer) printMessage(md *desc.MessageDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	si := sourceInfo.Get(path)
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *printer) {
 		p.indent(w, indent)
 
 		fmt.Fprint(w, "message ")
@@ -752,7 +752,7 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFacto
 		si = sourceInfo.Get(path)
 	}
 
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *printer) {
 		p.indent(w, indent)
 		if shouldEmitLabel(fld) {
 			locSi := sourceInfo.Get(append(path, internal.Field_labelTag))
@@ -887,7 +887,7 @@ func isGroup(fld *desc.FieldDescriptor) bool {
 func (p *Printer) printOneOf(ood *desc.OneOfDescriptor, parentElements elementAddrs, startFieldIndex int, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int, ooIndex int32) {
 	oopath := append(parentPath, internal.Message_oneOfsTag, ooIndex)
 	oosi := sourceInfo.Get(oopath)
-	p.printElement(oosi, w, indent, func(w *printer) {
+	p.printElement(true, oosi, w, indent, func(w *printer) {
 		p.indent(w, indent)
 		fmt.Fprint(w, "oneof ")
 		extNameSi := sourceInfo.Get(append(oopath, internal.OneOf_nameTag))
@@ -960,7 +960,7 @@ func (p *Printer) printExtensionRanges(ranges []*descriptor.DescriptorProto_Exte
 		el := addrs[i]
 		elPath = append(parentPath, el.elementType, int32(el.elementIndex))
 		si := sourceInfo.Get(elPath)
-		p.printElement(si, w, inline(indent), func(w *printer) {
+		p.printElement(true, si, w, inline(indent), func(w *printer) {
 			if extr.GetStart() == extr.GetEnd()-1 {
 				fmt.Fprintf(w, "%d ", extr.GetStart())
 			} else if extr.GetEnd()-1 == internal.MaxTag {
@@ -988,7 +988,7 @@ func (p *Printer) printReservedRanges(ranges []reservedRange, isEnum bool, addrs
 		}
 		el := addrs[i]
 		si := sourceInfo.Get(append(parentPath, el.elementType, int32(el.elementIndex)))
-		p.printElement(si, w, inline(indent), func(w *printer) {
+		p.printElement(false, si, w, inline(indent), func(w *printer) {
 			if rr.start == rr.end {
 				fmt.Fprintf(w, "%d ", rr.start)
 			} else if (rr.end == internal.MaxTag && !isEnum) ||
@@ -1024,7 +1024,7 @@ func (p *Printer) printReservedNames(names []string, addrs []elementAddr, w *pri
 
 func (p *Printer) printEnum(ed *desc.EnumDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	si := sourceInfo.Get(path)
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *printer) {
 		p.indent(w, indent)
 
 		fmt.Fprint(w, "enum ")
@@ -1118,7 +1118,7 @@ func (p *Printer) printEnum(ed *desc.EnumDescriptor, mf *dynamic.MessageFactory,
 
 func (p *Printer) printEnumValue(evd *desc.EnumValueDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	si := sourceInfo.Get(path)
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *printer) {
 		p.indent(w, indent)
 
 		nameSi := sourceInfo.Get(append(path, internal.EnumVal_nameTag))
@@ -1136,7 +1136,7 @@ func (p *Printer) printEnumValue(evd *desc.EnumValueDescriptor, mf *dynamic.Mess
 
 func (p *Printer) printService(sd *desc.ServiceDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	si := sourceInfo.Get(path)
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *printer) {
 		p.indent(w, indent)
 
 		fmt.Fprint(w, "service ")
@@ -1185,7 +1185,7 @@ func (p *Printer) printService(sd *desc.ServiceDescriptor, mf *dynamic.MessageFa
 func (p *Printer) printMethod(mtd *desc.MethodDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	si := sourceInfo.Get(path)
 	pkg := mtd.GetFile().GetPackage()
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *printer) {
 		p.indent(w, indent)
 
 		fmt.Fprint(w, "rpc ")
@@ -1310,7 +1310,7 @@ func (p *Printer) printOptionElementsShort(addrs elementAddrs, w *printer, sourc
 func (p *Printer) printOptions(opts []option, w *printer, indent int, siFetch func(i int32) *descriptor.SourceCodeInfo_Location, fn func(w *printer, indent int, opt option)) {
 	for i, opt := range opts {
 		si := siFetch(int32(i))
-		p.printElement(si, w, indent, func(w *printer) {
+		p.printElement(false, si, w, indent, func(w *printer) {
 			fn(w, indent, opt)
 		})
 	}
@@ -1963,18 +1963,20 @@ func (o optionsByName) Swap(i, j int) {
 	o.addrs[i], o.addrs[j] = o.addrs[j], o.addrs[i]
 }
 
-func (p *Printer) printElement(si *descriptor.SourceCodeInfo_Location, w *printer, indent int, el func(*printer)) {
-	if si != nil {
+func (p *Printer) printElement(isDecriptor bool, si *descriptor.SourceCodeInfo_Location, w *printer, indent int, el func(*printer)) {
+	includeComments := isDecriptor || p.includeCommentType(CommentsTokens)
+
+	if includeComments && si != nil {
 		p.printLeadingComments(si, w, indent)
 	}
 	el(w)
-	if si != nil {
+	if includeComments && si != nil {
 		p.printTrailingComments(si, w, indent)
 	}
 }
 
 func (p *Printer) printElementString(si *descriptor.SourceCodeInfo_Location, w *printer, indent int, str string) {
-	p.printElement(si, w, inline(indent), func(w *printer) {
+	p.printElement(false, si, w, inline(indent), func(w *printer) {
 		fmt.Fprintf(w, "%s ", str)
 	})
 }
@@ -2051,7 +2053,7 @@ func (p *Printer) printComment(comments string, w io.Writer, indent int) bool {
 	} else {
 		multiLine = p.PreferMultiLineStyleComments
 	}
-	if strings.Contains(comments, "*/") {
+	if multiLine && strings.Contains(comments, "*/") {
 		// can't emit '*/' in a multi-line style comment
 		multiLine = false
 	}
