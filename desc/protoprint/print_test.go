@@ -103,7 +103,7 @@ func TestPrintNonFileDescriptors(t *testing.T) {
 	checkContents(t, buf.String(), "test-non-files-full.txt")
 
 	buf.Reset()
-	crawl(t, fd, &Printer{OmitComments: CommentsNonDoc, Compact: true, SortElements: true}, &buf)
+	crawl(t, fd, &Printer{OmitComments: CommentsNonDoc, Compact: true, SortElements: true, ForceFullyQualifiedNames: true}, &buf)
 	checkContents(t, buf.String(), "test-non-files-compact.txt")
 }
 

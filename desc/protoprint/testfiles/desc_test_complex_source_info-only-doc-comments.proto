@@ -31,7 +31,7 @@ message Test {
 
   extensions 100 to 200;
 
-  extensions 300 to 350, 500 to 550 [(foo.bar.label) = "jazz"];
+  extensions 300 to 350, 500 to 550 [(label) = "jazz"];
 
   message Nested {
     extend google.protobuf.MessageOptions {
@@ -39,9 +39,9 @@ message Test {
     }
 
     message _NestedNested {
-      option (foo.bar.Test.Nested.fooblez) = 10101;
+      option (fooblez) = 10101;
 
-      option (foo.bar.rept) = { foo:"goo" [foo.bar.Test.Nested._NestedNested._garblez]:"boo" };
+      option (rept) = { foo:"goo" [foo.bar.Test.Nested._NestedNested._garblez]:"boo" };
 
       enum EEE {
         OK = 0;
@@ -64,7 +64,7 @@ message Test {
       }
 
       message NestedNestedNested {
-        option (foo.bar.rept) = { foo:"hoo" [foo.bar.Test.Nested._NestedNested._garblez]:"spoo" };
+        option (rept) = { foo:"hoo" [foo.bar.Test.Nested._NestedNested._garblez]:"spoo" };
 
         optional Test Test = 1;
       }
@@ -99,13 +99,13 @@ extend google.protobuf.MessageOptions {
 }
 
 message Another {
-  option (foo.bar.a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765> m:<key:"bar" value:200> m:<key:"foo" value:100>> fff:OK };
+  option (a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765> m:<key:"bar" value:200> m:<key:"foo" value:100>> fff:OK };
 
-  option (foo.bar.eee) = V1;
+  option (eee) = V1;
 
-  option (foo.bar.rept) = { foo:"abc" array:1 array:2 array:3 s:<name:"foo" id:123> r:<name:"f"> r:<name:"s"> r:<id:456> };
-  option (foo.bar.rept) = { foo:"def" array:3 array:2 array:1 s:<name:"bar" id:321> r:<name:"g"> r:<name:"s"> };
-  option (foo.bar.rept) = { foo:"def" };
+  option (rept) = { foo:"abc" array:1 array:2 array:3 s:<name:"foo" id:123> r:<name:"f"> r:<name:"s"> r:<id:456> };
+  option (rept) = { foo:"def" array:3 array:2 array:1 s:<name:"bar" id:321> r:<name:"g"> r:<name:"s"> };
+  option (rept) = { foo:"def" };
 
   optional Test test = 1;
 
@@ -138,11 +138,11 @@ extend google.protobuf.MethodOptions {
 
 service TestTestService {
   rpc UserAuth ( Test ) returns ( Test ) {
-    option (foo.bar.validator) = { authenticated:true permission:<action:LOGIN entity:"client"> };
+    option (validator) = { authenticated:true permission:<action:LOGIN entity:"client"> };
   }
 
   rpc Get ( Test ) returns ( Test ) {
-    option (foo.bar.validator) = { authenticated:true permission:<action:READ entity:"user"> };
+    option (validator) = { authenticated:true permission:<action:READ entity:"user"> };
   }
 }
 
@@ -189,7 +189,7 @@ extend google.protobuf.FieldOptions {
 }
 
 message IsAuthorizedReq {
-  repeated string subjects = 1 [(foo.bar.rules) = { repeated:<min_items:1 items:<string:<pattern:"^(?:(?:team:(?:local|ldap))|user):[[:alnum:]_-]+$">>> }];
+  repeated string subjects = 1 [(rules) = { repeated:<min_items:1 items:<string:<pattern:"^(?:(?:team:(?:local|ldap))|user):[[:alnum:]_-]+$">>> }];
 }
 
 message KeywordCollisions {
@@ -339,7 +339,7 @@ extend google.protobuf.FieldOptions {
 }
 
 message KeywordCollisionOptions {
-  optional uint64 id = 1 [(foo.bar.bool) = true, (foo.bar.bytes) = "bytes", (foo.bar.default) = 222, (foo.bar.double) = 3.141590, (foo.bar.enum) = true, (foo.bar.extend) = true, (foo.bar.extensions) = true, (foo.bar.false) = -111, (foo.bar.fixed32) = 3232, (foo.bar.fixed64) = 6464, (foo.bar.float) = 3.140000, (foo.bar.import) = true, (foo.bar.int32) = 32, (foo.bar.int64) = 64, (foo.bar.message) = true, (foo.bar.option) = true, (foo.bar.optional) = true, (foo.bar.package) = true, (foo.bar.public) = true, (foo.bar.repeated) = true, (foo.bar.required) = true, (foo.bar.reserved) = true, (foo.bar.rpc) = true, (foo.bar.service) = true, (foo.bar.sfixed32) = -3232, (foo.bar.sfixed64) = -6464, (foo.bar.sint32) = -32, (foo.bar.sint64) = -64, (foo.bar.string) = "string", (foo.bar.syntax) = true, (foo.bar.to) = true, (foo.bar.true) = 111, (foo.bar.uint32) = 3200, (foo.bar.uint64) = 6400, (foo.bar.weak) = true];
+  optional uint64 id = 1 [(bool) = true, (bytes) = "bytes", (default) = 222, (double) = 3.141590, (enum) = true, (extend) = true, (extensions) = true, (false) = -111, (fixed32) = 3232, (fixed64) = 6464, (float) = 3.140000, (import) = true, (int32) = 32, (int64) = 64, (message) = true, (option) = true, (optional) = true, (package) = true, (public) = true, (repeated) = true, (required) = true, (reserved) = true, (rpc) = true, (service) = true, (sfixed32) = -3232, (sfixed64) = -6464, (sint32) = -32, (sint64) = -64, (string) = "string", (syntax) = true, (to) = true, (true) = 111, (uint32) = 3200, (uint64) = 6400, (weak) = true];
 
-  optional string name = 2 [(foo.bar.boom) = { syntax:true import:true public:true weak:true package:true string:"string" bytes:"bytes" int32:32 int64:64 uint32:3200 uint64:6400 sint32:-32 sint64:-64 fixed32:3232 fixed64:6464 sfixed32:-3232 sfixed64:-6464 bool:true float:3.14 double:3.14159 optional:true repeated:true required:true message:true enum:true service:true rpc:true option:true extend:true extensions:true reserved:true to:true true:111 false:-111 default:222 }];
+  optional string name = 2 [(boom) = { syntax:true import:true public:true weak:true package:true string:"string" bytes:"bytes" int32:32 int64:64 uint32:3200 uint64:6400 sint32:-32 sint64:-64 fixed32:3232 fixed64:6464 sfixed32:-3232 sfixed64:-6464 bool:true float:3.14 double:3.14159 optional:true repeated:true required:true message:true enum:true service:true rpc:true option:true extend:true extensions:true reserved:true to:true true:111 false:-111 default:222 }];
 }
