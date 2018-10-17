@@ -1,8 +1,5 @@
 // Syntax comment...
-syntax = "proto2";
-// Syntax trailer.
-
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+syntax = "proto2"; // Syntax trailer.
 
 // And now the package declaration
 package foo.bar;
@@ -11,6 +8,8 @@ import "desc_test_options.proto";
 
 import "google/protobuf/empty.proto";
 
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
 // We need a request for our RPC service below.
 message Request {
    option deprecated = true;
@@ -18,8 +17,7 @@ message Request {
    option (testprotos.mfubar) = true;
 
    // A field comment
-   repeated int32 ids = 1 [json_name = "|foo|", packed = true, (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"];
-   // field trailer #1...
+   repeated int32 ids = 1 [json_name = "|foo|", packed = true, (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"]; // field trailer #1...
 
    // label comment
    optional string name = 2 [default = "fubar"];
@@ -35,8 +33,7 @@ message Request {
       optional float flt = 2;
 
       // Leading comment...
-      optional string str = 3;
-      // Trailing comment...
+      optional string str = 3; // Trailing comment...
    }
 
    enum MarioCharacters {
@@ -99,7 +96,9 @@ service RpcService {
 }
 
 extend Request {
+   // comment for guid1
    optional uint64 guid1 = 123;
 
+   // ... and a comment for guid2
    optional uint64 guid2 = 124;
 }

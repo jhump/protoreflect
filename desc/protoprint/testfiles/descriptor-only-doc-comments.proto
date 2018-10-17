@@ -1,41 +1,3 @@
-// Protocol Buffers - Google's data interchange format
-// Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-// Author: kenton@google.com (Kenton Varda)
-//  Based on original Protocol Buffers design by
-//  Sanjay Ghemawat, Jeff Dean, and others.
-//
-// The messages in this file describe the definitions found in .proto files.
-// A valid .proto file can be translated directly to a FileDescriptorProto
-// without any other information (e.g. without reading its imports).
-
 syntax = "proto2";
 
 option cc_enable_arenas = true;
@@ -62,9 +24,9 @@ message FileDescriptorSet {
 
 // Describes a complete .proto file.
 message FileDescriptorProto {
-  optional string name = 1; // file name, relative to root of source tree
+  optional string name = 1;
 
-  optional string package = 2; // e.g. "foo", "foo.bar", etc.
+  optional string package = 2;
 
   // Names of files imported by this file.
   repeated string dependency = 3;
@@ -128,9 +90,9 @@ message DescriptorProto {
   // fields or extension ranges in the same message. Reserved ranges may
   // not overlap.
   message ReservedRange {
-    optional int32 start = 1; // Inclusive.
+    optional int32 start = 1;
 
-    optional int32 end = 2; // Exclusive.
+    optional int32 end = 2;
   }
 
   repeated ReservedRange reserved_range = 9;
@@ -180,7 +142,7 @@ message FieldDescriptorProto {
     // treat group fields as unknown fields.
     TYPE_GROUP = 10;
 
-    TYPE_MESSAGE = 11; // Length-delimited aggregate.
+    TYPE_MESSAGE = 11;
 
     // New in version 2.
     TYPE_BYTES = 12;
@@ -193,9 +155,9 @@ message FieldDescriptorProto {
 
     TYPE_SFIXED64 = 16;
 
-    TYPE_SINT32 = 17; // Uses ZigZag encoding.
+    TYPE_SINT32 = 17;
 
-    TYPE_SINT64 = 18; // Uses ZigZag encoding.
+    TYPE_SINT64 = 18;
   }
 
   enum Label {
@@ -270,9 +232,9 @@ message EnumDescriptorProto {
   // is inclusive such that it can appropriately represent the entire int32
   // domain.
   message EnumReservedRange {
-    optional int32 start = 1; // Inclusive.
+    optional int32 start = 1;
 
-    optional int32 end = 2; // Inclusive.
+    optional int32 end = 2;
   }
 
   // Range of reserved numeric values. Reserved numeric values may not be used
@@ -322,38 +284,6 @@ message MethodDescriptorProto {
   optional bool server_streaming = 6 [default = false];
 }
 
-// ===================================================================
-// Options
-
-// Each of the definitions above may have "options" attached.  These are
-// just annotations which may cause code to be generated slightly differently
-// or may contain hints for code that manipulates protocol messages.
-//
-// Clients may define custom options as extensions of the *Options messages.
-// These extensions may not yet be known at parsing time, so the parser cannot
-// store the values in them.  Instead it stores them in a field in the *Options
-// message called uninterpreted_option. This field must have the same name
-// across all *Options messages. We then use this field to populate the
-// extensions when we build a descriptor, at which point all protos have been
-// parsed and so all extensions are known.
-//
-// Extension numbers for custom options may be chosen as follows:
-// * For options which will only be used within a single application or
-//   organization, or for experimental options, use field numbers 50000
-//   through 99999.  It is up to you to ensure that you do not use the
-//   same number for multiple options.
-// * For options which will be published and used publicly by multiple
-//   independent entities, e-mail protobuf-global-extension-registry@google.com
-//   to reserve extension numbers. Simply provide your project name (e.g.
-//   Objective-C plugin) and your project website (if available) -- there's no
-//   need to explain how you intend to use them. Usually you only need one
-//   extension number. You can declare multiple options with only one extension
-//   number by putting them in a sub-message. See the Custom Options section of
-//   the docs for examples:
-//   https://developers.google.com/protocol-buffers/docs/proto#options
-//   If this turns out to be popular, a web service will be set up
-//   to automatically assign option numbers.
-
 message FileOptions {
   // Sets the Java package where classes generated from this .proto will be
   // placed.  By default, the proto package is used, but this is often
@@ -389,12 +319,12 @@ message FileOptions {
 
   // Generated classes can be optimized for speed or code size.
   enum OptimizeMode {
-    SPEED = 1; // Generate complete code for parsing, serialization,
+    SPEED = 1;
 
     // etc.
-    CODE_SIZE = 2; // Use ReflectionOps to implement these methods.
+    CODE_SIZE = 2;
 
-    LITE_RUNTIME = 3; // Generate code using MessageLite and the lite runtime.
+    LITE_RUNTIME = 3;
   }
 
   optional OptimizeMode optimize_for = 9 [default = SPEED];
@@ -662,11 +592,6 @@ message EnumValueOptions {
 }
 
 message ServiceOptions {
-  // Note:  Field numbers 1 through 32 are reserved for Google's internal RPC
-  //   framework.  We apologize for hoarding these numbers to ourselves, but
-  //   we were already using them long before we decided to release Protocol
-  //   Buffers.
-
   // Is this service deprecated?
   // Depending on the target platform, this can emit Deprecated annotations
   // for the service, or it will be completely ignored; in the very least,
@@ -680,11 +605,6 @@ message ServiceOptions {
 }
 
 message MethodOptions {
-  // Note:  Field numbers 1 through 32 are reserved for Google's internal RPC
-  //   framework.  We apologize for hoarding these numbers to ourselves, but
-  //   we were already using them long before we decided to release Protocol
-  //   Buffers.
-
   // Is this method deprecated?
   // Depending on the target platform, this can emit Deprecated annotations
   // for the method, or it will be completely ignored; in the very least,
@@ -697,9 +617,9 @@ message MethodOptions {
   enum IdempotencyLevel {
     IDEMPOTENCY_UNKNOWN = 0;
 
-    NO_SIDE_EFFECTS = 1; // implies idempotent
+    NO_SIDE_EFFECTS = 1;
 
-    IDEMPOTENT = 2; // idempotent, but may have side effects
+    IDEMPOTENT = 2;
   }
 
   optional IdempotencyLevel idempotency_level = 34 [default = IDEMPOTENCY_UNKNOWN];
@@ -744,9 +664,6 @@ message UninterpretedOption {
 
   optional string aggregate_value = 8;
 }
-
-// ===================================================================
-// Optional source code info
 
 // Encapsulates information about the original source file from which a
 // FileDescriptorProto was generated.

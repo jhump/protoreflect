@@ -88,7 +88,7 @@ func (x *Request_MarioCharacters) UnmarshalJSON(data []byte) error {
 	return nil
 }
 func (Request_MarioCharacters) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_desc_test_comments_107ec7a8bfd09c21, []int{0, 0}
+	return fileDescriptor_desc_test_comments_055e0dc63d6a9e0b, []int{0, 0}
 }
 
 // We need a request for our RPC service below.
@@ -110,7 +110,7 @@ func (m *Request) Reset()         { *m = Request{} }
 func (m *Request) String() string { return proto.CompactTextString(m) }
 func (*Request) ProtoMessage()    {}
 func (*Request) Descriptor() ([]byte, []int) {
-	return fileDescriptor_desc_test_comments_107ec7a8bfd09c21, []int{0}
+	return fileDescriptor_desc_test_comments_055e0dc63d6a9e0b, []int{0}
 }
 
 var extRange_Request = []proto.ExtensionRange{
@@ -177,7 +177,7 @@ func (m *Request_Extras) Reset()         { *m = Request_Extras{} }
 func (m *Request_Extras) String() string { return proto.CompactTextString(m) }
 func (*Request_Extras) ProtoMessage()    {}
 func (*Request_Extras) Descriptor() ([]byte, []int) {
-	return fileDescriptor_desc_test_comments_107ec7a8bfd09c21, []int{0, 0}
+	return fileDescriptor_desc_test_comments_055e0dc63d6a9e0b, []int{0, 0}
 }
 func (m *Request_Extras) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Request_Extras.Unmarshal(m, b)
@@ -388,10 +388,10 @@ var _RpcService_serviceDesc = grpc.ServiceDesc{
 }
 
 func init() {
-	proto.RegisterFile("desc_test_comments.proto", fileDescriptor_desc_test_comments_107ec7a8bfd09c21)
+	proto.RegisterFile("desc_test_comments.proto", fileDescriptor_desc_test_comments_055e0dc63d6a9e0b)
 }
 
-var fileDescriptor_desc_test_comments_107ec7a8bfd09c21 = []byte{
+var fileDescriptor_desc_test_comments_055e0dc63d6a9e0b = []byte{
 	// 655 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x93, 0xbf, 0x6f, 0xd3, 0x40,
 	0x14, 0xc7, 0x73, 0xf6, 0xd9, 0x71, 0xae, 0x20, 0x4e, 0x87, 0xda, 0x1a, 0x57, 0xaa, 0x42, 0x85,

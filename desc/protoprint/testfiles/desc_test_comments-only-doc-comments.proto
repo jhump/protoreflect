@@ -1,23 +1,12 @@
-// This is the first detached comment for the syntax.
-
-// This is a second detached comment.
-
-// This is a third.
-
-// Syntax comment...
-syntax = "proto2"; // Syntax trailer.
+syntax = "proto2";
 
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
-// And now the package declaration
 package foo.bar;
 
 import "google/protobuf/empty.proto";
 
 import "desc_test_options.proto";
-
-// Multiple white space lines (like above) cannot
-// be preserved...
 
 // We need a request for our RPC service below.
 message Request {
@@ -26,13 +15,7 @@ message Request {
   option (testprotos.mfubar) = true;
 
   // A field comment
-  repeated int32 ids = 1 [json_name = "|foo|", packed = true, (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"]; // field trailer #1...
-
-  // some detached comments
-
-  // some detached comments
-
-  // Another field comment
+  repeated int32 ids = 1 [json_name = "|foo|", packed = true, (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"];
 
   // label comment
   optional string name = 2 [default = "fubar"];
@@ -56,7 +39,7 @@ message Request {
     optional float flt = 2;
 
     // Leading comment...
-    optional string str = 3; // Trailing comment...
+    optional string str = 3;
   }
 
   enum MarioCharacters {

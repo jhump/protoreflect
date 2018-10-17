@@ -68,11 +68,9 @@ message FileDescriptorSet {
 
 /* Describes a complete .proto file. */
 message FileDescriptorProto {
-	optional string name = 1;
-	/* file name, relative to root of source tree */
+	optional string name = 1; /* file name, relative to root of source tree */
 
-	optional string package = 2;
-	/* e.g. "foo", "foo.bar", etc. */
+	optional string package = 2; /* e.g. "foo", "foo.bar", etc. */
 
 	/* Names of files imported by this file. */
 	repeated string dependency = 3;
@@ -144,11 +142,9 @@ message DescriptorProto {
 	 * not overlap.
 	 */
 	message ReservedRange {
-		optional int32 start = 1;
-		/* Inclusive. */
+		optional int32 start = 1; /* Inclusive. */
 
-		optional int32 end = 2;
-		/* Exclusive. */
+		optional int32 end = 2; /* Exclusive. */
 	}
 
 	repeated ReservedRange reserved_range = 9;
@@ -208,8 +204,7 @@ message FieldDescriptorProto {
 		 */
 		TYPE_GROUP = 10;
 
-		TYPE_MESSAGE = 11;
-		/* Length-delimited aggregate. */
+		TYPE_MESSAGE = 11; /* Length-delimited aggregate. */
 
 		/* New in version 2. */
 		TYPE_BYTES = 12;
@@ -222,11 +217,9 @@ message FieldDescriptorProto {
 
 		TYPE_SFIXED64 = 16;
 
-		TYPE_SINT32 = 17;
-		/* Uses ZigZag encoding. */
+		TYPE_SINT32 = 17; /* Uses ZigZag encoding. */
 
-		TYPE_SINT64 = 18;
-		/* Uses ZigZag encoding. */
+		TYPE_SINT64 = 18; /* Uses ZigZag encoding. */
 	}
 
 	enum Label {
@@ -315,11 +308,9 @@ message EnumDescriptorProto {
 	 * domain.
 	 */
 	message EnumReservedRange {
-		optional int32 start = 1;
-		/* Inclusive. */
+		optional int32 start = 1; /* Inclusive. */
 
-		optional int32 end = 2;
-		/* Inclusive. */
+		optional int32 end = 2; /* Inclusive. */
 	}
 
 	/*
@@ -454,15 +445,12 @@ message FileOptions {
 
 	/* Generated classes can be optimized for speed or code size. */
 	enum OptimizeMode {
-		SPEED = 1;
-		/* Generate complete code for parsing, serialization, */
+		SPEED = 1; /* Generate complete code for parsing, serialization, */
 
 		/* etc. */
-		CODE_SIZE = 2;
-		/* Use ReflectionOps to implement these methods. */
+		CODE_SIZE = 2; /* Use ReflectionOps to implement these methods. */
 
-		LITE_RUNTIME = 3;
-		/* Generate code using MessageLite and the lite runtime. */
+		LITE_RUNTIME = 3; /* Generate code using MessageLite and the lite runtime. */
 	}
 
 	optional OptimizeMode optimize_for = 9 [default = SPEED];
@@ -817,11 +805,9 @@ message MethodOptions {
 	enum IdempotencyLevel {
 		IDEMPOTENCY_UNKNOWN = 0;
 
-		NO_SIDE_EFFECTS = 1;
-		/* implies idempotent */
+		NO_SIDE_EFFECTS = 1; /* implies idempotent */
 
-		IDEMPOTENT = 2;
-		/* idempotent, but may have side effects */
+		IDEMPOTENT = 2; /* idempotent, but may have side effects */
 	}
 
 	optional IdempotencyLevel idempotency_level = 34 [default = IDEMPOTENCY_UNKNOWN];

@@ -192,8 +192,6 @@ message IsAuthorizedReq {
   repeated string subjects = 1 [(rules) = { repeated:<min_items:1 items:<string:<pattern:"^(?:(?:team:(?:local|ldap))|user):[[:alnum:]_-]+$">>> }];
 }
 
-// tests cases where field names collide with keywords
-
 message KeywordCollisions {
   optional bool syntax = 1;
 

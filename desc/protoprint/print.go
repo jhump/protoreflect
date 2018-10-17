@@ -26,13 +26,14 @@ type Printer struct {
 	// If true, comments are rendered using "/*" style comments. Otherwise, they
 	// are printed using "//" style line comments.
 	PreferMultiLineStyleComments bool
+
 	// If true, elements are sorted into a canonical order.
 	//
 	// The canonical order for elements in a file follows:
 	//  1. Syntax
-	//  2. Options (sorted by name, standard options before custom options)
-	//  3. Package
-	//  4. Imports (sorted lexically)
+	//  2. Package
+	//  3. Imports (sorted lexically)
+	//  4. Options (sorted by name, standard options before custom options)
 	//  5. Messages (sorted by name)
 	//  6. Enums (sorted by name)
 	//  7. Services (sorted by name)
@@ -49,15 +50,123 @@ type Printer struct {
 	//  7. Reserved ranges (sorted by starting tag number)
 	//  8. Reserved names (sorted lexically)
 	//
-	// Methods are sorted within a service by name. Enum values are sorted
-	// within an enum first by numeric value then by name.
+	// Methods are sorted within a service by name and appear after any service
+	// options (which are sorted by name, standard options before custom ones).
+	// Enum values are sorted within an enum, first by numeric value then by
+	// name, and also appear after any enum options.
+	//
+	// Options for fields, enum values, and extension ranges are sorted by name,
+	// standard options before custom ones.
 	SortElements bool
-	// The indentation used. Any characters other spaces or tabs will be
+
+	// The indentation used. Any characters other than spaces or tabs will be
 	// replaced with spaces. If unset/empty, two spaces will be used.
 	Indent string
+
 	// If true, detached comments (between elements) will be ignored.
+	//
+	// Deprecated: Use OmitComments bitmask instead.
 	OmitDetachedComments bool
+
+	// A bitmask of comment types to omit. If unset, all comments will be
+	// included. Use CommentsAll to not print any comments.
+	OmitComments CommentType
+
+	// If true, trailing comments that typically appear on the same line as an
+	// element (option, field, enum value, method) will be printed on a separate
+	// line instead.
+	//
+	// So, with this set, you'll get output like so:
+	//
+	//    // leading comment for field
+	//    repeated string names = 1;
+	//    // trailing comment
+	//
+	// If left false, the printer will try to emit trailing comments on the same
+	// line instead:
+	//
+	//    // leading comment for field
+	//    repeated string names = 1; // trailing comment
+	//
+	// If the trailing comment has more than one line, it will automatically be
+	// forced to the next line. Also, elements that end with "}" instead of ";"
+	// will have trailing comments rendered on the subsequent line.
+	TrailingCommentsOnSeparateLine bool
+
+	// If true, the printed output will eschew any blank lines, which otherwise
+	// appear between descriptor elements and comment blocks. Note that this if
+	// detached comments are being printed, this will cause them to be merged
+	// into the subsequent leading comments. Similarly, any element trailing
+	// comments will be merged into the subsequent leading comments.
+	Compact bool
+
+	// If true, all references to messages, extensions, and enums (such as in
+	// options, field types, and method request and response types) will be
+	// fully-qualified. When left unset, the referenced elements will contain
+	// only as much qualifier as is required.
+	//
+	// For example, if a message is in the same package as the reference, the
+	// simple name can be used. If a message shares some context with the
+	// reference, only the unshared context needs to be included. For example:
+	//
+	//  message Foo {
+	//    message Bar {
+	//      enum Baz {
+	//        ZERO = 0;
+	//        ONE = 1;
+	//      }
+	//    }
+	//
+	//    // This field shares some context as the enum it references: they are
+	//    // both inside of the namespace Foo:
+	//    //    field is "Foo.my_baz"
+	//    //     enum is "Foo.Bar.Baz"
+	//    // So we only need to qualify the reference with the context that they
+	//    // do NOT have in common:
+	//    Bar.Baz my_baz = 1;
+	//  }
+	//
+	// When printing fully-qualified names, they will be preceded by a dot, to
+	// avoid any ambiguity that they might be relative vs. fully-qualified.
+	ForceFullyQualifiedNames bool
 }
+
+// CommentType is a kind of comments in a proto source file. This can be used
+// as a bitmask.
+type CommentType int
+
+const (
+	// CommentsDetached refers to comments that are not "attached" to any
+	// source element. They are attributed to the subsequent element in the
+	// file as "detached" comments.
+	CommentsDetached CommentType = 1 << iota
+	// CommentsTrailing refers to a comment block immediately following an
+	// element in the source file. If another element immediately follows
+	// the trailing comment, it is instead considered a leading comment for
+	// that subsequent element.
+	CommentsTrailing
+	// CommentsLeading refers to a comment block immediately preceding an
+	// element in the source file. For high-level elements (those that have
+	// their own descriptor), these are used as doc comments for that element.
+	CommentsLeading
+	// CommentsTokens refers to any comments (leading, trailing, or detached)
+	// on low-level elements in the file. "High-level" elements have their own
+	// descriptors, e.g. messages, enums, fields, services, and methods. But
+	// comments can appear anywhere (such as around identifiers and keywords,
+	// sprinkled inside the declarations of a high-level element). This class
+	// of comments are for those extra comments sprinkled into the file.
+	CommentsTokens
+
+	// CommentsNonDoc refers to comments that are *not* doc comments. This is a
+	// bitwise union of everything other than CommentsLeading. If you configure
+	// a printer to omit this, only doc comments on descriptor elements will be
+	// included in the printed output.
+	CommentsNonDoc = CommentsDetached | CommentsTrailing | CommentsTokens
+	// CommentsAll indicates all kinds of comments. If you configure a printer
+	// to omit this, no comments will appear in the printed output, even if the
+	// input descriptors had source info and comments.
+	CommentsAll = -1
+)
 
 // PrintProtoFiles prints all of the given file descriptors. The given open
 // function is given a file name and is responsible for creating the outputs and
@@ -114,8 +223,25 @@ type reservedRange struct {
 }
 
 // PrintProtoFile prints the given single file descriptor to the given writer.
-func (p *Printer) PrintProtoFile(fd *desc.FileDescriptor, w io.Writer) error {
-	out := &printer{Writer: w}
+func (p *Printer) PrintProtoFile(fd *desc.FileDescriptor, out io.Writer) error {
+	return p.printProto(fd, out)
+}
+
+// PrintProto prints the given descriptor and returns the resulting string. This
+// can be used to print proto files, but it can also be used to get the proto
+// "source form" for any kind of descriptor, which can be a more user-friendly
+// way to present descriptors that are intended for human consumption.
+func (p *Printer) PrintProtoToString(dsc desc.Descriptor) (string, error) {
+	var buf bytes.Buffer
+	if err := p.printProto(dsc, &buf); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func (p *Printer) printProto(dsc desc.Descriptor, out io.Writer) error {
+	w := newWriter(out)
+
 	if p.Indent == "" {
 		// default indent to two spaces
 		p.Indent = "  "
@@ -131,46 +257,206 @@ func (p *Printer) PrintProtoFile(fd *desc.FileDescriptor, w io.Writer) error {
 		}
 		p.Indent = string(ind)
 	}
+	if p.OmitDetachedComments {
+		p.OmitComments |= CommentsDetached
+	}
 
 	er := dynamic.ExtensionRegistry{}
-	er.AddExtensionsFromFileRecursively(fd)
+	er.AddExtensionsFromFileRecursively(dsc.GetFile())
 	mf := dynamic.NewMessageFactoryWithExtensionRegistry(&er)
-	fdp := fd.AsFileDescriptorProto()
+	fdp := dsc.GetFile().AsFileDescriptorProto()
 	sourceInfo := internal.CreateSourceInfoMap(fdp)
 	extendOptionLocations(sourceInfo)
-	path := make([]int32, 1)
 
-	opts, err := extractOptions(fd.GetOptions(), mf)
-	if err != nil {
-		if out.err != nil {
-			return out.err
+	path := findElement(dsc)
+	switch d := dsc.(type) {
+	case *desc.FileDescriptor:
+		p.printFile(d, mf, w, sourceInfo)
+	case *desc.MessageDescriptor:
+		p.printMessage(d, mf, w, sourceInfo, path, 0)
+	case *desc.FieldDescriptor:
+		var scope string
+		if md, ok := d.GetParent().(*desc.MessageDescriptor); ok {
+			scope = md.GetFullyQualifiedName()
 		} else {
-			return err
+			scope = d.GetFile().GetPackage()
+		}
+		if d.IsExtension() {
+			fmt.Fprint(w, "extend ")
+			extNameSi := sourceInfo.Get(append(path, internal.Field_extendeeTag))
+			p.printElementString(extNameSi, w, 0, p.qualifyName(d.GetFile().GetPackage(), scope, d.GetOwner().GetFullyQualifiedName()))
+			fmt.Fprintln(w, "{")
+
+			p.printField(d, mf, w, sourceInfo, path, scope, 1)
+
+			fmt.Fprintln(w, "}")
+		} else {
+			p.printField(d, mf, w, sourceInfo, path, scope, 0)
+		}
+	case *desc.OneOfDescriptor:
+		md := d.GetOwner()
+		elements := elementAddrs{dsc: md}
+		for i := range md.GetFields() {
+			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_fieldsTag, elementIndex: i})
+		}
+		p.printOneOf(d, elements, 0, mf, w, sourceInfo, path[:len(path)-1], 0, path[len(path)-1])
+	case *desc.EnumDescriptor:
+		p.printEnum(d, mf, w, sourceInfo, path, 0)
+	case *desc.EnumValueDescriptor:
+		p.printEnumValue(d, mf, w, sourceInfo, path, 0)
+	case *desc.ServiceDescriptor:
+		p.printService(d, mf, w, sourceInfo, path, 0)
+	case *desc.MethodDescriptor:
+		p.printMethod(d, mf, w, sourceInfo, path, 0)
+	}
+
+	return w.err
+}
+
+func findElement(dsc desc.Descriptor) []int32 {
+	if dsc.GetParent() == nil {
+		return nil
+	}
+	path := findElement(dsc.GetParent())
+	switch d := dsc.(type) {
+	case *desc.MessageDescriptor:
+		if pm, ok := d.GetParent().(*desc.MessageDescriptor); ok {
+			return append(path, internal.Message_nestedMessagesTag, getMessageIndex(d, pm.GetNestedMessageTypes()))
+		}
+		return append(path, internal.File_messagesTag, getMessageIndex(d, d.GetFile().GetMessageTypes()))
+
+	case *desc.FieldDescriptor:
+		if d.IsExtension() {
+			if pm, ok := d.GetParent().(*desc.MessageDescriptor); ok {
+				return append(path, internal.Message_extensionsTag, getFieldIndex(d, pm.GetNestedExtensions()))
+			}
+			return append(path, internal.File_extensionsTag, getFieldIndex(d, d.GetFile().GetExtensions()))
+		}
+		return append(path, internal.Message_fieldsTag, getFieldIndex(d, d.GetOwner().GetFields()))
+
+	case *desc.OneOfDescriptor:
+		return append(path, internal.Message_oneOfsTag, getOneOfIndex(d, d.GetOwner().GetOneOfs()))
+
+	case *desc.EnumDescriptor:
+		if pm, ok := d.GetParent().(*desc.MessageDescriptor); ok {
+			return append(path, internal.Message_enumsTag, getEnumIndex(d, pm.GetNestedEnumTypes()))
+		}
+		return append(path, internal.File_enumsTag, getEnumIndex(d, d.GetFile().GetEnumTypes()))
+
+	case *desc.EnumValueDescriptor:
+		return append(path, internal.Enum_valuesTag, getEnumValueIndex(d, d.GetEnum().GetValues()))
+
+	case *desc.ServiceDescriptor:
+		return append(path, internal.File_servicesTag, getServiceIndex(d, d.GetFile().GetServices()))
+
+	case *desc.MethodDescriptor:
+		return append(path, internal.Service_methodsTag, getMethodIndex(d, d.GetService().GetMethods()))
+
+	default:
+		panic(fmt.Sprintf("unexpected descriptor type: %T", dsc))
+	}
+}
+
+func getMessageIndex(md *desc.MessageDescriptor, list []*desc.MessageDescriptor) int32 {
+	for i := range list {
+		if md == list[i] {
+			return int32(i)
 		}
 	}
+	panic(fmt.Sprintf("unable to determine index of message %s", md.GetFullyQualifiedName()))
+}
+
+func getFieldIndex(fd *desc.FieldDescriptor, list []*desc.FieldDescriptor) int32 {
+	for i := range list {
+		if fd == list[i] {
+			return int32(i)
+		}
+	}
+	panic(fmt.Sprintf("unable to determine index of field %s", fd.GetFullyQualifiedName()))
+}
+
+func getOneOfIndex(ood *desc.OneOfDescriptor, list []*desc.OneOfDescriptor) int32 {
+	for i := range list {
+		if ood == list[i] {
+			return int32(i)
+		}
+	}
+	panic(fmt.Sprintf("unable to determine index of oneof %s", ood.GetFullyQualifiedName()))
+}
+
+func getEnumIndex(ed *desc.EnumDescriptor, list []*desc.EnumDescriptor) int32 {
+	for i := range list {
+		if ed == list[i] {
+			return int32(i)
+		}
+	}
+	panic(fmt.Sprintf("unable to determine index of enum %s", ed.GetFullyQualifiedName()))
+}
+
+func getEnumValueIndex(evd *desc.EnumValueDescriptor, list []*desc.EnumValueDescriptor) int32 {
+	for i := range list {
+		if evd == list[i] {
+			return int32(i)
+		}
+	}
+	panic(fmt.Sprintf("unable to determine index of enum value %s", evd.GetFullyQualifiedName()))
+}
+
+func getServiceIndex(sd *desc.ServiceDescriptor, list []*desc.ServiceDescriptor) int32 {
+	for i := range list {
+		if sd == list[i] {
+			return int32(i)
+		}
+	}
+	panic(fmt.Sprintf("unable to determine index of service %s", sd.GetFullyQualifiedName()))
+}
+
+func getMethodIndex(mtd *desc.MethodDescriptor, list []*desc.MethodDescriptor) int32 {
+	for i := range list {
+		if mtd == list[i] {
+			return int32(i)
+		}
+	}
+	panic(fmt.Sprintf("unable to determine index of method %s", mtd.GetFullyQualifiedName()))
+}
+
+func (p *Printer) newLine(w io.Writer) {
+	if !p.Compact {
+		fmt.Fprintln(w)
+	}
+}
+
+func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap) {
+	opts, err := p.extractOptions(fd, fd.GetOptions(), mf)
+	if err != nil {
+		return
+	}
+
+	fdp := fd.AsFileDescriptorProto()
+	path := make([]int32, 1)
 
 	path[0] = internal.File_packageTag
 	sourceInfo.PutIfAbsent(append(path, 0), sourceInfo.Get(path))
 
 	path[0] = internal.File_syntaxTag
 	si := sourceInfo.Get(path)
-	p.printElement(si, out, 0, func(w *printer) {
+	p.printElement(false, si, w, 0, func(w *writer) {
 		syn := fdp.GetSyntax()
 		if syn == "" {
 			syn = "proto2"
 		}
-		fmt.Fprintf(w, "syntax = %q;\n", syn)
+		fmt.Fprintf(w, "syntax = %q;", syn)
 	})
-	fmt.Fprintln(out)
+	p.newLine(w)
 
 	elements := elementAddrs{dsc: fd, opts: opts}
-	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.File_optionsTag, -3, opts)...)
 	if fdp.Package != nil {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_packageTag, elementIndex: 0, order: -2})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_packageTag, elementIndex: 0, order: -3})
 	}
 	for i := range fd.AsFileDescriptorProto().GetDependency() {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_dependencyTag, elementIndex: i, order: -1})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_dependencyTag, elementIndex: i, order: -2})
 	}
+	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.File_optionsTag, -1, opts)...)
 	for i := range fd.GetMessageTypes() {
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_messagesTag, elementIndex: i})
 	}
@@ -189,7 +475,6 @@ func (p *Printer) PrintProtoFile(fd *desc.FileDescriptor, w io.Writer) error {
 	pkgName := fd.GetPackage()
 
 	var ext *desc.FieldDescriptor
-	var extSi *descriptor.SourceCodeInfo_Location
 	for i, el := range elements.addrs {
 		d := elements.at(el)
 		path = []int32{el.elementType, int32(el.elementIndex)}
@@ -199,68 +484,59 @@ func (p *Printer) PrintProtoFile(fd *desc.FileDescriptor, w io.Writer) error {
 				// need to open a new extend block
 				if ext != nil {
 					// close preceding extend block
-					fmt.Fprintln(out, "}")
-					p.printTrailingComments(extSi, out, 0)
+					fmt.Fprintln(w, "}")
 				}
 				if i > 0 {
-					fmt.Fprintln(out)
+					p.newLine(w)
 				}
 
 				ext = fld
-				extSi = sourceInfo.Get(path)
-				p.printLeadingComments(extSi, out, 0)
-
-				fmt.Fprint(out, "extend ")
+				fmt.Fprint(w, "extend ")
 				extNameSi := sourceInfo.Get(append(path, internal.Field_extendeeTag))
-				p.printElementString(extNameSi, out, 0, getLocalName(pkgName, pkgName, fld.GetOwner().GetFullyQualifiedName()))
-				fmt.Fprintln(out, "{")
+				p.printElementString(extNameSi, w, 0, p.qualifyName(pkgName, pkgName, fld.GetOwner().GetFullyQualifiedName()))
+				fmt.Fprintln(w, "{")
 			} else {
-				fmt.Fprintln(out)
+				p.newLine(w)
 			}
-			p.printField(fld, mf, out, sourceInfo, path, pkgName, 1)
+			p.printField(fld, mf, w, sourceInfo, path, pkgName, 1)
 		} else {
 			if ext != nil {
 				// close preceding extend block
-				fmt.Fprintln(out, "}")
-				p.printTrailingComments(extSi, out, 0)
+				fmt.Fprintln(w, "}")
 				ext = nil
-				extSi = nil
 			}
 
 			if i > 0 {
-				fmt.Fprintln(out)
+				p.newLine(w)
 			}
 
 			switch d := d.(type) {
 			case pkg:
 				si := sourceInfo.Get(path)
-				p.printElement(si, out, 0, func(w *printer) {
-					fmt.Fprintf(w, "package %s;\n", d)
+				p.printElement(false, si, w, 0, func(w *writer) {
+					fmt.Fprintf(w, "package %s;", d)
 				})
 			case imp:
 				si := sourceInfo.Get(path)
-				p.printElement(si, out, 0, func(w *printer) {
-					fmt.Fprintf(w, "import %q;\n", d)
+				p.printElement(false, si, w, 0, func(w *writer) {
+					fmt.Fprintf(w, "import %q;", d)
 				})
 			case []option:
-				p.printOptionsLong(d, out, sourceInfo, path, 0)
+				p.printOptionsLong(d, w, sourceInfo, path, 0)
 			case *desc.MessageDescriptor:
-				p.printMessage(d, mf, out, sourceInfo, path, 0)
+				p.printMessage(d, mf, w, sourceInfo, path, 0)
 			case *desc.EnumDescriptor:
-				p.printEnum(d, mf, out, sourceInfo, path, 0)
+				p.printEnum(d, mf, w, sourceInfo, path, 0)
 			case *desc.ServiceDescriptor:
-				p.printService(d, mf, out, sourceInfo, path, 0)
+				p.printService(d, mf, w, sourceInfo, path, 0)
 			}
 		}
 	}
 
 	if ext != nil {
 		// close trailing extend block
-		fmt.Fprintln(out, "}")
-		p.printTrailingComments(extSi, out, 0)
+		fmt.Fprintln(w, "}")
 	}
-
-	return out.err
 }
 
 func (p *Printer) sort(elements elementAddrs, sourceInfo internal.SourceInfoMap, path []int32) {
@@ -278,7 +554,16 @@ func (p *Printer) sort(elements elementAddrs, sourceInfo internal.SourceInfoMap,
 	}
 }
 
-func getLocalName(pkg, scope, fqn string) string {
+func (p *Printer) qualifyName(pkg, scope string, fqn string) string {
+	if p.ForceFullyQualifiedNames {
+		// forcing fully-qualified names; make sure to include preceding dot
+		if fqn[0] == '.' {
+			return fqn
+		}
+		return fmt.Sprintf(".%s", fqn)
+	}
+
+	// compute relative name (so no leading dot)
 	if fqn[0] == '.' {
 		fqn = fqn[1:]
 	}
@@ -298,9 +583,54 @@ func getLocalName(pkg, scope, fqn string) string {
 	return fqn
 }
 
-func (p *Printer) printMessage(md *desc.MessageDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
+func (p *Printer) typeString(fld *desc.FieldDescriptor, scope string) string {
+	if fld.IsMap() {
+		return fmt.Sprintf("map<%s, %s>", p.typeString(fld.GetMapKeyType(), scope), p.typeString(fld.GetMapValueType(), scope))
+	}
+	switch fld.GetType() {
+	case descriptor.FieldDescriptorProto_TYPE_INT32:
+		return "int32"
+	case descriptor.FieldDescriptorProto_TYPE_INT64:
+		return "int64"
+	case descriptor.FieldDescriptorProto_TYPE_UINT32:
+		return "uint32"
+	case descriptor.FieldDescriptorProto_TYPE_UINT64:
+		return "uint64"
+	case descriptor.FieldDescriptorProto_TYPE_SINT32:
+		return "sint32"
+	case descriptor.FieldDescriptorProto_TYPE_SINT64:
+		return "sint64"
+	case descriptor.FieldDescriptorProto_TYPE_FIXED32:
+		return "fixed32"
+	case descriptor.FieldDescriptorProto_TYPE_FIXED64:
+		return "fixed64"
+	case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
+		return "sfixed32"
+	case descriptor.FieldDescriptorProto_TYPE_SFIXED64:
+		return "sfixed64"
+	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
+		return "float"
+	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+		return "double"
+	case descriptor.FieldDescriptorProto_TYPE_BOOL:
+		return "bool"
+	case descriptor.FieldDescriptorProto_TYPE_STRING:
+		return "string"
+	case descriptor.FieldDescriptorProto_TYPE_BYTES:
+		return "bytes"
+	case descriptor.FieldDescriptorProto_TYPE_ENUM:
+		return p.qualifyName(fld.GetFile().GetPackage(), scope, fld.GetEnumType().GetFullyQualifiedName())
+	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
+		return p.qualifyName(fld.GetFile().GetPackage(), scope, fld.GetMessageType().GetFullyQualifiedName())
+	case descriptor.FieldDescriptorProto_TYPE_GROUP:
+		return fld.GetMessageType().GetName()
+	}
+	panic(fmt.Sprintf("invalid type: %v", fld.GetType()))
+}
+
+func (p *Printer) printMessage(md *desc.MessageDescriptor, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	si := sourceInfo.Get(path)
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *writer) {
 		p.indent(w, indent)
 
 		fmt.Fprint(w, "message ")
@@ -314,8 +644,8 @@ func (p *Printer) printMessage(md *desc.MessageDescriptor, mf *dynamic.MessageFa
 	})
 }
 
-func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
-	opts, err := extractOptions(md.GetOptions(), mf)
+func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
+	opts, err := p.extractOptions(md, md.GetOptions(), mf)
 	if err != nil {
 		if w.err == nil {
 			w.err = err
@@ -360,7 +690,6 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 	scope := md.GetFullyQualifiedName()
 
 	var ext *desc.FieldDescriptor
-	var extSi *descriptor.SourceCodeInfo_Location
 	for i, el := range elements.addrs {
 		d := elements.at(el)
 		// skip[d] will panic if d is a slice (which it could be for []option),
@@ -380,23 +709,19 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 					// close preceding extend block
 					p.indent(w, indent)
 					fmt.Fprintln(w, "}")
-					p.printTrailingComments(extSi, w, indent)
 				}
 				if i > 0 {
-					fmt.Fprintln(w)
+					p.newLine(w)
 				}
 
 				ext = fld
-				extSi = sourceInfo.Get(childPath)
-				p.printLeadingComments(extSi, w, indent)
-
 				p.indent(w, indent)
 				fmt.Fprint(w, "extend ")
 				extNameSi := sourceInfo.Get(append(childPath, internal.Field_extendeeTag))
-				p.printElementString(extNameSi, w, indent, getLocalName(pkg, scope, fld.GetOwner().GetFullyQualifiedName()))
+				p.printElementString(extNameSi, w, indent, p.qualifyName(pkg, scope, fld.GetOwner().GetFullyQualifiedName()))
 				fmt.Fprintln(w, "{")
 			} else {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 			p.printField(fld, mf, w, sourceInfo, childPath, scope, indent+1)
 		} else {
@@ -404,13 +729,11 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 				// close preceding extend block
 				p.indent(w, indent)
 				fmt.Fprintln(w, "}")
-				p.printTrailingComments(extSi, w, indent)
 				ext = nil
-				extSi = nil
 			}
 
 			if i > 0 {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 
 			switch d := d.(type) {
@@ -446,7 +769,7 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 					addrs = append(addrs, elnext)
 					skip[extr] = true
 				}
-				p.printExtensionRanges(ranges, addrs, mf, w, sourceInfo, path, indent)
+				p.printExtensionRanges(md, ranges, addrs, mf, w, sourceInfo, path, indent)
 			case reservedRange:
 				// collapse reserved ranges into a single "reserved" block
 				ranges := []reservedRange{d}
@@ -485,7 +808,6 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 		// close trailing extend block
 		p.indent(w, indent)
 		fmt.Fprintln(w, "}")
-		p.printTrailingComments(extSi, w, 0)
 	}
 }
 
@@ -511,7 +833,7 @@ func asDynamicIfPossible(msg proto.Message, mf *dynamic.MessageFactory) proto.Me
 	return msg
 }
 
-func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, scope string, indent int) {
+func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, path []int32, scope string, indent int) {
 	var groupPath []int32
 	var si *descriptor.SourceCodeInfo_Location
 	if isGroup(fld) {
@@ -535,7 +857,7 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFacto
 		si = sourceInfo.Get(path)
 	}
 
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *writer) {
 		p.indent(w, indent)
 		if shouldEmitLabel(fld) {
 			locSi := sourceInfo.Get(append(path, internal.Field_labelTag))
@@ -546,7 +868,7 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFacto
 			fmt.Fprint(w, "group ")
 
 			typeSi := sourceInfo.Get(append(path, internal.Field_typeTag))
-			p.printElementString(typeSi, w, indent, typeString(fld, scope))
+			p.printElementString(typeSi, w, indent, p.typeString(fld, scope))
 			fmt.Fprint(w, "= ")
 
 			numSi := sourceInfo.Get(append(path, internal.Field_numberTag))
@@ -559,7 +881,7 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFacto
 			fmt.Fprintln(w, "}")
 		} else {
 			typeSi := sourceInfo.Get(append(path, internal.Field_typeTag))
-			p.printElementString(typeSi, w, indent, typeString(fld, scope))
+			p.printElementString(typeSi, w, indent, p.typeString(fld, scope))
 
 			nameSi := sourceInfo.Get(append(path, internal.Field_nameTag))
 			p.printElementString(nameSi, w, indent, fld.GetName())
@@ -568,7 +890,7 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFacto
 			numSi := sourceInfo.Get(append(path, internal.Field_numberTag))
 			p.printElementString(numSi, w, indent, fmt.Sprintf("%d", fld.GetNumber()))
 
-			opts, err := extractOptions(fld.GetOptions(), mf)
+			opts, err := p.extractOptions(fld, fld.GetOptions(), mf)
 			if err != nil {
 				if w.err == nil {
 					w.err = err
@@ -597,7 +919,7 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFacto
 			p.sort(elements, sourceInfo, path)
 			p.printOptionElementsShort(elements, w, sourceInfo, path, indent)
 
-			fmt.Fprintln(w, ";")
+			fmt.Fprint(w, ";")
 		}
 	})
 }
@@ -618,59 +940,14 @@ func labelString(lbl descriptor.FieldDescriptorProto_Label) string {
 	panic(fmt.Sprintf("invalid label: %v", lbl))
 }
 
-func typeString(fld *desc.FieldDescriptor, scope string) string {
-	if fld.IsMap() {
-		return fmt.Sprintf("map<%s, %s>", typeString(fld.GetMapKeyType(), scope), typeString(fld.GetMapValueType(), scope))
-	}
-	switch fld.GetType() {
-	case descriptor.FieldDescriptorProto_TYPE_INT32:
-		return "int32"
-	case descriptor.FieldDescriptorProto_TYPE_INT64:
-		return "int64"
-	case descriptor.FieldDescriptorProto_TYPE_UINT32:
-		return "uint32"
-	case descriptor.FieldDescriptorProto_TYPE_UINT64:
-		return "uint64"
-	case descriptor.FieldDescriptorProto_TYPE_SINT32:
-		return "sint32"
-	case descriptor.FieldDescriptorProto_TYPE_SINT64:
-		return "sint64"
-	case descriptor.FieldDescriptorProto_TYPE_FIXED32:
-		return "fixed32"
-	case descriptor.FieldDescriptorProto_TYPE_FIXED64:
-		return "fixed64"
-	case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
-		return "sfixed32"
-	case descriptor.FieldDescriptorProto_TYPE_SFIXED64:
-		return "sfixed64"
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		return "float"
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		return "double"
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		return "bool"
-	case descriptor.FieldDescriptorProto_TYPE_STRING:
-		return "string"
-	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		return "bytes"
-	case descriptor.FieldDescriptorProto_TYPE_ENUM:
-		return getLocalName(fld.GetFile().GetPackage(), scope, fld.GetEnumType().GetFullyQualifiedName())
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		return getLocalName(fld.GetFile().GetPackage(), scope, fld.GetMessageType().GetFullyQualifiedName())
-	case descriptor.FieldDescriptorProto_TYPE_GROUP:
-		return fld.GetMessageType().GetName()
-	}
-	panic(fmt.Sprintf("invalid type: %v", fld.GetType()))
-}
-
 func isGroup(fld *desc.FieldDescriptor) bool {
 	return fld.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP
 }
 
-func (p *Printer) printOneOf(ood *desc.OneOfDescriptor, parentElements elementAddrs, startFieldIndex int, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int, ooIndex int32) {
+func (p *Printer) printOneOf(ood *desc.OneOfDescriptor, parentElements elementAddrs, startFieldIndex int, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int, ooIndex int32) {
 	oopath := append(parentPath, internal.Message_oneOfsTag, ooIndex)
 	oosi := sourceInfo.Get(oopath)
-	p.printElement(oosi, w, indent, func(w *printer) {
+	p.printElement(true, oosi, w, indent, func(w *writer) {
 		p.indent(w, indent)
 		fmt.Fprint(w, "oneof ")
 		extNameSi := sourceInfo.Get(append(oopath, internal.OneOf_nameTag))
@@ -678,7 +955,7 @@ func (p *Printer) printOneOf(ood *desc.OneOfDescriptor, parentElements elementAd
 		fmt.Fprintln(w, "{")
 
 		indent++
-		opts, err := extractOptions(ood.GetOptions(), mf)
+		opts, err := p.extractOptions(ood, ood.GetOptions(), mf)
 		if err != nil {
 			if w.err == nil {
 				w.err = err
@@ -708,7 +985,7 @@ func (p *Printer) printOneOf(ood *desc.OneOfDescriptor, parentElements elementAd
 
 		for i, el := range elements.addrs {
 			if i > 0 {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 
 			switch d := elements.at(el).(type) {
@@ -726,7 +1003,7 @@ func (p *Printer) printOneOf(ood *desc.OneOfDescriptor, parentElements elementAd
 	})
 }
 
-func (p *Printer) printExtensionRanges(ranges []*descriptor.DescriptorProto_ExtensionRange, addrs []elementAddr, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
+func (p *Printer) printExtensionRanges(parent *desc.MessageDescriptor, ranges []*descriptor.DescriptorProto_ExtensionRange, addrs []elementAddr, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
 	p.indent(w, indent)
 	fmt.Fprint(w, "extensions ")
 
@@ -743,7 +1020,7 @@ func (p *Printer) printExtensionRanges(ranges []*descriptor.DescriptorProto_Exte
 		el := addrs[i]
 		elPath = append(parentPath, el.elementType, int32(el.elementIndex))
 		si := sourceInfo.Get(elPath)
-		p.printElement(si, w, inline(indent), func(w *printer) {
+		p.printElement(true, si, w, inline(indent), func(w *writer) {
 			if extr.GetStart() == extr.GetEnd()-1 {
 				fmt.Fprintf(w, "%d ", extr.GetStart())
 			} else if extr.GetEnd()-1 == internal.MaxTag {
@@ -753,12 +1030,13 @@ func (p *Printer) printExtensionRanges(ranges []*descriptor.DescriptorProto_Exte
 			}
 		})
 	}
-	p.printOptionsShort(ranges[0], opts, mf, internal.ExtensionRange_optionsTag, w, sourceInfo, elPath, indent)
+	dsc := extensionRange{owner: parent, extRange: ranges[0]}
+	p.printOptionsShort(dsc, opts, mf, internal.ExtensionRange_optionsTag, w, sourceInfo, elPath, indent)
 
 	fmt.Fprintln(w, ";")
 }
 
-func (p *Printer) printReservedRanges(ranges []reservedRange, isEnum bool, addrs []elementAddr, w *printer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
+func (p *Printer) printReservedRanges(ranges []reservedRange, isEnum bool, addrs []elementAddr, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
 	p.indent(w, indent)
 	fmt.Fprint(w, "reserved ")
 
@@ -771,7 +1049,7 @@ func (p *Printer) printReservedRanges(ranges []reservedRange, isEnum bool, addrs
 		}
 		el := addrs[i]
 		si := sourceInfo.Get(append(parentPath, el.elementType, int32(el.elementIndex)))
-		p.printElement(si, w, inline(indent), func(w *printer) {
+		p.printElement(false, si, w, inline(indent), func(w *writer) {
 			if rr.start == rr.end {
 				fmt.Fprintf(w, "%d ", rr.start)
 			} else if (rr.end == internal.MaxTag && !isEnum) ||
@@ -786,7 +1064,7 @@ func (p *Printer) printReservedRanges(ranges []reservedRange, isEnum bool, addrs
 	fmt.Fprintln(w, ";")
 }
 
-func (p *Printer) printReservedNames(names []string, addrs []elementAddr, w *printer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
+func (p *Printer) printReservedNames(names []string, addrs []elementAddr, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
 	p.indent(w, indent)
 	fmt.Fprint(w, "reserved ")
 
@@ -805,9 +1083,9 @@ func (p *Printer) printReservedNames(names []string, addrs []elementAddr, w *pri
 	fmt.Fprintln(w, ";")
 }
 
-func (p *Printer) printEnum(ed *desc.EnumDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
+func (p *Printer) printEnum(ed *desc.EnumDescriptor, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	si := sourceInfo.Get(path)
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *writer) {
 		p.indent(w, indent)
 
 		fmt.Fprint(w, "enum ")
@@ -816,7 +1094,7 @@ func (p *Printer) printEnum(ed *desc.EnumDescriptor, mf *dynamic.MessageFactory,
 		fmt.Fprintln(w, "{")
 
 		indent++
-		opts, err := extractOptions(ed.GetOptions(), mf)
+		opts, err := p.extractOptions(ed, ed.GetOptions(), mf)
 		if err != nil {
 			if w.err == nil {
 				w.err = err
@@ -851,7 +1129,7 @@ func (p *Printer) printEnum(ed *desc.EnumDescriptor, mf *dynamic.MessageFactory,
 			}
 
 			if i > 0 {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 
 			childPath := append(path, el.elementType, int32(el.elementIndex))
@@ -899,9 +1177,9 @@ func (p *Printer) printEnum(ed *desc.EnumDescriptor, mf *dynamic.MessageFactory,
 	})
 }
 
-func (p *Printer) printEnumValue(evd *desc.EnumValueDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
+func (p *Printer) printEnumValue(evd *desc.EnumValueDescriptor, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	si := sourceInfo.Get(path)
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *writer) {
 		p.indent(w, indent)
 
 		nameSi := sourceInfo.Get(append(path, internal.EnumVal_nameTag))
@@ -913,13 +1191,13 @@ func (p *Printer) printEnumValue(evd *desc.EnumValueDescriptor, mf *dynamic.Mess
 
 		p.printOptionsShort(evd, evd.GetOptions(), mf, internal.EnumVal_optionsTag, w, sourceInfo, path, indent)
 
-		fmt.Fprintln(w, ";")
+		fmt.Fprint(w, ";")
 	})
 }
 
-func (p *Printer) printService(sd *desc.ServiceDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
+func (p *Printer) printService(sd *desc.ServiceDescriptor, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	si := sourceInfo.Get(path)
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *writer) {
 		p.indent(w, indent)
 
 		fmt.Fprint(w, "service ")
@@ -929,7 +1207,7 @@ func (p *Printer) printService(sd *desc.ServiceDescriptor, mf *dynamic.MessageFa
 
 		indent++
 
-		opts, err := extractOptions(sd.GetOptions(), mf)
+		opts, err := p.extractOptions(sd, sd.GetOptions(), mf)
 		if err != nil {
 			if w.err == nil {
 				w.err = err
@@ -947,7 +1225,7 @@ func (p *Printer) printService(sd *desc.ServiceDescriptor, mf *dynamic.MessageFa
 
 		for i, el := range elements.addrs {
 			if i > 0 {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 
 			childPath := append(path, el.elementType, int32(el.elementIndex))
@@ -965,10 +1243,10 @@ func (p *Printer) printService(sd *desc.ServiceDescriptor, mf *dynamic.MessageFa
 	})
 }
 
-func (p *Printer) printMethod(mtd *desc.MethodDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
+func (p *Printer) printMethod(mtd *desc.MethodDescriptor, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	si := sourceInfo.Get(path)
 	pkg := mtd.GetFile().GetPackage()
-	p.printElement(si, w, indent, func(w *printer) {
+	p.printElement(true, si, w, indent, func(w *writer) {
 		p.indent(w, indent)
 
 		fmt.Fprint(w, "rpc ")
@@ -977,7 +1255,7 @@ func (p *Printer) printMethod(mtd *desc.MethodDescriptor, mf *dynamic.MessageFac
 
 		fmt.Fprint(w, "( ")
 		inSi := sourceInfo.Get(append(path, internal.Method_inputTag))
-		inName := getLocalName(pkg, pkg, mtd.GetInputType().GetFullyQualifiedName())
+		inName := p.qualifyName(pkg, pkg, mtd.GetInputType().GetFullyQualifiedName())
 		if mtd.IsClientStreaming() {
 			inName = "stream " + inName
 		}
@@ -986,14 +1264,14 @@ func (p *Printer) printMethod(mtd *desc.MethodDescriptor, mf *dynamic.MessageFac
 		fmt.Fprint(w, ") returns ( ")
 
 		outSi := sourceInfo.Get(append(path, internal.Method_outputTag))
-		outName := getLocalName(pkg, pkg, mtd.GetOutputType().GetFullyQualifiedName())
+		outName := p.qualifyName(pkg, pkg, mtd.GetOutputType().GetFullyQualifiedName())
 		if mtd.IsServerStreaming() {
 			outName = "stream " + outName
 		}
 		p.printElementString(outSi, w, indent, outName)
 		fmt.Fprint(w, ") ")
 
-		opts, err := extractOptions(mtd.GetOptions(), mf)
+		opts, err := p.extractOptions(mtd, mtd.GetOptions(), mf)
 		if err != nil {
 			if w.err == nil {
 				w.err = err
@@ -1012,7 +1290,7 @@ func (p *Printer) printMethod(mtd *desc.MethodDescriptor, mf *dynamic.MessageFac
 
 			for i, addr := range elements.addrs {
 				if i > 0 {
-					fmt.Fprintln(w)
+					p.newLine(w)
 				}
 				o := elements.at(addr).([]option)
 				p.printOptionsLong(o, w, sourceInfo, path, indent)
@@ -1021,26 +1299,30 @@ func (p *Printer) printMethod(mtd *desc.MethodDescriptor, mf *dynamic.MessageFac
 			p.indent(w, indent-1)
 			fmt.Fprintln(w, "}")
 		} else {
-			fmt.Fprintln(w, ";")
+			fmt.Fprint(w, ";")
 		}
 	})
 }
 
-func (p *Printer) printOptionsLong(opts []option, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
+func (p *Printer) printOptionsLong(opts []option, w *writer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	p.printOptions(opts, w, indent,
 		func(i int32) *descriptor.SourceCodeInfo_Location {
 			return sourceInfo.Get(append(path, i))
 		},
-		func(w *printer, indent int, opt option) {
+		func(w *writer, indent int, opt option) {
 			p.indent(w, indent)
 			fmt.Fprint(w, "option ")
 			p.printOption(opt.name, opt.val, w, indent)
-			fmt.Fprintln(w, ";")
+			fmt.Fprint(w, ";")
 		})
 }
 
-func (p *Printer) printOptionsShort(dsc interface{}, optsMsg proto.Message, mf *dynamic.MessageFactory, optsTag int32, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
-	opts, err := extractOptions(optsMsg, mf)
+func (p *Printer) printOptionsShort(dsc interface{}, optsMsg proto.Message, mf *dynamic.MessageFactory, optsTag int32, w *writer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
+	d, ok := dsc.(desc.Descriptor)
+	if !ok {
+		d = dsc.(extensionRange).owner
+	}
+	opts, err := p.extractOptions(d, optsMsg, mf)
 	if err != nil {
 		if w.err == nil {
 			w.err = err
@@ -1054,7 +1336,7 @@ func (p *Printer) printOptionsShort(dsc interface{}, optsMsg proto.Message, mf *
 	p.printOptionElementsShort(elements, w, sourceInfo, path, indent)
 }
 
-func (p *Printer) printOptionElementsShort(addrs elementAddrs, w *printer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
+func (p *Printer) printOptionElementsShort(addrs elementAddrs, w *writer, sourceInfo internal.SourceInfoMap, path []int32, indent int) {
 	if len(addrs.addrs) == 0 {
 		return
 	}
@@ -1077,7 +1359,7 @@ func (p *Printer) printOptionElementsShort(addrs elementAddrs, w *printer, sourc
 				}
 				return sourceInfo.Get(p)
 			},
-			func(w *printer, indent int, opt option) {
+			func(w *writer, indent int, opt option) {
 				if first {
 					first = false
 				} else {
@@ -1090,10 +1372,10 @@ func (p *Printer) printOptionElementsShort(addrs elementAddrs, w *printer, sourc
 	fmt.Fprint(w, "]")
 }
 
-func (p *Printer) printOptions(opts []option, w *printer, indent int, siFetch func(i int32) *descriptor.SourceCodeInfo_Location, fn func(w *printer, indent int, opt option)) {
+func (p *Printer) printOptions(opts []option, w *writer, indent int, siFetch func(i int32) *descriptor.SourceCodeInfo_Location, fn func(w *writer, indent int, opt option)) {
 	for i, opt := range opts {
 		si := siFetch(int32(i))
-		p.printElement(si, w, indent, func(w *printer) {
+		p.printElement(false, si, w, indent, func(w *writer) {
 			fn(w, indent, opt)
 		})
 	}
@@ -1148,7 +1430,7 @@ func (k sortedKeys) Less(i, j int) bool {
 	}
 }
 
-func (p *Printer) printOption(name string, optVal interface{}, w *printer, indent int) {
+func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent int) {
 	fmt.Fprintf(w, "%s = ", name)
 
 	switch optVal.(type) {
@@ -1169,7 +1451,11 @@ func (p *Printer) printOption(name string, optVal interface{}, w *printer, inden
 	case proto.Message:
 		// TODO: if value is too long, marshal to text format with indentation to
 		// make output prettier (also requires correctly indenting subsequent lines)
-		fmt.Fprintf(w, "{ %s }", proto.MarshalTextString(optVal.(proto.Message)))
+
+		// TODO: alternate approach so we can apply p.ForceFullyQualifiedNames
+		// inside the resulting value?
+
+		fmt.Fprintf(w, "{ %s }", proto.CompactTextString(optVal.(proto.Message)))
 	default:
 		panic(fmt.Sprintf("unknown type of value %T for field %s", optVal, name))
 	}
@@ -1277,7 +1563,7 @@ func extendOptionLocations(sc internal.SourceInfoMap) {
 	}
 }
 
-func extractOptions(opts proto.Message, mf *dynamic.MessageFactory) (map[int32][]option, error) {
+func (p *Printer) extractOptions(dsc desc.Descriptor, opts proto.Message, mf *dynamic.MessageFactory) (map[int32][]option, error) {
 	md, err := desc.LoadMessageDescriptorForMessage(opts)
 	if err != nil {
 		return nil, err
@@ -1286,6 +1572,15 @@ func extractOptions(opts proto.Message, mf *dynamic.MessageFactory) (map[int32][
 	if err = dm.ConvertFrom(opts); err != nil {
 		return nil, fmt.Errorf("failed convert %s to dynamic message: %v", md.GetFullyQualifiedName(), err)
 	}
+
+	pkg := dsc.GetFile().GetPackage()
+	var scope string
+	if _, ok := dsc.(*desc.FileDescriptor); ok {
+		scope = pkg
+	} else {
+		scope = dsc.GetFullyQualifiedName()
+	}
+
 	options := map[int32][]option{}
 	var uninterpreted []interface{}
 	for _, fldset := range [][]*desc.FieldDescriptor{md.GetFields(), mf.GetExtensionRegistry().AllExtensionsForType(md.GetFullyQualifiedName())} {
@@ -1295,7 +1590,7 @@ func extractOptions(opts proto.Message, mf *dynamic.MessageFactory) (map[int32][
 				var opts []option
 				var name string
 				if fld.IsExtension() {
-					name = fmt.Sprintf("(%s)", fld.GetFullyQualifiedName())
+					name = fmt.Sprintf("(%s)", p.qualifyName(pkg, scope, fld.GetFullyQualifiedName()))
 				} else {
 					name = fld.GetName()
 				}
@@ -1318,7 +1613,7 @@ func extractOptions(opts proto.Message, mf *dynamic.MessageFactory) (map[int32][
 						}
 						var name string
 						if fld.IsExtension() {
-							name = fmt.Sprintf("(%s)", fld.GetFullyQualifiedName())
+							name = fmt.Sprintf("(%s)", p.qualifyName(pkg, scope, fld.GetFullyQualifiedName()))
 						} else {
 							name = fld.GetName()
 						}
@@ -1327,7 +1622,7 @@ func extractOptions(opts proto.Message, mf *dynamic.MessageFactory) (map[int32][
 				case map[interface{}]interface{}:
 					for k := range sortKeys(val) {
 						v := val[k]
-						vf := fld.GetMessageType().FindFieldByNumber(2)
+						vf := fld.GetMapValueType()
 						if vf.GetType() == descriptor.FieldDescriptorProto_TYPE_ENUM {
 							ev := vf.GetEnumType().FindValueByNumber(v.(int32))
 							if ev == nil {
@@ -1623,13 +1918,18 @@ func (a elementAddrs) at(addr elementAddr) interface{} {
 		if addr.elementType == internal.Method_optionsTag {
 			return a.opts[int32(addr.elementIndex)]
 		}
-	case *descriptor.DescriptorProto_ExtensionRange:
+	case extensionRange:
 		if addr.elementType == internal.ExtensionRange_optionsTag {
 			return a.opts[int32(addr.elementIndex)]
 		}
 	}
 
 	panic(fmt.Sprintf("location for unknown field %d of %T", addr.elementType, a.dsc))
+}
+
+type extensionRange struct {
+	owner    *desc.MessageDescriptor
+	extRange *descriptor.DescriptorProto_ExtensionRange
 }
 
 type elementSrcOrder struct {
@@ -1746,31 +2046,41 @@ func (o optionsByName) Swap(i, j int) {
 	o.addrs[i], o.addrs[j] = o.addrs[j], o.addrs[i]
 }
 
-func (p *Printer) printElement(si *descriptor.SourceCodeInfo_Location, w *printer, indent int, el func(*printer)) {
-	if si != nil {
+func (p *Printer) printElement(isDecriptor bool, si *descriptor.SourceCodeInfo_Location, w *writer, indent int, el func(*writer)) {
+	includeComments := isDecriptor || p.includeCommentType(CommentsTokens)
+
+	if includeComments && si != nil {
 		p.printLeadingComments(si, w, indent)
 	}
 	el(w)
-	if si != nil {
+	if includeComments && si != nil {
 		p.printTrailingComments(si, w, indent)
+	}
+	if indent >= 0 && !w.newline {
+		// if we're not printing inline but element did not have trailing newline, add one now
+		fmt.Fprintln(w)
 	}
 }
 
-func (p *Printer) printElementString(si *descriptor.SourceCodeInfo_Location, w *printer, indent int, str string) {
-	p.printElement(si, w, inline(indent), func(w *printer) {
+func (p *Printer) printElementString(si *descriptor.SourceCodeInfo_Location, w *writer, indent int, str string) {
+	p.printElement(false, si, w, inline(indent), func(w *writer) {
 		fmt.Fprintf(w, "%s ", str)
 	})
 }
 
-func (p *Printer) printLeadingComments(si *descriptor.SourceCodeInfo_Location, w io.Writer, indent int) bool {
+func (p *Printer) includeCommentType(c CommentType) bool {
+	return (p.OmitComments & c) == 0
+}
+
+func (p *Printer) printLeadingComments(si *descriptor.SourceCodeInfo_Location, w *writer, indent int) bool {
 	endsInNewLine := false
 
-	if !p.OmitDetachedComments {
+	if p.includeCommentType(CommentsDetached) {
 		for _, c := range si.GetLeadingDetachedComments() {
-			if p.printComment(c, w, indent) {
+			if p.printComment(c, w, indent, true) {
 				// if comment ended in newline, add another newline to separate
 				// this comment from the next
-				fmt.Fprintln(w)
+				p.newLine(w)
 				endsInNewLine = true
 			} else if indent < 0 {
 				// comment did not end in newline and we are trying to inline?
@@ -1781,20 +2091,20 @@ func (p *Printer) printLeadingComments(si *descriptor.SourceCodeInfo_Location, w
 				// comment did not end in newline and we are *not* trying to inline?
 				// add newline to end of comment and add another to separate this
 				// comment from what follows
-				fmt.Fprintln(w)
-				fmt.Fprintln(w)
+				fmt.Fprintln(w) // needed to end comment, regardless of p.Compact
+				p.newLine(w)
 				endsInNewLine = true
 			}
 		}
 	}
 
-	if si.GetLeadingComments() != "" {
-		endsInNewLine = p.printComment(si.GetLeadingComments(), w, indent)
+	if p.includeCommentType(CommentsLeading) && si.GetLeadingComments() != "" {
+		endsInNewLine = p.printComment(si.GetLeadingComments(), w, indent, true)
 		if !endsInNewLine {
 			if indent >= 0 {
 				// leading comment didn't end with newline but needs one
 				// (because we're *not* inlining)
-				fmt.Fprintln(w)
+				fmt.Fprintln(w) // needed to end comment, regardless of p.Compact
 				endsInNewLine = true
 			} else {
 				// space between comment and following element when inlined
@@ -1806,19 +2116,19 @@ func (p *Printer) printLeadingComments(si *descriptor.SourceCodeInfo_Location, w
 	return endsInNewLine
 }
 
-func (p *Printer) printTrailingComments(si *descriptor.SourceCodeInfo_Location, w io.Writer, indent int) {
-	if si.GetTrailingComments() != "" {
-		if !p.printComment(si.GetTrailingComments(), w, indent) && indent >= 0 {
+func (p *Printer) printTrailingComments(si *descriptor.SourceCodeInfo_Location, w *writer, indent int) {
+	if p.includeCommentType(CommentsTrailing) && si.GetTrailingComments() != "" {
+		if !p.printComment(si.GetTrailingComments(), w, indent, p.TrailingCommentsOnSeparateLine) && indent >= 0 {
 			// trailing comment didn't end with newline but needs one
 			// (because we're *not* inlining)
-			fmt.Fprintln(w)
+			fmt.Fprintln(w) // needed to end comment, regardless of p.Compact
 		} else if indent < 0 {
 			fmt.Fprint(w, " ")
 		}
 	}
 }
 
-func (p *Printer) printComment(comments string, w io.Writer, indent int) bool {
+func (p *Printer) printComment(comments string, w *writer, indent int, forceNextLine bool) bool {
 	if comments == "" {
 		return false
 	}
@@ -1830,7 +2140,7 @@ func (p *Printer) printComment(comments string, w io.Writer, indent int) bool {
 	} else {
 		multiLine = p.PreferMultiLineStyleComments
 	}
-	if strings.Contains(comments, "*/") {
+	if multiLine && strings.Contains(comments, "*/") {
 		// can't emit '*/' in a multi-line style comment
 		multiLine = false
 	}
@@ -1846,6 +2156,20 @@ func (p *Printer) printComment(comments string, w io.Writer, indent int) bool {
 	}
 	if len(lines) == 0 {
 		return false
+	}
+
+	if indent >= 0 && !w.newline {
+		// last element did not have trailing newline, so we
+		// either need to tack on newline or, if comment is
+		// just one line, inline it on the end
+		if forceNextLine || len(lines) > 1 {
+			fmt.Fprintln(w)
+		} else {
+			if !w.space {
+				fmt.Fprint(w, " ")
+			}
+			indent = inline(indent)
+		}
 	}
 
 	if len(lines) == 1 && multiLine {
@@ -1914,16 +2238,23 @@ func (p *Printer) maybeIndent(w io.Writer, indent int, requireIndent bool) {
 	}
 }
 
-type printer struct {
+type writer struct {
 	io.Writer
-	err   error
-	space bool
+	err     error
+	space   bool
+	newline bool
 }
 
-func (w *printer) Write(p []byte) (int, error) {
+func newWriter(w io.Writer) *writer {
+	return &writer{Writer: w, newline: true}
+}
+
+func (w *writer) Write(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
+
+	w.newline = false
 
 	if w.space {
 		// skip any trailing space if the following
@@ -1941,6 +2272,9 @@ func (w *printer) Write(p []byte) (int, error) {
 	if p[len(p)-1] == ' ' {
 		w.space = true
 		p = p[:len(p)-1]
+	}
+	if len(p) > 0 && p[len(p)-1] == '\n' {
+		w.newline = true
 	}
 
 	num, err := w.Writer.Write(p)

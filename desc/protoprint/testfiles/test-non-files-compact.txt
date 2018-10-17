@@ -1,0 +1,203 @@
+-------- desc_test_comments.proto (*desc.FileDescriptor) --------
+syntax = "proto2";
+package foo.bar;
+import "desc_test_options.proto";
+import "google/protobuf/empty.proto";
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+// We need a request for our RPC service below.
+message Request {
+  option deprecated = true;
+  option (.testprotos.mfubar) = true;
+  // A field comment
+  repeated int32 ids = 1 [json_name = "|foo|", packed = true, (.testprotos.ffubar) = "abc", (.testprotos.ffubarb) = "xyz"];
+  // label comment
+  optional string name = 2 [default = "fubar"];
+  optional group Extras = 3 {
+    option no_standard_descriptor_accessor = false;
+    option (.testprotos.mfubar) = false;
+    optional double dbl = 1;
+    optional float flt = 2;
+    // Leading comment...
+    optional string str = 3;
+  }
+  enum MarioCharacters {
+    option allow_alias = true;
+    option (.testprotos.efubar) = 123;
+    option (.testprotos.efubars) = -321;
+    SNIFIT = -101;
+    MARIO = 1 [(.testprotos.evfubar) = 278, (.testprotos.evfubars) = -314];
+    LUIGI = 2 [(.testprotos.evfubaru) = 200, (.testprotos.evfubaruf) = 100];
+    PEACH = 3;
+    BOWSER = 4;
+    WARIO = 5;
+    WALUIGI = 6;
+    HEY_HO = 7;
+    SHY_GUY = 7 [(.testprotos.evfubarsf) = 10101];
+    KAMEK = 8;
+    MAGIKOOPA = 8;
+  }
+  extensions 100 to 200;
+  extensions 201 to 250 [(.testprotos.exfubar) = "splat!", (.testprotos.exfubarb) = "\000\001\002\003\004\005\006\007"];
+  reserved 10 to 20, 30 to 50;
+  reserved "bar", "baz", "foo";
+}
+// Service comment
+service RpcService {
+  option deprecated = false;
+  option (.testprotos.sfubar) = { id:100 name:"bob" };
+  option (.testprotos.sfubare) = VALUE;
+  // Method comment
+  rpc StreamingRpc ( stream .foo.bar.Request ) returns ( .foo.bar.Request );
+  rpc UnaryRpc ( .foo.bar.Request ) returns ( .google.protobuf.Empty ) {
+    option deprecated = true;
+    option (.testprotos.mtfubar) = 12.340000;
+    option (.testprotos.mtfubard) = 123.456000;
+  }
+}
+extend .foo.bar.Request {
+  // comment for guid1
+  optional uint64 guid1 = 123;
+  // ... and a comment for guid2
+  optional uint64 guid2 = 124;
+}
+-------- foo.bar.Request (*desc.MessageDescriptor) --------
+// We need a request for our RPC service below.
+message Request {
+  option deprecated = true;
+  option (.testprotos.mfubar) = true;
+  // A field comment
+  repeated int32 ids = 1 [json_name = "|foo|", packed = true, (.testprotos.ffubar) = "abc", (.testprotos.ffubarb) = "xyz"];
+  // label comment
+  optional string name = 2 [default = "fubar"];
+  optional group Extras = 3 {
+    option no_standard_descriptor_accessor = false;
+    option (.testprotos.mfubar) = false;
+    optional double dbl = 1;
+    optional float flt = 2;
+    // Leading comment...
+    optional string str = 3;
+  }
+  enum MarioCharacters {
+    option allow_alias = true;
+    option (.testprotos.efubar) = 123;
+    option (.testprotos.efubars) = -321;
+    SNIFIT = -101;
+    MARIO = 1 [(.testprotos.evfubar) = 278, (.testprotos.evfubars) = -314];
+    LUIGI = 2 [(.testprotos.evfubaru) = 200, (.testprotos.evfubaruf) = 100];
+    PEACH = 3;
+    BOWSER = 4;
+    WARIO = 5;
+    WALUIGI = 6;
+    HEY_HO = 7;
+    SHY_GUY = 7 [(.testprotos.evfubarsf) = 10101];
+    KAMEK = 8;
+    MAGIKOOPA = 8;
+  }
+  extensions 100 to 200;
+  extensions 201 to 250 [(.testprotos.exfubar) = "splat!", (.testprotos.exfubarb) = "\000\001\002\003\004\005\006\007"];
+  reserved 10 to 20, 30 to 50;
+  reserved "bar", "baz", "foo";
+}
+-------- foo.bar.Request.ids (*desc.FieldDescriptor) --------
+// A field comment
+repeated int32 ids = 1 [json_name = "|foo|", packed = true, (.testprotos.ffubar) = "abc", (.testprotos.ffubarb) = "xyz"];
+-------- foo.bar.Request.name (*desc.FieldDescriptor) --------
+// label comment
+optional string name = 2 [default = "fubar"];
+-------- foo.bar.Request.extras (*desc.FieldDescriptor) --------
+optional group Extras = 3 {
+  option no_standard_descriptor_accessor = false;
+  option (.testprotos.mfubar) = false;
+  optional double dbl = 1;
+  optional float flt = 2;
+  // Leading comment...
+  optional string str = 3;
+}
+-------- foo.bar.Request.Extras (*desc.MessageDescriptor) --------
+message Extras {
+  option no_standard_descriptor_accessor = false;
+  option (.testprotos.mfubar) = false;
+  optional double dbl = 1;
+  optional float flt = 2;
+  // Leading comment...
+  optional string str = 3;
+}
+-------- foo.bar.Request.Extras.dbl (*desc.FieldDescriptor) --------
+optional double dbl = 1;
+-------- foo.bar.Request.Extras.flt (*desc.FieldDescriptor) --------
+optional float flt = 2;
+-------- foo.bar.Request.Extras.str (*desc.FieldDescriptor) --------
+// Leading comment...
+optional string str = 3;
+-------- foo.bar.Request.MarioCharacters (*desc.EnumDescriptor) --------
+enum MarioCharacters {
+  option allow_alias = true;
+  option (.testprotos.efubar) = 123;
+  option (.testprotos.efubars) = -321;
+  SNIFIT = -101;
+  MARIO = 1 [(.testprotos.evfubar) = 278, (.testprotos.evfubars) = -314];
+  LUIGI = 2 [(.testprotos.evfubaru) = 200, (.testprotos.evfubaruf) = 100];
+  PEACH = 3;
+  BOWSER = 4;
+  WARIO = 5;
+  WALUIGI = 6;
+  HEY_HO = 7;
+  SHY_GUY = 7 [(.testprotos.evfubarsf) = 10101];
+  KAMEK = 8;
+  MAGIKOOPA = 8;
+}
+-------- foo.bar.Request.MarioCharacters.MARIO (*desc.EnumValueDescriptor) --------
+MARIO = 1 [(.testprotos.evfubar) = 278, (.testprotos.evfubars) = -314];
+-------- foo.bar.Request.MarioCharacters.LUIGI (*desc.EnumValueDescriptor) --------
+LUIGI = 2 [(.testprotos.evfubaru) = 200, (.testprotos.evfubaruf) = 100];
+-------- foo.bar.Request.MarioCharacters.PEACH (*desc.EnumValueDescriptor) --------
+PEACH = 3;
+-------- foo.bar.Request.MarioCharacters.BOWSER (*desc.EnumValueDescriptor) --------
+BOWSER = 4;
+-------- foo.bar.Request.MarioCharacters.WARIO (*desc.EnumValueDescriptor) --------
+WARIO = 5;
+-------- foo.bar.Request.MarioCharacters.WALUIGI (*desc.EnumValueDescriptor) --------
+WALUIGI = 6;
+-------- foo.bar.Request.MarioCharacters.SHY_GUY (*desc.EnumValueDescriptor) --------
+SHY_GUY = 7 [(.testprotos.evfubarsf) = 10101];
+-------- foo.bar.Request.MarioCharacters.HEY_HO (*desc.EnumValueDescriptor) --------
+HEY_HO = 7;
+-------- foo.bar.Request.MarioCharacters.MAGIKOOPA (*desc.EnumValueDescriptor) --------
+MAGIKOOPA = 8;
+-------- foo.bar.Request.MarioCharacters.KAMEK (*desc.EnumValueDescriptor) --------
+KAMEK = 8;
+-------- foo.bar.Request.MarioCharacters.SNIFIT (*desc.EnumValueDescriptor) --------
+SNIFIT = -101;
+-------- foo.bar.guid1 (*desc.FieldDescriptor) --------
+extend .foo.bar.Request {
+  // comment for guid1
+  optional uint64 guid1 = 123;
+}
+-------- foo.bar.guid2 (*desc.FieldDescriptor) --------
+extend .foo.bar.Request {
+  // ... and a comment for guid2
+  optional uint64 guid2 = 124;
+}
+-------- foo.bar.RpcService (*desc.ServiceDescriptor) --------
+// Service comment
+service RpcService {
+  option deprecated = false;
+  option (.testprotos.sfubar) = { id:100 name:"bob" };
+  option (.testprotos.sfubare) = VALUE;
+  // Method comment
+  rpc StreamingRpc ( stream .foo.bar.Request ) returns ( .foo.bar.Request );
+  rpc UnaryRpc ( .foo.bar.Request ) returns ( .google.protobuf.Empty ) {
+    option deprecated = true;
+    option (.testprotos.mtfubar) = 12.340000;
+    option (.testprotos.mtfubard) = 123.456000;
+  }
+}
+-------- foo.bar.RpcService.StreamingRpc (*desc.MethodDescriptor) --------
+// Method comment
+rpc StreamingRpc ( stream .foo.bar.Request ) returns ( .foo.bar.Request );
+-------- foo.bar.RpcService.UnaryRpc (*desc.MethodDescriptor) --------
+rpc UnaryRpc ( .foo.bar.Request ) returns ( .google.protobuf.Empty ) {
+  option deprecated = true;
+  option (.testprotos.mtfubar) = 12.340000;
+  option (.testprotos.mtfubard) = 123.456000;
+}
