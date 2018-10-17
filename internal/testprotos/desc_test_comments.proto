@@ -92,7 +92,9 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 extend
 // extendee comment
 Request {
+	// comment for guid1
 	optional uint64 guid1 = 123;
+	// ... and a comment for guid2
 	optional uint64 guid2 = 124;
 }
 // extendee trailer...

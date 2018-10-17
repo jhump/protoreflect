@@ -3,11 +3,11 @@ package protoparse
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -23,29 +23,29 @@ func TestSourceCodeInfo(t *testing.T) {
 	testutil.Ok(t, err)
 	fd := fds[0]
 
+	// create description of source code info
+	// (human readable so diffs in source control are comprehensible)
+	var buf bytes.Buffer
+	printSourceCodeInfo(t, fd, &buf)
+	actual := buf.String()
+
 	if regenerateMode {
 		// re-generate the file
-		b, err := proto.Marshal(fd.AsFileDescriptorProto().GetSourceCodeInfo())
+		err = ioutil.WriteFile("test-source-info.txt", buf.Bytes(), 0666)
 		testutil.Ok(t, err)
-		err = ioutil.WriteFile("test-source-info.bin", b, 0666)
-		testutil.Ok(t, err)
-
-		printSourceCodeInfo(t, fd)
 	}
 
-	b, err := ioutil.ReadFile("test-source-info.bin")
+	b, err := ioutil.ReadFile("test-source-info.txt")
 	testutil.Ok(t, err)
-	var sci descriptor.SourceCodeInfo
-	err = proto.Unmarshal(b, &sci)
-	testutil.Ok(t, err)
+	golden := string(b)
 
-	testutil.Require(t, proto.Equal(&sci, fd.AsFileDescriptorProto().GetSourceCodeInfo()), "wrong source code info")
+	testutil.Eq(t, golden, actual, "wrong source code info")
 }
 
 // NB: this function can be used to manually inspect the source code info for a
 // descriptor, in a manner that is much easier to read and check than raw
 // descriptor form.
-func printSourceCodeInfo(t *testing.T, fd *desc.FileDescriptor) {
+func printSourceCodeInfo(t *testing.T, fd *desc.FileDescriptor, out io.Writer) {
 	md, err := desc.LoadMessageDescriptorForMessage(fd.AsProto())
 	testutil.Ok(t, err)
 	er := &dynamic.ExtensionRegistry{}
@@ -58,24 +58,24 @@ func printSourceCodeInfo(t *testing.T, fd *desc.FileDescriptor) {
 	for _, loc := range fd.AsFileDescriptorProto().GetSourceCodeInfo().GetLocation() {
 		var buf bytes.Buffer
 		findLocation(mf, dfd, md, loc.Path, &buf)
-		fmt.Printf("\n\n%s:\n", buf.String())
+		fmt.Fprintf(out, "\n\n%s:\n", buf.String())
 		if len(loc.Span) == 3 {
-			fmt.Printf("%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[1]+1)
-			fmt.Printf("%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[2]+1)
+			fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[1]+1)
+			fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[2]+1)
 		} else {
-			fmt.Printf("%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[1]+1)
-			fmt.Printf("%s:%d:%d\n", fd.GetName(), loc.Span[2]+1, loc.Span[3]+1)
+			fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[1]+1)
+			fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[2]+1, loc.Span[3]+1)
 		}
 		if len(loc.LeadingDetachedComments) > 0 {
 			for i, comment := range loc.LeadingDetachedComments {
-				fmt.Printf("    Leading detached comment [%d]:\n%s\n", i, comment)
+				fmt.Fprintf(out, "    Leading detached comment [%d]:\n%s\n", i, comment)
 			}
 		}
 		if loc.LeadingComments != nil {
-			fmt.Printf("    Leading comments:\n%s\n", loc.GetLeadingComments())
+			fmt.Fprintf(out, "    Leading comments:\n%s\n", loc.GetLeadingComments())
 		}
 		if loc.TrailingComments != nil {
-			fmt.Printf("    Trailing comments:\n%s\n", loc.GetTrailingComments())
+			fmt.Fprintf(out, "    Trailing comments:\n%s\n", loc.GetTrailingComments())
 		}
 	}
 }
