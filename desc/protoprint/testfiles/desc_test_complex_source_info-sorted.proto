@@ -1,10 +1,10 @@
 syntax = "proto2";
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
-
 package foo.bar;
 
 import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 message Another {
    option (foo.bar.a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765> m:<key:"bar" value:200> m:<key:"foo" value:100>> fff:OK };

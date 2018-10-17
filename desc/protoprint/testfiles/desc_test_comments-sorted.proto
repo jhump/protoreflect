@@ -2,14 +2,14 @@
 syntax = "proto2";
 // Syntax trailer.
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
-
 // And now the package declaration
 package foo.bar;
 
 import "desc_test_options.proto";
 
 import "google/protobuf/empty.proto";
+
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 // We need a request for our RPC service below.
 message Request {

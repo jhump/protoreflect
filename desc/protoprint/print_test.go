@@ -28,6 +28,7 @@ const (
 func TestPrinter(t *testing.T) {
 	prs := map[string]*Printer{
 		"default":                  {},
+		"compact":                  {Compact: true},
 		"multiline-style-comments": {Indent: "\t", PreferMultiLineStyleComments: true},
 		"sorted":                   {Indent: "   ", SortElements: true, OmitDetachedComments: true},
 		"sorted-AND-multiline-style-comments": {PreferMultiLineStyleComments: true, SortElements: true},

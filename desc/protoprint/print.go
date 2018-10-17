@@ -26,13 +26,14 @@ type Printer struct {
 	// If true, comments are rendered using "/*" style comments. Otherwise, they
 	// are printed using "//" style line comments.
 	PreferMultiLineStyleComments bool
+
 	// If true, elements are sorted into a canonical order.
 	//
 	// The canonical order for elements in a file follows:
 	//  1. Syntax
-	//  2. Options (sorted by name, standard options before custom options)
-	//  3. Package
-	//  4. Imports (sorted lexically)
+	//  2. Package
+	//  3. Imports (sorted lexically)
+	//  4. Options (sorted by name, standard options before custom options)
 	//  5. Messages (sorted by name)
 	//  6. Enums (sorted by name)
 	//  7. Services (sorted by name)
@@ -49,19 +50,28 @@ type Printer struct {
 	//  7. Reserved ranges (sorted by starting tag number)
 	//  8. Reserved names (sorted lexically)
 	//
-	// Methods are sorted within a service by name. Enum values are sorted
-	// within an enum first by numeric value then by name.
+	// Methods are sorted within a service by name and appear after any service
+	// options (which are sorted by name, standard options before custom ones).
+	// Enum values are sorted within an enum, first by numeric value then by
+	// name, and also appear after any enum options.
+	//
+	// Options for fields, enum values, and extension ranges are sorted by name,
+	// standard options before custom ones.
 	SortElements bool
+
 	// The indentation used. Any characters other than spaces or tabs will be
 	// replaced with spaces. If unset/empty, two spaces will be used.
 	Indent string
+
 	// If true, detached comments (between elements) will be ignored.
 	//
 	// Deprecated: Use OmitComments bitmask instead.
 	OmitDetachedComments bool
+
 	// A bitmask of comment types to omit. If unset, all comments will be
 	// included. Use CommentsAll to not print any comments.
 	OmitComments CommentType
+
 	// If true, the printed output will eschew any blank lines, which otherwise
 	// appear between descriptor elements and comment blocks. Note that this if
 	// detached comments are being printed, this will cause them to be merged
@@ -359,6 +369,12 @@ func getMethodIndex(mtd *desc.MethodDescriptor, list []*desc.MethodDescriptor) i
 	panic(fmt.Sprintf("unable to determine index of method %s", mtd.GetFullyQualifiedName()))
 }
 
+func (p *Printer) newLine(w io.Writer) {
+	if !p.Compact {
+		fmt.Fprintln(w)
+	}
+}
+
 func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory, w *printer, sourceInfo internal.SourceInfoMap) {
 	opts, err := extractOptions(fd.GetOptions(), mf)
 	if err != nil {
@@ -380,16 +396,16 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 		}
 		fmt.Fprintf(w, "syntax = %q;\n", syn)
 	})
-	fmt.Fprintln(w)
+	p.newLine(w)
 
 	elements := elementAddrs{dsc: fd, opts: opts}
-	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.File_optionsTag, -3, opts)...)
 	if fdp.Package != nil {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_packageTag, elementIndex: 0, order: -2})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_packageTag, elementIndex: 0, order: -3})
 	}
 	for i := range fd.AsFileDescriptorProto().GetDependency() {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_dependencyTag, elementIndex: i, order: -1})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_dependencyTag, elementIndex: i, order: -2})
 	}
+	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.File_optionsTag, -1, opts)...)
 	for i := range fd.GetMessageTypes() {
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_messagesTag, elementIndex: i})
 	}
@@ -420,7 +436,7 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 					fmt.Fprintln(w, "}")
 				}
 				if i > 0 {
-					fmt.Fprintln(w)
+					p.newLine(w)
 				}
 
 				ext = fld
@@ -429,7 +445,7 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 				p.printElementString(extNameSi, w, 0, getLocalName(pkgName, pkgName, fld.GetOwner().GetFullyQualifiedName()))
 				fmt.Fprintln(w, "{")
 			} else {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 			p.printField(fld, mf, w, sourceInfo, path, pkgName, 1)
 		} else {
@@ -440,7 +456,7 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 			}
 
 			if i > 0 {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 
 			switch d := d.(type) {
@@ -590,7 +606,7 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 					fmt.Fprintln(w, "}")
 				}
 				if i > 0 {
-					fmt.Fprintln(w)
+					p.newLine(w)
 				}
 
 				ext = fld
@@ -600,7 +616,7 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 				p.printElementString(extNameSi, w, indent, getLocalName(pkg, scope, fld.GetOwner().GetFullyQualifiedName()))
 				fmt.Fprintln(w, "{")
 			} else {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 			p.printField(fld, mf, w, sourceInfo, childPath, scope, indent+1)
 		} else {
@@ -612,7 +628,7 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 			}
 
 			if i > 0 {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 
 			switch d := d.(type) {
@@ -909,7 +925,7 @@ func (p *Printer) printOneOf(ood *desc.OneOfDescriptor, parentElements elementAd
 
 		for i, el := range elements.addrs {
 			if i > 0 {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 
 			switch d := elements.at(el).(type) {
@@ -1052,7 +1068,7 @@ func (p *Printer) printEnum(ed *desc.EnumDescriptor, mf *dynamic.MessageFactory,
 			}
 
 			if i > 0 {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 
 			childPath := append(path, el.elementType, int32(el.elementIndex))
@@ -1148,7 +1164,7 @@ func (p *Printer) printService(sd *desc.ServiceDescriptor, mf *dynamic.MessageFa
 
 		for i, el := range elements.addrs {
 			if i > 0 {
-				fmt.Fprintln(w)
+				p.newLine(w)
 			}
 
 			childPath := append(path, el.elementType, int32(el.elementIndex))
@@ -1213,7 +1229,7 @@ func (p *Printer) printMethod(mtd *desc.MethodDescriptor, mf *dynamic.MessageFac
 
 			for i, addr := range elements.addrs {
 				if i > 0 {
-					fmt.Fprintln(w)
+					p.newLine(w)
 				}
 				o := elements.at(addr).([]option)
 				p.printOptionsLong(o, w, sourceInfo, path, indent)
@@ -1975,7 +1991,7 @@ func (p *Printer) printLeadingComments(si *descriptor.SourceCodeInfo_Location, w
 			if p.printComment(c, w, indent) {
 				// if comment ended in newline, add another newline to separate
 				// this comment from the next
-				fmt.Fprintln(w)
+				p.newLine(w)
 				endsInNewLine = true
 			} else if indent < 0 {
 				// comment did not end in newline and we are trying to inline?
@@ -1986,8 +2002,8 @@ func (p *Printer) printLeadingComments(si *descriptor.SourceCodeInfo_Location, w
 				// comment did not end in newline and we are *not* trying to inline?
 				// add newline to end of comment and add another to separate this
 				// comment from what follows
-				fmt.Fprintln(w)
-				fmt.Fprintln(w)
+				fmt.Fprintln(w) // needed to end comment, regardless of p.Compact
+				p.newLine(w)
 				endsInNewLine = true
 			}
 		}
@@ -1999,7 +2015,7 @@ func (p *Printer) printLeadingComments(si *descriptor.SourceCodeInfo_Location, w
 			if indent >= 0 {
 				// leading comment didn't end with newline but needs one
 				// (because we're *not* inlining)
-				fmt.Fprintln(w)
+				fmt.Fprintln(w) // needed to end comment, regardless of p.Compact
 				endsInNewLine = true
 			} else {
 				// space between comment and following element when inlined
@@ -2016,7 +2032,7 @@ func (p *Printer) printTrailingComments(si *descriptor.SourceCodeInfo_Location, 
 		if !p.printComment(si.GetTrailingComments(), w, indent) && indent >= 0 {
 			// trailing comment didn't end with newline but needs one
 			// (because we're *not* inlining)
-			fmt.Fprintln(w)
+			fmt.Fprintln(w) // needed to end comment, regardless of p.Compact
 		} else if indent < 0 {
 			fmt.Fprint(w, " ")
 		}
