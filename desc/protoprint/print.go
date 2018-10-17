@@ -193,8 +193,8 @@ type reservedRange struct {
 }
 
 // PrintProtoFile prints the given single file descriptor to the given writer.
-func (p *Printer) PrintProtoFile(fd *desc.FileDescriptor, w io.Writer) error {
-	return p.printProto(fd, w)
+func (p *Printer) PrintProtoFile(fd *desc.FileDescriptor, out io.Writer) error {
+	return p.printProto(fd, out)
 }
 
 // PrintProto prints the given descriptor and returns the resulting string. This
@@ -209,8 +209,8 @@ func (p *Printer) PrintProtoToString(dsc desc.Descriptor) (string, error) {
 	return buf.String(), nil
 }
 
-func (p *Printer) printProto(dsc desc.Descriptor, w io.Writer) error {
-	out := newWriter(w)
+func (p *Printer) printProto(dsc desc.Descriptor, out io.Writer) error {
+	w := newWriter(out)
 
 	if p.Indent == "" {
 		// default indent to two spaces
@@ -241,9 +241,9 @@ func (p *Printer) printProto(dsc desc.Descriptor, w io.Writer) error {
 	path := findElement(dsc)
 	switch d := dsc.(type) {
 	case *desc.FileDescriptor:
-		p.printFile(d, mf, out, sourceInfo)
+		p.printFile(d, mf, w, sourceInfo)
 	case *desc.MessageDescriptor:
-		p.printMessage(d, mf, out, sourceInfo, path, 0)
+		p.printMessage(d, mf, w, sourceInfo, path, 0)
 	case *desc.FieldDescriptor:
 		var scope string
 		if md, ok := d.GetParent().(*desc.MessageDescriptor); ok {
@@ -252,16 +252,16 @@ func (p *Printer) printProto(dsc desc.Descriptor, w io.Writer) error {
 			scope = d.GetFile().GetPackage()
 		}
 		if d.IsExtension() {
-			fmt.Fprint(out, "extend ")
+			fmt.Fprint(w, "extend ")
 			extNameSi := sourceInfo.Get(append(path, internal.Field_extendeeTag))
-			p.printElementString(extNameSi, out, 0, getLocalName(d.GetFile().GetPackage(), scope, d.GetOwner().GetFullyQualifiedName()))
+			p.printElementString(extNameSi, w, 0, getLocalName(d.GetFile().GetPackage(), scope, d.GetOwner().GetFullyQualifiedName()))
 			fmt.Fprintln(w, "{")
 
-			p.printField(d, mf, out, sourceInfo, path, scope, 1)
+			p.printField(d, mf, w, sourceInfo, path, scope, 1)
 
-			fmt.Fprintln(out, "}")
+			fmt.Fprintln(w, "}")
 		} else {
-			p.printField(d, mf, out, sourceInfo, path, scope, 0)
+			p.printField(d, mf, w, sourceInfo, path, scope, 0)
 		}
 	case *desc.OneOfDescriptor:
 		md := d.GetOwner()
@@ -269,18 +269,18 @@ func (p *Printer) printProto(dsc desc.Descriptor, w io.Writer) error {
 		for i := range md.GetFields() {
 			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_fieldsTag, elementIndex: i})
 		}
-		p.printOneOf(d, elements, 0, mf, out, sourceInfo, path[:len(path)-1], 0, path[len(path)-1])
+		p.printOneOf(d, elements, 0, mf, w, sourceInfo, path[:len(path)-1], 0, path[len(path)-1])
 	case *desc.EnumDescriptor:
-		p.printEnum(d, mf, out, sourceInfo, path, 0)
+		p.printEnum(d, mf, w, sourceInfo, path, 0)
 	case *desc.EnumValueDescriptor:
-		p.printEnumValue(d, mf, out, sourceInfo, path, 0)
+		p.printEnumValue(d, mf, w, sourceInfo, path, 0)
 	case *desc.ServiceDescriptor:
-		p.printService(d, mf, out, sourceInfo, path, 0)
+		p.printService(d, mf, w, sourceInfo, path, 0)
 	case *desc.MethodDescriptor:
-		p.printMethod(d, mf, out, sourceInfo, path, 0)
+		p.printMethod(d, mf, w, sourceInfo, path, 0)
 	}
 
-	return out.err
+	return w.err
 }
 
 func findElement(dsc desc.Descriptor) []int32 {
