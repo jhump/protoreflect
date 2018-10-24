@@ -8,6 +8,7 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/internal/testutil"
+	"os"
 )
 
 func TestSimpleParse(t *testing.T) {
@@ -126,6 +127,15 @@ func TestSimpleParse(t *testing.T) {
 		"pkg/desc_test_pkg.proto",
 	}
 	testutil.Eq(t, expected, actual)
+}
+
+func parseProtoFile(filename string) (*parseResult, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return parseProto(filename, f, true)
 }
 
 func hasExtension(fd *dpb.FileDescriptorProto, name string) bool {
@@ -373,7 +383,7 @@ func TestBasicValidation(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		_, err := parseProto("test.proto", strings.NewReader(tc.contents))
+		_, err := parseProto("test.proto", strings.NewReader(tc.contents), true)
 		if tc.succeeds {
 			testutil.Ok(t, err, "case #%d should succeed", i)
 		} else {

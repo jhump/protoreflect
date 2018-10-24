@@ -77,6 +77,10 @@ type Parser struct {
 	// The paths used to search for dependencies that are referenced in import
 	// statements in proto source files. If no import paths are provided then
 	// "." (current directory) is assumed to be the only import path.
+	//
+	// This setting is only used during ParseFiles operations. Since calls to
+	// ParseFilesButDoNotLink do not link, there is no need to load and parse
+	// dependencies.
 	ImportPaths []string
 
 	// If true, the supplied file names/paths need not necessarily match how the
@@ -89,8 +93,9 @@ type Parser struct {
 	InferImportPaths bool
 
 	// Used to create a reader for a given filename, when loading proto source
-	// file contents. If unset, os.Open is used, and relative paths are thus
-	// relative to the process's current working directory.
+	// file contents. If unset, os.Open is used. If ImportPaths is also empty
+	// then relative paths are will be relative to the process's current working
+	// directory.
 	Accessor FileAccessor
 
 	// If true, the resulting file descriptors will retain source code info,
@@ -98,6 +103,23 @@ type Parser struct {
 	// includes comments found during parsing (and attributed to elements of
 	// the source file).
 	IncludeSourceCodeInfo bool
+
+	// If true, the results from ParseFilesButDoNotLink will be passed through
+	// some additional validations. But only constraints that do not require
+	// linking can be checked. These include proto2 vs. proto3 language features,
+	// looking for incorrect usage of reserved names or tags, and ensuring that
+	// fields have unique tags and that enum values have unique numbers (unless
+	// the enum allows aliases).
+	ValidateUnlinkedFiles bool
+
+	// If true, the results from ParseFilesButDoNotLink will have options
+	// interpreted. Any uninterpretable options (including any custom options or
+	// options that refer to message and enum types, which can only be
+	// interpreted after linking) will be left in uninterpreted_options. Also,
+	// the "default" pseudo-option for fields can only be interpreted for scalar
+	// fields, excluding enums. (Interpreting default values for enum fields
+	// requires resolving enum names, which requires linking.)
+	InterpretOptionsInUnlinkedFiles bool
 }
 
 // ParseFiles parses the named files into descriptors. The returned slice has
@@ -106,10 +128,10 @@ type Parser struct {
 //
 // All dependencies for all specified files (including transitive dependencies)
 // must be accessible via the parser's Accessor or a link error will occur. The
-// exception to this rule is that files can import standard "google/protobuf/*.proto"
-// files without needing to supply sources for these files. Like protoc, this
-// parser has a built-in version of these files it can use if they aren't
-// explicitly supplied.
+// exception to this rule is that files can import standard Google-provided
+// files -- e.g. google/protobuf/*.proto -- without needing to supply sources
+// for these files. Like protoc, this parser has a built-in version of these
+// files it can use if they aren't explicitly supplied.
 func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) {
 	accessor := p.Accessor
 	if accessor == nil {
@@ -137,7 +159,7 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	}
 
 	protos := map[string]*parseResult{}
-	err := parseProtoFiles(accessor, filenames, protos)
+	err := parseProtoFiles(accessor, filenames, true, true, protos)
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +179,63 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	fds := make([]*desc.FileDescriptor, len(filenames))
 	for i, name := range filenames {
 		fd := linkedProtos[name]
+		fds[i] = fd
+	}
+	return fds, nil
+}
+
+// ParseFilesButDoNotLink parses the named files into descriptor protos. The
+// results are just protos, not fully-linked descriptors. It is possible that
+// descriptors are invalid and still be returned in parsed form without error
+// due to the fact that the linking step is skipped (and thus many validation
+// steps omitted).
+//
+// There are a few side effects to not linking the descriptors:
+//   1. No options will be interpreted. Options can refer to extensions or have
+//      message and enum types. Without linking, these extension and type
+//      references are not resolved, so the options may not be interpretable.
+//      So all options will appear in UninterpretedOption fields of the various
+//      descriptor options messages.
+//   2. Type references will not be resolved. This means that the actual type
+//      names in the descriptors may be unqualified and even relative to the
+//      scope in which the type reference appears. This goes for fields that
+//      have message and enum types. It also applies to methods and their
+//      references to request and response message types.
+//   3. Enum fields are not known. Until a field's type reference is resolved
+//      (during linking), it is not known whether the type refers to a message
+//      or an enum. So all fields with such type references have their Type set
+//      to TYPE_MESSAGE.
+//
+// This method will still validate the syntax of parsed files. If the parser's
+// ValidateUnlinkedFiles field is true, additional checks, beyond syntax will
+// also be performed.
+func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescriptorProto, error) {
+	accessor := p.Accessor
+	if accessor == nil {
+		accessor = func(name string) (io.ReadCloser, error) {
+			return os.Open(name)
+		}
+	}
+
+	protos := map[string]*parseResult{}
+	err := parseProtoFiles(accessor, filenames, true, p.ValidateUnlinkedFiles, protos)
+	if err != nil {
+		return nil, err
+	}
+	if p.InferImportPaths {
+		protos = fixupFilenames(protos)
+	}
+	fds := make([]*dpb.FileDescriptorProto, len(filenames))
+	for i, name := range filenames {
+		pr := protos[name]
+		fd := pr.fd
+		if p.InterpretOptionsInUnlinkedFiles {
+			pr.lenient = true
+			interpretFileOptions(pr, poorFileDescriptorish{FileDescriptorProto: fd})
+		}
+		if p.IncludeSourceCodeInfo {
+			fd.SourceCodeInfo = pr.generateSourceCodeInfo()
+		}
 		fds[i] = fd
 	}
 	return fds, nil
@@ -270,7 +349,7 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	return revisedProtos
 }
 
-func parseProtoFiles(acc FileAccessor, filenames []string, parsed map[string]*parseResult) error {
+func parseProtoFiles(acc FileAccessor, filenames []string, recursive, validate bool, parsed map[string]*parseResult) error {
 	for _, name := range filenames {
 		if _, ok := parsed[name]; ok {
 			continue
@@ -285,31 +364,29 @@ func parseProtoFiles(acc FileAccessor, filenames []string, parsed map[string]*pa
 		}
 		func() {
 			defer in.Close()
-			parsed[name], err = parseProto(name, in)
+			parsed[name], err = parseProto(name, in, validate)
 		}()
 		if err != nil {
 			return err
 		}
-		err = parseProtoFiles(acc, parsed[name].fd.Dependency, parsed)
-		if err != nil {
-			return fmt.Errorf("failed to load imports for %q: %s", name, err)
+		if recursive {
+			err = parseProtoFiles(acc, parsed[name].fd.Dependency, true, validate, parsed)
+			if err != nil {
+				return fmt.Errorf("failed to load imports for %q: %s", name, err)
+			}
 		}
 	}
 	return nil
 }
 
-func parseProtoFile(filename string) (*parseResult, error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	return parseProto(filename, f)
-}
-
 type parseResult struct {
 	// the parsed file descriptor
 	fd *dpb.FileDescriptorProto
+
+	// if set to true, enables lenient interpretation of options, where
+	// unrecognized options will be left uninterpreted instead of resulting in a
+	// link error
+	lenient bool
 
 	// a map of elements in the descriptor to nodes in the AST
 	// (for extracting position information when validating the descriptor)
@@ -463,7 +540,7 @@ func (r *parseResult) putMethodNode(m *dpb.MethodDescriptorProto, n *methodNode)
 	r.nodes[m] = n
 }
 
-func parseProto(filename string, r io.Reader) (*parseResult, error) {
+func parseProto(filename string, r io.Reader, validate bool) (*parseResult, error) {
 	lx := newLexer(r)
 	lx.filename = filename
 	protoParse(lx)
@@ -475,13 +552,16 @@ func parseProto(filename string, r io.Reader) (*parseResult, error) {
 		}
 	}
 
-	if res, err := createParseResult(filename, lx.res); err != nil {
+	res, err := createParseResult(filename, lx.res)
+	if err != nil {
 		return nil, err
-	} else if err := basicValidate(res); err != nil {
-		return nil, err
-	} else {
-		return res, nil
 	}
+	if validate {
+		if err := basicValidate(res); err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 func createParseResult(filename string, file *fileNode) (*parseResult, error) {
@@ -489,12 +569,11 @@ func createParseResult(filename string, file *fileNode) (*parseResult, error) {
 		nodes:              map[proto.Message]node{},
 		interpretedOptions: map[*optionNode][]int32{},
 	}
-	var err error
-	res.fd, err = res.asFileDescriptor(filename, file)
+	err := res.createFileDescriptor(filename, file)
 	return res, err
 }
 
-func (r *parseResult) asFileDescriptor(filename string, file *fileNode) (*dpb.FileDescriptorProto, error) {
+func (r *parseResult) createFileDescriptor(filename string, file *fileNode) error {
 	fd := &dpb.FileDescriptorProto{Name: proto.String(filename)}
 	r.putFileNode(fd, file)
 
@@ -529,13 +608,14 @@ func (r *parseResult) asFileDescriptor(filename string, file *fileNode) (*dpb.Fi
 			fd.Service = append(fd.Service, r.asServiceDescriptor(decl.service))
 		} else if decl.pkg != nil {
 			if fd.Package != nil {
-				return nil, ErrorWithSourcePos{Pos: decl.pkg.start(), Underlying: errors.New("files should have only one package declaration")}
+				return ErrorWithSourcePos{Pos: decl.pkg.start(), Underlying: errors.New("files should have only one package declaration")}
 			}
 			file.pkg = decl.pkg
 			fd.Package = proto.String(decl.pkg.name.val)
 		}
 	}
-	return fd, nil
+	r.fd = fd
+	return nil
 }
 
 func (r *parseResult) asUninterpretedOptions(nodes []*optionNode) []*dpb.UninterpretedOption {
