@@ -1,9 +1,9 @@
-# Protocol Buffer and GRPC Reflection
+# Protocol Buffer and gRPC Reflection
 [![Build Status](https://travis-ci.org/jhump/protoreflect.svg?branch=master)](https://travis-ci.org/jhump/protoreflect/branches)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jhump/protoreflect)](https://goreportcard.com/report/github.com/jhump/protoreflect)
 
-This repo provides reflection APIs for protocol buffers (also known as "protobufs" for short)
-and GRPC. The core of reflection in protobufs is the
+This repo provides reflection APIs for [protocol buffers](https://developers.google.com/protocol-buffers/) (also known as "protobufs" for short)
+and [gRPC](https://grpc.io/). The core of reflection in protobufs is the
 [descriptor](https://github.com/google/protobuf/blob/199d82fde1734ab5bc931cd0de93309e50cd7ab9/src/google/protobuf/descriptor.proto).
 A descriptor is itself a protobuf message that describes a `.proto` source file or any element
 therein. So a collection of descriptors can describe an entire schema of protobuf types, including
@@ -97,17 +97,17 @@ be used to issue RPC methods using method descriptors instead of generated clien
 *[Read more ≫](https://godoc.org/github.com/jhump/protoreflect/dynamic/grpcdynamic)*
 
 ----
-## GRPC Service Reflection
+## gRPC Server Reflection
 
 ```go
 import "github.com/jhump/protoreflect/grpcreflect"
 ```
 
 The `grpcreflect` package provides an easy-to-use client for the
-[GRPC reflection service](https://github.com/grpc/grpc-go/blob/6bd4f6eb1ea9d81d1209494242554dcde44429a4/reflection/grpc_reflection_v1alpha/reflection.proto#L36),
+[gRPC reflection service](https://github.com/grpc/grpc-go/blob/6bd4f6eb1ea9d81d1209494242554dcde44429a4/reflection/grpc_reflection_v1alpha/reflection.proto#L36),
 making it much easier to query for and work with the schemas of remote services.
 
 It also provides some helper methods for querying for rich service descriptors for the
-services registered in a GRPC server.
+services registered in a gRPC server.
 
 *[Read more ≫](https://godoc.org/github.com/jhump/protoreflect/grpcreflect)*
