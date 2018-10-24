@@ -218,7 +218,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 	}
 
 	protos := map[string]*parseResult{}
-	err := parseProtoFiles(accessor, filenames, true, p.ValidateUnlinkedFiles, protos)
+	err := parseProtoFiles(accessor, filenames, false, p.ValidateUnlinkedFiles, protos)
 	if err != nil {
 		return nil, err
 	}
