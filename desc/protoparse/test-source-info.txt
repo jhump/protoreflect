@@ -1,3 +1,4 @@
+---- desc_test_comments.proto ----
 
 
  > syntax:
@@ -768,3 +769,743 @@ desc_test_comments.proto:116:39
  > service[0] > method[1] > options > mtfubard:
 desc_test_comments.proto:117:3
 desc_test_comments.proto:117:42
+---- desc_test_options.proto ----
+
+
+ > syntax:
+desc_test_options.proto:1:1
+desc_test_options.proto:1:19
+
+
+ > package:
+desc_test_options.proto:5:1
+desc_test_options.proto:5:20
+
+
+ > dependency[0]:
+desc_test_options.proto:7:1
+desc_test_options.proto:7:43
+
+
+ > options > go_package:
+desc_test_options.proto:3:1
+desc_test_options.proto:3:73
+
+
+ > message_type[0]:
+desc_test_options.proto:45:1
+desc_test_options.proto:48:2
+    Leading comments:
+ Test message used by custom options
+
+
+ > message_type[0] > name:
+desc_test_options.proto:45:9
+desc_test_options.proto:45:28
+
+
+ > message_type[0] > field[0]:
+desc_test_options.proto:46:2
+desc_test_options.proto:46:25
+
+
+ > message_type[0] > field[0] > name:
+desc_test_options.proto:46:18
+desc_test_options.proto:46:20
+
+
+ > message_type[0] > field[0] > type:
+desc_test_options.proto:46:11
+desc_test_options.proto:46:17
+
+
+ > message_type[0] > field[0] > label:
+desc_test_options.proto:46:2
+desc_test_options.proto:46:10
+
+
+ > message_type[0] > field[0] > number:
+desc_test_options.proto:46:23
+desc_test_options.proto:46:24
+
+
+ > message_type[0] > field[1]:
+desc_test_options.proto:47:2
+desc_test_options.proto:47:27
+
+
+ > message_type[0] > field[1] > name:
+desc_test_options.proto:47:18
+desc_test_options.proto:47:22
+
+
+ > message_type[0] > field[1] > type:
+desc_test_options.proto:47:11
+desc_test_options.proto:47:17
+
+
+ > message_type[0] > field[1] > label:
+desc_test_options.proto:47:2
+desc_test_options.proto:47:10
+
+
+ > message_type[0] > field[1] > number:
+desc_test_options.proto:47:25
+desc_test_options.proto:47:26
+
+
+ > enum_type[0]:
+desc_test_options.proto:51:1
+desc_test_options.proto:53:2
+    Leading comments:
+ Test enum used by custom options
+
+
+ > enum_type[0] > name:
+desc_test_options.proto:51:6
+desc_test_options.proto:51:22
+
+
+ > enum_type[0] > value[0]:
+desc_test_options.proto:52:2
+desc_test_options.proto:52:12
+
+
+ > enum_type[0] > value[0] > name:
+desc_test_options.proto:52:2
+desc_test_options.proto:52:7
+
+
+ > enum_type[0] > value[0] > number:
+desc_test_options.proto:52:10
+desc_test_options.proto:52:11
+
+
+ > extension[0]:
+desc_test_options.proto:10:2
+desc_test_options.proto:10:31
+
+
+ > extension[0] > name:
+desc_test_options.proto:10:16
+desc_test_options.proto:10:22
+
+
+ > extension[0] > type:
+desc_test_options.proto:10:11
+desc_test_options.proto:10:15
+
+
+ > extension[0] > label:
+desc_test_options.proto:10:2
+desc_test_options.proto:10:10
+
+
+ > extension[0] > number:
+desc_test_options.proto:10:25
+desc_test_options.proto:10:30
+
+
+ > extension[0] > extendee:
+desc_test_options.proto:9:8
+desc_test_options.proto:9:38
+
+
+ > extension[1]:
+desc_test_options.proto:14:2
+desc_test_options.proto:14:33
+
+
+ > extension[1] > name:
+desc_test_options.proto:14:18
+desc_test_options.proto:14:24
+
+
+ > extension[1] > type:
+desc_test_options.proto:14:11
+desc_test_options.proto:14:17
+
+
+ > extension[1] > label:
+desc_test_options.proto:14:2
+desc_test_options.proto:14:10
+
+
+ > extension[1] > number:
+desc_test_options.proto:14:27
+desc_test_options.proto:14:32
+
+
+ > extension[1] > extendee:
+desc_test_options.proto:13:8
+desc_test_options.proto:13:36
+
+
+ > extension[2]:
+desc_test_options.proto:15:2
+desc_test_options.proto:15:33
+
+
+ > extension[2] > name:
+desc_test_options.proto:15:17
+desc_test_options.proto:15:24
+
+
+ > extension[2] > type:
+desc_test_options.proto:15:11
+desc_test_options.proto:15:16
+
+
+ > extension[2] > label:
+desc_test_options.proto:15:2
+desc_test_options.proto:15:10
+
+
+ > extension[2] > number:
+desc_test_options.proto:15:27
+desc_test_options.proto:15:32
+
+
+ > extension[2] > extendee:
+desc_test_options.proto:13:8
+desc_test_options.proto:13:36
+
+
+ > extension[3]:
+desc_test_options.proto:19:2
+desc_test_options.proto:19:32
+
+
+ > extension[3] > name:
+desc_test_options.proto:19:17
+desc_test_options.proto:19:23
+
+
+ > extension[3] > type:
+desc_test_options.proto:19:11
+desc_test_options.proto:19:16
+
+
+ > extension[3] > label:
+desc_test_options.proto:19:2
+desc_test_options.proto:19:10
+
+
+ > extension[3] > number:
+desc_test_options.proto:19:26
+desc_test_options.proto:19:31
+
+
+ > extension[3] > extendee:
+desc_test_options.proto:18:8
+desc_test_options.proto:18:35
+
+
+ > extension[4]:
+desc_test_options.proto:20:2
+desc_test_options.proto:20:34
+
+
+ > extension[4] > name:
+desc_test_options.proto:20:18
+desc_test_options.proto:20:25
+
+
+ > extension[4] > type:
+desc_test_options.proto:20:11
+desc_test_options.proto:20:17
+
+
+ > extension[4] > label:
+desc_test_options.proto:20:2
+desc_test_options.proto:20:10
+
+
+ > extension[4] > number:
+desc_test_options.proto:20:28
+desc_test_options.proto:20:33
+
+
+ > extension[4] > extendee:
+desc_test_options.proto:18:8
+desc_test_options.proto:18:35
+
+
+ > extension[5]:
+desc_test_options.proto:21:2
+desc_test_options.proto:21:37
+
+
+ > extension[5] > name:
+desc_test_options.proto:21:20
+desc_test_options.proto:21:28
+
+
+ > extension[5] > type:
+desc_test_options.proto:21:11
+desc_test_options.proto:21:19
+
+
+ > extension[5] > label:
+desc_test_options.proto:21:2
+desc_test_options.proto:21:10
+
+
+ > extension[5] > number:
+desc_test_options.proto:21:31
+desc_test_options.proto:21:36
+
+
+ > extension[5] > extendee:
+desc_test_options.proto:18:8
+desc_test_options.proto:18:35
+
+
+ > extension[6]:
+desc_test_options.proto:22:2
+desc_test_options.proto:22:34
+
+
+ > extension[6] > name:
+desc_test_options.proto:22:18
+desc_test_options.proto:22:25
+
+
+ > extension[6] > type:
+desc_test_options.proto:22:11
+desc_test_options.proto:22:17
+
+
+ > extension[6] > label:
+desc_test_options.proto:22:2
+desc_test_options.proto:22:10
+
+
+ > extension[6] > number:
+desc_test_options.proto:22:28
+desc_test_options.proto:22:33
+
+
+ > extension[6] > extendee:
+desc_test_options.proto:18:8
+desc_test_options.proto:18:35
+
+
+ > extension[7]:
+desc_test_options.proto:23:2
+desc_test_options.proto:23:36
+
+
+ > extension[7] > name:
+desc_test_options.proto:23:19
+desc_test_options.proto:23:27
+
+
+ > extension[7] > type:
+desc_test_options.proto:23:11
+desc_test_options.proto:23:18
+
+
+ > extension[7] > label:
+desc_test_options.proto:23:2
+desc_test_options.proto:23:10
+
+
+ > extension[7] > number:
+desc_test_options.proto:23:30
+desc_test_options.proto:23:35
+
+
+ > extension[7] > extendee:
+desc_test_options.proto:18:8
+desc_test_options.proto:18:35
+
+
+ > extension[8]:
+desc_test_options.proto:27:2
+desc_test_options.proto:27:33
+
+
+ > extension[8] > name:
+desc_test_options.proto:27:17
+desc_test_options.proto:27:24
+
+
+ > extension[8] > type:
+desc_test_options.proto:27:11
+desc_test_options.proto:27:16
+
+
+ > extension[8] > label:
+desc_test_options.proto:27:2
+desc_test_options.proto:27:10
+
+
+ > extension[8] > number:
+desc_test_options.proto:27:27
+desc_test_options.proto:27:32
+
+
+ > extension[8] > extendee:
+desc_test_options.proto:26:8
+desc_test_options.proto:26:40
+
+
+ > extension[9]:
+desc_test_options.proto:28:2
+desc_test_options.proto:28:35
+
+
+ > extension[9] > name:
+desc_test_options.proto:28:18
+desc_test_options.proto:28:26
+
+
+ > extension[9] > type:
+desc_test_options.proto:28:11
+desc_test_options.proto:28:17
+
+
+ > extension[9] > label:
+desc_test_options.proto:28:2
+desc_test_options.proto:28:10
+
+
+ > extension[9] > number:
+desc_test_options.proto:28:29
+desc_test_options.proto:28:34
+
+
+ > extension[9] > extendee:
+desc_test_options.proto:26:8
+desc_test_options.proto:26:40
+
+
+ > extension[10]:
+desc_test_options.proto:29:2
+desc_test_options.proto:29:38
+
+
+ > extension[10] > name:
+desc_test_options.proto:29:20
+desc_test_options.proto:29:29
+
+
+ > extension[10] > type:
+desc_test_options.proto:29:11
+desc_test_options.proto:29:19
+
+
+ > extension[10] > label:
+desc_test_options.proto:29:2
+desc_test_options.proto:29:10
+
+
+ > extension[10] > number:
+desc_test_options.proto:29:32
+desc_test_options.proto:29:37
+
+
+ > extension[10] > extendee:
+desc_test_options.proto:26:8
+desc_test_options.proto:26:40
+
+
+ > extension[11]:
+desc_test_options.proto:30:2
+desc_test_options.proto:30:35
+
+
+ > extension[11] > name:
+desc_test_options.proto:30:18
+desc_test_options.proto:30:26
+
+
+ > extension[11] > type:
+desc_test_options.proto:30:11
+desc_test_options.proto:30:17
+
+
+ > extension[11] > label:
+desc_test_options.proto:30:2
+desc_test_options.proto:30:10
+
+
+ > extension[11] > number:
+desc_test_options.proto:30:29
+desc_test_options.proto:30:34
+
+
+ > extension[11] > extendee:
+desc_test_options.proto:26:8
+desc_test_options.proto:26:40
+
+
+ > extension[12]:
+desc_test_options.proto:31:2
+desc_test_options.proto:31:37
+
+
+ > extension[12] > name:
+desc_test_options.proto:31:19
+desc_test_options.proto:31:28
+
+
+ > extension[12] > type:
+desc_test_options.proto:31:11
+desc_test_options.proto:31:18
+
+
+ > extension[12] > label:
+desc_test_options.proto:31:2
+desc_test_options.proto:31:10
+
+
+ > extension[12] > number:
+desc_test_options.proto:31:31
+desc_test_options.proto:31:36
+
+
+ > extension[12] > extendee:
+desc_test_options.proto:26:8
+desc_test_options.proto:26:40
+
+
+ > extension[13]:
+desc_test_options.proto:35:2
+desc_test_options.proto:35:46
+
+
+ > extension[13] > name:
+desc_test_options.proto:35:31
+desc_test_options.proto:35:37
+
+
+ > extension[13] > type:
+desc_test_options.proto:35:11
+desc_test_options.proto:35:30
+
+
+ > extension[13] > label:
+desc_test_options.proto:35:2
+desc_test_options.proto:35:10
+
+
+ > extension[13] > number:
+desc_test_options.proto:35:40
+desc_test_options.proto:35:45
+
+
+ > extension[13] > extendee:
+desc_test_options.proto:34:8
+desc_test_options.proto:34:38
+
+
+ > extension[14]:
+desc_test_options.proto:36:2
+desc_test_options.proto:36:44
+
+
+ > extension[14] > name:
+desc_test_options.proto:36:28
+desc_test_options.proto:36:35
+
+
+ > extension[14] > type:
+desc_test_options.proto:36:11
+desc_test_options.proto:36:27
+
+
+ > extension[14] > label:
+desc_test_options.proto:36:2
+desc_test_options.proto:36:10
+
+
+ > extension[14] > number:
+desc_test_options.proto:36:38
+desc_test_options.proto:36:43
+
+
+ > extension[14] > extendee:
+desc_test_options.proto:34:8
+desc_test_options.proto:34:38
+
+
+ > extension[15]:
+desc_test_options.proto:40:2
+desc_test_options.proto:40:33
+
+
+ > extension[15] > name:
+desc_test_options.proto:40:17
+desc_test_options.proto:40:24
+
+
+ > extension[15] > type:
+desc_test_options.proto:40:11
+desc_test_options.proto:40:16
+
+
+ > extension[15] > label:
+desc_test_options.proto:40:2
+desc_test_options.proto:40:10
+
+
+ > extension[15] > number:
+desc_test_options.proto:40:27
+desc_test_options.proto:40:32
+
+
+ > extension[15] > extendee:
+desc_test_options.proto:39:8
+desc_test_options.proto:39:37
+
+
+ > extension[16]:
+desc_test_options.proto:41:2
+desc_test_options.proto:41:35
+
+
+ > extension[16] > name:
+desc_test_options.proto:41:18
+desc_test_options.proto:41:26
+
+
+ > extension[16] > type:
+desc_test_options.proto:41:11
+desc_test_options.proto:41:17
+
+
+ > extension[16] > label:
+desc_test_options.proto:41:2
+desc_test_options.proto:41:10
+
+
+ > extension[16] > number:
+desc_test_options.proto:41:29
+desc_test_options.proto:41:34
+
+
+ > extension[16] > extendee:
+desc_test_options.proto:39:8
+desc_test_options.proto:39:37
+
+
+ > extension[17]:
+desc_test_options.proto:56:2
+desc_test_options.proto:56:34
+
+
+ > extension[17] > name:
+desc_test_options.proto:56:18
+desc_test_options.proto:56:25
+
+
+ > extension[17] > type:
+desc_test_options.proto:56:11
+desc_test_options.proto:56:17
+
+
+ > extension[17] > label:
+desc_test_options.proto:56:2
+desc_test_options.proto:56:10
+
+
+ > extension[17] > number:
+desc_test_options.proto:56:28
+desc_test_options.proto:56:33
+
+
+ > extension[17] > extendee:
+desc_test_options.proto:55:8
+desc_test_options.proto:55:45
+
+
+ > extension[18]:
+desc_test_options.proto:57:2
+desc_test_options.proto:57:34
+
+
+ > extension[18] > name:
+desc_test_options.proto:57:17
+desc_test_options.proto:57:25
+
+
+ > extension[18] > type:
+desc_test_options.proto:57:11
+desc_test_options.proto:57:16
+
+
+ > extension[18] > label:
+desc_test_options.proto:57:2
+desc_test_options.proto:57:10
+
+
+ > extension[18] > number:
+desc_test_options.proto:57:28
+desc_test_options.proto:57:33
+
+
+ > extension[18] > extendee:
+desc_test_options.proto:55:8
+desc_test_options.proto:55:45
+
+
+ > extension[19]:
+desc_test_options.proto:61:2
+desc_test_options.proto:61:34
+
+
+ > extension[19] > name:
+desc_test_options.proto:61:18
+desc_test_options.proto:61:25
+
+
+ > extension[19] > type:
+desc_test_options.proto:61:11
+desc_test_options.proto:61:17
+
+
+ > extension[19] > label:
+desc_test_options.proto:61:2
+desc_test_options.proto:61:10
+
+
+ > extension[19] > number:
+desc_test_options.proto:61:28
+desc_test_options.proto:61:33
+
+
+ > extension[19] > extendee:
+desc_test_options.proto:60:8
+desc_test_options.proto:60:36
+
+
+ > extension[20]:
+desc_test_options.proto:62:2
+desc_test_options.proto:62:34
+
+
+ > extension[20] > name:
+desc_test_options.proto:62:17
+desc_test_options.proto:62:25
+
+
+ > extension[20] > type:
+desc_test_options.proto:62:11
+desc_test_options.proto:62:16
+
+
+ > extension[20] > label:
+desc_test_options.proto:62:2
+desc_test_options.proto:62:10
+
+
+ > extension[20] > number:
+desc_test_options.proto:62:28
+desc_test_options.proto:62:33
+
+
+ > extension[20] > extendee:
+desc_test_options.proto:60:8
+desc_test_options.proto:60:36
