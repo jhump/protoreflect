@@ -48,6 +48,8 @@ type Descriptor interface {
 	AsProto() proto.Message
 }
 
+type sourceInfoRecomputeFunc = descinternal.SourceInfoComputeFunc
+
 // FileDescriptor describes a proto source file.
 type FileDescriptor struct {
 	proto      *dpb.FileDescriptorProto
@@ -61,6 +63,8 @@ type FileDescriptor struct {
 	services   []*ServiceDescriptor
 	fieldIndex map[string]map[int32]*FieldDescriptor
 	isProto3   bool
+	sourceInfo descinternal.SourceInfoMap
+	sourceInfoRecomputeFunc
 }
 
 // CreateFileDescriptor instantiates a new file descriptor for the given descriptor proto.
@@ -68,7 +72,11 @@ type FileDescriptor struct {
 // all of the file's dependencies or if the contents of the descriptors are internally
 // inconsistent (e.g. contain unresolvable symbols) then an error is returned.
 func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) (*FileDescriptor, error) {
-	ret := &FileDescriptor{proto: fd, symbols: map[string]Descriptor{}, fieldIndex: map[string]map[int32]*FieldDescriptor{}}
+	ret := &FileDescriptor{
+		proto:      fd,
+		symbols:    map[string]Descriptor{},
+		fieldIndex: map[string]map[int32]*FieldDescriptor{},
+	}
 	pkg := fd.GetPackage()
 
 	// populate references to file descriptor dependencies
@@ -114,30 +122,32 @@ func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) 
 		ret.symbols[n] = sd
 		ret.services = append(ret.services, sd)
 	}
-	sourceCodeInfo := descinternal.CreateSourceInfoMap(fd)
+
+	ret.sourceInfo = descinternal.CreateSourceInfoMap(fd)
+	ret.sourceInfoRecomputeFunc = ret.recomputeSourceInfo
 
 	// now we can resolve all type references and source code info
 	scopes := []scope{fileScope(ret)}
 	path := make([]int32, 1, 8)
 	path[0] = descinternal.File_messagesTag
 	for i, md := range ret.messages {
-		if err := md.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
+		if err := md.resolve(append(path, int32(i)), scopes); err != nil {
 			return nil, err
 		}
 	}
 	path[0] = descinternal.File_enumsTag
 	for i, ed := range ret.enums {
-		ed.resolve(append(path, int32(i)), sourceCodeInfo)
+		ed.resolve(append(path, int32(i)))
 	}
 	path[0] = descinternal.File_extensionsTag
 	for i, exd := range ret.extensions {
-		if err := exd.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
+		if err := exd.resolve(append(path, int32(i)), scopes); err != nil {
 			return nil, err
 		}
 	}
 	path[0] = descinternal.File_servicesTag
 	for i, sd := range ret.services {
-		if err := sd.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
+		if err := sd.resolve(append(path, int32(i)), scopes); err != nil {
 			return nil, err
 		}
 	}
@@ -237,6 +247,10 @@ func createFromSet(filename string, seen []string, files map[string]*dpb.FileDes
 	}
 	resolved[filename] = d
 	return d, nil
+}
+
+func (fd *FileDescriptor) recomputeSourceInfo() {
+	descinternal.PopulateSourceInfoMap(fd.proto, fd.sourceInfo)
 }
 
 func (fd *FileDescriptor) registerField(field *FieldDescriptor) {
@@ -418,20 +432,20 @@ func (fd *FileDescriptor) FindExtensionByName(extName string) *FieldDescriptor {
 
 // MessageDescriptor describes a protocol buffer message.
 type MessageDescriptor struct {
-	proto      *dpb.DescriptorProto
-	parent     Descriptor
-	file       *FileDescriptor
-	fields     []*FieldDescriptor
-	nested     []*MessageDescriptor
-	enums      []*EnumDescriptor
-	extensions []*FieldDescriptor
-	oneOfs     []*OneOfDescriptor
-	extRanges  extRanges
-	fqn        string
-	sourceInfo *dpb.SourceCodeInfo_Location
-	jsonNames  jsonNameMap
-	isProto3   bool
-	isMapEntry bool
+	proto          *dpb.DescriptorProto
+	parent         Descriptor
+	file           *FileDescriptor
+	fields         []*FieldDescriptor
+	nested         []*MessageDescriptor
+	enums          []*EnumDescriptor
+	extensions     []*FieldDescriptor
+	oneOfs         []*OneOfDescriptor
+	extRanges      extRanges
+	fqn            string
+	sourceInfoPath []int32
+	jsonNames      jsonNameMap
+	isProto3       bool
+	isMapEntry     bool
 }
 
 func createMessageDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, md *dpb.DescriptorProto, symbols map[string]Descriptor) (*MessageDescriptor, string) {
@@ -480,34 +494,34 @@ func createMessageDescriptor(fd *FileDescriptor, parent Descriptor, enclosing st
 	return ret, msgName
 }
 
-func (md *MessageDescriptor) resolve(path []int32, sourceCodeInfo descinternal.SourceInfoMap, scopes []scope) error {
-	md.sourceInfo = sourceCodeInfo.Get(path)
+func (md *MessageDescriptor) resolve(path []int32, scopes []scope) error {
+	md.sourceInfoPath = append([]int32(nil), path...) // defensive copy
 	path = append(path, descinternal.Message_nestedMessagesTag)
 	scopes = append(scopes, messageScope(md))
 	for i, nmd := range md.nested {
-		if err := nmd.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
+		if err := nmd.resolve(append(path, int32(i)), scopes); err != nil {
 			return err
 		}
 	}
 	path[len(path)-1] = descinternal.Message_enumsTag
 	for i, ed := range md.enums {
-		ed.resolve(append(path, int32(i)), sourceCodeInfo)
+		ed.resolve(append(path, int32(i)))
 	}
 	path[len(path)-1] = descinternal.Message_fieldsTag
 	for i, fld := range md.fields {
-		if err := fld.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
+		if err := fld.resolve(append(path, int32(i)), scopes); err != nil {
 			return err
 		}
 	}
 	path[len(path)-1] = descinternal.Message_extensionsTag
 	for i, exd := range md.extensions {
-		if err := exd.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
+		if err := exd.resolve(append(path, int32(i)), scopes); err != nil {
 			return err
 		}
 	}
 	path[len(path)-1] = descinternal.Message_oneOfsTag
 	for i, od := range md.oneOfs {
-		od.resolve(append(path, int32(i)), sourceCodeInfo)
+		od.resolve(append(path, int32(i)))
 	}
 	return nil
 }
@@ -554,7 +568,7 @@ func (md *MessageDescriptor) GetMessageOptions() *dpb.MessageOptions {
 // message was defined and also contains comments associated with the message
 // definition.
 func (md *MessageDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
-	return md.sourceInfo
+	return md.file.sourceInfo.Get(md.sourceInfoPath)
 }
 
 // AsProto returns the underlying descriptor proto. Most usages will be more
@@ -682,17 +696,17 @@ func (md *MessageDescriptor) FindFieldByNumber(tagNumber int32) *FieldDescriptor
 
 // FieldDescriptor describes a field of a protocol buffer message.
 type FieldDescriptor struct {
-	proto      *dpb.FieldDescriptorProto
-	parent     Descriptor
-	owner      *MessageDescriptor
-	file       *FileDescriptor
-	oneOf      *OneOfDescriptor
-	msgType    *MessageDescriptor
-	enumType   *EnumDescriptor
-	fqn        string
-	sourceInfo *dpb.SourceCodeInfo_Location
-	def        memoizedDefault
-	isMap      bool
+	proto          *dpb.FieldDescriptorProto
+	parent         Descriptor
+	owner          *MessageDescriptor
+	file           *FileDescriptor
+	oneOf          *OneOfDescriptor
+	msgType        *MessageDescriptor
+	enumType       *EnumDescriptor
+	fqn            string
+	sourceInfoPath []int32
+	def            memoizedDefault
+	isMap          bool
 }
 
 func createFieldDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, fld *dpb.FieldDescriptorProto) (*FieldDescriptor, string) {
@@ -705,11 +719,11 @@ func createFieldDescriptor(fd *FileDescriptor, parent Descriptor, enclosing stri
 	return ret, fldName
 }
 
-func (fd *FieldDescriptor) resolve(path []int32, sourceCodeInfo descinternal.SourceInfoMap, scopes []scope) error {
+func (fd *FieldDescriptor) resolve(path []int32, scopes []scope) error {
 	if fd.proto.OneofIndex != nil && fd.oneOf == nil {
 		return fmt.Errorf("Could not link field %s to one-of index %d", fd.fqn, *fd.proto.OneofIndex)
 	}
-	fd.sourceInfo = sourceCodeInfo.Get(path)
+	fd.sourceInfoPath = append([]int32(nil), path...) // defensive copy
 	if fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_ENUM {
 		if desc, err := resolve(fd.file, fd.proto.GetTypeName(), scopes); err != nil {
 			return err
@@ -1040,7 +1054,7 @@ func (fd *FieldDescriptor) GetFieldOptions() *dpb.FieldOptions {
 // field was defined and also contains comments associated with the field
 // definition.
 func (fd *FieldDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
-	return fd.sourceInfo
+	return fd.file.sourceInfo.Get(fd.sourceInfoPath)
 }
 
 // AsProto returns the underlying descriptor proto. Most usages will be more
@@ -1198,13 +1212,13 @@ func (fd *FieldDescriptor) GetDefaultValue() interface{} {
 
 // EnumDescriptor describes an enum declared in a proto file.
 type EnumDescriptor struct {
-	proto       *dpb.EnumDescriptorProto
-	parent      Descriptor
-	file        *FileDescriptor
-	values      []*EnumValueDescriptor
-	valuesByNum sortedValues
-	fqn         string
-	sourceInfo  *dpb.SourceCodeInfo_Location
+	proto          *dpb.EnumDescriptorProto
+	parent         Descriptor
+	file           *FileDescriptor
+	values         []*EnumValueDescriptor
+	valuesByNum    sortedValues
+	fqn            string
+	sourceInfoPath []int32
 }
 
 func createEnumDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, ed *dpb.EnumDescriptorProto, symbols map[string]Descriptor) (*EnumDescriptor, string) {
@@ -1237,11 +1251,11 @@ func (sv sortedValues) Swap(i, j int) {
 	sv[i], sv[j] = sv[j], sv[i]
 }
 
-func (ed *EnumDescriptor) resolve(path []int32, sourceCodeInfo descinternal.SourceInfoMap) {
-	ed.sourceInfo = sourceCodeInfo.Get(path)
+func (ed *EnumDescriptor) resolve(path []int32) {
+	ed.sourceInfoPath = append([]int32(nil), path...) // defensive copy
 	path = append(path, descinternal.Enum_valuesTag)
 	for i, evd := range ed.values {
-		evd.resolve(append(path, int32(i)), sourceCodeInfo)
+		evd.resolve(append(path, int32(i)))
 	}
 }
 
@@ -1287,7 +1301,7 @@ func (ed *EnumDescriptor) GetEnumOptions() *dpb.EnumOptions {
 // enum type was defined and also contains comments associated with the enum
 // definition.
 func (ed *EnumDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
-	return ed.sourceInfo
+	return ed.file.sourceInfo.Get(ed.sourceInfoPath)
 }
 
 // AsProto returns the underlying descriptor proto. Most usages will be more
@@ -1339,11 +1353,11 @@ func (ed *EnumDescriptor) FindValueByNumber(num int32) *EnumValueDescriptor {
 
 // EnumValueDescriptor describes an allowed value of an enum declared in a proto file.
 type EnumValueDescriptor struct {
-	proto      *dpb.EnumValueDescriptorProto
-	parent     *EnumDescriptor
-	file       *FileDescriptor
-	fqn        string
-	sourceInfo *dpb.SourceCodeInfo_Location
+	proto          *dpb.EnumValueDescriptorProto
+	parent         *EnumDescriptor
+	file           *FileDescriptor
+	fqn            string
+	sourceInfoPath []int32
 }
 
 func createEnumValueDescriptor(fd *FileDescriptor, parent *EnumDescriptor, enclosing string, evd *dpb.EnumValueDescriptorProto) (*EnumValueDescriptor, string) {
@@ -1351,8 +1365,8 @@ func createEnumValueDescriptor(fd *FileDescriptor, parent *EnumDescriptor, enclo
 	return &EnumValueDescriptor{proto: evd, parent: parent, file: fd, fqn: valName}, valName
 }
 
-func (vd *EnumValueDescriptor) resolve(path []int32, sourceCodeInfo descinternal.SourceInfoMap) {
-	vd.sourceInfo = sourceCodeInfo.Get(path)
+func (vd *EnumValueDescriptor) resolve(path []int32) {
+	vd.sourceInfoPath = append([]int32(nil), path...) // defensive copy
 }
 
 // GetName returns the name of the enum value.
@@ -1407,7 +1421,7 @@ func (vd *EnumValueDescriptor) GetEnumValueOptions() *dpb.EnumValueOptions {
 // enum value was defined and also contains comments associated with the enum
 // value definition.
 func (vd *EnumValueDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
-	return vd.sourceInfo
+	return vd.file.sourceInfo.Get(vd.sourceInfoPath)
 }
 
 // AsProto returns the underlying descriptor proto. Most usages will be more
@@ -1429,11 +1443,11 @@ func (vd *EnumValueDescriptor) String() string {
 
 // ServiceDescriptor describes an RPC service declared in a proto file.
 type ServiceDescriptor struct {
-	proto      *dpb.ServiceDescriptorProto
-	file       *FileDescriptor
-	methods    []*MethodDescriptor
-	fqn        string
-	sourceInfo *dpb.SourceCodeInfo_Location
+	proto          *dpb.ServiceDescriptorProto
+	file           *FileDescriptor
+	methods        []*MethodDescriptor
+	fqn            string
+	sourceInfoPath []int32
 }
 
 func createServiceDescriptor(fd *FileDescriptor, enclosing string, sd *dpb.ServiceDescriptorProto, symbols map[string]Descriptor) (*ServiceDescriptor, string) {
@@ -1447,11 +1461,11 @@ func createServiceDescriptor(fd *FileDescriptor, enclosing string, sd *dpb.Servi
 	return ret, serviceName
 }
 
-func (sd *ServiceDescriptor) resolve(path []int32, sourceCodeInfo descinternal.SourceInfoMap, scopes []scope) error {
-	sd.sourceInfo = sourceCodeInfo.Get(path)
+func (sd *ServiceDescriptor) resolve(path []int32, scopes []scope) error {
+	sd.sourceInfoPath = append([]int32(nil), path...) // defensive copy
 	path = append(path, descinternal.Service_methodsTag)
 	for i, md := range sd.methods {
-		if err := md.resolve(append(path, int32(i)), sourceCodeInfo, scopes); err != nil {
+		if err := md.resolve(append(path, int32(i)), scopes); err != nil {
 			return err
 		}
 	}
@@ -1499,7 +1513,7 @@ func (sd *ServiceDescriptor) GetServiceOptions() *dpb.ServiceOptions {
 // service was defined and also contains comments associated with the service
 // definition.
 func (sd *ServiceDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
-	return sd.sourceInfo
+	return sd.file.sourceInfo.Get(sd.sourceInfoPath)
 }
 
 // AsProto returns the underlying descriptor proto. Most usages will be more
@@ -1537,13 +1551,13 @@ func (sd *ServiceDescriptor) FindMethodByName(name string) *MethodDescriptor {
 
 // MethodDescriptor describes an RPC method declared in a proto file.
 type MethodDescriptor struct {
-	proto      *dpb.MethodDescriptorProto
-	parent     *ServiceDescriptor
-	file       *FileDescriptor
-	inType     *MessageDescriptor
-	outType    *MessageDescriptor
-	fqn        string
-	sourceInfo *dpb.SourceCodeInfo_Location
+	proto          *dpb.MethodDescriptorProto
+	parent         *ServiceDescriptor
+	file           *FileDescriptor
+	inType         *MessageDescriptor
+	outType        *MessageDescriptor
+	fqn            string
+	sourceInfoPath []int32
 }
 
 func createMethodDescriptor(fd *FileDescriptor, parent *ServiceDescriptor, enclosing string, md *dpb.MethodDescriptorProto) (*MethodDescriptor, string) {
@@ -1552,8 +1566,8 @@ func createMethodDescriptor(fd *FileDescriptor, parent *ServiceDescriptor, enclo
 	return &MethodDescriptor{proto: md, parent: parent, file: fd, fqn: methodName}, methodName
 }
 
-func (md *MethodDescriptor) resolve(path []int32, sourceCodeInfo descinternal.SourceInfoMap, scopes []scope) error {
-	md.sourceInfo = sourceCodeInfo.Get(path)
+func (md *MethodDescriptor) resolve(path []int32, scopes []scope) error {
+	md.sourceInfoPath = append([]int32(nil), path...) // defensive copy
 	if desc, err := resolve(md.file, md.proto.GetInputType(), scopes); err != nil {
 		return err
 	} else {
@@ -1614,7 +1628,7 @@ func (md *MethodDescriptor) GetMethodOptions() *dpb.MethodOptions {
 // method was defined and also contains comments associated with the method
 // definition.
 func (md *MethodDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
-	return md.sourceInfo
+	return md.file.sourceInfo.Get(md.sourceInfoPath)
 }
 
 // AsProto returns the underlying descriptor proto. Most usages will be more
@@ -1656,12 +1670,12 @@ func (md *MethodDescriptor) GetOutputType() *MessageDescriptor {
 
 // OneOfDescriptor describes a one-of field set declared in a protocol buffer message.
 type OneOfDescriptor struct {
-	proto      *dpb.OneofDescriptorProto
-	parent     *MessageDescriptor
-	file       *FileDescriptor
-	choices    []*FieldDescriptor
-	fqn        string
-	sourceInfo *dpb.SourceCodeInfo_Location
+	proto          *dpb.OneofDescriptorProto
+	parent         *MessageDescriptor
+	file           *FileDescriptor
+	choices        []*FieldDescriptor
+	fqn            string
+	sourceInfoPath []int32
 }
 
 func createOneOfDescriptor(fd *FileDescriptor, parent *MessageDescriptor, index int, enclosing string, od *dpb.OneofDescriptorProto) (*OneOfDescriptor, string) {
@@ -1677,8 +1691,8 @@ func createOneOfDescriptor(fd *FileDescriptor, parent *MessageDescriptor, index 
 	return ret, oneOfName
 }
 
-func (od *OneOfDescriptor) resolve(path []int32, sourceCodeInfo descinternal.SourceInfoMap) {
-	od.sourceInfo = sourceCodeInfo.Get(path)
+func (od *OneOfDescriptor) resolve(path []int32) {
+	od.sourceInfoPath = append([]int32(nil), path...) // defensive copy
 }
 
 // GetName returns the name of the one-of.
@@ -1728,7 +1742,7 @@ func (od *OneOfDescriptor) GetOneOfOptions() *dpb.OneofOptions {
 // one-of was defined and also contains comments associated with the one-of
 // definition.
 func (od *OneOfDescriptor) GetSourceInfo() *dpb.SourceCodeInfo_Location {
-	return od.sourceInfo
+	return od.file.sourceInfo.Get(od.sourceInfoPath)
 }
 
 // AsProto returns the underlying descriptor proto. Most usages will be more

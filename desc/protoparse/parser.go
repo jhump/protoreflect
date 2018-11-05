@@ -174,6 +174,7 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 		for name, fd := range linkedProtos {
 			pr := protos[name]
 			fd.AsFileDescriptorProto().SourceCodeInfo = pr.generateSourceCodeInfo()
+			internal.RecomputeSourceInfo(fd)
 		}
 	}
 	fds := make([]*desc.FileDescriptor, len(filenames))
