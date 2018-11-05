@@ -22,11 +22,22 @@ func TestSourceCodeInfo(t *testing.T) {
 	fds, err := p.ParseFiles("desc_test_comments.proto")
 	testutil.Ok(t, err)
 	fd := fds[0]
+	// also test that imported files have source code info
+	// (desc_test_comments.proto imports desc_test_options.proto)
+	var importedFd *desc.FileDescriptor
+	for _, dep := range fd.GetDependencies() {
+		if dep.GetName() == "desc_test_options.proto" {
+			importedFd = dep
+			break
+		}
+	}
+	testutil.Require(t, importedFd != nil)
 
 	// create description of source code info
 	// (human readable so diffs in source control are comprehensible)
 	var buf bytes.Buffer
 	printSourceCodeInfo(t, fd, &buf)
+	printSourceCodeInfo(t, importedFd, &buf)
 	actual := buf.String()
 
 	if regenerateMode {
@@ -46,6 +57,7 @@ func TestSourceCodeInfo(t *testing.T) {
 // descriptor, in a manner that is much easier to read and check than raw
 // descriptor form.
 func printSourceCodeInfo(t *testing.T, fd *desc.FileDescriptor, out io.Writer) {
+	fmt.Fprintf(out, "---- %s ----\n", fd.GetName())
 	md, err := desc.LoadMessageDescriptorForMessage(fd.AsProto())
 	testutil.Ok(t, err)
 	er := &dynamic.ExtensionRegistry{}

@@ -41,11 +41,13 @@ extend google.protobuf.MethodOptions {
 	optional double mtfubard = 10102;
 }
 
+// Test message used by custom options
 message ReallySimpleMessage {
 	optional uint64 id = 1;
 	optional string name = 2;
 }
 
+// Test enum used by custom options
 enum ReallySimpleEnum {
 	VALUE = 1;
 }
@@ -53,4 +55,9 @@ enum ReallySimpleEnum {
 extend google.protobuf.ExtensionRangeOptions {
 	repeated string exfubar = 10101;
 	optional bytes exfubarb = 10102;
+}
+
+extend google.protobuf.OneofOptions {
+	repeated string oofubar = 10101;
+	optional bytes oofubarb = 10102;
 }
