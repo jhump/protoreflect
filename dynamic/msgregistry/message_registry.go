@@ -590,10 +590,16 @@ func (r *MessageRegistry) methodAsApi(md *desc.MethodDescriptor) *api.Method {
 func (r *MessageRegistry) options(options proto.Message) []*ptype.Option {
 	rv := reflect.ValueOf(options)
 	if rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return nil
+		}
 		rv = rv.Elem()
 	}
 	var opts []*ptype.Option
 	for _, p := range proto.GetProperties(rv.Type()).Prop {
+		if p.Tag == 0 {
+			continue
+		}
 		o := r.option(p.OrigName, rv.FieldByName(p.Name))
 		if o != nil {
 			opts = append(opts, o...)
@@ -619,12 +625,21 @@ func (r *MessageRegistry) option(name string, value reflect.Value) []*ptype.Opti
 	if value.Kind() == reflect.Slice && value.Type() != typeOfBytes {
 		// repeated field
 		ret := make([]*ptype.Option, value.Len())
+		j := 0
 		for i := 0; i < value.Len(); i++ {
-			ret[i] = r.singleOption(name, value.Index(i))
+			opt := r.singleOption(name, value.Index(i))
+			if opt != nil {
+				ret[j] = opt
+				j++
+			}
 		}
-		return ret
+		return ret[:j]
 	} else {
-		return []*ptype.Option{r.singleOption(name, value)}
+		opt := r.singleOption(name, value)
+		if opt != nil {
+			return []*ptype.Option{opt}
+		}
+		return nil
 	}
 }
 
@@ -647,12 +662,21 @@ func wrap(v reflect.Value) proto.Message {
 	if pm, ok := v.Interface().(proto.Message); ok {
 		return pm
 	}
+	if !v.IsValid() {
+		return nil
+	}
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
 	switch v.Kind() {
 	case reflect.Bool:
 		return &wrappers.BoolValue{Value: v.Bool()}
 	case reflect.Slice:
 		if v.Type() != typeOfBytes {
-			return nil
+			panic(fmt.Sprintf("cannot convert/wrap %T as proto", v.Type()))
 		}
 		return &wrappers.BytesValue{Value: v.Bytes()}
 	case reflect.String:
@@ -670,7 +694,7 @@ func wrap(v reflect.Value) proto.Message {
 	case reflect.Uint64:
 		return &wrappers.UInt64Value{Value: v.Uint()}
 	default:
-		return nil
+		panic(fmt.Sprintf("cannot convert/wrap %T as proto", v.Type()))
 	}
 }
 
