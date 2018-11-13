@@ -220,6 +220,112 @@ func TestMessageRegistry_FindMessage_WithFetcher(t *testing.T) {
 	testutil.Eq(t, false, md3.IsProto3())
 }
 
+func TestMessageRegistry_FindMessage_Mixed(t *testing.T) {
+	msgType := &ptype.Type{
+		Name:   "foo.Bar",
+		Oneofs: []string{"baz"},
+		Fields: []*ptype.Field{
+			{
+				Name:        "id",
+				Number:      1,
+				Kind:        ptype.Field_TYPE_UINT64,
+				Cardinality: ptype.Field_CARDINALITY_OPTIONAL,
+				JsonName:    "id",
+			},
+			{
+				Name:        "name",
+				Number:      2,
+				Kind:        ptype.Field_TYPE_STRING,
+				Cardinality: ptype.Field_CARDINALITY_OPTIONAL,
+				JsonName:    "name",
+			},
+			{
+				Name:        "count",
+				Number:      3,
+				OneofIndex:  1,
+				Kind:        ptype.Field_TYPE_INT32,
+				Cardinality: ptype.Field_CARDINALITY_OPTIONAL,
+				JsonName:    "count",
+			},
+			{
+				Name:        "data",
+				Number:      4,
+				OneofIndex:  1,
+				Kind:        ptype.Field_TYPE_BYTES,
+				Cardinality: ptype.Field_CARDINALITY_OPTIONAL,
+				JsonName:    "data",
+			},
+			{
+				Name:        "other",
+				Number:      5,
+				OneofIndex:  1,
+				Kind:        ptype.Field_TYPE_MESSAGE,
+				Cardinality: ptype.Field_CARDINALITY_OPTIONAL,
+				JsonName:    "other",
+				TypeUrl:     "type.googleapis.com/google.protobuf.Empty",
+			},
+			{
+				Name:        "created",
+				Number:      6,
+				Kind:        ptype.Field_TYPE_MESSAGE,
+				Cardinality: ptype.Field_CARDINALITY_OPTIONAL,
+				JsonName:    "created",
+				TypeUrl:     "type.googleapis.com/google.protobuf.Timestamp",
+			},
+			{
+				Name:        "updated",
+				Number:      7,
+				Kind:        ptype.Field_TYPE_MESSAGE,
+				Cardinality: ptype.Field_CARDINALITY_OPTIONAL,
+				JsonName:    "updated",
+				TypeUrl:     "type.googleapis.com/google.protobuf.Timestamp",
+			},
+			{
+				Name:        "tombstone",
+				Number:      8,
+				Kind:        ptype.Field_TYPE_BOOL,
+				Cardinality: ptype.Field_CARDINALITY_OPTIONAL,
+				JsonName:    "tombstone",
+			},
+		},
+		SourceContext: &source_context.SourceContext{
+			FileName: "test/foo.proto",
+		},
+		Syntax: ptype.Syntax_SYNTAX_PROTO3,
+	}
+
+	var mr MessageRegistry
+	mr.WithFetcher(func(url string, enum bool) (proto.Message, error) {
+		if url == "https://foo.test.com/foo.Bar" && !enum {
+			return msgType, nil
+		}
+		return nil, fmt.Errorf("unknown type: %s", url)
+	})
+
+	// Make sure we successfully get back a descriptor
+	md, err := mr.FindMessageTypeByUrl("foo.test.com/foo.Bar")
+	testutil.Ok(t, err)
+
+	// Check its properties. It should have the fields from the type
+	// description above, but also correctly refer to google/protobuf
+	// dependencies (which came from resolver, not the fetcher).
+
+	testutil.Eq(t, "foo.Bar", md.GetFullyQualifiedName())
+	testutil.Eq(t, "Bar", md.GetName())
+	testutil.Eq(t, "test/foo.proto", md.GetFile().GetName())
+	testutil.Eq(t, "foo", md.GetFile().GetPackage())
+
+	fd := md.FindFieldByName("created")
+	testutil.Eq(t, "google.protobuf.Timestamp", fd.GetMessageType().GetFullyQualifiedName())
+	testutil.Eq(t, "google/protobuf/timestamp.proto", fd.GetMessageType().GetFile().GetName())
+
+	ood := md.GetOneOfs()[0]
+	testutil.Eq(t, 3, len(ood.GetChoices()))
+	fd = ood.GetChoices()[2]
+	testutil.Eq(t, "google.protobuf.Empty", fd.GetMessageType().GetFullyQualifiedName())
+	testutil.Eq(t, "google/protobuf/empty.proto", fd.GetMessageType().GetFile().GetName())
+}
+
 func TestMessageRegistry_FindEnum_WithFetcher(t *testing.T) {
 	tf := createFetcher(t)
 	// we want "defaults" for the message factory so that we can properly process
@@ -653,8 +759,7 @@ func getApi(t *testing.T) *api.Api {
 }
 
 func TestMessageRegistry_MarshalAndUnmarshalAny(t *testing.T) {
-	mr := &MessageRegistry{}
-	mrdef := NewMessageRegistryWithDefaults()
+	mr := NewMessageRegistryWithDefaults()
 
 	md, err := desc.LoadMessageDescriptor("google.protobuf.DescriptorProto")
 	testutil.Ok(t, err)
@@ -671,7 +776,7 @@ func TestMessageRegistry_MarshalAndUnmarshalAny(t *testing.T) {
 	testutil.Ceq(t, md.AsProto(), &umd, eqpm)
 
 	// and that we can unmarshal it with a message registry
-	pm, err := mrdef.UnmarshalAny(a)
+	pm, err := mr.UnmarshalAny(a)
 	testutil.Ok(t, err)
 	_, ok := pm.(*descriptor.DescriptorProto)
 	testutil.Require(t, ok)
@@ -679,8 +784,9 @@ func TestMessageRegistry_MarshalAndUnmarshalAny(t *testing.T) {
 
 	// and that we can unmarshal it as a dynamic message, using a
 	// message registry that doesn't know about the generated type
-	mr.AddMessage("type.googleapis.com/google.protobuf.DescriptorProto", md)
-	pm, err = mr.UnmarshalAny(a)
+	mrWithoutDefaults := &MessageRegistry{}
+	mrWithoutDefaults.AddMessage("type.googleapis.com/google.protobuf.DescriptorProto", md)
+	pm, err = mrWithoutDefaults.UnmarshalAny(a)
 	testutil.Ok(t, err)
 	dm, ok := pm.(*dynamic.Message)
 	testutil.Require(t, ok)
@@ -740,6 +846,7 @@ func TestMessageRegistry_MessageDescriptorToPType(t *testing.T) {
 	testutil.Eq(t, ptype.Syntax_SYNTAX_PROTO2, msg.Syntax)
 	testutil.Eq(t, "test.proto", msg.SourceContext.GetFileName())
 	testutil.Eq(t, 0, len(msg.Options))
+	testutil.Eq(t, 5, len(msg.Fields))
 
 	testutil.Eq(t, "abc", msg.Fields[0].Name)
 	testutil.Eq(t, ptype.Field_CARDINALITY_OPTIONAL, msg.Fields[0].Cardinality)
@@ -753,9 +860,7 @@ func TestMessageRegistry_MessageDescriptorToPType(t *testing.T) {
 	var v ptypes.DynamicAny
 	err = ptypes.UnmarshalAny(msg.Fields[0].Options[0].Value, &v)
 	testutil.Ok(t, err)
-	testutil.Ceq(t, &wrappers.BoolValue{Value: true}, v.Message, func(a, b interface{}) bool {
-		return proto.Equal(a.(proto.Message), b.(proto.Message))
-	})
+	testutil.Ceq(t, &wrappers.BoolValue{Value: true}, v.Message, eqpm)
 
 	testutil.Eq(t, "def", msg.Fields[1].Name)
 	testutil.Eq(t, ptype.Field_CARDINALITY_REPEATED, msg.Fields[1].Cardinality)
@@ -792,7 +897,68 @@ func TestMessageRegistry_MessageDescriptorToPType(t *testing.T) {
 }
 
 func TestMessageRegistry_EnumDescriptorToPType(t *testing.T) {
-	// TODO
+	protoSource := `
+		syntax = "proto2";
+		package foo;
+		enum Bar {
+			option allow_alias = true;
+			ZERO = 0;
+			__UNSET__ = 0 [deprecated = true];
+			ONE = 1;
+			TWO = 2;
+			THREE = 3;
+		}`
+	p := protoparse.Parser{
+		Accessor: func(filename string) (io.ReadCloser, error) {
+			if filename == "test.proto" {
+				return ioutil.NopCloser(strings.NewReader(protoSource)), nil
+			}
+			return nil, os.ErrNotExist
+		},
+	}
+	fds, err := p.ParseFiles("test.proto")
+	testutil.Ok(t, err)
+	fd := fds[0]
+
+	enum := NewMessageRegistryWithDefaults().EnumAsPType(fd.GetEnumTypes()[0])
+
+	// quick check of the resulting message's properties
+	testutil.Eq(t, "foo.Bar", enum.Name)
+	testutil.Eq(t, ptype.Syntax_SYNTAX_PROTO2, enum.Syntax)
+	testutil.Eq(t, "test.proto", enum.SourceContext.GetFileName())
+	testutil.Eq(t, 5, len(enum.Enumvalue))
+	testutil.Eq(t, 1, len(enum.Options))
+	testutil.Eq(t, "allow_alias", enum.Options[0].Name)
+	// make sure the value is a wrapped bool
+	var v ptypes.DynamicAny
+	err = ptypes.UnmarshalAny(enum.Options[0].Value, &v)
+	testutil.Ok(t, err)
+	testutil.Ceq(t, &wrappers.BoolValue{Value: true}, v.Message, eqpm)
+
+	testutil.Eq(t, "ZERO", enum.Enumvalue[0].Name)
+	testutil.Eq(t, int32(0), enum.Enumvalue[0].Number)
+	testutil.Eq(t, 0, len(enum.Enumvalue[0].Options))
+
+	testutil.Eq(t, "__UNSET__", enum.Enumvalue[1].Name)
+	testutil.Eq(t, int32(0), enum.Enumvalue[1].Number)
+	testutil.Eq(t, 1, len(enum.Enumvalue[1].Options))
+	testutil.Eq(t, "deprecated", enum.Enumvalue[1].Options[0].Name)
+	// make sure the value is a wrapped bool
+	err = ptypes.UnmarshalAny(enum.Enumvalue[1].Options[0].Value, &v)
+	testutil.Ok(t, err)
+	testutil.Ceq(t, &wrappers.BoolValue{Value: true}, v.Message, eqpm)
+
+	testutil.Eq(t, "ONE", enum.Enumvalue[2].Name)
+	testutil.Eq(t, int32(1), enum.Enumvalue[2].Number)
+	testutil.Eq(t, 0, len(enum.Enumvalue[2].Options))
+
+	testutil.Eq(t, "TWO", enum.Enumvalue[3].Name)
+	testutil.Eq(t, int32(2), enum.Enumvalue[3].Number)
+	testutil.Eq(t, 0, len(enum.Enumvalue[3].Options))
+
+	testutil.Eq(t, "THREE", enum.Enumvalue[4].Name)
+	testutil.Eq(t, int32(3), enum.Enumvalue[4].Number)
+	testutil.Eq(t, 0, len(enum.Enumvalue[4].Options))
 }
 
 func TestMessageRegistry_ServiceDescriptorToApi(t *testing.T) {

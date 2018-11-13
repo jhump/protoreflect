@@ -25,7 +25,6 @@ const googleApisDomain = "type.googleapis.com"
 // MessageRegistry is a registry that maps URLs to message types. It allows for marshalling
 // and unmarshalling Any types to and from dynamic messages.
 type MessageRegistry struct {
-	includeDefault bool
 	resolver       typeResolver
 	mf             *dynamic.MessageFactory
 	er             *dynamic.ExtensionRegistry
@@ -44,9 +43,8 @@ type MessageRegistry struct {
 func NewMessageRegistryWithDefaults() *MessageRegistry {
 	mf := dynamic.NewMessageFactoryWithDefaults()
 	return &MessageRegistry{
-		includeDefault: true,
-		mf:             mf,
-		er:             mf.GetExtensionRegistry(),
+		mf: mf,
+		er: mf.GetExtensionRegistry(),
 	}
 }
 
@@ -103,6 +101,10 @@ func (r *MessageRegistry) AddMessage(url string, md *desc.MessageDescriptor) err
 		r.types = map[string]desc.Descriptor{}
 	}
 	r.types[url] = md
+	if r.baseUrls == nil {
+		r.baseUrls = map[string]string{}
+	}
+	r.baseUrls[md.GetFullyQualifiedName()] = url
 	return nil
 }
 
@@ -118,11 +120,15 @@ func (r *MessageRegistry) AddEnum(url string, ed *desc.EnumDescriptor) error {
 		r.types = map[string]desc.Descriptor{}
 	}
 	r.types[url] = ed
+	if r.baseUrls == nil {
+		r.baseUrls = map[string]string{}
+	}
+	r.baseUrls[ed.GetFullyQualifiedName()] = url
 	return nil
 }
 
 // AddFile adds to the registry all message and enum types in the given file. The URL for each type
-// is derived using the given base URL as "baseURL/full.qualified.type.name".
+// is derived using the given base URL as "baseURL/fully.qualified.type.name".
 func (r *MessageRegistry) AddFile(baseUrl string, fd *desc.FileDescriptor) {
 	baseUrl = stripTrailingSlash(ensureScheme(baseUrl))
 	r.mu.Lock()
@@ -130,21 +136,28 @@ func (r *MessageRegistry) AddFile(baseUrl string, fd *desc.FileDescriptor) {
 	if r.types == nil {
 		r.types = map[string]desc.Descriptor{}
 	}
+	if r.baseUrls == nil {
+		r.baseUrls = map[string]string{}
+	}
 	r.addEnumTypesLocked(baseUrl, fd.GetEnumTypes())
 	r.addMessageTypesLocked(baseUrl, fd.GetMessageTypes())
 }
 
-func (r *MessageRegistry) addEnumTypesLocked(domain string, enums []*desc.EnumDescriptor) {
+func (r *MessageRegistry) addEnumTypesLocked(baseUrl string, enums []*desc.EnumDescriptor) {
 	for _, ed := range enums {
-		r.types[fmt.Sprintf("%s/%s", domain, ed.GetFullyQualifiedName())] = ed
+		url := fmt.Sprintf("%s/%s", baseUrl, ed.GetFullyQualifiedName())
+		r.types[url] = ed
+		r.baseUrls[ed.GetFullyQualifiedName()] = url
 	}
 }
 
-func (r *MessageRegistry) addMessageTypesLocked(domain string, msgs []*desc.MessageDescriptor) {
+func (r *MessageRegistry) addMessageTypesLocked(baseUrl string, msgs []*desc.MessageDescriptor) {
 	for _, md := range msgs {
-		r.types[fmt.Sprintf("%s/%s", domain, md.GetFullyQualifiedName())] = md
-		r.addEnumTypesLocked(domain, md.GetNestedEnumTypes())
-		r.addMessageTypesLocked(domain, md.GetNestedMessageTypes())
+		url := fmt.Sprintf("%s/%s", baseUrl, md.GetFullyQualifiedName())
+		r.types[url] = md
+		r.baseUrls[md.GetFullyQualifiedName()] = url
+		r.addEnumTypesLocked(baseUrl, md.GetNestedEnumTypes())
+		r.addMessageTypesLocked(baseUrl, md.GetNestedMessageTypes())
 	}
 }
 
@@ -162,49 +175,56 @@ func (r *MessageRegistry) FindMessageTypeByUrl(url string) (*desc.MessageDescrip
 	if r.resolver.fetcher == nil {
 		return nil, nil
 	}
-	if md, err := r.resolver.resolveUrlToMessageDescriptor(url); err != nil {
-		return nil, err
-	} else {
-		return md, nil
-	}
-
+	return r.resolver.resolveUrlToMessageDescriptor(url)
 }
 
 func (r *MessageRegistry) getRegisteredMessageTypeByUrl(url string) (*desc.MessageDescriptor, error) {
-	if r == nil {
+	if r != nil {
+		r.mu.RLock()
+		m := r.types[ensureScheme(url)]
+		r.mu.RUnlock()
+		if m != nil {
+			if md, ok := m.(*desc.MessageDescriptor); ok {
+				return md, nil
+			} else {
+				return nil, fmt.Errorf("Type for url %v is the wrong type: wanted message, got enum", url)
+			}
+		}
+	}
+
+	var ktr *dynamic.KnownTypeRegistry
+	if r != nil {
+		ktr = r.mf.GetKnownTypeRegistry()
+	}
+	msgType := ktr.GetKnownType(typeName(url))
+	if msgType == nil {
 		return nil, nil
 	}
-	r.mu.RLock()
-	m := r.types[ensureScheme(url)]
-	r.mu.RUnlock()
-	if m != nil {
-		if md, ok := m.(*desc.MessageDescriptor); ok {
-			return md, nil
-		} else {
-			return nil, fmt.Errorf("Type for url %v is the wrong type: wanted message, got enum", url)
-		}
-	}
-	if r.includeDefault {
-		pos := strings.LastIndex(url, "/")
-		var msgName string
-		if pos >= 0 {
-			msgName = url[pos+1:]
-		} else {
-			msgName = url
-		}
-		if md, err := desc.LoadMessageDescriptor(msgName); err != nil {
-			return nil, err
-		} else if md != nil {
-			return md, nil
-		}
-	}
-	return nil, nil
+	return desc.LoadMessageDescriptorForType(msgType)
 }
 
 // FindEnumTypeByUrl finds an enum descriptor for the type at the given URL. It may return nil
 // if the registry is empty and cannot resolve unknown URLs. If an error occurs while resolving
 // the URL, it is returned.
 func (r *MessageRegistry) FindEnumTypeByUrl(url string) (*desc.EnumDescriptor, error) {
+	ed, err := r.getRegisteredEnumTypeByUrl(url)
+	if err != nil {
+		return nil, err
+	} else if ed != nil {
+		return ed, err
+	}
+
+	if r.resolver.fetcher == nil {
+		return nil, nil
+	}
+	if ed, err := r.resolver.resolveUrlToEnumDescriptor(url); err != nil {
+		return nil, err
+	} else {
+		return ed, nil
+	}
+}
+
+func (r *MessageRegistry) getRegisteredEnumTypeByUrl(url string) (*desc.EnumDescriptor, error) {
 	if r == nil {
 		return nil, nil
 	}
@@ -218,14 +238,7 @@ func (r *MessageRegistry) FindEnumTypeByUrl(url string) (*desc.EnumDescriptor, e
 			return nil, fmt.Errorf("Type for url %v is the wrong type: wanted enum, got message", url)
 		}
 	}
-	if r.resolver.fetcher == nil {
-		return nil, nil
-	}
-	if ed, err := r.resolver.resolveUrlToEnumDescriptor(url); err != nil {
-		return nil, err
-	} else {
-		return ed, nil
-	}
+	return nil, nil
 }
 
 // ResolveApiIntoServiceDescriptor constructs a service descriptor that describes the given API.
@@ -292,7 +305,7 @@ func (r *MessageRegistry) ResolveApiIntoServiceDescriptor(a *api.Api) (*desc.Ser
 	fe.proto3 = a.Syntax == ptype.Syntax_SYNTAX_PROTO3
 	files[fileName] = fe
 	fe.types.addType(a.Name, createServiceDescriptor(a, r))
-	added := map[string]struct{}{}
+	added := newNameTracker()
 	for _, md := range msgs {
 		addDescriptors(fileName, files, md, msgs, added)
 	}
@@ -303,48 +316,6 @@ func (r *MessageRegistry) ResolveApiIntoServiceDescriptor(a *api.Api) (*desc.Ser
 		return nil, err
 	}
 	return fileDescriptors[fileName].FindService(a.Name), nil
-}
-
-func addDescriptors(ref string, files map[string]*fileEntry, d desc.Descriptor, msgs map[string]*desc.MessageDescriptor, added map[string]struct{}) {
-	name := d.GetFullyQualifiedName()
-
-	fileName := d.GetFile().GetName()
-	if fileName != ref {
-		dependee := files[ref]
-		if dependee.deps == nil {
-			dependee.deps = map[string]struct{}{}
-		}
-		dependee.deps[fileName] = struct{}{}
-	}
-
-	if _, ok := added[name]; ok {
-		// already added this one
-		return
-	}
-	added[name] = struct{}{}
-
-	fe := files[fileName]
-	if fe == nil {
-		fe = &fileEntry{}
-		fe.proto3 = d.GetFile().IsProto3()
-		files[fileName] = fe
-	}
-	fe.types.addType(name, d.AsProto())
-
-	if md, ok := d.(*desc.MessageDescriptor); ok {
-		for _, fld := range md.GetFields() {
-			if fld.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE || fld.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP {
-				// prefer descriptor in msgs map over what the field descriptor indicates
-				md := msgs[fld.GetMessageType().GetFullyQualifiedName()]
-				if md == nil {
-					md = fld.GetMessageType()
-				}
-				addDescriptors(fileName, files, md, msgs, added)
-			} else if fld.GetType() == descriptor.FieldDescriptorProto_TYPE_ENUM {
-				addDescriptors(fileName, files, fld.GetEnumType(), msgs, added)
-			}
-		}
-	}
 }
 
 // UnmarshalAny will unmarshal the value embedded in the given Any value. This will use this
@@ -361,24 +332,20 @@ func (r *MessageRegistry) unmarshalAny(any *any.Any, fetch func(string) (*desc.M
 	}
 
 	var msg proto.Message
-	if r == nil {
-		// a nil registry only knows about well-known types
-		if msg = (*dynamic.KnownTypeRegistry)(nil).CreateIfKnown(name); msg == nil {
+
+	var mf *dynamic.MessageFactory
+	var ktr *dynamic.KnownTypeRegistry
+	if r != nil {
+		mf = r.mf
+		ktr = r.mf.GetKnownTypeRegistry()
+	}
+	if msg = ktr.CreateIfKnown(name); msg == nil {
+		if md, err := fetch(any.TypeUrl); err != nil {
+			return nil, err
+		} else if md == nil {
 			return nil, fmt.Errorf("Unknown message type: %s", any.TypeUrl)
-		}
-	} else {
-		var ktr *dynamic.KnownTypeRegistry
-		if r.mf != nil {
-			ktr = r.mf.GetKnownTypeRegistry()
-		}
-		if msg = ktr.CreateIfKnown(name); msg == nil {
-			if md, err := fetch(any.TypeUrl); err != nil {
-				return nil, err
-			} else if md == nil {
-				return nil, fmt.Errorf("Unknown message type: %s", any.TypeUrl)
-			} else {
-				msg = r.mf.NewDynamicMessage(md)
-			}
+		} else {
+			msg = mf.NewDynamicMessage(md)
 		}
 	}
 
@@ -418,13 +385,11 @@ func (r *MessageRegistry) MarshalAny(m proto.Message) (*any.Any, error) {
 			return nil, err
 		}
 	}
-	typeName := md.GetFullyQualifiedName()
-	packageName := md.GetFile().GetPackage()
 
 	if b, err := proto.Marshal(m); err != nil {
 		return nil, err
 	} else {
-		return &any.Any{TypeUrl: r.asUrl(typeName, packageName), Value: b}, nil
+		return &any.Any{TypeUrl: r.ComputeUrl(md), Value: b}, nil
 	}
 }
 
@@ -482,13 +447,13 @@ func (r *MessageRegistry) fieldAsPType(fd *desc.FieldDescriptor) *ptype.Field {
 	switch fd.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_ENUM:
 		kind = ptype.Field_TYPE_ENUM
-		url = r.asUrl(fd.GetEnumType().GetFullyQualifiedName(), fd.GetFile().GetPackage())
+		url = r.ComputeUrl(fd.GetEnumType())
 	case descriptor.FieldDescriptorProto_TYPE_GROUP:
 		kind = ptype.Field_TYPE_GROUP
-		url = r.asUrl(fd.GetMessageType().GetFullyQualifiedName(), fd.GetFile().GetPackage())
+		url = r.ComputeUrl(fd.GetMessageType())
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 		kind = ptype.Field_TYPE_MESSAGE
-		url = r.asUrl(fd.GetMessageType().GetFullyQualifiedName(), fd.GetFile().GetPackage())
+		url = r.ComputeUrl(fd.GetMessageType())
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
 		kind = ptype.Field_TYPE_BYTES
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
@@ -580,8 +545,8 @@ func (r *MessageRegistry) methodAsApi(md *desc.MethodDescriptor) *api.Method {
 		Name:              md.GetName(),
 		RequestStreaming:  md.IsClientStreaming(),
 		ResponseStreaming: md.IsServerStreaming(),
-		RequestTypeUrl:    r.asUrl(md.GetInputType().GetFullyQualifiedName(), md.GetInputType().GetFile().GetPackage()),
-		ResponseTypeUrl:   r.asUrl(md.GetOutputType().GetFullyQualifiedName(), md.GetOutputType().GetFile().GetPackage()),
+		RequestTypeUrl:    r.ComputeUrl(md.GetInputType()),
+		ResponseTypeUrl:   r.ComputeUrl(md.GetOutputType()),
 		Options:           r.options(md.GetOptions()),
 		Syntax:            syntax(md.GetFile()),
 	}
@@ -706,12 +671,17 @@ func syntax(fd *desc.FileDescriptor) ptype.Syntax {
 	}
 }
 
-func (r *MessageRegistry) asUrl(name, pkgName string) string {
+// ComputeUrl computes a type URL for element described by the given descriptor.
+// The given descriptor must be an enum or message descriptor. This will use any
+// registered URLs and base URLs to determine the appropriate URL for the given
+// type.
+func (r *MessageRegistry) ComputeUrl(d desc.Descriptor) string {
+	name, pkg := d.GetFullyQualifiedName(), d.GetFile().GetPackage()
 	r.mu.RLock()
 	baseUrl := r.baseUrls[name]
 	if baseUrl == "" {
 		// lookup domain for the package
-		baseUrl = r.baseUrls[pkgName]
+		baseUrl = r.baseUrls[pkg]
 	}
 	r.mu.RUnlock()
 
@@ -729,12 +699,11 @@ func (r *MessageRegistry) asUrl(name, pkgName string) string {
 // implements the jsonpb.AnyResolver interface, for use with marshaling and
 // unmarshaling Any messages to/from JSON.
 func (r *MessageRegistry) Resolve(typeUrl string) (proto.Message, error) {
-	mr := (*MessageRegistry)(r)
-	md, err := mr.FindMessageTypeByUrl(typeUrl)
+	md, err := r.FindMessageTypeByUrl(typeUrl)
 	if err != nil {
 		return nil, err
 	}
-	return mr.mf.NewMessage(md), nil
+	return r.mf.NewMessage(md), nil
 }
 
 var _ jsonpb.AnyResolver = (*MessageRegistry)(nil)
