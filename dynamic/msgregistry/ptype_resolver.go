@@ -3,9 +3,6 @@ package msgregistry
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"reflect"
 	"sort"
 	"strings"
@@ -57,202 +54,12 @@ func init() {
 	}
 }
 
-// TypeFetcher is a simple operation that retrieves a type definition for a given type URL.
-// The returned proto message will be either a *ptype.Enum or a *ptype.Type, depending on
-// whether the enum flag is true or not.
-type TypeFetcher func(url string, enum bool) (proto.Message, error)
-
-// CachingTypeFetcher adds a caching layer to the given type fetcher. Queries for
-// types that have already been fetched will not result in another call to the
-// underlying fetcher and instead are retrieved from the cache.
-func CachingTypeFetcher(fetcher TypeFetcher) TypeFetcher {
-	c := protoCache{entries: map[string]*protoCacheEntry{}}
-	return func(typeUrl string, enum bool) (proto.Message, error) {
-		m, err := c.getOrLoad(typeUrl, func() (proto.Message, error) {
-			return fetcher(typeUrl, enum)
-		})
-		if err != nil {
-			return nil, err
-		}
-		if _, isEnum := m.(*ptype.Enum); enum != isEnum {
-			var want, got string
-			if enum {
-				want = "enum"
-				got = "message"
-			} else {
-				want = "message"
-				got = "enum"
-			}
-			return nil, fmt.Errorf("Type for url %v is the wrong type: wanted %s, got %s", typeUrl, want, got)
-		}
-		return m.(proto.Message), nil
-	}
-}
-
-type protoCache struct {
-	mu      sync.RWMutex
-	entries map[string]*protoCacheEntry
-}
-
-type protoCacheEntry struct {
-	msg proto.Message
-	err error
-	wg  sync.WaitGroup
-}
-
-func (c *protoCache) getOrLoad(key string, loader func() (proto.Message, error)) (m proto.Message, err error) {
-	// see if it's cached
-	c.mu.RLock()
-	cached, ok := c.entries[key]
-	c.mu.RUnlock()
-	if ok {
-		cached.wg.Wait()
-		return cached.msg, cached.err
-	}
-
-	// must delegate and cache the result
-	c.mu.Lock()
-	// double-check, in case it was added concurrently while we were upgrading lock
-	cached, ok = c.entries[key]
-	if ok {
-		c.mu.Unlock()
-		cached.wg.Wait()
-		return cached.msg, cached.err
-	}
-	e := &protoCacheEntry{}
-	e.wg.Add(1)
-	c.entries[key] = e
-	c.mu.Unlock()
-	defer func() {
-		if err != nil {
-			// don't leave broken entry in the cache
-			c.mu.Lock()
-			delete(c.entries, key)
-			c.mu.Unlock()
-		}
-		e.msg, e.err = m, err
-		e.wg.Done()
-	}()
-
-	return loader()
-}
-
-// HttpTypeFetcher returns a TypeFetcher that uses the given HTTP transport to query and
-// download type definitions. The given szLimit is the maximum response size accepted. If
-// used from multiple goroutines (like when a type's dependency graph is resolved in
-// parallel), this resolver limits the number of parallel queries/downloads to the given
-// parLimit.
-func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFetcher {
-	sem := semaphore{count: parLimit, permits: parLimit}
-	return CachingTypeFetcher(func(typeUrl string, enum bool) (proto.Message, error) {
-		sem.Acquire()
-		defer sem.Release()
-
-		// build URL
-		u, err := url.Parse(ensureScheme(typeUrl))
-		if err != nil {
-			return nil, err
-		}
-
-		resp, err := transport.RoundTrip(&http.Request{URL: u})
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("HTTP request returned non-200 status code: %s", resp.Status)
-		}
-
-		if resp.ContentLength > int64(szLimit) {
-			return nil, fmt.Errorf("Type definition size %d is larger than limit of %d", resp.ContentLength, szLimit)
-		}
-
-		// download the response, up to the given size limit, into a buffer
-		bufptr := bufferPool.Get().(*[]byte)
-		defer bufferPool.Put(bufptr)
-		buf := *bufptr
-		var b bytes.Buffer
-		for {
-			n, err := resp.Body.Read(buf)
-			if err != nil && err != io.EOF {
-				return nil, err
-			}
-			if n > 0 {
-				if b.Len()+n > szLimit {
-					return nil, fmt.Errorf("Type definition size %d+ is larger than limit of %d", b.Len()+n, szLimit)
-				}
-				b.Write(buf[:n])
-			}
-			if err == io.EOF {
-				break
-			}
-		}
-
-		// now we can de-serialize the type definition
-		if enum {
-			var ret ptype.Enum
-			if err = proto.Unmarshal(b.Bytes(), &ret); err != nil {
-				return nil, err
-			}
-			return &ret, nil
-		} else {
-			var ret ptype.Type
-			if err = proto.Unmarshal(b.Bytes(), &ret); err != nil {
-				return nil, err
-			}
-			return &ret, nil
-		}
-	})
-}
-
 func ensureScheme(url string) string {
 	pos := strings.Index(url, "://")
 	if pos < 0 {
 		return "https://" + url
 	}
 	return url
-}
-
-var bufferPool = sync.Pool{New: func() interface{} {
-	buf := make([]byte, 8192)
-	return &buf
-}}
-
-type semaphore struct {
-	lock    sync.Mutex
-	count   int
-	permits int
-	cond    sync.Cond
-}
-
-func (s *semaphore) Acquire() {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if s.cond.L == nil {
-		s.cond.L = &s.lock
-	}
-
-	for s.count == 0 {
-		s.cond.Wait()
-	}
-	s.count--
-}
-
-func (s *semaphore) Release() {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if s.cond.L == nil {
-		s.cond.L = &s.lock
-	}
-
-	if s.count == s.permits {
-		panic("call to Release() without corresponding call to Acquire()")
-	}
-	s.count++
-	s.cond.Signal()
 }
 
 // typeResolver is used by MessageRegistry to resolve message types. It uses a given TypeFetcher
@@ -278,8 +85,8 @@ func (r *typeResolver) resolveUrlToMessageDescriptor(url string) (*desc.MessageD
 		}
 	}
 
-	rc := newResolutionContext()
-	if err := rc.addType(url, r.fetcher, false); err != nil {
+	rc := newResolutionContext(r)
+	if err := rc.addType(url, false); err != nil {
 		return nil, err
 	}
 
@@ -334,9 +141,9 @@ func (r *typeResolver) resolveUrlsToMessageDescriptors(urls ...string) (map[stri
 		return ret, nil
 	}
 
-	rc := newResolutionContext()
+	rc := newResolutionContext(r)
 	for _, u := range unresolved {
-		if err := rc.addType(u, r.fetcher, false); err != nil {
+		if err := rc.addType(u, false); err != nil {
 			return nil, err
 		}
 	}
@@ -378,8 +185,8 @@ func (r *typeResolver) resolveUrlToEnumDescriptor(url string) (*desc.EnumDescrip
 		}
 	}
 
-	rc := newResolutionContext()
-	if err := rc.addType(url, r.fetcher, true); err != nil {
+	rc := newResolutionContext(r)
+	if err := rc.addType(url, true); err != nil {
 		return nil, err
 	}
 
@@ -407,6 +214,61 @@ func (r *typeResolver) resolveUrlToEnumDescriptor(url string) (*desc.EnumDescrip
 	return ed, nil
 }
 
+type tracker func(d desc.Descriptor) bool
+
+func newNameTracker() tracker {
+	names := map[string]struct{}{}
+	return func(d desc.Descriptor) bool {
+		name := d.GetFullyQualifiedName()
+		if _, ok := names[name]; ok {
+			return false
+		}
+		names[name] = struct{}{}
+		return true
+	}
+}
+
+func addDescriptors(ref string, files map[string]*fileEntry, d desc.Descriptor, msgs map[string]*desc.MessageDescriptor, onAdd tracker) {
+	name := d.GetFullyQualifiedName()
+
+	fileName := d.GetFile().GetName()
+	if fileName != ref {
+		dependee := files[ref]
+		if dependee.deps == nil {
+			dependee.deps = map[string]struct{}{}
+		}
+		dependee.deps[fileName] = struct{}{}
+	}
+
+	if !onAdd(d) {
+		// already added this one
+		return
+	}
+
+	fe := files[fileName]
+	if fe == nil {
+		fe = &fileEntry{}
+		fe.proto3 = d.GetFile().IsProto3()
+		files[fileName] = fe
+	}
+	fe.types.addType(name, d.AsProto())
+
+	if md, ok := d.(*desc.MessageDescriptor); ok {
+		for _, fld := range md.GetFields() {
+			if fld.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE || fld.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP {
+				// prefer descriptor in msgs map over what the field descriptor indicates
+				md := msgs[fld.GetMessageType().GetFullyQualifiedName()]
+				if md == nil {
+					md = fld.GetMessageType()
+				}
+				addDescriptors(fileName, files, md, msgs, onAdd)
+			} else if fld.GetType() == descriptor.FieldDescriptorProto_TYPE_ENUM {
+				addDescriptors(fileName, files, fld.GetEnumType(), msgs, onAdd)
+			}
+		}
+	}
+}
+
 // resolutionContext provides the state for a resolution operation, accumulating details about
 // type descriptions and the files that contain them.
 type resolutionContext struct {
@@ -414,6 +276,7 @@ type resolutionContext struct {
 	// type or enum descriptions to download.
 	ctx    context.Context
 	cancel func()
+	res    *typeResolver
 
 	mu sync.Mutex
 	// map of file names to details regarding the files' contents
@@ -425,11 +288,12 @@ type resolutionContext struct {
 	unknownCount int
 }
 
-func newResolutionContext() *resolutionContext {
+func newResolutionContext(res *typeResolver) *resolutionContext {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &resolutionContext{
 		ctx:           ctx,
 		cancel:        cancel,
+		res:           res,
 		typeLocations: map[string]string{},
 		files:         map[string]*fileEntry{},
 	}
@@ -438,11 +302,12 @@ func newResolutionContext() *resolutionContext {
 // addType adds the type at the given URL to the context, using the given fetcher to download the type's
 // description. This function will recursively add dependencies (e.g. types referenced by the given type's
 // fields if it is a message type), fetching their type descriptions concurrently.
-func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool) error {
+func (rc *resolutionContext) addType(url string, enum bool) error {
 	if err := rc.ctx.Err(); err != nil {
 		return err
 	}
-	m, err := fetcher(url, enum)
+
+	m, err := rc.res.fetcher(url, enum)
 	if err != nil {
 		return err
 	} else if m == nil {
@@ -450,34 +315,18 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 	}
 
 	if enum {
-		e := m.(*ptype.Enum)
-
-		rc.mu.Lock()
-		defer rc.mu.Unlock()
-
-		var fileName string
-		if e.SourceContext != nil && e.SourceContext.FileName != "" {
-			fileName = e.SourceContext.FileName
-		} else {
-			fileName = fmt.Sprintf("--unknown--%d.proto", rc.unknownCount)
-			rc.unknownCount++
-		}
-		rc.typeLocations[url] = fileName
-
-		fe := rc.files[fileName]
-		if fe == nil {
-			fe = &fileEntry{}
-			rc.files[fileName] = fe
-		}
-		fe.types.addType(e.Name, e)
-		if e.Syntax == ptype.Syntax_SYNTAX_PROTO3 {
-			fe.proto3 = true
-		}
+		rc.recordEnum(url, m.(*ptype.Enum))
 		return nil
 	}
 
 	// for messages, resolve dependencies in parallel
 	t := m.(*ptype.Type)
+	fe, fileName := rc.recordType(url, t)
+	if fe == nil {
+		// already resolved this one
+		return nil
+	}
+
 	var wg sync.WaitGroup
 	var failed int32
 	for _, f := range t.Fields {
@@ -487,7 +336,33 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				innerErr := rc.addType(typeUrl, fetcher, kind == ptype.Field_TYPE_ENUM)
+				// first check the registry for descriptors
+				var d desc.Descriptor
+				var innerErr error
+				if kind == ptype.Field_TYPE_ENUM {
+					var ed *desc.EnumDescriptor
+					ed, innerErr = rc.res.mr.getRegisteredEnumTypeByUrl(typeUrl)
+					if ed != nil {
+						d = ed
+					}
+				} else {
+					var md *desc.MessageDescriptor
+					md, innerErr = rc.res.mr.getRegisteredMessageTypeByUrl(typeUrl)
+					if md != nil {
+						d = md
+					}
+				}
+
+				if innerErr == nil {
+					if d != nil {
+						// found it!
+						rc.recordDescriptor(typeUrl, fileName, d)
+					} else {
+						// not in registry, so we have to recursively fetch
+						innerErr = rc.addType(typeUrl, kind == ptype.Field_TYPE_ENUM)
+					}
+				}
+
 				// We want the "real" error to ultimately propagate to root, not
 				// one of the resulting cancellations (from any concurrent goroutines
 				// working in the same resolution context).
@@ -512,6 +387,53 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
+	for _, f := range t.Fields {
+		if f.Kind == ptype.Field_TYPE_GROUP || f.Kind == ptype.Field_TYPE_MESSAGE || f.Kind == ptype.Field_TYPE_ENUM {
+			typeUrl := ensureScheme(f.TypeUrl)
+			if fe.deps == nil {
+				fe.deps = map[string]struct{}{}
+			}
+			dep := rc.typeLocations[typeUrl]
+			if dep != fileName {
+				fe.deps[dep] = struct{}{}
+			}
+		}
+	}
+	return nil
+}
+
+func (rc *resolutionContext) recordEnum(url string, e *ptype.Enum) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+
+	var fileName string
+	if e.SourceContext != nil && e.SourceContext.FileName != "" {
+		fileName = e.SourceContext.FileName
+	} else {
+		fileName = fmt.Sprintf("--unknown--%d.proto", rc.unknownCount)
+		rc.unknownCount++
+	}
+	rc.typeLocations[url] = fileName
+
+	fe := rc.files[fileName]
+	if fe == nil {
+		fe = &fileEntry{}
+		rc.files[fileName] = fe
+	}
+	fe.types.addType(e.Name, e)
+	if e.Syntax == ptype.Syntax_SYNTAX_PROTO3 {
+		fe.proto3 = true
+	}
+}
+
+func (rc *resolutionContext) recordType(url string, t *ptype.Type) (*fileEntry, string) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+
+	if _, ok := rc.typeLocations[url]; ok {
+		return nil, ""
+	}
+
 	var fileName string
 	if t.SourceContext != nil && t.SourceContext.FileName != "" {
 		fileName = t.SourceContext.FileName
@@ -531,19 +453,27 @@ func (rc *resolutionContext) addType(url string, fetcher TypeFetcher, enum bool)
 		fe.proto3 = true
 	}
 
-	for _, f := range t.Fields {
-		if f.Kind == ptype.Field_TYPE_GROUP || f.Kind == ptype.Field_TYPE_MESSAGE || f.Kind == ptype.Field_TYPE_ENUM {
-			typeUrl := ensureScheme(f.TypeUrl)
-			if fe.deps == nil {
-				fe.deps = map[string]struct{}{}
-			}
-			dep := rc.typeLocations[typeUrl]
-			if dep != fileName {
-				fe.deps[dep] = struct{}{}
-			}
+	return fe, fileName
+}
+
+func (rc *resolutionContext) recordDescriptor(url, ref string, d desc.Descriptor) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+
+	addDescriptors(ref, rc.files, d, nil, func(dsc desc.Descriptor) bool {
+		u := ensureScheme(rc.res.mr.ComputeUrl(dsc))
+		if _, ok := rc.typeLocations[u]; ok {
+			// already seen this one
+			return false
 		}
-	}
-	return nil
+		fileName := dsc.GetFile().GetName()
+		rc.typeLocations[u] = fileName
+		if dsc == d {
+			// make sure we're also adding the actual URL reference used
+			rc.typeLocations[url] = fileName
+		}
+		return true
+	})
 }
 
 // toFileDescriptors converts the information in the context into a map of file names to file descriptors.
@@ -588,7 +518,11 @@ func makeFileDesc(fdp *descriptor.FileDescriptorProto, fds map[string]*desc.File
 		d := fds[dep]
 		if d == nil {
 			var err error
-			d, err = makeFileDesc(fdps[dep], fds, fdps)
+			depFd := fdps[dep]
+			if depFd == nil {
+				return nil, fmt.Errorf("missing dependency: %s", dep)
+			}
+			d, err = makeFileDesc(depFd, fds, fdps)
 			if err != nil {
 				return nil, err
 			}
@@ -612,7 +546,7 @@ type fileEntry struct {
 
 // toFileDescriptor converts this file entry into a file descriptor proto. The given function
 // is used to transform nodes in a typeTrie into message and/or enum descriptor protos.
-func (fe fileEntry) toFileDescriptor(name string, trieFn func(*typeTrie, string) (proto.Message, error)) (*descriptor.FileDescriptorProto, error) {
+func (fe *fileEntry) toFileDescriptor(name string, trieFn func(*typeTrie, string) (proto.Message, error)) (*descriptor.FileDescriptorProto, error) {
 	var pkg bytes.Buffer
 	tt := &fe.types
 	first := true
@@ -692,14 +626,25 @@ func (t *typeTrie) addType(key string, typ proto.Message) {
 	child.addType(rest, typ)
 }
 
-// ptypeToDescriptor converts this level of the trie into a message or enum descriptor proto, requiring
-// that the element stored in t.typ is a *ptype.Type or *ptype.Enum. If t.typ is nil, a placeholder
-// message (with no fields) is returned that contains the trie's children as nested message and/or enum
+// ptypeToDescriptor converts this level of the trie into a message or enum
+// descriptor proto, requiring that the element stored in t.typ is a *ptype.Type
+// or *ptype.Enum. If t.typ is nil, a placeholder message (with no fields) is
+// returned that contains the trie's children as nested message and/or enum
 // types.
+//
+// If the value in t.typ is already a *descriptor.DescriptorProto or a
+// *descriptor.EnumDescriptorProto then it is returned as is. This function
+// should not be used in type tries that may have service descriptors. That will
+// result in a panic.
 func (t *typeTrie) ptypeToDescriptor(name string, mr *MessageRegistry) (*descriptor.DescriptorProto, *descriptor.EnumDescriptorProto) {
-	if en, ok := t.typ.(*ptype.Enum); ok {
-		return nil, createEnumDescriptor(en, mr)
-	} else {
+	switch typ := t.typ.(type) {
+	case *descriptor.EnumDescriptorProto:
+		return nil, typ
+	case *ptype.Enum:
+		return nil, createEnumDescriptor(typ, mr)
+	case *descriptor.DescriptorProto:
+		return typ, nil
+	default:
 		var msg *descriptor.DescriptorProto
 		if t.typ == nil {
 			msg = createIntermediateMessageDescriptor(name)
@@ -725,10 +670,12 @@ func (t *typeTrie) ptypeToDescriptor(name string, mr *MessageRegistry) (*descrip
 	}
 }
 
-// rewriteDescriptor converts this level of the trie into a new descriptor proto, requiring that
-// the element stored in t.type is already a servie, message, or enum descriptor proto. If this trie
-// has children then t.typ must be a message descriptor proto. The returned descriptor proto is the
-// same as t.type but with possibly new nested elements to represent this trie node's children.
+// rewriteDescriptor converts this level of the trie into a new descriptor
+// proto, requiring that the element stored in t.type is already a service,
+// message, or enum descriptor proto. If this trie has children then t.typ must
+// be a message descriptor proto. The returned descriptor proto is the same as
+// .type but with possibly new nested elements to represent this trie node's
+// children.
 func (t *typeTrie) rewriteDescriptor(name string) (proto.Message, error) {
 	if len(t.children) == 0 && t.typ != nil {
 		if mdp, ok := t.typ.(*descriptor.DescriptorProto); ok {
