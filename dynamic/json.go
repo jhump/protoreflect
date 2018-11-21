@@ -148,6 +148,10 @@ func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
 
 		v, ok := m.values[itag]
 		if !ok {
+			if fd.GetOneOf() != nil {
+				// don't print defaults for fields in a oneof
+				continue
+			}
 			v = fd.GetDefaultValue()
 		}
 
@@ -226,7 +230,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 		return err
 	}
 
-	if v == nil {
+	if isNil(v) {
 		_, err := b.WriteString("null")
 		return err
 	}
@@ -302,6 +306,14 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 	} else {
 		return marshalKnownFieldValueJSON(b, fd, v, opts)
 	}
+}
+
+func isNil(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	return rv.Kind() == reflect.Ptr && rv.IsNil()
 }
 
 func marshalKnownFieldMapEntryJSON(b *indentBuffer, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}, opts *jsonpb.Marshaler) error {
@@ -576,8 +588,30 @@ func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
 			if err := mergeField(m, fd, v); err != nil {
 				return err
 			}
-		} else if m.values != nil {
-			delete(m.values, fd.GetNumber())
+		} else if fd.GetOneOf() != nil {
+			// preserve explicit null for oneof fields (this is a little odd but
+			// mimics the behavior of jsonpb with oneofs in generated message types)
+			if fd.GetMessageType() != nil {
+				typ := m.mf.GetKnownTypeRegistry().GetKnownType(fd.GetMessageType().GetFullyQualifiedName())
+				if typ != nil {
+					// typed nil
+					if typ.Kind() != reflect.Ptr {
+						typ = reflect.PtrTo(typ)
+					}
+					v = reflect.Zero(typ).Interface()
+				} else {
+					// can't use nil dynamic message, so we just use empty one instead
+					v = m.mf.NewDynamicMessage(fd.GetMessageType())
+				}
+				if err := m.setField(fd, v); err != nil {
+					return err
+				}
+			} else {
+				// not a message... explicit null makes no sense
+				return fmt.Errorf("Message type %s cannot set field %s to null: it is not a message type", m.md.GetFullyQualifiedName(), f)
+			}
+		} else {
+			m.clearField(fd)
 		}
 	}
 

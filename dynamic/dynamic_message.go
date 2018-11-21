@@ -814,8 +814,17 @@ func (m *Message) TryClearFieldByNumber(tagNumber int) error {
 }
 
 func (m *Message) clearField(fd *desc.FieldDescriptor) {
+	// clear value
 	if m.values != nil {
 		delete(m.values, fd.GetNumber())
+	}
+	// also clear any unknown fields
+	if m.unknownFields != nil {
+		delete(m.unknownFields, fd.GetNumber())
+	}
+	// and add this field if it was previously unknown
+	if existing := m.FindFieldDescriptor(fd.GetNumber()); existing == nil {
+		m.addField(fd)
 	}
 }
 
@@ -1576,7 +1585,7 @@ func (m *Message) addRepeatedField(fd *desc.FieldDescriptor, val interface{}) er
 		// We're lenient. Just as we allow setting a map field to a slice of entry messages, we also allow
 		// adding entries one at a time (as if the field were a normal repeated field).
 		msg := val.(proto.Message)
-		dm, err := asDynamicMessage(msg, fd.GetMessageType())
+		dm, err := asDynamicMessage(msg, fd.GetMessageType(), m.mf)
 		if err != nil {
 			return err
 		}
@@ -1830,7 +1839,7 @@ func validFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interfac
 					return nil, err
 				}
 				msg := e.(proto.Message)
-				dm, err := asDynamicMessage(msg, fd.GetMessageType())
+				dm, err := asDynamicMessage(msg, fd.GetMessageType(), nil)
 				if err != nil {
 					return nil, err
 				}
@@ -1868,11 +1877,11 @@ func validFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interfac
 	return validElementFieldValueForRv(fd, val)
 }
 
-func asDynamicMessage(m proto.Message, md *desc.MessageDescriptor) (*Message, error) {
+func asDynamicMessage(m proto.Message, md *desc.MessageDescriptor, mf *MessageFactory) (*Message, error) {
 	if dm, ok := m.(*Message); ok {
 		return dm, nil
 	}
-	dm := NewMessage(md)
+	dm := NewMessageWithMessageFactory(md, mf)
 	if err := dm.mergeFrom(m); err != nil {
 		return nil, err
 	}

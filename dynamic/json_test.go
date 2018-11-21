@@ -176,6 +176,53 @@ func TestMarshalJSONEmitDefaultsMapKeyFields(t *testing.T) {
 	testutil.Eq(t, string(jsDefaults), string(jsDefaults2))
 }
 
+func TestMarshalJSONEmitDefaultsOneOfFields(t *testing.T) {
+	// we don't include default values for fields in a one-of
+	// since it would not round-trip correctly
+	testCases := []struct {
+		msg          *testprotos.OneOfMessage
+		expectedJson string
+	}{
+		{
+			msg:          &testprotos.OneOfMessage{},
+			expectedJson: `{}`,
+		},
+		{
+			msg:          &testprotos.OneOfMessage{Value: &testprotos.OneOfMessage_IntValue{IntValue: 12345}},
+			expectedJson: `{"intValue":12345}`,
+		},
+		{
+			msg:          &testprotos.OneOfMessage{Value: &testprotos.OneOfMessage_StringValue{StringValue: "foobar"}},
+			expectedJson: `{"stringValue":"foobar"}`,
+		},
+		{
+			msg:          &testprotos.OneOfMessage{Value: &testprotos.OneOfMessage_MsgValue{MsgValue: &testprotos.OneOfMessage{}}},
+			expectedJson: `{"msgValue":{}}`,
+		},
+		{
+			msg:          &testprotos.OneOfMessage{Value: &testprotos.OneOfMessage_MsgValue{MsgValue: nil}},
+			expectedJson: `{"msgValue":null}`,
+		},
+	}
+	m := &jsonpb.Marshaler{EmitDefaults: true}
+	for _, testCase := range testCases {
+		dm, err := AsDynamicMessageWithMessageFactory(testCase.msg, NewMessageFactoryWithDefaults())
+		testutil.Ok(t, err)
+		asJson, err := dm.MarshalJSONPB(m)
+		testutil.Ok(t, err)
+		actualJson := string(asJson)
+		testutil.Eq(t, testCase.expectedJson, actualJson)
+
+		// round-trip
+		err = jsonpb.UnmarshalString(actualJson, dm)
+		testutil.Ok(t, err)
+		var roundtripped testprotos.OneOfMessage
+		err = dm.ConvertTo(&roundtripped)
+		testutil.Ok(t, err)
+		testutil.Ceq(t, testCase.msg, &roundtripped, eqpm)
+	}
+}
+
 func TestMarshalJSONEnumsAsInts(t *testing.T) {
 	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.TestRequest)(nil))
 	testutil.Ok(t, err)
