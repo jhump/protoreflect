@@ -8,6 +8,7 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc/internal"
+	intn "github.com/jhump/protoreflect/internal"
 )
 
 // CreateFileDescriptor instantiates a new file descriptor for the given descriptor proto.
@@ -15,6 +16,10 @@ import (
 // all of the file's dependencies or if the contents of the descriptors are internally
 // inconsistent (e.g. contain unresolvable symbols) then an error is returned.
 func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) (*FileDescriptor, error) {
+	return createFileDescriptor(fd, deps, nil)
+}
+
+func createFileDescriptor(fd *dpb.FileDescriptorProto, deps []*FileDescriptor, r *ImportResolver) (*FileDescriptor, error) {
 	ret := &FileDescriptor{
 		proto:      fd,
 		symbols:    map[string]Descriptor{},
@@ -29,9 +34,15 @@ func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) 
 	}
 	ret.deps = make([]*FileDescriptor, len(fd.GetDependency()))
 	for i, d := range fd.GetDependency() {
-		ret.deps[i] = files[d]
+		resolved := r.ResolveImport(fd.GetName(), d)
+		ret.deps[i] = files[resolved]
 		if ret.deps[i] == nil {
-			return nil, fmt.Errorf("Given dependencies did not include %q", d)
+			if resolved != d {
+				ret.deps[i] = files[d]
+			}
+			if ret.deps[i] == nil {
+				return nil, intn.ErrNoSuchFile(d)
+			}
 		}
 	}
 	ret.publicDeps = make([]*FileDescriptor, len(fd.GetPublicDependency()))
@@ -102,6 +113,10 @@ func CreateFileDescriptor(fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) 
 // given descriptor protos. The given set of descriptor protos must include all
 // transitive dependencies for every file.
 func CreateFileDescriptors(fds []*dpb.FileDescriptorProto) (map[string]*FileDescriptor, error) {
+	return createFileDescriptors(fds, nil)
+}
+
+func createFileDescriptors(fds []*dpb.FileDescriptorProto, r *ImportResolver) (map[string]*FileDescriptor, error) {
 	if len(fds) == 0 {
 		return nil, nil
 	}
@@ -113,7 +128,7 @@ func CreateFileDescriptors(fds []*dpb.FileDescriptorProto) (map[string]*FileDesc
 		files[name] = fd
 	}
 	for _, fd := range fds {
-		_, err := createFromSet(fd.GetName(), nil, files, resolved)
+		_, err := createFromSet(fd.GetName(), r, nil, files, resolved)
 		if err != nil {
 			return nil, err
 		}
@@ -147,11 +162,15 @@ func addAllFiles(src []*FileDescriptor, results *[]*dpb.FileDescriptorProto, see
 // order used by protoc when emitting a FileDescriptorSet file with an invocation like so:
 //    protoc --descriptor_set_out=./test.protoset --include_imports -I. test.proto
 func CreateFileDescriptorFromSet(fds *dpb.FileDescriptorSet) (*FileDescriptor, error) {
+	return createFileDescriptorFromSet(fds, nil)
+}
+
+func createFileDescriptorFromSet(fds *dpb.FileDescriptorSet, r *ImportResolver) (*FileDescriptor, error) {
 	files := fds.GetFile()
 	if len(files) == 0 {
 		return nil, errors.New("file descriptor set is empty")
 	}
-	resolved, err := CreateFileDescriptors(files)
+	resolved, err := createFileDescriptors(files, r)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +180,7 @@ func CreateFileDescriptorFromSet(fds *dpb.FileDescriptorSet) (*FileDescriptor, e
 
 // createFromSet creates a descriptor for the given filename. It recursively
 // creates descriptors for the given file's dependencies.
-func createFromSet(filename string, seen []string, files map[string]*dpb.FileDescriptorProto, resolved map[string]*FileDescriptor) (*FileDescriptor, error) {
+func createFromSet(filename string, r *ImportResolver, seen []string, files map[string]*dpb.FileDescriptorProto, resolved map[string]*FileDescriptor) (*FileDescriptor, error) {
 	for _, s := range seen {
 		if filename == s {
 			return nil, fmt.Errorf("cycle in imports: %s", strings.Join(append(seen, filename), " -> "))
@@ -174,17 +193,21 @@ func createFromSet(filename string, seen []string, files map[string]*dpb.FileDes
 	}
 	fdp := files[filename]
 	if fdp == nil {
-		return nil, fmt.Errorf("file descriptor set missing a dependency: %s", filename)
+		return nil, intn.ErrNoSuchFile(filename)
 	}
 	deps := make([]*FileDescriptor, len(fdp.GetDependency()))
 	for i, depName := range fdp.GetDependency() {
-		if dep, err := createFromSet(depName, seen, files, resolved); err != nil {
-			return nil, err
-		} else {
-			deps[i] = dep
+		resolvedDep := r.ResolveImport(filename, depName)
+		dep, err := createFromSet(resolvedDep, r, seen, files, resolved)
+		if _, ok := err.(intn.ErrNoSuchFile); ok && resolvedDep != depName {
+			dep, err = createFromSet(depName, r, seen, files, resolved)
 		}
+		if err != nil {
+			return nil, err
+		}
+		deps[i] = dep
 	}
-	d, err := CreateFileDescriptor(fdp, deps...)
+	d, err := createFileDescriptor(fdp, deps, r)
 	if err != nil {
 		return nil, err
 	}
