@@ -12,6 +12,8 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
+// TODO: replace this alias configuration with desc.RegisterImportPath?
+
 // StdFileAliases are the standard protos included with protoc, but older versions of
 // their respective packages registered them using incorrect paths.
 var StdFileAliases = map[string]string{
@@ -56,6 +58,12 @@ func init() {
 	}
 }
 
+type ErrNoSuchFile string
+
+func (e ErrNoSuchFile) Error() string {
+	return fmt.Sprintf("no such file: %q", string(e))
+}
+
 // LoadFileDescriptor loads a registered descriptor and decodes it. If the given
 // name cannot be loaded but is a known standard name, an alias will be tried,
 // so the standard files can be loaded even if linked against older "known bad"
@@ -69,10 +77,10 @@ func LoadFileDescriptor(file string) (*dpb.FileDescriptorProto, error) {
 		if ok {
 			aliased = true
 			if fdb = proto.FileDescriptor(alias); fdb == nil {
-				return nil, fmt.Errorf("No such file: %q", file)
+				return nil, ErrNoSuchFile(file)
 			}
 		} else {
-			return nil, fmt.Errorf("No such file: %q", file)
+			return nil, ErrNoSuchFile(file)
 		}
 	}
 
