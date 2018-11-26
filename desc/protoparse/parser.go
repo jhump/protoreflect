@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -71,6 +72,20 @@ func setTokenName(token int, text string) {
 // FileAccessor is an abstraction for opening proto source files. It takes the
 // name of the file to open and returns either the input reader or an error.
 type FileAccessor func(filename string) (io.ReadCloser, error)
+
+// FileContentsFromMap returns a FileAccessor that uses the given map of file
+// contents. This allows proto source files to be constructed in memory and
+// easily supplied to a parser. The map keys are the paths to the proto source
+// files, and the values are the actual proto source contents.
+func FileContentsFromMap(files map[string]string) FileAccessor {
+	return func(filename string) (io.ReadCloser, error) {
+		contents, ok := files[filename]
+		if !ok {
+			return nil, os.ErrNotExist
+		}
+		return ioutil.NopCloser(strings.NewReader(contents)), nil
+	}
+}
 
 // Parser parses proto source into descriptors.
 type Parser struct {

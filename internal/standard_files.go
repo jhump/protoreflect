@@ -61,7 +61,7 @@ func init() {
 type ErrNoSuchFile string
 
 func (e ErrNoSuchFile) Error() string {
-	return fmt.Sprintf("no such file: %q", e)
+	return fmt.Sprintf("no such file: %q", string(e))
 }
 
 // LoadFileDescriptor loads a registered descriptor and decodes it. If the given

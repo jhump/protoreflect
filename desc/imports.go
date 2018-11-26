@@ -24,6 +24,8 @@ var (
 // An un-registered registerPath is also invalid. For example, if an attempt is
 // made to register the import path "foo/bar.proto" as "bar.proto", but there is
 // no "bar.proto" registered in the Go protobuf runtime, this method will panic.
+// This method also panics if an attempt is made to register the same import
+// path more than once.
 //
 // This function works globally, applying to all descriptors loaded by this
 // package. If you instead want more granular support for handling alternate
@@ -37,12 +39,15 @@ func RegisterImportPath(registerPath, importPath string) {
 	}
 	desc := proto.FileDescriptor(registerPath)
 	if len(desc) == 0 {
-		panic(fmt.Sprintf("path %s is not a registered proto file", registerPath))
+		panic(fmt.Sprintf("path %q is not a registered proto file", registerPath))
 	}
 	globalImportPathMu.Lock()
 	defer globalImportPathMu.Unlock()
 	if reg := globalImportPathConf[importPath]; reg != "" {
-		panic(fmt.Sprintf("import path %s already registered for %s", importPath, reg))
+		panic(fmt.Sprintf("import path %q already registered for %s", importPath, reg))
+	}
+	if globalImportPathConf == nil {
+		globalImportPathConf = map[string]string{}
 	}
 	globalImportPathConf[importPath] = registerPath
 }
@@ -51,7 +56,7 @@ func RegisterImportPath(registerPath, importPath string) {
 // alternate via RegisterImportPath, the registered path is returned. Otherwise,
 // the given import path is returned unchanged.
 func ResolveImport(importPath string) string {
-	importPath = filepath.Clean(importPath)
+	importPath = clean(importPath)
 	globalImportPathMu.RLock()
 	defer globalImportPathMu.RUnlock()
 	reg := globalImportPathConf[importPath]
@@ -107,7 +112,7 @@ type ImportResolver struct {
 // unchanged.
 func (r *ImportResolver) ResolveImport(source, importPath string) string {
 	if r != nil {
-		res := r.resolveImport(source, filepath.Clean(importPath))
+		res := r.resolveImport(clean(source), clean(importPath))
 		if res != "" {
 			return res
 		}
@@ -141,7 +146,8 @@ func (r *ImportResolver) resolveImport(source, importPath string) string {
 // registered path cannot be located, then linking will fallback to the actual
 // imported path.
 //
-// This method will panic if given an empty path.
+// This method will panic if given an empty path or if the same import path is
+// registered more than once.
 //
 // To constrain the contexts where the given import path is to be re-written,
 // use RegisterImportPathFrom instead.
@@ -164,17 +170,19 @@ func (r *ImportResolver) RegisterImportPath(registerPath, importPath string) {
 // actual imported path.
 //
 // This method will panic if given an empty path. The source context, on the
-// other hand, is allowed to be blank. A blank source matches all files.
+// other hand, is allowed to be blank. A blank source matches all files. This
+// method also panics if the same import path is registered in the same source
+// context more than once.
 func (r *ImportResolver) RegisterImportPathFrom(registerPath, importPath, source string) {
-	importPath = filepath.Clean(importPath)
+	importPath = clean(importPath)
 	if len(importPath) == 0 {
 		panic("import path cannot be empty")
 	}
-	registerPath = filepath.Clean(registerPath)
+	registerPath = clean(registerPath)
 	if len(registerPath) == 0 {
 		panic("registered path cannot be empty")
 	}
-	r.registerImportPathFrom(registerPath, importPath, filepath.Clean(source))
+	r.registerImportPathFrom(registerPath, importPath, clean(source))
 }
 
 func (r *ImportResolver) registerImportPathFrom(registerPath, importPath, source string) {
@@ -182,7 +190,7 @@ func (r *ImportResolver) registerImportPathFrom(registerPath, importPath, source
 		if r.importPaths == nil {
 			r.importPaths = map[string]string{}
 		} else if reg := r.importPaths[importPath]; reg != "" {
-			panic(fmt.Sprintf("already registered import path %s as %s", importPath, registerPath))
+			panic(fmt.Sprintf("already registered import path %q as %q", importPath, registerPath))
 		}
 		r.importPaths[importPath] = registerPath
 		return
@@ -273,4 +281,17 @@ func (r *ImportResolver) CreateFileDescriptors(fds []*dpb.FileDescriptorProto) (
 // linking the descriptor protos in the given set.
 func (r *ImportResolver) CreateFileDescriptorFromSet(fds *dpb.FileDescriptorSet) (*FileDescriptor, error) {
 	return createFileDescriptorFromSet(fds, r)
+}
+
+const dotPrefix = "." + string(filepath.Separator)
+
+func clean(path string) string {
+	if path == "" {
+		return ""
+	}
+	path = filepath.Clean(path)
+	if path == "." {
+		return ""
+	}
+	return strings.TrimPrefix(path, dotPrefix)
 }
