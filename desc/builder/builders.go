@@ -1208,10 +1208,7 @@ func (mb *MessageBuilder) SetComments(c Comments) *MessageBuilder {
 // include the message's fields and one-ofs as well as any nested messages,
 // extensions, and enums.
 func (mb *MessageBuilder) GetChildren() []Builder {
-	var ch []Builder
-	for _, b := range mb.fieldsAndOneOfs {
-		ch = append(ch, b)
-	}
+	ch := append([]Builder(nil), mb.fieldsAndOneOfs...)
 	for _, nmb := range mb.nestedMessages {
 		ch = append(ch, nmb)
 	}

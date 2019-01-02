@@ -332,7 +332,7 @@ func marshalFieldValue(fd *desc.FieldDescriptor, val interface{}, b *codedBuffer
 		// whosoever writeth start-group tag (e.g. caller) is responsible for writing end-group tag
 
 	default:
-		return fmt.Errorf("Unrecognized field type: %v", fd.GetType())
+		return fmt.Errorf("unrecognized field type: %v", fd.GetType())
 	}
 }
 

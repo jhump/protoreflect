@@ -81,7 +81,7 @@ func (r *typeResolver) resolveUrlToMessageDescriptor(url string) (*desc.MessageD
 		if md, ok := cached.(*desc.MessageDescriptor); ok {
 			return md, nil
 		} else {
-			return nil, fmt.Errorf("Type for url %v is the wrong type: wanted message, got enum", url)
+			return nil, fmt.Errorf("type for URL %v is the wrong type: wanted message, got enum", url)
 		}
 	}
 
@@ -128,7 +128,7 @@ func (r *typeResolver) resolveUrlsToMessageDescriptors(urls ...string) (map[stri
 				ret[u] = md
 			} else {
 				r.mu.RUnlock()
-				return nil, fmt.Errorf("Type for url %v is the wrong type: wanted message, got enum", u)
+				return nil, fmt.Errorf("type for URL %v is the wrong type: wanted message, got enum", u)
 			}
 		} else {
 			ret[u] = nil
@@ -181,7 +181,7 @@ func (r *typeResolver) resolveUrlToEnumDescriptor(url string) (*desc.EnumDescrip
 		if ed, ok := cached.(*desc.EnumDescriptor); ok {
 			return ed, nil
 		} else {
-			return nil, fmt.Errorf("Type for url %v is the wrong type: wanted enum, got message", url)
+			return nil, fmt.Errorf("type for URL %v is the wrong type: wanted enum, got message", url)
 		}
 	}
 
@@ -311,7 +311,7 @@ func (rc *resolutionContext) addType(url string, enum bool) error {
 	if err != nil {
 		return err
 	} else if m == nil {
-		return fmt.Errorf("Failed to locate type for %s", url)
+		return fmt.Errorf("failed to locate type for %s", url)
 	}
 
 	if enum {
@@ -715,7 +715,8 @@ func (t *typeTrie) rewriteDescriptor(name string) (proto.Message, error) {
 		case (*descriptor.EnumDescriptorProto):
 			mdp.EnumType = append(mdp.EnumType, typ)
 		default:
-			return nil, fmt.Errorf("Invalid descriptor trie: message cannot have child of type %v", reflect.TypeOf(typ))
+			// TODO: this should probably panic instead
+			return nil, fmt.Errorf("invalid descriptor trie: message cannot have child of type %v", reflect.TypeOf(typ))
 		}
 	}
 	return mdp, nil

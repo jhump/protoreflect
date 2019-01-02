@@ -187,7 +187,7 @@ func (r *MessageRegistry) getRegisteredMessageTypeByUrl(url string) (*desc.Messa
 			if md, ok := m.(*desc.MessageDescriptor); ok {
 				return md, nil
 			} else {
-				return nil, fmt.Errorf("Type for url %v is the wrong type: wanted message, got enum", url)
+				return nil, fmt.Errorf("type for URL %v is the wrong type: wanted message, got enum", url)
 			}
 		}
 	}
@@ -235,7 +235,7 @@ func (r *MessageRegistry) getRegisteredEnumTypeByUrl(url string) (*desc.EnumDesc
 		if ed, ok := m.(*desc.EnumDescriptor); ok {
 			return ed, nil
 		} else {
-			return nil, fmt.Errorf("Type for url %v is the wrong type: wanted enum, got message", url)
+			return nil, fmt.Errorf("type for URL %v is the wrong type: wanted enum, got message", url)
 		}
 	}
 	return nil, nil
@@ -343,7 +343,7 @@ func (r *MessageRegistry) unmarshalAny(any *any.Any, fetch func(string) (*desc.M
 		if md, err := fetch(any.TypeUrl); err != nil {
 			return nil, err
 		} else if md == nil {
-			return nil, fmt.Errorf("Unknown message type: %s", any.TypeUrl)
+			return nil, fmt.Errorf("unknown message type: %s", any.TypeUrl)
 		} else {
 			msg = mf.NewDynamicMessage(md)
 		}

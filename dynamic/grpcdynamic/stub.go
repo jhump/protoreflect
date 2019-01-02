@@ -152,7 +152,7 @@ func checkMessageType(md *desc.MessageDescriptor, msg proto.Message) error {
 		typeName = proto.MessageName(msg)
 	}
 	if typeName != md.GetFullyQualifiedName() {
-		return fmt.Errorf("Expecting message of type %s; got %s", md.GetFullyQualifiedName(), typeName)
+		return fmt.Errorf("expecting message of type %s; got %s", md.GetFullyQualifiedName(), typeName)
 	}
 	return nil
 }

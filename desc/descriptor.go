@@ -535,7 +535,7 @@ func createFieldDescriptor(fd *FileDescriptor, parent Descriptor, enclosing stri
 
 func (fd *FieldDescriptor) resolve(path []int32, scopes []scope) error {
 	if fd.proto.OneofIndex != nil && fd.oneOf == nil {
-		return fmt.Errorf("Could not link field %s to one-of index %d", fd.fqn, *fd.proto.OneofIndex)
+		return fmt.Errorf("could not link field %s to one-of index %d", fd.fqn, *fd.proto.OneofIndex)
 	}
 	fd.sourceInfoPath = append([]int32(nil), path...) // defensive copy
 	if fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_ENUM {
@@ -1630,7 +1630,7 @@ func resolve(fd *FileDescriptor, name string, scopes []scope) (Descriptor, error
 			}
 		}
 	}
-	return nil, fmt.Errorf("File %q included an unresolvable reference to %q", fd.proto.GetName(), name)
+	return nil, fmt.Errorf("file %q included an unresolvable reference to %q", fd.proto.GetName(), name)
 }
 
 func findSymbol(fd *FileDescriptor, name string, public bool) Descriptor {
