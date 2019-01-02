@@ -569,7 +569,7 @@ func textError(tok *token, format string, args ...interface{}) error {
 	} else {
 		msg = fmt.Sprintf(format, args...)
 	}
-	return fmt.Errorf("Line %d, col %d: %s", tok.pos.Line, tok.pos.Column, msg)
+	return fmt.Errorf("line %d, col %d: %s", tok.pos.Line, tok.pos.Column, msg)
 }
 
 type setFunction func(*Message, *desc.FieldDescriptor, interface{}) error
@@ -738,7 +738,7 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 
 	// if we get here, token was wrong type; create error message
 	var article string
-	if strings.Index("aieou", expected[0:1]) != -1 {
+	if strings.Contains("aieou", expected[0:1]) {
 		article = "an"
 	} else {
 		article = "a"
@@ -997,7 +997,7 @@ func (p *txtReader) processToken(t rune, text string, pos scanner.Position) erro
 				p.peeked.val = text // can't parse the number because we don't know if it's signed or unsigned
 			} else {
 				p.peeked.pos = p.scanner.Position
-				return fmt.Errorf("Expecting an int or float but got %q", p.scanner.TokenText())
+				return fmt.Errorf("expecting an int or float but got %q", p.scanner.TokenText())
 			}
 		}
 	case ':':
@@ -1034,7 +1034,7 @@ func (p *txtReader) processToken(t rune, text string, pos scanner.Position) erro
 		p.peeked.tokTyp = tokenCloseParen
 		p.peeked.val = ')'
 	default:
-		return fmt.Errorf("Invalid character: %c", t)
+		return fmt.Errorf("invalid character: %c", t)
 	}
 	return nil
 }

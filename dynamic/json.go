@@ -329,7 +329,7 @@ func marshalKnownFieldMapEntryJSON(b *indentBuffer, mk interface{}, vfd *desc.Fi
 	case reflect.String:
 		strkey = rk.String()
 	default:
-		return fmt.Errorf("Invalid map key value: %v (%v)", mk, rk.Type())
+		return fmt.Errorf("invalid map key value: %v (%v)", mk, rk.Type())
 	}
 	err := writeString(b, strkey)
 	if err != nil {
@@ -508,7 +508,7 @@ func (m *Message) UnmarshalMergeJSONPB(opts *jsonpb.Unmarshaler, js []byte) erro
 	if t, err := r.poll(); err != io.EOF {
 		b, _ := ioutil.ReadAll(r.unread())
 		s := fmt.Sprintf("%v%s", t, string(b))
-		return fmt.Errorf("Superfluous data found after JSON object: %q", s)
+		return fmt.Errorf("superfluous data found after JSON object: %q", s)
 	}
 	return nil
 }
@@ -578,7 +578,7 @@ func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
 				r.skip()
 				continue
 			}
-			return fmt.Errorf("Message type %s has no known field named %s", m.md.GetFullyQualifiedName(), f)
+			return fmt.Errorf("message type %s has no known field named %s", m.md.GetFullyQualifiedName(), f)
 		}
 		v, err := unmarshalJsField(fd, r, m.mf, opts)
 		if err != nil {
@@ -608,7 +608,7 @@ func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
 				}
 			} else {
 				// not a message... explicit null makes no sense
-				return fmt.Errorf("Message type %s cannot set field %s to null: it is not a message type", m.md.GetFullyQualifiedName(), f)
+				return fmt.Errorf("message type %s cannot set field %s to null: it is not a message type", m.md.GetFullyQualifiedName(), f)
 			}
 		} else {
 			m.clearField(fd)
@@ -778,7 +778,7 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 				if vd != nil {
 					return vd.GetNumber(), nil
 				} else {
-					return nil, fmt.Errorf("Enum %q does not have value named %q", fd.GetEnumType().GetFullyQualifiedName(), e)
+					return nil, fmt.Errorf("enum %q does not have value named %q", fd.GetEnumType().GetFullyQualifiedName(), e)
 				}
 			} else if i > math.MaxInt32 || i < math.MinInt32 {
 				return nil, NumericOverflowError
@@ -846,7 +846,7 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 		return r.nextString()
 
 	default:
-		return nil, fmt.Errorf("Unknown field type: %v", fd.GetType())
+		return nil, fmt.Errorf("unknown field type: %v", fd.GetType())
 	}
 }
 
@@ -993,7 +993,7 @@ func (r *jsReader) nextNumber() (json.Number, error) {
 	case string:
 		return json.Number(t), nil
 	}
-	return "", fmt.Errorf("Expecting a number but got %v", t)
+	return "", fmt.Errorf("expecting a number but got %v", t)
 }
 
 func (r *jsReader) skip() error {
@@ -1051,7 +1051,7 @@ func (r *jsReader) expect(predicate func(json.Token) bool, ifNil interface{}, ex
 		return ifNil, nil
 	}
 	if !predicate(t) {
-		return t, fmt.Errorf("Bad input. Expecting %s. Instead got: %v.", expected, t)
+		return t, fmt.Errorf("bad input: expecting %s ; instead got %v", expected, t)
 	}
 	return t, nil
 }

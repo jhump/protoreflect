@@ -179,7 +179,7 @@ func TestHttpTypeFetcher_ParallelDownloads(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	elapsed := time.Now().Sub(start)
+	elapsed := time.Since(start)
 
 	// we should have observed exactly the maximum number of parallel downloads
 	testutil.Eq(t, 10, trt.max)

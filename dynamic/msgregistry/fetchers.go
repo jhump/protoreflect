@@ -38,7 +38,7 @@ func CachingTypeFetcher(fetcher TypeFetcher) TypeFetcher {
 				want = "message"
 				got = "enum"
 			}
-			return nil, fmt.Errorf("Type for url %v is the wrong type: wanted %s, got %s", typeUrl, want, got)
+			return nil, fmt.Errorf("type for URL %v is the wrong type: wanted %s, got %s", typeUrl, want, got)
 		}
 		return m.(proto.Message), nil
 	}
@@ -120,7 +120,7 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 		}
 
 		if resp.ContentLength > int64(szLimit) {
-			return nil, fmt.Errorf("Type definition size %d is larger than limit of %d", resp.ContentLength, szLimit)
+			return nil, fmt.Errorf("type definition size %d is larger than limit of %d", resp.ContentLength, szLimit)
 		}
 
 		// download the response, up to the given size limit, into a buffer
@@ -135,7 +135,7 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 			}
 			if n > 0 {
 				if b.Len()+n > szLimit {
-					return nil, fmt.Errorf("Type definition size %d+ is larger than limit of %d", b.Len()+n, szLimit)
+					return nil, fmt.Errorf("type definition size %d+ is larger than limit of %d", b.Len()+n, szLimit)
 				}
 				b.Write(buf[:n])
 			}

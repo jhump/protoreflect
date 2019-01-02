@@ -335,7 +335,7 @@ func loadFieldDescriptorForExtension(ext *proto.ExtensionDesc, r *ImportResolver
 	// make sure descriptor agrees with attributes of the ExtensionDesc
 	if !ok || !field.IsExtension() || field.GetOwner().GetFullyQualifiedName() != proto.MessageName(ext.ExtendedType) ||
 		field.GetNumber() != ext.Field {
-		return nil, fmt.Errorf("File descriptor contained unexpected object with name %s:", ext.Name)
+		return nil, fmt.Errorf("file descriptor contained unexpected object with name %s", ext.Name)
 	}
 	return field, nil
 }

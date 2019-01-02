@@ -52,7 +52,7 @@ func (r *ExtensionRegistry) AddExtensionDesc(exts ...*proto.ExtensionDesc) error
 func (r *ExtensionRegistry) AddExtension(exts ...*desc.FieldDescriptor) error {
 	for _, ext := range exts {
 		if !ext.IsExtension() {
-			return fmt.Errorf("Given field is not an extension: %s", ext.GetFullyQualifiedName())
+			return fmt.Errorf("given field is not an extension: %s", ext.GetFullyQualifiedName())
 		}
 	}
 	r.mu.Lock()

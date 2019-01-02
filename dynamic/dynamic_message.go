@@ -15,30 +15,54 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
-// UnknownTagNumberError is an error that is returned when an operation refers
+// ErrUnknownTagNumber is an error that is returned when an operation refers
 // to an unknown tag number.
-var UnknownTagNumberError = errors.New("unknown tag number")
+var ErrUnknownTagNumber = errors.New("unknown tag number")
 
-// UnknownFieldNameError is an error that is returned when an operation refers
+// UnknownTagNumberError is the same as ErrUnknownTagNumber.
+// Deprecated: use ErrUnknownTagNumber
+var UnknownTagNumberError = ErrUnknownTagNumber
+
+// ErrUnknownFieldName is an error that is returned when an operation refers
 // to an unknown field name.
-var UnknownFieldNameError = errors.New("unknown field name")
+var ErrUnknownFieldName = errors.New("unknown field name")
 
-// FieldIsNotMapError is an error that is returned when map-related operations
+// UnknownFieldNameError is the same as ErrUnknownFieldName.
+// Deprecated: use ErrUnknownFieldName
+var UnknownFieldNameError = ErrUnknownFieldName
+
+// ErrFieldIsNotMap is an error that is returned when map-related operations
 // are attempted with fields that are not maps.
-var FieldIsNotMapError = errors.New("field is not a map type")
+var ErrFieldIsNotMap = errors.New("field is not a map type")
 
-// FieldIsNotRepeatedError is an error that is returned when repeated field
+// FieldIsNotMapError is the same as ErrFieldIsNotMap.
+// Deprecated: use ErrFieldIsNotMap
+var FieldIsNotMapError = ErrFieldIsNotMap
+
+// ErrFieldIsNotRepeated is an error that is returned when repeated field
 // operations are attempted with fields that are not repeated.
-var FieldIsNotRepeatedError = errors.New("field is not repeated")
+var ErrFieldIsNotRepeated = errors.New("field is not repeated")
 
-// IndexOutOfRangeError is an error that is returned when an invalid index is
+// FieldIsNotRepeatedError is the same as ErrFieldIsNotRepeated.
+// Deprecated: use ErrFieldIsNotRepeated
+var FieldIsNotRepeatedError = ErrFieldIsNotRepeated
+
+// ErrIndexOutOfRange is an error that is returned when an invalid index is
 // provided when access a single element of a repeated field.
-var IndexOutOfRangeError = errors.New("index is out of range")
+var ErrIndexOutOfRange = errors.New("index is out of range")
 
-// NumericOverflowError is an error returned by operations that encounter a
+// IndexOutOfRangeError is the same as ErrIndexOutOfRange.
+// Deprecated: use ErrIndexOutOfRange
+var IndexOutOfRangeError = ErrIndexOutOfRange
+
+// ErrNumericOverflow is an error returned by operations that encounter a
 // numeric value that is too large, for example de-serializing a value into an
 // int32 field when the value is larger that can fit into a 32-bit value.
-var NumericOverflowError = errors.New("numeric value is out of range")
+var ErrNumericOverflow = errors.New("numeric value is out of range")
+
+// NumericOverflowError is the same as ErrNumericOverflow.
+// Deprecated: use ErrNumericOverflow
+var NumericOverflowError = ErrNumericOverflow
 
 var typeOfProtoMessage = reflect.TypeOf((*proto.Message)(nil)).Elem()
 var typeOfDynamicMessage = reflect.TypeOf((*Message)(nil))
