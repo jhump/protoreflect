@@ -1433,21 +1433,21 @@ func (k sortedKeys) Less(i, j int) bool {
 func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent int) {
 	fmt.Fprintf(w, "%s = ", name)
 
-	switch optVal.(type) {
+	switch optVal := optVal.(type) {
 	case int32, uint32, int64, uint64:
 		fmt.Fprintf(w, "%d", optVal)
 	case float32, float64:
 		fmt.Fprintf(w, "%f", optVal)
 	case string:
-		fmt.Fprintf(w, "%s", quotedString(optVal.(string)))
+		fmt.Fprintf(w, "%s", quotedString(optVal))
 	case []byte:
-		fmt.Fprintf(w, "%s", quotedString(string(optVal.([]byte))))
+		fmt.Fprintf(w, "%s", quotedString(string(optVal)))
 	case bool:
 		fmt.Fprintf(w, "%v", optVal)
 	case ident:
 		fmt.Fprintf(w, "%s", optVal)
 	case *desc.EnumValueDescriptor:
-		fmt.Fprintf(w, "%s", optVal.(*desc.EnumValueDescriptor).GetName())
+		fmt.Fprintf(w, "%s", optVal.GetName())
 	case proto.Message:
 		// TODO: if value is too long, marshal to text format with indentation to
 		// make output prettier (also requires correctly indenting subsequent lines)
@@ -1455,7 +1455,7 @@ func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent
 		// TODO: alternate approach so we can apply p.ForceFullyQualifiedNames
 		// inside the resulting value?
 
-		fmt.Fprintf(w, "{ %s }", proto.CompactTextString(optVal.(proto.Message)))
+		fmt.Fprintf(w, "{ %s }", proto.CompactTextString(optVal))
 	default:
 		panic(fmt.Sprintf("unknown type of value %T for field %s", optVal, name))
 	}
