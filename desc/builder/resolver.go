@@ -2,6 +2,7 @@ package builder
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -18,12 +19,14 @@ import (
 type dependencyResolver struct {
 	resolvedRoots map[Builder]*desc.FileDescriptor
 	seen          map[Builder]struct{}
+	opts          BuilderOptions
 }
 
-func newResolver() *dependencyResolver {
+func newResolver(opts BuilderOptions) *dependencyResolver {
 	return &dependencyResolver{
 		resolvedRoots: map[Builder]*desc.FileDescriptor{},
 		seen:          map[Builder]struct{}{},
+		opts:          opts,
 	}
 }
 
@@ -68,6 +71,11 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 			return nil, err
 		}
 	}
+	for _, eb := range fb.enums {
+		if err := r.resolveTypesInEnum(root, seen, deps, eb); err != nil {
+			return nil, err
+		}
+	}
 	for _, exb := range fb.extensions {
 		if err := r.resolveTypesInExtension(root, seen, deps, exb); err != nil {
 			return nil, err
@@ -77,6 +85,10 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 		if err := r.resolveTypesInService(root, seen, deps, sb); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := r.resolveTypesInOptions(root, fb.Options, deps); err != nil {
+		return nil, err
 	}
 
 	depSlice := make([]*desc.FileDescriptor, 0, len(deps))
@@ -175,6 +187,19 @@ func (r *dependencyResolver) resolveTypesInMessage(root Builder, seen []Builder,
 					return err
 				}
 			}
+			if err := r.resolveTypesInOptions(root, oob.Options, deps); err != nil {
+				return err
+			}
+		}
+	}
+	for _, extr := range mb.ExtensionRanges {
+		if err := r.resolveTypesInOptions(root, extr.Options, deps); err != nil {
+			return err
+		}
+	}
+	for _, eb := range mb.nestedEnums {
+		if err := r.resolveTypesInEnum(root, seen, deps, eb); err != nil {
+			return err
 		}
 	}
 	for _, nmb := range mb.nestedMessages {
@@ -186,6 +211,9 @@ func (r *dependencyResolver) resolveTypesInMessage(root Builder, seen []Builder,
 		if err := r.resolveTypesInExtension(root, seen, deps, exb); err != nil {
 			return err
 		}
+	}
+	if err := r.resolveTypesInOptions(root, mb.Options, deps); err != nil {
+		return err
 	}
 	return nil
 }
@@ -210,6 +238,12 @@ func (r *dependencyResolver) resolveTypesInService(root Builder, seen []Builder,
 		if err := r.resolveRpcType(root, seen, mtb.RespType, deps); err != nil {
 			return err
 		}
+		if err := r.resolveTypesInOptions(root, mtb.Options, deps); err != nil {
+			return err
+		}
+	}
+	if err := r.resolveTypesInOptions(root, sb.Options, deps); err != nil {
+		return err
 	}
 	return nil
 }
@@ -224,6 +258,9 @@ func (r *dependencyResolver) resolveRpcType(root Builder, seen []Builder, t *Rpc
 }
 
 func (r *dependencyResolver) resolveTypesInField(root Builder, seen []Builder, flb *FieldBuilder, deps map[*desc.FileDescriptor]struct{}) error {
+	if err := r.resolveTypesInOptions(root, flb.Options, deps); err != nil {
+		return err
+	}
 	if flb.fieldType.foreignMsgType != nil {
 		deps[flb.fieldType.foreignMsgType.GetFile()] = struct{}{}
 	} else if flb.fieldType.foreignEnumType != nil {
@@ -236,6 +273,54 @@ func (r *dependencyResolver) resolveTypesInField(root Builder, seen []Builder, f
 		}
 	} else if flb.fieldType.localEnumType != nil {
 		return r.resolveType(root, seen, flb.fieldType.localEnumType, deps)
+	}
+	return nil
+}
+
+func (r *dependencyResolver) resolveTypesInEnum(root Builder, seen []Builder, deps map[*desc.FileDescriptor]struct{}, eb *EnumBuilder) error {
+	for _, evb := range eb.values {
+		if err := r.resolveTypesInOptions(root, evb.Options, deps); err != nil {
+			return err
+		}
+	}
+	if err := r.resolveTypesInOptions(root, eb.Options, deps); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *dependencyResolver) resolveTypesInOptions(root Builder, opts proto.Message, deps map[*desc.FileDescriptor]struct{}) error {
+	// nothing to see if opts is nil
+	if opts == nil {
+		return nil
+	}
+	if rv := reflect.ValueOf(opts); rv.Kind() == reflect.Ptr && rv.IsNil() {
+		return nil
+	}
+
+	msgName := proto.MessageName(opts)
+
+	extdescs, err := proto.ExtensionDescs(opts)
+	if err != nil {
+		return err
+	}
+	for _, ed := range extdescs {
+		extd := r.opts.Extensions.FindExtension(msgName, ed.Field)
+		if extd != nil {
+			// extension registry recognized it!
+			deps[extd.GetFile()] = struct{}{}
+		} else if ed.Filename != "" {
+			// if filename is filled in, then this extension is a known
+			// extension (registered in proto package)
+			fd, err := desc.LoadFileDescriptor(ed.Filename)
+			if err != nil {
+				return err
+			}
+			deps[fd] = struct{}{}
+		} else if r.opts.RequireInterpretedOptions {
+			// we require options to be interpreted but are not able to!
+			return fmt.Errorf("could not interpret custom option for %s, tag %d", msgName, ed.Field)
+		}
 	}
 	return nil
 }

@@ -402,11 +402,15 @@ func (m *Message) FindFieldDescriptorByJSONName(name string) *desc.FieldDescript
 }
 
 func (m *Message) checkField(fd *desc.FieldDescriptor) error {
-	if fd.GetOwner().GetFullyQualifiedName() != m.md.GetFullyQualifiedName() {
-		return fmt.Errorf("given field, %s, is for wrong message type: %s; expecting %s", fd.GetName(), fd.GetOwner().GetFullyQualifiedName(), m.md.GetFullyQualifiedName())
+	return checkField(fd, m.md)
+}
+
+func checkField(fd *desc.FieldDescriptor, md *desc.MessageDescriptor) error {
+	if fd.GetOwner().GetFullyQualifiedName() != md.GetFullyQualifiedName() {
+		return fmt.Errorf("given field, %s, is for wrong message type: %s; expecting %s", fd.GetName(), fd.GetOwner().GetFullyQualifiedName(), md.GetFullyQualifiedName())
 	}
-	if fd.IsExtension() && !m.md.IsExtension(fd.GetNumber()) {
-		return fmt.Errorf("given field, %s, is an extension but is not in message extension range: %v", fd.GetFullyQualifiedName(), m.md.GetExtensionRanges())
+	if fd.IsExtension() && !md.IsExtension(fd.GetNumber()) {
+		return fmt.Errorf("given field, %s, is an extension but is not in message extension range: %v", fd.GetFullyQualifiedName(), md.GetExtensionRanges())
 	}
 	return nil
 }
