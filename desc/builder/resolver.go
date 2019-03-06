@@ -187,6 +187,9 @@ func (r *dependencyResolver) resolveTypesInMessage(root Builder, seen []Builder,
 					return err
 				}
 			}
+			if err := r.resolveTypesInOptions(root, oob.Options, deps); err != nil {
+				return err
+			}
 		}
 	}
 	for _, extr := range mb.ExtensionRanges {
@@ -304,20 +307,17 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, opts proto.Mess
 	for _, ed := range extdescs {
 		extd := r.opts.Extensions.FindExtension(msgName, ed.Field)
 		if extd != nil {
+			// extension registry recognized it!
 			deps[extd.GetFile()] = struct{}{}
-		}
-
-		// if not found in extension registry, see if it's a known
-		// extension (registered in proto package)
-		if ed.Filename != "" {
+		} else if ed.Filename != "" {
+			// if filename is filled in, then this extension is a known
+			// extension (registered in proto package)
 			fd, err := desc.LoadFileDescriptor(ed.Filename)
 			if err != nil {
 				return err
 			}
 			deps[fd] = struct{}{}
-		}
-
-		if r.opts.RequireInterpretedOptions {
+		} else if r.opts.RequireInterpretedOptions {
 			// we require options to be interpreted but are not able to!
 			return fmt.Errorf("could not interpret custom option for %s, tag %d", msgName, ed.Field)
 		}
