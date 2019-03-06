@@ -19,12 +19,14 @@ import (
 type dependencyResolver struct {
 	resolvedRoots map[Builder]*desc.FileDescriptor
 	seen          map[Builder]struct{}
+	opts          BuilderOptions
 }
 
-func newResolver() *dependencyResolver {
+func newResolver(opts BuilderOptions) *dependencyResolver {
 	return &dependencyResolver{
 		resolvedRoots: map[Builder]*desc.FileDescriptor{},
 		seen:          map[Builder]struct{}{},
+		opts:          opts,
 	}
 }
 
@@ -285,9 +287,6 @@ func (r *dependencyResolver) resolveTypesInEnum(root Builder, seen []Builder, de
 }
 
 func (r *dependencyResolver) resolveTypesInOptions(root Builder, opts proto.Message, deps map[*desc.FileDescriptor]struct{}) error {
-	// TODO: need a dynamic.ExtensionRegistry in order to process custom options
-	// that are not known/compiled into this program
-
 	// nothing to see if opts is nil
 	if opts == nil {
 		return nil
@@ -296,19 +295,32 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, opts proto.Mess
 		return nil
 	}
 
+	msgName := proto.MessageName(opts)
+
 	extdescs, err := proto.ExtensionDescs(opts)
 	if err != nil {
 		return err
 	}
 	for _, ed := range extdescs {
-		if ed.Filename == "" {
-			continue
+		extd := r.opts.Extensions.FindExtension(msgName, ed.Field)
+		if extd != nil {
+			deps[extd.GetFile()] = struct{}{}
 		}
-		fd, err := desc.LoadFileDescriptor(ed.Filename)
-		if err != nil {
-			return err
+
+		// if not found in extension registry, see if it's a known
+		// extension (registered in proto package)
+		if ed.Filename != "" {
+			fd, err := desc.LoadFileDescriptor(ed.Filename)
+			if err != nil {
+				return err
+			}
+			deps[fd] = struct{}{}
 		}
-		deps[fd] = struct{}{}
+
+		if r.opts.RequireInterpretedOptions {
+			// we require options to be interpreted but are not able to!
+			return fmt.Errorf("could not interpret custom option for %s, tag %d", msgName, ed.Field)
+		}
 	}
 	return nil
 }

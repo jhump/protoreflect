@@ -14,6 +14,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
+	"github.com/jhump/protoreflect/dynamic"
 )
 
 // Builder is the core interface implemented by all descriptor builders. It
@@ -66,6 +67,11 @@ type Builder interface {
 	// BuildDescriptor is a generic form of the Build method. Its declared
 	// return type is general so that it can be included in this interface and
 	// implemented by all concrete builder types.
+	//
+	// If the builder includes references to custom options, only those known to
+	// the calling program (i.e. linked in and registered with the proto
+	// package) can be correctly interpreted. If the builder references other
+	// custom options, use BuilderOptions.Build instead.
 	BuildDescriptor() (desc.Descriptor, error)
 
 	// findChild returns the child builder with the given name or nil if this
@@ -89,6 +95,28 @@ type Builder interface {
 	// this element's parent is up-to-date. It does NOT try to remove references
 	// from the parent to this child. (See doc for removeChild(Builder)).
 	setParent(Builder)
+}
+
+// BuilderOptions includes additional options to use when building descriptors.
+type BuilderOptions struct {
+	// This registry provides definitions for custom options. If a builder
+	// refers to an option that is not known by this registry, it can still be
+	// interpreted if the extension is "known" to the calling program (i.e.
+	// linked in and registered with the proto package).
+	Extensions *dynamic.ExtensionRegistry
+
+	// If this option is true, then all options referred to in builders must
+	// be interpreted. That means that if an option is present that is neither
+	// recognized by Extenions nor known to the calling program, trying to build
+	// the descriptor will fail.
+	RequireInterpretedOptions bool
+}
+
+// Build processes the given builder into a descriptor using these options.
+// Using the builder's Build() or BuildDescriptor() method is equivalent to
+// building with a zero-value BuilderOptions.
+func (opts BuilderOptions) Build(b Builder) (desc.Descriptor, error) {
+	return doBuild(b, opts)
 }
 
 // Comments represents the various comments that might be associated with a
@@ -307,10 +335,13 @@ func (b *baseBuilder) GetComments() *Comments {
 
 // doBuild is a helper for implementing the Build() method that each builder
 // exposes. It is used for all builders except for the root FileBuilder type.
-func doBuild(b Builder) (desc.Descriptor, error) {
-	fd, err := newResolver().resolveElement(b, nil)
+func doBuild(b Builder, opts BuilderOptions) (desc.Descriptor, error) {
+	fd, err := newResolver(opts).resolveElement(b, nil)
 	if err != nil {
 		return nil, err
+	}
+	if _, ok := b.(*FileBuilder); ok {
+		return fd, nil
 	}
 	return fd.FindSymbol(GetFullyQualifiedName(b)), nil
 }
@@ -1027,7 +1058,11 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 // resolving symbols referenced by the builder or failing to meet certain
 // validation rules, an error is returned.
 func (fb *FileBuilder) Build() (*desc.FileDescriptor, error) {
-	return newResolver().resolveElement(fb, nil)
+	fd, err := fb.BuildDescriptor()
+	if err != nil {
+		return nil, err
+	}
+	return fd.(*desc.FileDescriptor), nil
 }
 
 // BuildDescriptor constructs a file descriptor based on the contents of this
@@ -1035,7 +1070,7 @@ func (fb *FileBuilder) Build() (*desc.FileDescriptor, error) {
 // concrete descriptor type. This method is present to satisfy the Builder
 // interface.
 func (fb *FileBuilder) BuildDescriptor() (desc.Descriptor, error) {
-	return fb.Build()
+	return doBuild(fb, BuilderOptions{})
 }
 
 // MessageBuilder is a builder used to construct a desc.MessageDescriptor. A
@@ -1838,11 +1873,11 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 // resolving symbols referenced by the builder or failing to meet certain
 // validation rules, an error is returned.
 func (mb *MessageBuilder) Build() (*desc.MessageDescriptor, error) {
-	d, err := doBuild(mb)
+	md, err := mb.BuildDescriptor()
 	if err != nil {
 		return nil, err
 	}
-	return d.(*desc.MessageDescriptor), nil
+	return md.(*desc.MessageDescriptor), nil
 }
 
 // BuildDescriptor constructs a message descriptor based on the contents of this
@@ -1850,7 +1885,7 @@ func (mb *MessageBuilder) Build() (*desc.MessageDescriptor, error) {
 // is a concrete descriptor type. This method is present to satisfy the Builder
 // interface.
 func (mb *MessageBuilder) BuildDescriptor() (desc.Descriptor, error) {
-	return mb.Build()
+	return doBuild(mb, BuilderOptions{})
 }
 
 // FieldBuilder is a builder used to construct a desc.FieldDescriptor. A field
@@ -2377,11 +2412,11 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 // resolving symbols referenced by the builder or failing to meet certain
 // validation rules, an error is returned.
 func (flb *FieldBuilder) Build() (*desc.FieldDescriptor, error) {
-	d, err := doBuild(flb)
+	fld, err := flb.BuildDescriptor()
 	if err != nil {
 		return nil, err
 	}
-	return d.(*desc.FieldDescriptor), nil
+	return fld.(*desc.FieldDescriptor), nil
 }
 
 // BuildDescriptor constructs a field descriptor based on the contents of this
@@ -2389,7 +2424,7 @@ func (flb *FieldBuilder) Build() (*desc.FieldDescriptor, error) {
 // a concrete descriptor type. This method is present to satisfy the Builder
 // interface.
 func (flb *FieldBuilder) BuildDescriptor() (desc.Descriptor, error) {
-	return flb.Build()
+	return doBuild(flb, BuilderOptions{})
 }
 
 // OneOfBuilder is a builder used to construct a desc.OneOfDescriptor. A one-of
@@ -2650,11 +2685,11 @@ func (oob *OneOfBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 // resolving symbols referenced by the builder or failing to meet certain
 // validation rules, an error is returned.
 func (oob *OneOfBuilder) Build() (*desc.OneOfDescriptor, error) {
-	d, err := doBuild(oob)
+	ood, err := oob.BuildDescriptor()
 	if err != nil {
 		return nil, err
 	}
-	return d.(*desc.OneOfDescriptor), nil
+	return ood.(*desc.OneOfDescriptor), nil
 }
 
 // BuildDescriptor constructs a one-of descriptor based on the contents of this
@@ -2662,7 +2697,7 @@ func (oob *OneOfBuilder) Build() (*desc.OneOfDescriptor, error) {
 // a concrete descriptor type. This method is present to satisfy the Builder
 // interface.
 func (oob *OneOfBuilder) BuildDescriptor() (desc.Descriptor, error) {
-	return oob.Build()
+	return doBuild(oob, BuilderOptions{})
 }
 
 // EnumBuilder is a builder used to construct a desc.EnumDescriptor.
@@ -2943,11 +2978,11 @@ func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) 
 // resolving symbols referenced by the builder or failing to meet certain
 // validation rules, an error is returned.
 func (eb *EnumBuilder) Build() (*desc.EnumDescriptor, error) {
-	d, err := doBuild(eb)
+	ed, err := eb.BuildDescriptor()
 	if err != nil {
 		return nil, err
 	}
-	return d.(*desc.EnumDescriptor), nil
+	return ed.(*desc.EnumDescriptor), nil
 }
 
 // BuildDescriptor constructs an enum descriptor based on the contents of this
@@ -2955,7 +2990,7 @@ func (eb *EnumBuilder) Build() (*desc.EnumDescriptor, error) {
 // is a concrete descriptor type. This method is present to satisfy the Builder
 // interface.
 func (eb *EnumBuilder) BuildDescriptor() (desc.Descriptor, error) {
-	return eb.Build()
+	return doBuild(eb, BuilderOptions{})
 }
 
 // EnumValueBuilder is a builder used to construct a desc.EnumValueDescriptor.
@@ -3107,11 +3142,11 @@ func (evb *EnumValueBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCode
 // including resolving symbols referenced by the builder or failing to meet
 // certain validation rules, an error is returned.
 func (evb *EnumValueBuilder) Build() (*desc.EnumValueDescriptor, error) {
-	d, err := doBuild(evb)
+	evd, err := evb.BuildDescriptor()
 	if err != nil {
 		return nil, err
 	}
-	return d.(*desc.EnumValueDescriptor), nil
+	return evd.(*desc.EnumValueDescriptor), nil
 }
 
 // BuildDescriptor constructs an enum value descriptor based on the contents of
@@ -3119,7 +3154,7 @@ func (evb *EnumValueBuilder) Build() (*desc.EnumValueDescriptor, error) {
 // return type is a concrete descriptor type. This method is present to satisfy
 // the Builder interface.
 func (evb *EnumValueBuilder) BuildDescriptor() (desc.Descriptor, error) {
-	return evb.Build()
+	return doBuild(evb, BuilderOptions{})
 }
 
 // ServiceBuilder is a builder used to construct a desc.ServiceDescriptor.
@@ -3325,11 +3360,11 @@ func (sb *ServiceBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 // resolving symbols referenced by the builder or failing to meet certain
 // validation rules, an error is returned.
 func (sb *ServiceBuilder) Build() (*desc.ServiceDescriptor, error) {
-	d, err := doBuild(sb)
+	sd, err := sb.BuildDescriptor()
 	if err != nil {
 		return nil, err
 	}
-	return d.(*desc.ServiceDescriptor), nil
+	return sd.(*desc.ServiceDescriptor), nil
 }
 
 // BuildDescriptor constructs a service descriptor based on the contents of this
@@ -3337,7 +3372,7 @@ func (sb *ServiceBuilder) Build() (*desc.ServiceDescriptor, error) {
 // is a concrete descriptor type. This method is present to satisfy the Builder
 // interface.
 func (sb *ServiceBuilder) BuildDescriptor() (desc.Descriptor, error) {
-	return sb.Build()
+	return doBuild(sb, BuilderOptions{})
 }
 
 // MethodBuilder is a builder used to construct a desc.MethodDescriptor. A
@@ -3484,11 +3519,11 @@ func (mtb *MethodBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 // resolving symbols referenced by the builder or failing to meet certain
 // validation rules, an error is returned.
 func (mtb *MethodBuilder) Build() (*desc.MethodDescriptor, error) {
-	d, err := doBuild(mtb)
+	mtd, err := mtb.BuildDescriptor()
 	if err != nil {
 		return nil, err
 	}
-	return d.(*desc.MethodDescriptor), nil
+	return mtd.(*desc.MethodDescriptor), nil
 }
 
 // BuildDescriptor constructs a method descriptor based on the contents of this
@@ -3496,7 +3531,7 @@ func (mtb *MethodBuilder) Build() (*desc.MethodDescriptor, error) {
 // a concrete descriptor type. This method is present to satisfy the Builder
 // interface.
 func (mtb *MethodBuilder) BuildDescriptor() (desc.Descriptor, error) {
-	return mtb.Build()
+	return doBuild(mtb, BuilderOptions{})
 }
 
 func entryTypeName(fieldName string) string {

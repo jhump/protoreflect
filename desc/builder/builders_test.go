@@ -774,3 +774,7 @@ func TestRenamingBuilders(t *testing.T) {
 func TestRenumberingFields(t *testing.T) {
 	// TODO
 }
+
+func TestUseOfExtensionRegistry(t *testing.T) {
+	// TODO
+}
