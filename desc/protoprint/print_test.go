@@ -28,13 +28,13 @@ const (
 
 func TestPrinter(t *testing.T) {
 	prs := map[string]*Printer{
-		"default":                  {},
-		"compact":                  {Compact: true},
-		"no-trailing-comments":     {OmitComments: CommentsTrailing},
-		"trailing-on-next-line":    {TrailingCommentsOnSeparateLine: true},
-		"only-doc-comments":        {OmitComments: CommentsNonDoc},
-		"multiline-style-comments": {Indent: "\t", PreferMultiLineStyleComments: true},
-		"sorted":                   {Indent: "   ", SortElements: true, OmitDetachedComments: true},
+		"default":                             {},
+		"compact":                             {Compact: true},
+		"no-trailing-comments":                {OmitComments: CommentsTrailing},
+		"trailing-on-next-line":               {TrailingCommentsOnSeparateLine: true},
+		"only-doc-comments":                   {OmitComments: CommentsNonDoc},
+		"multiline-style-comments":            {Indent: "\t", PreferMultiLineStyleComments: true},
+		"sorted":                              {Indent: "   ", SortElements: true, OmitDetachedComments: true},
 		"sorted-AND-multiline-style-comments": {PreferMultiLineStyleComments: true, SortElements: true},
 	}
 	files := []string{
