@@ -370,8 +370,8 @@ func (d poorFileDescriptorish) GetServices() []svcDescriptorish {
 	for i, s := range svcs {
 		ret[i] = poorSvcDescriptorish{
 			ServiceDescriptorProto: s,
-			qual: pkg,
-			file: d,
+			qual:                   pkg,
+			file:                   d,
 		}
 	}
 	return ret
@@ -570,8 +570,8 @@ func (d poorEnumDescriptorish) GetValues() []enumValDescriptorish {
 	for i, v := range vals {
 		ret[i] = poorEnumValDescriptorish{
 			EnumValueDescriptorProto: v,
-			qual: d.GetFullyQualifiedName(),
-			file: d.file,
+			qual:                     d.GetFullyQualifiedName(),
+			file:                     d.file,
 		}
 	}
 	return ret
@@ -627,8 +627,8 @@ func (d poorSvcDescriptorish) GetMethods() []methodDescriptorish {
 	for i, m := range mtds {
 		ret[i] = poorMethodDescriptorish{
 			MethodDescriptorProto: m,
-			qual: d.GetFullyQualifiedName(),
-			file: d.file,
+			qual:                  d.GetFullyQualifiedName(),
+			file:                  d.file,
 		}
 	}
 	return ret

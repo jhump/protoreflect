@@ -1,6 +1,6 @@
 # TODO: run golint, errcheck
 .PHONY: default
-default: deps checkgofmt vet predeclared staticcheck unused ineffassign test
+default: deps checkgofmt vet predeclared staticcheck ineffassign test
 
 .PHONY: deps
 deps:
@@ -37,11 +37,6 @@ staticcheck:
 	@go get honnef.co/go/tools/cmd/staticcheck
 	@echo staticcheck --ignore $$(go list ./... | grep protoparse)/proto.y.go:* ./...
 	@staticcheck --ignore $$(go list ./... | grep protoparse)/proto.y.go:* ./...
-
-.PHONY: unused
-unused:
-	@go get honnef.co/go/tools/cmd/unused
-	unused ./...
 
 # same remarks as for staticcheck: we ignore errors in generated proto.y.go
 .PHONY: ineffassign
