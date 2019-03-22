@@ -1,6 +1,7 @@
 %{
-
 package protoparse
+
+//lint:file-ignore SA4006 generated parser has unused values
 
 import (
 	"fmt"

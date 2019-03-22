@@ -35,8 +35,7 @@ vet:
 .PHONY: staticcheck
 staticcheck:
 	@go get honnef.co/go/tools/cmd/staticcheck
-	@echo staticcheck --ignore $$(go list ./... | grep protoparse)/proto.y.go:* ./...
-	@staticcheck --ignore $$(go list ./... | grep protoparse)/proto.y.go:* ./...
+	staticcheck ./...
 
 # same remarks as for staticcheck: we ignore errors in generated proto.y.go
 .PHONY: ineffassign
