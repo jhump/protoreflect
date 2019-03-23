@@ -131,4 +131,13 @@ func TestBinaryUnknownFields(t *testing.T) {
 
 func binaryTranslationParty(t *testing.T, msg proto.Message) {
 	doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, (*Message).Marshal, (*Message).Unmarshal)
+
+	// Declare a function that has the same interface as (*Message.Marshal) but uses
+	// MarshalAppend internally so we can reuse the translation party tests to verify
+	// the behavior of MarshalAppend in addition to Marshal.
+	marshalAppend := func(m *Message) ([]byte, error) {
+		b := []byte{}
+		return (*Message).MarshalAppend(m, b)
+	}
+	doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalAppend, (*Message).Unmarshal)
 }

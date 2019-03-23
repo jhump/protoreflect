@@ -31,6 +31,14 @@ func (m *Message) Marshal() ([]byte, error) {
 	return b.buf, nil
 }
 
+func (m *Message) MarshalAppend(b []byte) ([]byte, error) {
+	codedBuf := codedBuffer{buf: b}
+	if err := m.marshal(&codedBuf, defaultDeterminism); err != nil {
+		return nil, err
+	}
+	return codedBuf.buf, nil
+}
+
 // MarshalDeterministic serializes this message to bytes in a deterministic way,
 // returning an error if the operation fails. This differs from Marshal in that
 // map keys will be sorted before serializing to bytes. The protobuf spec does
