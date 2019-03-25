@@ -31,6 +31,11 @@ func (m *Message) Marshal() ([]byte, error) {
 	return b.buf, nil
 }
 
+// MarshalAppend behaves exactly the same as Marshal, except instead of allocating a
+// new byte slice to marshal into, it uses the provided byte slice. The backing array
+// for the returned byte slice *may* be the same as the one that was passed in, but
+// it's not guaranteed as a new backing array will automatically be allocated if
+// more bytes need to be written than the provided buffer has capacity for.
 func (m *Message) MarshalAppend(b []byte) ([]byte, error) {
 	codedBuf := codedBuffer{buf: b}
 	if err := m.marshal(&codedBuf, defaultDeterminism); err != nil {

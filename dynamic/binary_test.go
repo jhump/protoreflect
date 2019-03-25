@@ -1,7 +1,9 @@
 package dynamic
 
 import (
+	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/golang/protobuf/proto"
 
@@ -131,13 +133,45 @@ func TestBinaryUnknownFields(t *testing.T) {
 
 func binaryTranslationParty(t *testing.T, msg proto.Message) {
 	doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, (*Message).Marshal, (*Message).Unmarshal)
+	binaryTranslationPartyMarshalAppend(t, msg)
+}
 
+func binaryTranslationPartyMarshalAppend(t *testing.T, msg proto.Message) {
 	// Declare a function that has the same interface as (*Message.Marshal) but uses
 	// MarshalAppend internally so we can reuse the translation party tests to verify
 	// the behavior of MarshalAppend in addition to Marshal.
-	marshalAppend := func(m *Message) ([]byte, error) {
-		b := []byte{}
-		return (*Message).MarshalAppend(m, b)
+	marshalAppendSimple := func(m *Message) ([]byte, error) {
+		b := make([]byte, 0, 2048)
+		marshaledB, err := m.MarshalAppend(b)
+
+		// Verify it doesn't allocate a new byte slice.
+		testutil.Eq(t, true, byteSlicesBackedBySameData(b, marshaledB))
+		return marshaledB, err
 	}
-	doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalAppend, (*Message).Unmarshal)
+	doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalAppendSimple, (*Message).Unmarshal)
+
+	marshalAppendPrefix := func(m *Message) ([]byte, error) {
+		var (
+			b      = make([]byte, 0, 2048)
+			prefix = "prefix"
+		)
+		b = append(b, []byte(prefix)...)
+		marshaledB, err := m.MarshalAppend(b)
+
+		// Verify it doesn't allocate a new byte slice.
+		testutil.Eq(t, true, byteSlicesBackedBySameData(b, marshaledB))
+		// Verify the prefix data is retained.
+		testutil.Eq(t, prefix, string(marshaledB[:len(prefix)]))
+
+		return marshaledB[len(prefix):], err
+	}
+	doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalAppendPrefix, (*Message).Unmarshal)
+}
+
+// byteSlicesBackedBySameData returns a bool indicating if the raw backing bytes
+// under the []byte slice point to the same memory.
+func byteSlicesBackedBySameData(a, b []byte) bool {
+	aHeader := (*reflect.SliceHeader)(unsafe.Pointer(&a))
+	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	return aHeader.Data == bHeader.Data
 }
