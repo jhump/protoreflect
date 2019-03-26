@@ -158,6 +158,7 @@ func binaryTranslationParty(t *testing.T, msg proto.Message) {
 		marshalAppendSimple,
 		marshalAppendPrefix,
 	}
+
 	for _, marshalFn := range marshalMethods {
 		doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalFn, (*Message).Unmarshal)
 	}
