@@ -716,41 +716,40 @@ func (m *Message) setField(fd *desc.FieldDescriptor, val interface{}) error {
 }
 
 func (m *Message) internalSetField(fd *desc.FieldDescriptor, val interface{}) {
-	if m.md.IsProto3() && fd.GetOneOf() == nil {
+	if fd.IsRepeated() {
+		// Unset fields and zero-length fields are indistinguishable, in both
+		// proto2 and proto3 syntax
+		if reflect.ValueOf(val).Len() == 0 {
+			if m.values != nil {
+				delete(m.values, fd.GetNumber())
+			}
+			return
+		}
+	} else if m.md.IsProto3() && fd.GetOneOf() == nil {
 		// proto3 considers fields that are set to their zero value as unset
-		if fd.IsRepeated() {
-			// can't use == comparison below for map and slices, so just test length
-			// (zero length is same as default)
-			if reflect.ValueOf(val).Len() == 0 {
-				if m.values != nil {
-					delete(m.values, fd.GetNumber())
-				}
-				return
-			}
-		} else {
+		// (we already handled repeated fields above)
+		var equal bool
+		if b, ok := val.([]byte); ok {
 			// can't compare slices, so we have to special-case []byte values
-			var equal bool
-			if b, ok := val.([]byte); ok {
-				equal = ok && bytes.Equal(b, fd.GetDefaultValue().([]byte))
-			} else {
-				defVal := fd.GetDefaultValue()
-				equal = defVal == val
-				if !equal && defVal == nil {
-					// above just checks if value is the nil interface,
-					// but we should also test if the given value is a
-					// nil pointer
-					rv := reflect.ValueOf(val)
-					if rv.Kind() == reflect.Ptr && rv.IsNil() {
-						equal = true
-					}
+			equal = ok && bytes.Equal(b, fd.GetDefaultValue().([]byte))
+		} else {
+			defVal := fd.GetDefaultValue()
+			equal = defVal == val
+			if !equal && defVal == nil {
+				// above just checks if value is the nil interface,
+				// but we should also test if the given value is a
+				// nil pointer
+				rv := reflect.ValueOf(val)
+				if rv.Kind() == reflect.Ptr && rv.IsNil() {
+					equal = true
 				}
 			}
-			if equal {
-				if m.values != nil {
-					delete(m.values, fd.GetNumber())
-				}
-				return
+		}
+		if equal {
+			if m.values != nil {
+				delete(m.values, fd.GetNumber())
 			}
+			return
 		}
 	}
 	if m.values == nil {
