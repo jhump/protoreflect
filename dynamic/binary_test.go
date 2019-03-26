@@ -3,7 +3,6 @@ package dynamic
 import (
 	"reflect"
 	"testing"
-	"unsafe"
 
 	"github.com/golang/protobuf/proto"
 
@@ -132,46 +131,42 @@ func TestBinaryUnknownFields(t *testing.T) {
 }
 
 func binaryTranslationParty(t *testing.T, msg proto.Message) {
-	doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, (*Message).Marshal, (*Message).Unmarshal)
-	binaryTranslationPartyMarshalAppend(t, msg)
-}
-
-func binaryTranslationPartyMarshalAppend(t *testing.T, msg proto.Message) {
-	// Declare a function that has the same interface as (*Message.Marshal) but uses
-	// MarshalAppend internally so we can reuse the translation party tests to verify
-	// the behavior of MarshalAppend in addition to Marshal.
 	marshalAppendSimple := func(m *Message) ([]byte, error) {
+		// Declare a function that has the same interface as (*Message.Marshal) but uses
+		// MarshalAppend internally so we can reuse the translation party tests to verify
+		// the behavior of MarshalAppend in addition to Marshal.
 		b := make([]byte, 0, 2048)
 		marshaledB, err := m.MarshalAppend(b)
 
 		// Verify it doesn't allocate a new byte slice.
-		testutil.Eq(t, true, byteSlicesBackedBySameData(b, marshaledB))
+		assertByteSlicesBackedBySameData(t, b, marshaledB)
 		return marshaledB, err
 	}
-	doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalAppendSimple, (*Message).Unmarshal)
 
 	marshalAppendPrefix := func(m *Message) ([]byte, error) {
-		var (
-			b      = make([]byte, 0, 2048)
-			prefix = "prefix"
-		)
-		b = append(b, []byte(prefix)...)
-		marshaledB, err := m.MarshalAppend(b)
+		// Same thing as MarshalAppendSimple, but we verify that prefix data is retained.
+		prefix := "prefix"
+		marshaledB, err := m.MarshalAppend([]byte(prefix))
 
-		// Verify it doesn't allocate a new byte slice.
-		testutil.Eq(t, true, byteSlicesBackedBySameData(b, marshaledB))
 		// Verify the prefix data is retained.
 		testutil.Eq(t, prefix, string(marshaledB[:len(prefix)]))
-
 		return marshaledB[len(prefix):], err
 	}
-	doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalAppendPrefix, (*Message).Unmarshal)
+
+	marshalMethods := []func(m *Message) ([]byte, error){
+		(*Message).Marshal,
+		marshalAppendSimple,
+		marshalAppendPrefix,
+	}
+	for _, marshalFn := range marshalMethods {
+		doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalFn, (*Message).Unmarshal)
+	}
 }
 
 // byteSlicesBackedBySameData returns a bool indicating if the raw backing bytes
 // under the []byte slice point to the same memory.
-func byteSlicesBackedBySameData(a, b []byte) bool {
-	aHeader := (*reflect.SliceHeader)(unsafe.Pointer(&a))
-	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&b))
-	return aHeader.Data == bHeader.Data
+func assertByteSlicesBackedBySameData(t *testing.T, a, b []byte) {
+	origPtr := reflect.ValueOf(a).Pointer()
+	resultPtr := reflect.ValueOf(b).Pointer()
+	testutil.Eq(t, origPtr, resultPtr)
 }
