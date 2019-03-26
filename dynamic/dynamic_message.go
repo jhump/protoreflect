@@ -2147,6 +2147,9 @@ func (m *Message) Merge(source proto.Message) {
 		// To support proto.Clone, initialize the descriptor from the source.
 		if dm, ok := source.(*Message); ok {
 			m.md = dm.md
+			// also make sure the clone uses the same message factory and
+			// extensions and also knows about the same extra fields (if any)
+			m.mf = dm.mf
 			m.er = dm.er
 			m.extraFields = dm.extraFields
 		} else if md, err := desc.LoadMessageDescriptorForMessage(source); err != nil {
