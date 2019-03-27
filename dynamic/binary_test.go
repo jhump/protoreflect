@@ -1,6 +1,7 @@
 package dynamic
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
@@ -130,5 +131,43 @@ func TestBinaryUnknownFields(t *testing.T) {
 }
 
 func binaryTranslationParty(t *testing.T, msg proto.Message) {
-	doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, (*Message).Marshal, (*Message).Unmarshal)
+	marshalAppendSimple := func(m *Message) ([]byte, error) {
+		// Declare a function that has the same interface as (*Message.Marshal) but uses
+		// MarshalAppend internally so we can reuse the translation party tests to verify
+		// the behavior of MarshalAppend in addition to Marshal.
+		b := make([]byte, 0, 2048)
+		marshaledB, err := m.MarshalAppend(b)
+
+		// Verify it doesn't allocate a new byte slice.
+		assertByteSlicesBackedBySameData(t, b, marshaledB)
+		return marshaledB, err
+	}
+
+	marshalAppendPrefix := func(m *Message) ([]byte, error) {
+		// Same thing as MarshalAppendSimple, but we verify that prefix data is retained.
+		prefix := "prefix"
+		marshaledB, err := m.MarshalAppend([]byte(prefix))
+
+		// Verify the prefix data is retained.
+		testutil.Eq(t, prefix, string(marshaledB[:len(prefix)]))
+		return marshaledB[len(prefix):], err
+	}
+
+	marshalMethods := []func(m *Message) ([]byte, error){
+		(*Message).Marshal,
+		marshalAppendSimple,
+		marshalAppendPrefix,
+	}
+
+	for _, marshalFn := range marshalMethods {
+		doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalFn, (*Message).Unmarshal)
+	}
+}
+
+// byteSlicesBackedBySameData returns a bool indicating if the raw backing bytes
+// under the []byte slice point to the same memory.
+func assertByteSlicesBackedBySameData(t *testing.T, a, b []byte) {
+	origPtr := reflect.ValueOf(a).Pointer()
+	resultPtr := reflect.ValueOf(b).Pointer()
+	testutil.Eq(t, origPtr, resultPtr)
 }
