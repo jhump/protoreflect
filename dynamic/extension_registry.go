@@ -48,7 +48,9 @@ func (r *ExtensionRegistry) AddExtensionDesc(exts ...*proto.ExtensionDesc) error
 	return nil
 }
 
-// AddExtension adds the given extensions to the registry.
+// AddExtension adds the given extensions to the registry. The given extensions
+// will overwrite any previously added extensions that are for the same extendee
+// message and same extension tag number.
 func (r *ExtensionRegistry) AddExtension(exts ...*desc.FieldDescriptor) error {
 	for _, ext := range exts {
 		if !ext.IsExtension() {
