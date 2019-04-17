@@ -996,10 +996,6 @@ func (fd *FieldDescriptor) GetEnumType() *EnumDescriptor {
 	return fd.enumType
 }
 
-func (fd *FieldDescriptor) getTypeString() string {
-	return strings.ToLower(fd.proto.GetType().String())
-}
-
 // GetDefaultValue returns the default value for this field.
 //
 // If this field represents a message type, this method always returns nil (even though
