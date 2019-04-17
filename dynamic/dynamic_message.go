@@ -1922,8 +1922,7 @@ func validElementFieldValue(fd *desc.FieldDescriptor, val interface{}) (interfac
 func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interface{}, error) {
 	t := fd.GetType()
 	if !val.IsValid() {
-		return nil, fmt.Errorf(
-			"%s field %s is not compatible with nil value", fd.GetTypeString(), fd.GetFullyQualifiedName())
+		return nil, typeError(fd, val.Type())
 	}
 
 	switch t {
@@ -1988,81 +1987,73 @@ func toInt32(v reflect.Value, fd *desc.FieldDescriptor) (int32, error) {
 	if v.Kind() == reflect.Int32 {
 		return int32(v.Int()), nil
 	}
-	return 0, fmt.Errorf(
-		"%s field %s is not compatible with value of type %v",
-		fd.GetTypeString(), fd.GetFullyQualifiedName(), v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
 func toUint32(v reflect.Value, fd *desc.FieldDescriptor) (uint32, error) {
 	if v.Kind() == reflect.Uint32 {
 		return uint32(v.Uint()), nil
 	}
-	return 0, fmt.Errorf(
-		"%s field %s is not compatible with value of type %v",
-		fd.GetTypeString(), fd.GetFullyQualifiedName(), v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
 func toFloat32(v reflect.Value, fd *desc.FieldDescriptor) (float32, error) {
 	if v.Kind() == reflect.Float32 {
 		return float32(v.Float()), nil
 	}
-	return 0, fmt.Errorf(
-		"%s field %s is not compatible with value of type %v",
-		fd.GetTypeString(), fd.GetFullyQualifiedName(), v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
 func toInt64(v reflect.Value, fd *desc.FieldDescriptor) (int64, error) {
 	if v.Kind() == reflect.Int64 || v.Kind() == reflect.Int || v.Kind() == reflect.Int32 {
 		return v.Int(), nil
 	}
-	return 0, fmt.Errorf(
-		"%s field %s is not compatible with value of type %v",
-		fd.GetTypeString(), fd.GetFullyQualifiedName(), v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
 func toUint64(v reflect.Value, fd *desc.FieldDescriptor) (uint64, error) {
 	if v.Kind() == reflect.Uint64 || v.Kind() == reflect.Uint || v.Kind() == reflect.Uint32 {
 		return v.Uint(), nil
 	}
-	return 0, fmt.Errorf(
-		"%s field %s is not compatible with value of type %v",
-		fd.GetTypeString(), fd.GetFullyQualifiedName(), v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
 func toFloat64(v reflect.Value, fd *desc.FieldDescriptor) (float64, error) {
 	if v.Kind() == reflect.Float64 || v.Kind() == reflect.Float32 {
 		return v.Float(), nil
 	}
-	return 0, fmt.Errorf(
-		"%s field %s is not compatible with value of type %v",
-		fd.GetTypeString(), fd.GetFullyQualifiedName(), v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
 func toBool(v reflect.Value, fd *desc.FieldDescriptor) (bool, error) {
 	if v.Kind() == reflect.Bool {
 		return v.Bool(), nil
 	}
-	return false, fmt.Errorf(
-		"%s field %s is not compatible with value of type %v",
-		fd.GetTypeString(), fd.GetFullyQualifiedName(), v.Type())
+	return false, typeError(fd, v.Type())
 }
 
 func toBytes(v reflect.Value, fd *desc.FieldDescriptor) ([]byte, error) {
 	if v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 {
 		return v.Bytes(), nil
 	}
-	return nil, fmt.Errorf(
-		"%s field %s is not compatible with value of type %v",
-		fd.GetTypeString(), fd.GetFullyQualifiedName(), v.Type())
+	return nil, typeError(fd, v.Type())
 }
 
 func toString(v reflect.Value, fd *desc.FieldDescriptor) (string, error) {
 	if v.Kind() == reflect.String {
 		return v.String(), nil
 	}
-	return "", fmt.Errorf(
+	return "", typeError(fd, v.Type())
+}
+
+func typeError(fd *desc.FieldDescriptor, t reflect.Type) error {
+	return fmt.Errorf(
 		"%s field %s is not compatible with value of type %v",
-		fd.GetTypeString(), fd.GetFullyQualifiedName(), v.Type())
+		getTypeString(fd), fd.GetFullyQualifiedName(), t)
+}
+
+func getTypeString(fd *desc.FieldDescriptor) string {
+	return strings.ToLower(fd.GetType().String())
 }
 
 func asMessage(v reflect.Value, fieldName string) (proto.Message, error) {

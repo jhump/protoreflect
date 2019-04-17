@@ -943,11 +943,6 @@ func (fd *FieldDescriptor) GetType() dpb.FieldDescriptorProto_Type {
 	return fd.proto.GetType()
 }
 
-// GetTypeString returns a lower-cased string that represents the type of this field.
-func (fd *FieldDescriptor) GetTypeString() string {
-	return strings.ToLower(fd.proto.GetType().String())
-}
-
 // GetLabel returns the label for this field. The label can be required (proto2-only),
 // optional (default for proto3), or required.
 func (fd *FieldDescriptor) GetLabel() dpb.FieldDescriptorProto_Label {
@@ -999,6 +994,10 @@ func (fd *FieldDescriptor) GetMessageType() *MessageDescriptor {
 // field is not an enum type, it returns nil.
 func (fd *FieldDescriptor) GetEnumType() *EnumDescriptor {
 	return fd.enumType
+}
+
+func (fd *FieldDescriptor) getTypeString() string {
+	return strings.ToLower(fd.proto.GetType().String())
 }
 
 // GetDefaultValue returns the default value for this field.
