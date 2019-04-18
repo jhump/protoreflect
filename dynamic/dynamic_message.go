@@ -2068,8 +2068,12 @@ func asMessage(v reflect.Value, fieldName string) (proto.Message, error) {
 // Reset resets this message to an empty message. It removes all values set in
 // the message.
 func (m *Message) Reset() {
-	m.values = nil
-	m.unknownFields = nil
+	for k := range m.values {
+		delete(m.values, k)
+	}
+	for k := range m.unknownFields {
+		delete(m.unknownFields, k)
+	}
 }
 
 // String returns this message rendered in compact text format.
