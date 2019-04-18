@@ -1922,7 +1922,7 @@ func validElementFieldValue(fd *desc.FieldDescriptor, val interface{}) (interfac
 func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interface{}, error) {
 	t := fd.GetType()
 	if !val.IsValid() {
-		return nil, typeError(fd, val.Type())
+		return nil, typeError(fd, nil)
 	}
 
 	switch t {
