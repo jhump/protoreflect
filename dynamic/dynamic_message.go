@@ -1820,32 +1820,7 @@ func validFieldValue(fd *desc.FieldDescriptor, val interface{}) (interface{}, er
 
 func validFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interface{}, error) {
 	if fd.IsMap() && val.Kind() == reflect.Map {
-		// make a defensive copy while we check the contents
-		// (also converts to map[interface{}]interface{} if it's some other type)
-		keyField := fd.GetMessageType().GetFields()[0]
-		valField := fd.GetMessageType().GetFields()[1]
-		m := map[interface{}]interface{}{}
-		for _, k := range val.MapKeys() {
-			if k.Kind() == reflect.Interface {
-				// unwrap it
-				k = reflect.ValueOf(k.Interface())
-			}
-			kk, err := validFieldValueForRv(keyField, k)
-			if err != nil {
-				return nil, err
-			}
-			v := val.MapIndex(k)
-			if v.Kind() == reflect.Interface {
-				// unwrap it
-				v = reflect.ValueOf(v.Interface())
-			}
-			vv, err := validFieldValueForRv(valField, v)
-			if err != nil {
-				return nil, err
-			}
-			m[kk] = vv
-		}
-		return m, nil
+		return validFieldValueForMapField(fd, val)
 	}
 
 	if fd.IsRepeated() { // this will also catch map fields where given value was not a map
@@ -2279,7 +2254,9 @@ func (m *Message) mergeInto(pm proto.Message) error {
 			continue
 		}
 		f := target.FieldByName(prop.Name)
-		mergeVal(reflect.ValueOf(v), f)
+		if err := mergeVal(reflect.ValueOf(v), f); err != nil {
+			return err
+		}
 	}
 	// merge one-ofs
 	for _, oop := range structProps.OneofTypes {
@@ -2291,7 +2268,9 @@ func (m *Message) mergeInto(pm proto.Message) error {
 		}
 		oov := reflect.New(oop.Type.Elem())
 		f := oov.Elem().FieldByName(prop.Name)
-		mergeVal(reflect.ValueOf(v), f)
+		if err := mergeVal(reflect.ValueOf(v), f); err != nil {
+			return err
+		}
 		target.Field(oop.Field).Set(oov)
 	}
 	// merge extensions, too
@@ -2301,7 +2280,9 @@ func (m *Message) mergeInto(pm proto.Message) error {
 			continue
 		}
 		e := reflect.New(reflect.TypeOf(ext.ExtensionType)).Elem()
-		mergeVal(reflect.ValueOf(v), e)
+		if err := mergeVal(reflect.ValueOf(v), e); err != nil {
+			return err
+		}
 		if err := proto.SetExtension(pm, ext, e.Interface()); err != nil {
 			// shouldn't happen since we already checked that the extension type was compatible above
 			return err
@@ -2362,17 +2343,7 @@ func canConvert(src reflect.Value, target reflect.Type) bool {
 		if srcType.Kind() != reflect.Map {
 			return false
 		}
-		kt := target.Key()
-		vt := target.Elem()
-		for _, k := range src.MapKeys() {
-			if !canConvert(k, kt) {
-				return false
-			}
-			if !canConvert(src.MapIndex(k), vt) {
-				return false
-			}
-		}
-		return true
+		return canConvertMap(src, target)
 	} else if srcType == typeOfDynamicMessage && target.Implements(typeOfProtoMessage) {
 		z := reflect.Zero(target).Interface()
 		msgType := proto.MessageName(z.(proto.Message))
@@ -2382,7 +2353,7 @@ func canConvert(src reflect.Value, target reflect.Type) bool {
 	}
 }
 
-func mergeVal(src, target reflect.Value) {
+func mergeVal(src, target reflect.Value) error {
 	if src.Kind() == reflect.Interface && !src.IsNil() {
 		src = src.Elem()
 	}
@@ -2419,47 +2390,25 @@ func mergeVal(src, target reflect.Value) {
 			if dest.Kind() == reflect.Ptr {
 				dest.Set(reflect.New(dest.Type().Elem()))
 			}
-			mergeVal(src.Index(i), dest)
+			if err := mergeVal(src.Index(i), dest); err != nil {
+				return err
+			}
 		}
 	} else if targetType.Kind() == reflect.Map {
-		tkt := targetType.Key()
-		tvt := targetType.Elem()
-		for _, k := range src.MapKeys() {
-			v := src.MapIndex(k)
-			skt := k.Type()
-			svt := v.Type()
-			var nk, nv reflect.Value
-			if tkt == skt {
-				nk = k
-			} else if tkt.Kind() == reflect.Ptr && tkt.Elem() == skt {
-				nk = k.Addr()
-			} else {
-				nk = reflect.New(tkt).Elem()
-				mergeVal(k, nk)
-			}
-			if tvt == svt {
-				nv = v
-			} else if tvt.Kind() == reflect.Ptr && tvt.Elem() == svt {
-				nv = v.Addr()
-			} else {
-				nv = reflect.New(tvt).Elem()
-				mergeVal(v, nv)
-			}
-			if target.IsNil() {
-				target.Set(reflect.MakeMap(targetType))
-			}
-			target.SetMapIndex(nk, nv)
-		}
+		return mergeMapVal(src, target, targetType)
 	} else if srcType == typeOfDynamicMessage && targetType.Implements(typeOfProtoMessage) {
 		dm := src.Interface().(*Message)
 		if target.IsNil() {
 			target.Set(reflect.New(targetType.Elem()))
 		}
 		m := target.Interface().(proto.Message)
-		dm.mergeInto(m)
+		if err := dm.mergeInto(m); err != nil {
+			return err
+		}
 	} else {
-		panic(fmt.Sprintf("cannot convert %v to %v", srcType, targetType))
+		return fmt.Errorf("cannot convert %v to %v", srcType, targetType)
 	}
+	return nil
 }
 
 func (m *Message) mergeFrom(pm proto.Message) error {
