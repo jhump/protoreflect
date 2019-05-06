@@ -112,29 +112,6 @@ func fieldsEqual(aval, bval interface{}) bool {
 	return true
 }
 
-func mapsEqual(a, b reflect.Value) bool {
-	if a.Len() != b.Len() {
-		return false
-	}
-	if a.Len() == 0 && b.Len() == 0 {
-		// Optimize the case where maps are frequently empty because MapKeys()
-		// function allocates heavily.
-		return true
-	}
-
-	for _, k := range a.MapKeys() {
-		av := a.MapIndex(k)
-		bv := b.MapIndex(k)
-		if !bv.IsValid() {
-			return false
-		}
-		if !fieldsEqual(av.Interface(), bv.Interface()) {
-			return false
-		}
-	}
-	return true
-}
-
 func slicesEqual(a, b reflect.Value) bool {
 	if a.Len() != b.Len() {
 		return false

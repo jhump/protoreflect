@@ -61,19 +61,7 @@ func mergeField(m *Message, fd *desc.FieldDescriptor, val interface{}) error {
 	rv := reflect.ValueOf(val)
 
 	if fd.IsMap() && rv.Kind() == reflect.Map {
-		for _, k := range rv.MapKeys() {
-			if k.Kind() == reflect.Interface && !k.IsNil() {
-				k = k.Elem()
-			}
-			v := rv.MapIndex(k)
-			if v.Kind() == reflect.Interface && !v.IsNil() {
-				v = v.Elem()
-			}
-			if err := m.putMapField(fd, k.Interface(), v.Interface()); err != nil {
-				return err
-			}
-		}
-		return nil
+		return mergeMapField(m, fd, rv)
 	}
 
 	if fd.IsRepeated() && rv.Kind() == reflect.Slice && rv.Type() != typeOfBytes {
