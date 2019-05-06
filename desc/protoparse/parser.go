@@ -567,6 +567,11 @@ func parseProto(filename string, r io.Reader, validate bool) (*parseResult, erro
 			return nil, ErrorWithSourcePos{Pos: lx.prev(), Underlying: lx.err}
 		}
 	}
+	// parser will not return an error if input is empty, so we
+	// need to also check if the result is non-nil
+	if lx.res == nil {
+		return nil, ErrorWithSourcePos{Pos: lx.prev(), Underlying: errors.New("input is empty")}
+	}
 
 	res, err := createParseResult(filename, lx.res)
 	if err != nil {
