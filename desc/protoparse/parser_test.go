@@ -1,6 +1,9 @@
 package protoparse
 
 import (
+	"bytes"
+	"io"
+	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -10,6 +13,16 @@ import (
 
 	"github.com/jhump/protoreflect/internal/testutil"
 )
+
+func TestEmptyParse(t *testing.T) {
+	p := Parser{
+		Accessor: func(filename string) (io.ReadCloser, error) {
+			return ioutil.NopCloser(bytes.NewReader(nil)), nil
+		},
+	}
+	_, err := p.ParseFiles("foo.proto")
+	testutil.Require(t, err != nil)
+}
 
 func TestSimpleParse(t *testing.T) {
 	protos := map[string]*parseResult{}
