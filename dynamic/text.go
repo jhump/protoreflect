@@ -5,7 +5,6 @@ package dynamic
 import (
 	"bytes"
 	"fmt"
-	"github.com/jhump/protoreflect/codec"
 	"io"
 	"math"
 	"reflect"
@@ -18,6 +17,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 
+	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
 )
 

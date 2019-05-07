@@ -1,12 +1,12 @@
 package dynamic
 
 import (
-	"github.com/jhump/protoreflect/codec"
 	"reflect"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"

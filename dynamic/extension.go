@@ -2,10 +2,10 @@ package dynamic
 
 import (
 	"fmt"
-	"github.com/jhump/protoreflect/codec"
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
 )
 

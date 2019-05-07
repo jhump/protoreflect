@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
-	"github.com/jhump/protoreflect/codec"
 	"reflect"
 	"sort"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 
+	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
 )
 
