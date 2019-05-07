@@ -382,7 +382,11 @@ func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
 		case proto.WireVarint:
 			// skip varint by finding last byte (has high bit unset)
 			i := cb.index
+			limit := i + 10 // varint cannot be >10 bytes
 			for {
+				if i >= limit {
+					return 0, 0, ErrOverflow
+				}
 				if i >= len(bs) {
 					return 0, 0, io.ErrUnexpectedEOF
 				}
