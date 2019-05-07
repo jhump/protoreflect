@@ -2,6 +2,7 @@ package dynamic
 
 import (
 	"fmt"
+	"github.com/jhump/protoreflect/codec"
 
 	"github.com/golang/protobuf/proto"
 
@@ -35,10 +36,10 @@ func SetExtension(msg proto.Message, extd *desc.FieldDescriptor, val interface{}
 		return err
 	}
 
-	var b codedBuffer
+	var b codec.Buffer
 	if err := marshalField(extd.GetNumber(), extd, val, &b, defaultDeterminism); err != nil {
 		return err
 	}
-	proto.SetRawExtension(msg, extd.GetNumber(), b.buf)
+	proto.SetRawExtension(msg, extd.GetNumber(), b.Bytes())
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"github.com/jhump/protoreflect/codec"
 	"reflect"
 	"sort"
 	"strings"
@@ -2291,14 +2292,14 @@ func (m *Message) mergeInto(pm proto.Message) error {
 	// if we have fields that the given message doesn't know about, add to its unknown fields
 	if len(unknownTags) > 0 {
 		ub := u.Interface().([]byte)
-		var b codedBuffer
+		var b codec.Buffer
 		for tag := range unknownTags {
 			fd := m.FindFieldDescriptor(tag)
 			if err := marshalField(tag, fd, m.values[tag], &b, false); err != nil {
 				return err
 			}
 		}
-		ub = append(ub, b.buf...)
+		ub = append(ub, b.Bytes()...)
 		u.Set(reflect.ValueOf(ub))
 	}
 
@@ -2306,9 +2307,9 @@ func (m *Message) mergeInto(pm proto.Message) error {
 	// (this will append to its unknown fields if not known; if somehow the given message recognizes
 	// a field even though the dynamic message did not, it will get correctly unmarshalled)
 	if unknownTags != nil && len(m.unknownFields) > 0 {
-		var b codedBuffer
-		m.marshalUnknownFields(&b)
-		proto.UnmarshalMerge(b.buf, pm)
+		var b codec.Buffer
+		_ = m.marshalUnknownFields(&b)
+		_ = proto.UnmarshalMerge(b.Bytes(), pm)
 	}
 
 	return nil
@@ -2534,7 +2535,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 	u := src.FieldByName("XXX_unrecognized")
 	if u.IsValid() && u.Type() == typeOfBytes {
 		// ignore any error returned: pulling in unknown fields is best-effort
-		m.UnmarshalMerge(u.Interface().([]byte))
+		_ = m.UnmarshalMerge(u.Interface().([]byte))
 	}
 
 	// lastly, also extract any unknown extensions the message may have (unknown extensions
@@ -2542,7 +2543,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 	// more than just the step above...)
 	if len(unknownExtensions) > 0 {
 		// pulling in unknown fields is best-effort, so we just ignore errors
-		m.UnmarshalMerge(unknownExtensions)
+		_ = m.UnmarshalMerge(unknownExtensions)
 	}
 	return nil
 }
