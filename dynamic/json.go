@@ -367,11 +367,11 @@ func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v int
 		f := rv.Float()
 		var str string
 		if math.IsNaN(f) {
-			str = "NaN"
+			str = `"NaN"`
 		} else if math.IsInf(f, 1) {
-			str = "Infinity"
+			str = `"Infinity"`
 		} else if math.IsInf(f, -1) {
-			str = "-Infinity"
+			str = `"-Infinity"`
 		} else {
 			var bits int
 			if rv.Kind() == reflect.Float32 {

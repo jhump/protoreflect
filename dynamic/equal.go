@@ -70,9 +70,8 @@ func fieldsEqual(aval, bval interface{}) bool {
 		if !ok {
 			return false
 		}
-		if !MessagesEqual(apm, bpm) {
-			return false
-		}
+		return MessagesEqual(apm, bpm)
+
 	} else {
 		switch arv.Kind() {
 		case reflect.Ptr:
@@ -83,33 +82,22 @@ func fieldsEqual(aval, bval interface{}) bool {
 				return false
 			}
 			bpm := bval.(proto.Message) // we know it will succeed because we know a and b have same type
-			if !MessagesEqual(apm, bpm) {
-				return false
-			}
+			return MessagesEqual(apm, bpm)
 
 		case reflect.Map:
-			if !mapsEqual(arv, brv) {
-				return false
-			}
+			return mapsEqual(arv, brv)
 
 		case reflect.Slice:
 			if arv.Type() == typeOfBytes {
-				if !bytes.Equal(aval.([]byte), bval.([]byte)) {
-					return false
-				}
+				return bytes.Equal(aval.([]byte), bval.([]byte))
 			} else {
-				if !slicesEqual(arv, brv) {
-					return false
-				}
+				return slicesEqual(arv, brv)
 			}
 
 		default:
-			if aval != bval {
-				return false
-			}
+			return aval == bval
 		}
 	}
-	return true
 }
 
 func slicesEqual(a, b reflect.Value) bool {

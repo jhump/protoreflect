@@ -24,20 +24,25 @@ import (
 )
 
 func TestJSONUnaryFields(t *testing.T) {
-	jsonTranslationParty(t, unaryFieldsPosMsg)
-	jsonTranslationParty(t, unaryFieldsNegMsg)
+	jsonTranslationParty(t, unaryFieldsPosMsg, false)
+	jsonTranslationParty(t, unaryFieldsNegMsg, false)
+	jsonTranslationParty(t, unaryFieldsPosInfMsg, false)
+	jsonTranslationParty(t, unaryFieldsNegInfMsg, false)
+	jsonTranslationParty(t, unaryFieldsNanMsg, true)
 }
 
 func TestJSONRepeatedFields(t *testing.T) {
-	jsonTranslationParty(t, repeatedFieldsMsg)
+	jsonTranslationParty(t, repeatedFieldsMsg, false)
+	jsonTranslationParty(t, repeatedFieldsInfNanMsg, true)
 }
 
 func TestJSONMapKeyFields(t *testing.T) {
-	jsonTranslationParty(t, mapKeyFieldsMsg)
+	jsonTranslationParty(t, mapKeyFieldsMsg, false)
 }
 
 func TestJSONMapValueFields(t *testing.T) {
-	jsonTranslationParty(t, mapValueFieldsMsg)
+	jsonTranslationParty(t, mapValueFieldsMsg, false)
+	jsonTranslationParty(t, mapValueFieldsInfNanMsg, true)
 }
 
 func TestJSONExtensionFields(t *testing.T) {
@@ -490,7 +495,7 @@ func TestJSONWellKnownTypeFromFileDescriptorSet(t *testing.T) {
 	testutil.Eq(t, js, dynJs)
 }
 
-func jsonTranslationParty(t *testing.T, msg proto.Message) {
+func jsonTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 	doTranslationParty(t, msg,
 		func(pm proto.Message) ([]byte, error) {
 			m := jsonpb.Marshaler{}
@@ -505,5 +510,5 @@ func jsonTranslationParty(t *testing.T, msg proto.Message) {
 		func(b []byte, pm proto.Message) error {
 			return jsonpb.Unmarshal(bytes.NewReader(b), pm)
 		},
-		(*Message).MarshalJSON, (*Message).UnmarshalJSON)
+		(*Message).MarshalJSON, (*Message).UnmarshalJSON, includesNaN)
 }
