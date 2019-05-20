@@ -11,20 +11,25 @@ import (
 )
 
 func TestTextUnaryFields(t *testing.T) {
-	textTranslationParty(t, unaryFieldsPosMsg)
-	textTranslationParty(t, unaryFieldsNegMsg)
+	textTranslationParty(t, unaryFieldsPosMsg, false)
+	textTranslationParty(t, unaryFieldsNegMsg, false)
+	textTranslationParty(t, unaryFieldsPosInfMsg, false)
+	textTranslationParty(t, unaryFieldsNegInfMsg, false)
+	textTranslationParty(t, unaryFieldsNanMsg, true)
 }
 
 func TestTextRepeatedFields(t *testing.T) {
-	textTranslationParty(t, repeatedFieldsMsg)
+	textTranslationParty(t, repeatedFieldsMsg, false)
+	textTranslationParty(t, repeatedFieldsInfNanMsg, true)
 }
 
 func TestTextMapKeyFields(t *testing.T) {
-	textTranslationParty(t, mapKeyFieldsMsg)
+	textTranslationParty(t, mapKeyFieldsMsg, false)
 }
 
 func TestTextMapValueFields(t *testing.T) {
-	textTranslationParty(t, mapValueFieldsMsg)
+	textTranslationParty(t, mapValueFieldsMsg, false)
+	textTranslationParty(t, mapValueFieldsInfNanMsg, true)
 }
 
 func TestTextUnknownFields(t *testing.T) {
@@ -154,7 +159,7 @@ func TestTextLenientParsing(t *testing.T) {
 	}
 }
 
-func textTranslationParty(t *testing.T, msg proto.Message) {
+func textTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 	doTranslationParty(t, msg,
 		func(pm proto.Message) ([]byte, error) {
 			return []byte(proto.MarshalTextString(pm)), nil
@@ -162,5 +167,5 @@ func textTranslationParty(t *testing.T, msg proto.Message) {
 		func(b []byte, pm proto.Message) error {
 			return proto.UnmarshalText(string(b), pm)
 		},
-		(*Message).MarshalText, (*Message).UnmarshalText)
+		(*Message).MarshalText, (*Message).UnmarshalText, includesNaN)
 }

@@ -1,6 +1,7 @@
 package dynamic
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -68,11 +69,26 @@ var unaryFieldsNegMsg = &testprotos.UnaryFields{
 	Z: testprotos.TestEnum_SECOND.Enum(),
 }
 
+var unaryFieldsPosInfMsg = &testprotos.UnaryFields{
+	S: proto.Float32(float32(math.Inf(1))),
+	T: proto.Float64(math.Inf(1)),
+}
+
+var unaryFieldsNegInfMsg = &testprotos.UnaryFields{
+	S: proto.Float32(float32(math.Inf(-1))),
+	T: proto.Float64(math.Inf(-1)),
+}
+
+var unaryFieldsNanMsg = &testprotos.UnaryFields{
+	S: proto.Float32(float32(math.NaN())),
+	T: proto.Float64(math.NaN()),
+}
+
 var repeatedFieldsMsg = &testprotos.RepeatedFields{
-	I: []int32{1, 2, 3},
-	J: []int64{4, 5, 6},
-	K: []int32{7, 8, 9},
-	L: []int64{10, 11, 12},
+	I: []int32{1, -2, 3},
+	J: []int64{-4, 5, -6},
+	K: []int32{7, -8, 9},
+	L: []int64{-10, 11, -12},
 	M: []uint32{13, 14, 15},
 	N: []uint64{16, 17, 18},
 	O: []uint32{19, 20, 21},
@@ -95,11 +111,16 @@ var repeatedFieldsMsg = &testprotos.RepeatedFields{
 	Z: []testprotos.TestEnum{testprotos.TestEnum_SECOND, testprotos.TestEnum_THIRD, testprotos.TestEnum_FIRST},
 }
 
+var repeatedFieldsInfNanMsg = &testprotos.RepeatedFields{
+	S: []float32{float32(math.Inf(1)), float32(math.Inf(-1)), float32(math.NaN())},
+	T: []float64{math.Inf(1), math.Inf(-1), math.NaN()},
+}
+
 var repeatedPackedFieldsMsg = &testprotos.RepeatedPackedFields{
-	I: []int32{1, 2, 3},
-	J: []int64{4, 5, 6},
-	K: []int32{7, 8, 9},
-	L: []int64{10, 11, 12},
+	I: []int32{1, -2, 3},
+	J: []int64{-4, 5, -6},
+	K: []int32{7, -8, 9},
+	L: []int64{-10, 11, -12},
 	M: []uint32{13, 14, 15},
 	N: []uint64{16, 17, 18},
 	O: []uint32{19, 20, 21},
@@ -116,11 +137,16 @@ var repeatedPackedFieldsMsg = &testprotos.RepeatedPackedFields{
 	V: []testprotos.TestEnum{testprotos.TestEnum_SECOND, testprotos.TestEnum_THIRD, testprotos.TestEnum_FIRST},
 }
 
+var repeatedPackedFieldsInfNanMsg = &testprotos.RepeatedPackedFields{
+	S: []float32{float32(math.Inf(1)), float32(math.Inf(-1)), float32(math.NaN())},
+	T: []float64{math.Inf(1), math.Inf(-1), math.NaN()},
+}
+
 var mapKeyFieldsMsg = &testprotos.MapKeyFields{
-	I: map[int32]string{1: "foo", 2: "bar", 3: "baz"},
-	J: map[int64]string{4: "foo", 5: "bar", 6: "baz"},
-	K: map[int32]string{7: "foo", 8: "bar", 9: "baz"},
-	L: map[int64]string{10: "foo", 11: "bar", 12: "baz"},
+	I: map[int32]string{1: "foo", -2: "bar", 3: "baz"},
+	J: map[int64]string{-4: "foo", 5: "bar", -6: "baz"},
+	K: map[int32]string{7: "foo", -8: "bar", 9: "baz"},
+	L: map[int64]string{-10: "foo", 11: "bar", -12: "baz"},
 	M: map[uint32]string{13: "foo", 14: "bar", 15: "baz"},
 	N: map[uint64]string{16: "foo", 17: "bar", 18: "baz"},
 	O: map[uint32]string{19: "foo", 20: "bar", 21: "baz"},
@@ -132,10 +158,10 @@ var mapKeyFieldsMsg = &testprotos.MapKeyFields{
 }
 
 var mapValueFieldsMsg = &testprotos.MapValFields{
-	I: map[string]int32{"a": 1, "b": 2, "c": 3},
-	J: map[string]int64{"a": 4, "b": 5, "c": 6},
-	K: map[string]int32{"a": 7, "b": 8, "c": 9},
-	L: map[string]int64{"a": 10, "b": 11, "c": 12},
+	I: map[string]int32{"a": 1, "b": -2, "c": 3},
+	J: map[string]int64{"a": -4, "b": 5, "c": -6},
+	K: map[string]int32{"a": 7, "b": -8, "c": 9},
+	L: map[string]int64{"a": -10, "b": 11, "c": -12},
 	M: map[string]uint32{"a": 13, "b": 14, "c": 15},
 	N: map[string]uint64{"a": 16, "b": 17, "c": 18},
 	O: map[string]uint32{"a": 19, "b": 20, "c": 21},
@@ -154,9 +180,15 @@ var mapValueFieldsMsg = &testprotos.MapValFields{
 	Y: map[string]testprotos.TestEnum{"a": testprotos.TestEnum_SECOND, "b": testprotos.TestEnum_THIRD, "c": testprotos.TestEnum_FIRST},
 }
 
+var mapValueFieldsInfNanMsg = &testprotos.MapValFields{
+	S: map[string]float32{"a": float32(math.Inf(1)), "b": float32(math.Inf(-1)), "c": float32(math.NaN())},
+	T: map[string]float64{"a": math.Inf(1), "b": math.Inf(-1), "c": math.NaN()},
+}
+
 func doTranslationParty(t *testing.T, msg proto.Message,
 	marshalPm func(proto.Message) ([]byte, error), unmarshalPm func([]byte, proto.Message) error,
-	marshalDm func(*Message) ([]byte, error), unmarshalDm func(*Message, []byte) error) {
+	marshalDm func(*Message) ([]byte, error), unmarshalDm func(*Message, []byte) error,
+	includesNaN bool) {
 
 	md, err := desc.LoadMessageDescriptorForMessage(msg)
 	testutil.Ok(t, err)
@@ -179,7 +211,10 @@ func doTranslationParty(t *testing.T, msg proto.Message,
 	err = unmarshalPm(b2a, msg2)
 	testutil.Ok(t, err)
 
-	testutil.Ceq(t, msg, msg2, eqpm)
+	if !includesNaN {
+		// NaN fields are never equal so this would always be false
+		testutil.Ceq(t, msg, msg2, eqpm)
+	}
 
 	// and back again
 	b3, err := marshalPm(msg2)
@@ -188,7 +223,9 @@ func doTranslationParty(t *testing.T, msg proto.Message,
 	err = unmarshalDm(dm2, b3)
 	testutil.Ok(t, err)
 
-	testutil.Ceq(t, dm, dm2, eqdm)
+	if !includesNaN {
+		testutil.Ceq(t, dm, dm2, eqdm)
+	}
 
 	// dynamic message -> (bytes) -> dynamic message
 	// both techniques to unmarshal are equivalent
@@ -199,6 +236,8 @@ func doTranslationParty(t *testing.T, msg proto.Message,
 	err = unmarshalDm(dm4, b2a)
 	testutil.Ok(t, err)
 
-	testutil.Ceq(t, dm, dm3, eqdm)
-	testutil.Ceq(t, dm, dm4, eqdm)
+	if !includesNaN {
+		testutil.Ceq(t, dm, dm3, eqdm)
+		testutil.Ceq(t, dm, dm4, eqdm)
+	}
 }

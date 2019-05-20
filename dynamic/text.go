@@ -706,24 +706,58 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 		}
 		expected = "string value"
 	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		if tok.tokTyp == tokenFloat {
+		switch tok.tokTyp {
+		case tokenFloat:
 			return set(m, fd, float32(tok.val.(float64)))
-		} else if tok.tokTyp == tokenInt {
+		case tokenInt:
 			if f, err := strconv.ParseFloat(tok.val.(string), 32); err != nil {
 				return err
 			} else {
 				return set(m, fd, float32(f))
 			}
+		case tokenIdent:
+			ident := strings.ToLower(tok.val.(string))
+			if ident == "inf" {
+				return set(m, fd, float32(math.Inf(1)))
+			} else if ident == "nan" {
+				return set(m, fd, float32(math.NaN()))
+			}
+		case tokenMinus:
+			peeked := tr.peek()
+			if peeked.tokTyp == tokenIdent {
+				ident := strings.ToLower(peeked.val.(string))
+				if ident == "inf" {
+					tr.next() // consume peeked token
+					return set(m, fd, float32(math.Inf(-1)))
+				}
+			}
 		}
 		expected = "float value"
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		if tok.tokTyp == tokenFloat {
+		switch tok.tokTyp {
+		case tokenFloat:
 			return set(m, fd, tok.val)
-		} else if tok.tokTyp == tokenInt {
+		case tokenInt:
 			if f, err := strconv.ParseFloat(tok.val.(string), 64); err != nil {
 				return err
 			} else {
 				return set(m, fd, f)
+			}
+		case tokenIdent:
+			ident := strings.ToLower(tok.val.(string))
+			if ident == "inf" {
+				return set(m, fd, math.Inf(1))
+			} else if ident == "nan" {
+				return set(m, fd, math.NaN())
+			}
+		case tokenMinus:
+			peeked := tr.peek()
+			if peeked.tokTyp == tokenIdent {
+				ident := strings.ToLower(peeked.val.(string))
+				if ident == "inf" {
+					tr.next() // consume peeked token
+					return set(m, fd, math.Inf(-1))
+				}
 			}
 		}
 		expected = "float value"
@@ -972,6 +1006,7 @@ const (
 	tokenOpenParen
 	tokenCloseParen
 	tokenSlash
+	tokenMinus
 )
 
 func (t tokenType) IsSep() bool {
@@ -1061,7 +1096,10 @@ func (p *txtReader) processToken(t rune, text string, pos scanner.Position) erro
 		}
 	case '-': // unary minus, for negative ints and floats
 		ch := p.scanner.Peek()
-		if ch >= '0' && ch <= '9' {
+		if ch < '0' || ch > '9' {
+			p.peeked.tokTyp = tokenMinus
+			p.peeked.val = '-'
+		} else {
 			t := p.scanner.Scan()
 			if t == scanner.EOF {
 				return io.ErrUnexpectedEOF

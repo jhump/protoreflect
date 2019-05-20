@@ -12,16 +12,21 @@ import (
 )
 
 func TestBinaryUnaryFields(t *testing.T) {
-	binaryTranslationParty(t, unaryFieldsPosMsg)
-	binaryTranslationParty(t, unaryFieldsNegMsg)
+	binaryTranslationParty(t, unaryFieldsPosMsg, false)
+	binaryTranslationParty(t, unaryFieldsNegMsg, false)
+	binaryTranslationParty(t, unaryFieldsPosInfMsg, false)
+	binaryTranslationParty(t, unaryFieldsNegInfMsg, false)
+	binaryTranslationParty(t, unaryFieldsNanMsg, true)
 }
 
 func TestBinaryRepeatedFields(t *testing.T) {
-	binaryTranslationParty(t, repeatedFieldsMsg)
+	binaryTranslationParty(t, repeatedFieldsMsg, false)
+	binaryTranslationParty(t, repeatedFieldsInfNanMsg, true)
 }
 
 func TestBinaryPackedRepeatedFields(t *testing.T) {
-	binaryTranslationParty(t, repeatedPackedFieldsMsg)
+	binaryTranslationParty(t, repeatedPackedFieldsMsg, false)
+	binaryTranslationParty(t, repeatedPackedFieldsInfNanMsg, true)
 }
 
 func TestBinaryMapKeyFields(t *testing.T) {
@@ -31,7 +36,7 @@ func TestBinaryMapKeyFields(t *testing.T) {
 		defaultDeterminism = false
 	}()
 
-	binaryTranslationParty(t, mapKeyFieldsMsg)
+	binaryTranslationParty(t, mapKeyFieldsMsg, false)
 }
 
 func TestMarshalMapValueFields(t *testing.T) {
@@ -41,7 +46,8 @@ func TestMarshalMapValueFields(t *testing.T) {
 		defaultDeterminism = false
 	}()
 
-	binaryTranslationParty(t, mapValueFieldsMsg)
+	binaryTranslationParty(t, mapValueFieldsMsg, false)
+	binaryTranslationParty(t, mapValueFieldsInfNanMsg, true)
 }
 
 func TestBinaryExtensionFields(t *testing.T) {
@@ -127,10 +133,10 @@ func TestBinaryUnknownFields(t *testing.T) {
 	testutil.Eq(t, buf.buf, bb)
 
 	// now try a full translation party to ensure unknown bits remain correct throughout
-	binaryTranslationParty(t, &msg)
+	binaryTranslationParty(t, &msg, false)
 }
 
-func binaryTranslationParty(t *testing.T, msg proto.Message) {
+func binaryTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 	marshalAppendSimple := func(m *Message) ([]byte, error) {
 		// Declare a function that has the same interface as (*Message.Marshal) but uses
 		// MarshalAppend internally so we can reuse the translation party tests to verify
@@ -160,7 +166,7 @@ func binaryTranslationParty(t *testing.T, msg proto.Message) {
 	}
 
 	for _, marshalFn := range marshalMethods {
-		doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalFn, (*Message).Unmarshal)
+		doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalFn, (*Message).Unmarshal, includesNaN)
 	}
 }
 
