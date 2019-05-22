@@ -2,7 +2,6 @@ package protoparse
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -456,7 +455,6 @@ func TestResolveFilenames(t *testing.T) {
 	testutil.Require(t, err == nil, "%v", err)
 	relResolvedFilePaths, err := ResolveFilenames(relImportPaths, relFilePaths...)
 	testutil.Require(t, err == nil, "%v", err)
-	fmt.Println(relResolvedFilePaths)
 	absResolvedFilePaths, err := ResolveFilenames(absImportPaths, absFilePaths...)
 	testutil.Require(t, err == nil, "%v", err)
 
