@@ -600,8 +600,11 @@ func (r *parseResult) createFileDescriptor(filename string, file *fileNode) erro
 
 	isProto3 := false
 	if file.syntax != nil {
-		fd.Syntax = proto.String(file.syntax.syntax.val)
 		isProto3 = file.syntax.syntax.val == "proto3"
+		// https://github.com/protocolbuffers/protobuf/blob/0c3f43a6190b77f1f68b7425d1b7e1a8257a8d0c/src/google/protobuf/descriptor.cc#L2014
+		if isProto3 {
+			fd.Syntax = proto.String(file.syntax.syntax.val)
+		}
 	}
 
 	for _, decl := range file.decls {
