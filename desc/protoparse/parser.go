@@ -601,7 +601,7 @@ func (r *parseResult) createFileDescriptor(filename string, file *fileNode) erro
 	isProto3 := false
 	if file.syntax != nil {
 		isProto3 = file.syntax.syntax.val == "proto3"
-		// https://github.com/protocolbuffers/protobuf/blob/0c3f43a6190b77f1f68b7425d1b7e1a8257a8d0c/src/google/protobuf/descriptor.cc#L2014
+		// proto2 is the default, so no need to set unless proto3
 		if isProto3 {
 			fd.Syntax = proto.String(file.syntax.syntax.val)
 		}
