@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package c;
+
+import "testprotos/noimportpath/a/b/b1.proto";
+import "testprotos/noimportpath/a/b/b2.proto";
+
+message See {
+  a.b.BeeOne bee_one = 1;
+  a.b.BeeTwo bee_two = 2;
+}
