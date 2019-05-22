@@ -600,8 +600,11 @@ func (r *parseResult) createFileDescriptor(filename string, file *fileNode) erro
 
 	isProto3 := false
 	if file.syntax != nil {
-		fd.Syntax = proto.String(file.syntax.syntax.val)
 		isProto3 = file.syntax.syntax.val == "proto3"
+		// proto2 is the default, so no need to set unless proto3
+		if isProto3 {
+			fd.Syntax = proto.String(file.syntax.syntax.val)
+		}
 	}
 
 	for _, decl := range file.decls {
