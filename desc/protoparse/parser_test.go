@@ -486,9 +486,10 @@ func TestParseFilesWithImportsNoImportPath(t *testing.T) {
 	err = os.Chdir("../../internal/testprotos/protoparse")
 	testutil.Require(t, err == nil, "%v", err)
 	p := Parser{}
-	protos, err := p.ParseFiles(relFilePaths...)
+	protos, parseErr := p.ParseFiles(relFilePaths...)
 	err = os.Chdir(pwd)
 	testutil.Require(t, err == nil, "%v", err)
+	testutil.Require(t, parseErr == nil, "%v", parseErr)
 
 	testutil.Ok(t, err)
 	testutil.Eq(t, len(relFilePaths), len(protos))
