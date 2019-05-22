@@ -3,19 +3,11 @@ package desc
 import (
 	"fmt"
 	"reflect"
-	"sync"
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/internal"
-)
-
-var (
-	cacheMu       sync.RWMutex
-	filesCache    = map[string]*FileDescriptor{}
-	messagesCache = map[string]*MessageDescriptor{}
-	enumCache     = map[reflect.Type]*EnumDescriptor{}
 )
 
 // LoadFileDescriptor creates a file descriptor using the bytes returned by
@@ -36,7 +28,7 @@ func loadFileDescriptor(file string, r *ImportResolver) (*FileDescriptor, error)
 }
 
 func loadFileDescriptorLocked(file string, r *ImportResolver) (*FileDescriptor, error) {
-	f := filesCache[file]
+	f, _ := filesCache.Get(file)
 	if f != nil {
 		return f, nil
 	}
@@ -73,17 +65,18 @@ func toFileDescriptorLocked(fd *dpb.FileDescriptorProto, r *ImportResolver) (*Fi
 func getFileFromCache(file string) *FileDescriptor {
 	cacheMu.RLock()
 	defer cacheMu.RUnlock()
-	return filesCache[file]
+	f, _ := filesCache.Get(file)
+	return f
 }
 
 func putCacheLocked(filename string, fd *FileDescriptor) {
-	filesCache[filename] = fd
+	filesCache.Set(filename, fd)
 	putMessageCacheLocked(fd.messages)
 }
 
 func putMessageCacheLocked(mds []*MessageDescriptor) {
 	for _, md := range mds {
-		messagesCache[md.fqn] = md
+		messagesCache.Set(md.fqn, md)
 		putMessageCacheLocked(md.nested)
 	}
 }
@@ -179,7 +172,7 @@ func messageFromType(mt reflect.Type) (protoMessage, error) {
 }
 
 func loadMessageDescriptorForTypeLocked(name string, message protoMessage, r *ImportResolver) (*MessageDescriptor, error) {
-	m := messagesCache[name]
+	m, _ := messagesCache.Get(name)
 	if m != nil {
 		return m, nil
 	}
@@ -201,7 +194,8 @@ func loadMessageDescriptorForTypeLocked(name string, message protoMessage, r *Im
 func getMessageFromCache(message string) *MessageDescriptor {
 	cacheMu.RLock()
 	defer cacheMu.RUnlock()
-	return messagesCache[message]
+	m, _ := messagesCache.Get(message)
+	return m
 }
 
 // interface implemented by all generated enums
@@ -277,7 +271,7 @@ func enumFromType(et reflect.Type) (protoEnum, error) {
 }
 
 func loadEnumDescriptorForTypeLocked(et reflect.Type, enum protoEnum, r *ImportResolver) (*EnumDescriptor, error) {
-	e := enumCache[et]
+	e, _ := enumCache.Get(et)
 	if e != nil {
 		return e, nil
 	}
@@ -289,7 +283,7 @@ func loadEnumDescriptorForTypeLocked(et reflect.Type, enum protoEnum, r *ImportR
 		return nil, err
 	}
 	// see if we already have cached "rich" descriptor
-	f, ok := filesCache[fd.GetName()]
+	f, ok := filesCache.Get(fd.GetName())
 	if !ok {
 		f, err = toFileDescriptorLocked(fd, r)
 		if err != nil {
@@ -299,14 +293,15 @@ func loadEnumDescriptorForTypeLocked(et reflect.Type, enum protoEnum, r *ImportR
 	}
 
 	ed := findEnum(f, path)
-	enumCache[et] = ed
+	enumCache.Set(et, ed)
 	return ed, nil
 }
 
 func getEnumFromCache(et reflect.Type) *EnumDescriptor {
 	cacheMu.RLock()
 	defer cacheMu.RUnlock()
-	return enumCache[et]
+	e, _ := enumCache.Get(et)
+	return e
 }
 
 func findEnum(fd *FileDescriptor, path []int) *EnumDescriptor {

@@ -5,15 +5,9 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
-)
-
-var (
-	globalImportPathConf map[string]string
-	globalImportPathMu   sync.RWMutex
 )
 
 // RegisterImportPath registers an alternate import path for a given registered
@@ -43,13 +37,11 @@ func RegisterImportPath(registerPath, importPath string) {
 	}
 	globalImportPathMu.Lock()
 	defer globalImportPathMu.Unlock()
-	if reg := globalImportPathConf[importPath]; reg != "" {
+	reg, _ := globalImportPathConf.Get(importPath)
+	if reg != "" {
 		panic(fmt.Sprintf("import path %q already registered for %s", importPath, reg))
 	}
-	if globalImportPathConf == nil {
-		globalImportPathConf = map[string]string{}
-	}
-	globalImportPathConf[importPath] = registerPath
+	globalImportPathConf.Set(importPath, registerPath)
 }
 
 // ResolveImport resolves the given import path. If it has been registered as an
@@ -59,7 +51,7 @@ func ResolveImport(importPath string) string {
 	importPath = clean(importPath)
 	globalImportPathMu.RLock()
 	defer globalImportPathMu.RUnlock()
-	reg := globalImportPathConf[importPath]
+	reg, _ := globalImportPathConf.Get(importPath)
 	if reg == "" {
 		return importPath
 	}
