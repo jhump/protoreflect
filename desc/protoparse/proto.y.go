@@ -2067,7 +2067,7 @@ protodefault:
 		protoDollar = protoS[protopt-0 : protopt+1]
 //line proto.y:875
 		{
-			protoVAL.opts = nil
+			protoVAL.opts = []*optionNode{}
 		}
 	case 177:
 		protoDollar = protoS[protopt-1 : protopt+1]
