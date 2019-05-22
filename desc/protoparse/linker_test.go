@@ -25,12 +25,6 @@ func TestSimpleLink(t *testing.T) {
 	var files dpb.FileDescriptorSet
 	err = proto.Unmarshal(b, &files)
 	testutil.Ok(t, err)
-
-	// protoc does not set syntax field if it is proto2, but we do
-	// so set it just so we can compare apples to apples
-	if files.File[0].Syntax == nil {
-		files.File[0].Syntax = proto.String("proto2")
-	}
 	testutil.Require(t, proto.Equal(files.File[0], fds[0].AsProto()), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(files.File[0]), toString(fds[0].AsProto()))
 }
 
@@ -52,12 +46,6 @@ func checkFiles(t *testing.T, act, exp *desc.FileDescriptor, checked map[string]
 		return
 	}
 	checked[act.GetName()] = struct{}{}
-
-	// protoc does not set syntax field if it is proto2, so modify
-	// ours to follow suit so we can compare apples to apples
-	if act.AsFileDescriptorProto().GetSyntax() == "proto2" {
-		act.AsFileDescriptorProto().Syntax = nil
-	}
 
 	testutil.Require(t, proto.Equal(exp.AsFileDescriptorProto(), act.AsProto()), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(exp.AsProto()), toString(act.AsProto()))
 
