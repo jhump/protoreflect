@@ -447,6 +447,11 @@ func TestParseFilesPaths(t *testing.T) {
 	// The testprotos/withimportpath directory has to have testprotos/withimportpath
 	// added as the ImportPath as the imports start from testprotos/withimportpath.
 
+	wktPath, err := filepath.Abs("../../.tmp/protoc/include")
+	testutil.Require(t, err == nil)
+	_, err = os.Stat(wktPath)
+	testutil.Require(t, err == nil)
+
 	// Relative file paths with no import path.
 	p := Parser{}
 	protos, err := p.ParseFiles(
@@ -470,6 +475,21 @@ func TestParseFilesPaths(t *testing.T) {
 	// Relative file paths with import path.
 	p = Parser{
 		ImportPaths: []string{
+			"testprotos/withimportpath",
+		},
+	}
+	protos, err = p.ParseFiles(
+		"a/b/b1.proto",
+		"a/b/b2.proto",
+		"c/c.proto",
+	)
+	testutil.Ok(t, err)
+	testutil.Eq(t, 3, len(protos))
+
+	// Relative file paths with import path with explicit WKT path.
+	p = Parser{
+		ImportPaths: []string{
+			wktPath,
 			"testprotos/withimportpath",
 		},
 	}
@@ -534,6 +554,21 @@ func TestParseFilesPaths(t *testing.T) {
 	// Absolute file paths with import path.
 	p = Parser{
 		ImportPaths: []string{
+			filepath.Join(pwd, "testprotos/withimportpath"),
+		},
+	}
+	protos, err = p.ParseFiles(
+		filepath.Join(pwd, "testprotos/withimportpath/a/b/b1.proto"),
+		filepath.Join(pwd, "testprotos/withimportpath/a/b/b2.proto"),
+		filepath.Join(pwd, "testprotos/withimportpath/c/c.proto"),
+	)
+	testutil.Ok(t, err)
+	testutil.Eq(t, 3, len(protos))
+
+	// Absolute file paths with import path with explicit WKT path.
+	p = Parser{
+		ImportPaths: []string{
+			wktPath,
 			filepath.Join(pwd, "testprotos/withimportpath"),
 		},
 	}

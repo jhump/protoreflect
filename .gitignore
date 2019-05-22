@@ -1,2 +1,2 @@
-internal/testprotos/protoc
+/.tmp/
 coverage.out
