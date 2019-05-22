@@ -880,7 +880,7 @@ rpcOption : option {
 		$$ = $1
 	}
 	| ';' {
-		$$ = nil
+		$$ = []*optionNode{}
 	}
 
 name : _NAME

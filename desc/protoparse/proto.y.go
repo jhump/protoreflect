@@ -2079,7 +2079,7 @@ protodefault:
 		protoDollar = protoS[protopt-1 : protopt+1]
 //line proto.y:882
 		{
-			protoVAL.opts = nil
+			protoVAL.opts = []*optionNode{}
 		}
 	}
 	goto protostack /* stack new state and value */
