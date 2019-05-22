@@ -22,6 +22,8 @@ import (
 
 //go:generate goyacc -o proto.y.go -p proto proto.y
 
+var errNoImportPathsForAbsoluteFilePath = errors.New("must specify at least one import path if any absolute file paths are given")
+
 func init() {
 	protoErrorVerbose = true
 
@@ -85,6 +87,49 @@ func FileContentsFromMap(files map[string]string) FileAccessor {
 		}
 		return ioutil.NopCloser(strings.NewReader(contents)), nil
 	}
+}
+
+// ResolveFilenames tries to resolve fileNames into paths that are relative to
+// directories in the given importPaths. The returned slice has the results in
+// the same order as they are supplied in fileNames.
+//
+// The resulting names should be suitable for passing to Parser.ParseFiles.
+//
+// If importPaths is empty and any path is absolute, this returns error.
+// If importPaths is empty and all paths are relative, this returns the original fileNames.
+func ResolveFilenames(importPaths []string, fileNames ...string) ([]string, error) {
+	if len(importPaths) == 0 {
+		if containsAbsFilePath(fileNames) {
+			// We have to do this as otherwise parseProtoFiles can result in duplicate symbols.
+			// For example, assume we import "foo/bar/bar.proto" in a file "/home/alice/dev/foo/bar/baz.proto"
+			// as we call ParseFiles("/home/alice/dev/foo/bar/bar.proto","/home/alice/dev/foo/bar/baz.proto")
+			// with "/home/alice/dev" as our current directory. Due to the recursive nature of parseProtoFiles,
+			// it will discover the import "foo/bar/bar.proto" in the input file, and call parse on this,
+			// adding "foo/bar/bar.proto" to the parsed results, as well as "/home/alice/dev/foo/bar/bar.proto"
+			// from the input file list. This will result in a
+			// 'duplicate symbol SYMBOL: already defined as field in "/home/alice/dev/foo/bar/bar.proto'
+			// error being returned from ParseFiles.
+			return nil, errNoImportPathsForAbsoluteFilePath
+		}
+		return fileNames, nil
+	}
+	absImportPaths, err := absoluteFilePaths(importPaths)
+	if err != nil {
+		return nil, err
+	}
+	absFileNames, err := absoluteFilePaths(fileNames)
+	if err != nil {
+		return nil, err
+	}
+	resolvedFileNames := make([]string, 0, len(fileNames))
+	for _, absFileName := range absFileNames {
+		resolvedFileName, err := resolveAbsFilename(absImportPaths, absFileName)
+		if err != nil {
+			return nil, err
+		}
+		resolvedFileNames = append(resolvedFileNames, resolvedFileName)
+	}
+	return resolvedFileNames, nil
 }
 
 // Parser parses proto source into descriptors.
@@ -155,7 +200,6 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 		}
 	}
 	paths := p.ImportPaths
-	importResolver := newImportResolver(paths)
 	if len(paths) > 0 {
 		acc := accessor
 		accessor = func(name string) (io.ReadCloser, error) {
@@ -170,15 +214,12 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 				}
 				return f, nil
 			}
-			if os.IsNotExist(ret) {
-				return nil, fmt.Errorf("%s not found in any of %s", name, strings.Join(paths, ", "))
-			}
 			return nil, ret
 		}
 	}
 
 	protos := map[string]*parseResult{}
-	err := parseProtoFiles(importResolver, accessor, filenames, true, true, protos)
+	err := parseProtoFiles(accessor, filenames, true, true, protos)
 	if err != nil {
 		return nil, err
 	}
@@ -198,10 +239,6 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	}
 	fds := make([]*desc.FileDescriptor, len(filenames))
 	for i, name := range filenames {
-		name, err := importResolver(name)
-		if err != nil {
-			return nil, err
-		}
 		fd := linkedProtos[name]
 		fds[i] = fd
 	}
@@ -242,8 +279,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 	}
 
 	protos := map[string]*parseResult{}
-	importResolver := newImportResolver(p.ImportPaths)
-	err := parseProtoFiles(importResolver, accessor, filenames, false, p.ValidateUnlinkedFiles, protos)
+	err := parseProtoFiles(accessor, filenames, false, p.ValidateUnlinkedFiles, protos)
 	if err != nil {
 		return nil, err
 	}
@@ -252,10 +288,6 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 	}
 	fds := make([]*dpb.FileDescriptorProto, len(filenames))
 	for i, name := range filenames {
-		name, err := importResolver(name)
-		if err != nil {
-			return nil, err
-		}
 		pr := protos[name]
 		fd := pr.fd
 		if p.InterpretOptionsInUnlinkedFiles {
@@ -270,43 +302,54 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 	return fds, nil
 }
 
-func newImportResolver(importPaths []string) func(string) (string, error) {
-	return func(name string) (string, error) {
-		if !filepath.IsAbs(name) {
-			return name, nil
+func containsAbsFilePath(filePaths []string) bool {
+	for _, filePath := range filePaths {
+		if filepath.IsAbs(filePath) {
+			return true
 		}
-		var currentImportPath string
-		var resolvedPath string
-		var err error
-		for _, importPath := range importPaths {
-			// If this is within this directory, we have a match.
-			if strings.HasPrefix(filepath.ToSlash(name), filepath.ToSlash(importPath)) {
-				// We have a duplicate.
-				if currentImportPath != "" {
-					return "", fmt.Errorf("%s resides in both %s and %s", name, importPath, currentImportPath)
-				}
-				currentImportPath = importPath
-				// This should always result in a relative path as we know that
-				// name is absolute, and for strings.HasPrefix to be true, import
-				// path must be absolute.
-				//
-				// We do not do strings.HasPrefix here to try to make this platform independent.
-				resolvedPath, err = filepath.Rel(importPath, name)
-				if err != nil {
-					return "", err
-				}
+	}
+	return false
+}
+
+func absoluteFilePaths(filePaths []string) ([]string, error) {
+	absFilePaths := make([]string, 0, len(filePaths))
+	for _, filePath := range filePaths {
+		absFilePath, err := filepath.Abs(filePath)
+		if err != nil {
+			return nil, err
+		}
+		absFilePaths = append(absFilePaths, absFilePath)
+	}
+	return absFilePaths, nil
+}
+
+func resolveAbsFilename(absImportPaths []string, absFileName string) (string, error) {
+	for _, absImportPath := range absImportPaths {
+		if isDescendant(absImportPath, absFileName) {
+			resolvedPath, err := filepath.Rel(absImportPath, absFileName)
+			if err != nil {
+				return "", err
 			}
+			return resolvedPath, nil
 		}
-		if resolvedPath == "" {
-			return "", fmt.Errorf("%s: File does not reside within any path "+
-				"specified using --proto_path (or -I).  You must specify a "+
-				"--proto_path which encompasses this file.  Note that the "+
-				"proto_path must be an exact prefix of the .proto file "+
-				"names -- protoc is too dumb to figure out when two paths "+
-				"(e.g. absolute and relative) are equivalent (it's harder "+
-				"than you think)", name)
+	}
+	return "", fmt.Errorf("%s does not reside in any import path", absFileName)
+}
+
+// isDescendant returns true if file is a descendant of dir.
+func isDescendant(dir, file string) bool {
+	dir = filepath.Clean(dir)
+	cur := file
+	for {
+		d := filepath.Dir(cur)
+		if d == dir {
+			return true
 		}
-		return resolvedPath, nil
+		if d == "." || d == cur {
+			// we've run out of path elements
+			return false
+		}
+		cur = d
 	}
 }
 
@@ -418,12 +461,8 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	return revisedProtos
 }
 
-func parseProtoFiles(importResolver func(string) (string, error), acc FileAccessor, filenames []string, recursive, validate bool, parsed map[string]*parseResult) error {
+func parseProtoFiles(acc FileAccessor, filenames []string, recursive, validate bool, parsed map[string]*parseResult) error {
 	for _, name := range filenames {
-		name, err := importResolver(name)
-		if err != nil {
-			return err
-		}
 		if _, ok := parsed[name]; ok {
 			continue
 		}
@@ -443,7 +482,7 @@ func parseProtoFiles(importResolver func(string) (string, error), acc FileAccess
 			return err
 		}
 		if recursive {
-			err = parseProtoFiles(importResolver, acc, parsed[name].fd.Dependency, true, validate, parsed)
+			err = parseProtoFiles(acc, parsed[name].fd.Dependency, true, validate, parsed)
 			if err != nil {
 				return fmt.Errorf("failed to load imports for %q: %s", name, err)
 			}

@@ -68,7 +68,6 @@ errcheck:
 
 .PHONY: test
 test:
-	@./scripts/install_protoc.sh
 	go test -cover -race ./...
 
 .PHONY: generate
@@ -78,7 +77,6 @@ generate:
 
 .PHONY: testcover
 testcover:
-	@./scripts/install_protoc.sh
 	@echo go test -race -covermode=atomic ./...
 	@echo "mode: atomic" > coverage.out
 	@for dir in $$(go list ./...); do \
