@@ -873,14 +873,14 @@ rpcOptions : rpcOptions rpcOption {
 	}
 	| rpcOption
 	| {
-		$$ = nil
+		$$ = []*optionNode{}
 	}
 
 rpcOption : option {
 		$$ = $1
 	}
 	| ';' {
-		$$ = nil
+		$$ = []*optionNode{}
 	}
 
 name : _NAME

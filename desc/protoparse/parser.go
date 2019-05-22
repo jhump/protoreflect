@@ -696,8 +696,11 @@ func (r *parseResult) createFileDescriptor(filename string, file *fileNode) erro
 
 	isProto3 := false
 	if file.syntax != nil {
-		fd.Syntax = proto.String(file.syntax.syntax.val)
 		isProto3 = file.syntax.syntax.val == "proto3"
+		// proto2 is the default, so no need to set unless proto3
+		if isProto3 {
+			fd.Syntax = proto.String(file.syntax.syntax.val)
+		}
 	}
 
 	for _, decl := range file.decls {
@@ -964,7 +967,11 @@ func (r *parseResult) asMethodDescriptor(node *methodNode) *dpb.MethodDescriptor
 	if node.output.streamKeyword != nil {
 		md.ServerStreaming = proto.Bool(true)
 	}
-	if len(node.options) > 0 {
+	// protoc always adds a MethodOptions if there are brackets
+	// We have a non-nil node.options if there are brackets
+	// We do the same to match protoc as closely as possible
+	// https://github.com/protocolbuffers/protobuf/blob/0c3f43a6190b77f1f68b7425d1b7e1a8257a8d0c/src/google/protobuf/compiler/parser.cc#L2152
+	if node.options != nil {
 		md.Options = &dpb.MethodOptions{UninterpretedOption: r.asUninterpretedOptions(node.options)}
 	}
 	return md
