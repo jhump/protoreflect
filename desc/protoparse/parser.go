@@ -1424,7 +1424,7 @@ func (r *parseResult) generateSourceCodeInfoForField(sci *sourceCodeInfo, fld *d
 
 func (sci *sourceCodeInfo) newLoc(n node, path []int32) {
 	leadingComments := n.leadingComments()
-	trailingComments := n.trailingComment()
+	trailingComments := n.trailingComments()
 	if sci.commentUsed(leadingComments) {
 		leadingComments = nil
 	}

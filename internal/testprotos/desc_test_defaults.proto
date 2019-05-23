@@ -1,6 +1,9 @@
-syntax = "proto2";
+syntax = "proto" // multi-line string literal
+         "2";
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+option go_package = "github.com/" // more multi-line string literals
+                    "jhump/protoreflect/"
+                    "internal/testprotos";
 
 package testprotos;
 
@@ -75,6 +78,12 @@ message StringAndBytesDefaults {
 	optional string utf8_string = 4 [default = "\341\210\264"]; // this is utf-8 for \u1234
   	optional string string_with_zero = 5 [default = "hel\000lo"];
   	optional bytes bytes_with_zero = 6 [default = "wor\000ld"];
+
+	optional string really_long_string = 7 [default = "this is "
+                                           "a really long string constant, so it "
+                                           "spans multiple lines! it also tests "
+                                           "support for multi-line string literals "
+                                           "in option values"];
 }
 
 enum Color {
