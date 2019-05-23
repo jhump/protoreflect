@@ -103,6 +103,12 @@ func ResolveImport(importPath string) string {
 type ImportResolver struct {
 	children    map[string]*ImportResolver
 	importPaths map[string]string
+
+	// By default, an ImportResolver will fallback to consulting any paths
+	// registered via the top-level RegisterImportPath function. Setting this
+	// field to true will cause the ImportResolver to skip that fallback and
+	// only examine its own locally registered paths.
+	SkipFallbackRules bool
 }
 
 // ResolveImport resolves the given import path in the context of the given
@@ -116,6 +122,9 @@ func (r *ImportResolver) ResolveImport(source, importPath string) string {
 		if res != "" {
 			return res
 		}
+	}
+	if r.SkipFallbackRules {
+		return importPath
 	}
 	return ResolveImport(importPath)
 }
