@@ -167,13 +167,13 @@ func TestLexer(t *testing.T) {
 		testutil.Eq(t, exp.line, n.end().Line, "case %d: wrong end line number", i)
 		testutil.Eq(t, exp.col+exp.span, n.end().Col, "case %d: wrong end column number", i)
 		if exp.trailCount > 0 {
-			testutil.Eq(t, exp.trailCount, len(prev.trailingComment()), "case %d: wrong number of trailing comments", i)
+			testutil.Eq(t, exp.trailCount, len(prev.trailingComments()), "case %d: wrong number of trailing comments", i)
 		}
 		testutil.Eq(t, len(exp.comments)-exp.trailCount, len(n.leadingComments()), "case %d: wrong number of comments", i)
 		for ci := range exp.comments {
 			var c *comment
 			if ci < exp.trailCount {
-				c = prev.trailingComment()[ci]
+				c = prev.trailingComments()[ci]
 			} else {
 				c = n.leadingComments()[ci-exp.trailCount]
 			}

@@ -89,6 +89,7 @@ import (
 %type <env>       enumField
 %type <extend>    extend
 %type <extDecls>  extendItem extendBody
+%type <str>       stringLit
 %type <svc>       service
 %type <svcDecls>  serviceItem serviceBody
 %type <mtd>       rpc
@@ -166,7 +167,7 @@ fileDecl : import {
 		$$ = []*fileElement{{empty: $1}}
 	}
 
-syntax : _SYNTAX '=' _STRING_LIT ';' {
+syntax : _SYNTAX '=' stringLit ';' {
 		if $3.val != "proto2" && $3.val != "proto3" {
 			lexError(protolex, $3.start(), "syntax value must be 'proto2' or 'proto3'")
 		}
@@ -174,15 +175,15 @@ syntax : _SYNTAX '=' _STRING_LIT ';' {
 		$$.setRange($1, $4)
 	}
 
-import : _IMPORT _STRING_LIT ';' {
+import : _IMPORT stringLit ';' {
 		$$ = &importNode{ name: $2 }
 		$$.setRange($1, $3)
 	}
-	| _IMPORT _WEAK _STRING_LIT ';' {
+	| _IMPORT _WEAK stringLit ';' {
 		$$ = &importNode{ name: $3, weak: true }
 		$$.setRange($1, $4)
 	}
-	| _IMPORT _PUBLIC _STRING_LIT ';' {
+	| _IMPORT _PUBLIC stringLit ';' {
 		$$ = &importNode{ name: $3, public: true }
 		$$.setRange($1, $4)
 	}
@@ -236,7 +237,7 @@ optionNameComponent : _TYPENAME {
 constant : scalarConstant
 	| aggregate
 
-scalarConstant : _STRING_LIT {
+scalarConstant : stringLit {
 		$$ = $1
 	}
 	| intLit {
@@ -296,6 +297,12 @@ floatLit : _FLOAT_LIT
 		$$ = &floatLiteralNode{val: math.Inf(-1)}
 		$$.setRange($1, $2)
 	}
+
+stringLit : _STRING_LIT
+    | stringLit _STRING_LIT {
+        $$ = &stringLiteralNode{val: $1.val + $2.val}
+        $$.setRange($1, $2)
+    }
 
 aggregate : '{' aggFields '}' {
 		a := &aggregateLiteralNode{elements: $2}
@@ -682,10 +689,10 @@ reservedNames : _RESERVED fieldNames ';' {
 		$$.setRange($1, $3)
 	}
 
-fieldNames : fieldNames ',' _STRING_LIT {
+fieldNames : fieldNames ',' stringLit {
 		$$ = append($1, $3)
 	}
-	| _STRING_LIT {
+	| stringLit {
 		$$ = []*stringLiteralNode{$1}
 	}
 
