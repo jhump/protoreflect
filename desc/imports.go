@@ -122,9 +122,9 @@ func (r *ImportResolver) ResolveImport(source, importPath string) string {
 		if res != "" {
 			return res
 		}
-	}
-	if r.SkipFallbackRules {
-		return importPath
+		if r.SkipFallbackRules {
+			return importPath
+		}
 	}
 	return ResolveImport(importPath)
 }
