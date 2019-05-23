@@ -1096,11 +1096,6 @@ func (r *parseResult) asServiceDescriptor(svc *serviceNode) *dpb.ServiceDescript
 	return sd
 }
 
-type sourceCodeInfo struct {
-	locs         []*dpb.SourceCodeInfo_Location
-	commentsUsed map[*comment]struct{}
-}
-
 func (r *parseResult) generateSourceCodeInfo() *dpb.SourceCodeInfo {
 	if r.nodes == nil {
 		// skip files that do not have AST info (these will be files
@@ -1176,7 +1171,7 @@ func (r *parseResult) generateSourceCodeInfo() *dpb.SourceCodeInfo {
 			}, mtd.Options.GetUninterpretedOption(), append(mtdPath, internal.Method_optionsTag))
 		}
 	}
-	return &dpb.SourceCodeInfo{Location: sci.locs}
+	return &dpb.SourceCodeInfo{Location: sci.generateLocs()}
 }
 
 func (r *parseResult) generateSourceCodeInfoForOptions(sci *sourceCodeInfo, elements interface{}, extractor func(interface{}) *optionNode, uninterp []*dpb.UninterpretedOption, path []int32) {
@@ -1422,6 +1417,11 @@ func (r *parseResult) generateSourceCodeInfoForField(sci *sourceCodeInfo, fld *d
 	}, fld.Options.GetUninterpretedOption(), append(path, internal.Field_optionsTag))
 }
 
+type sourceCodeInfo struct {
+	locs         []*dpb.SourceCodeInfo_Location
+	commentsUsed map[*comment]struct{}
+}
+
 func (sci *sourceCodeInfo) newLoc(n node, path []int32) {
 	leadingComments := n.leadingComments()
 	trailingComments := n.trailingComments()
@@ -1538,6 +1538,161 @@ func combineComments(comments []*comment) *string {
 		}
 	}
 	return proto.String(buf.String())
+}
+
+func (sci *sourceCodeInfo) generateLocs() []*dpb.SourceCodeInfo_Location {
+	// generate intermediate locations: paths between root (inclusive) and the
+	// leaf locations already created, these will not have comments but will
+	// have aggregate span, than runs from min(start pos) to max(end pos) for
+	// all descendent paths.
+
+	if len(sci.locs) == 0 {
+		// nothing to generate
+		return nil
+	}
+
+	var root locTrie
+	for _, loc := range sci.locs {
+		root.add(loc.Path, loc)
+	}
+	root.fillIn()
+	locs := make([]*dpb.SourceCodeInfo_Location, 0, root.countLocs())
+	root.aggregate(&locs)
+	// finally, sort the resulting slice by location
+	sort.Slice(locs, func(i, j int) bool {
+		startI, endI := getSpanPositions(locs[i].Span)
+		startJ, endJ := getSpanPositions(locs[j].Span)
+		cmp := compareSlice(startI, startJ)
+		if cmp == 0 {
+			// if start position is the same, sort by end position _decreasing_
+			// (so enclosing locations will appear before leaves)
+			cmp = -compareSlice(endI, endJ)
+			if cmp == 0 {
+				// start and end position are the same? so break ties using path
+				cmp = compareSlice(locs[i].Path, locs[j].Path)
+			}
+		}
+		return cmp < 0
+	})
+	return locs
+}
+
+type locTrie struct {
+	children map[int32]*locTrie
+	loc      *dpb.SourceCodeInfo_Location
+}
+
+func (t *locTrie) add(path []int32, loc *dpb.SourceCodeInfo_Location) {
+	if len(path) == 0 {
+		t.loc = loc
+		return
+	}
+	child := t.children[path[0]]
+	if child == nil {
+		if t.children == nil {
+			t.children = map[int32]*locTrie{}
+		}
+		child = &locTrie{}
+		t.children[path[0]] = child
+	}
+	child.add(path[1:], loc)
+}
+
+func (t *locTrie) fillIn() {
+	var path []int32
+	var start, end []int32
+	for _, child := range t.children {
+		// recurse
+		child.fillIn()
+		if t.loc == nil {
+			// maintain min(start) and max(end) so we can
+			// populate t.loc below
+			childStart, childEnd := getSpanPositions(child.loc.Span)
+
+			if start == nil {
+				if path == nil {
+					path = child.loc.Path[:len(child.loc.Path)-1]
+				}
+				start = childStart
+				end = childEnd
+			} else {
+				if compareSlice(childStart, start) < 0 {
+					start = childStart
+				}
+				if compareSlice(childEnd, end) > 0 {
+					end = childEnd
+				}
+			}
+		}
+	}
+
+	if t.loc == nil {
+		var span []int32
+		// we don't use append below because we want a new slice
+		// that doesn't share underlying buffer with spans from
+		// any other location
+		if start[0] == end[0] {
+			span = []int32{start[0], start[1], end[1]}
+		} else {
+			span = []int32{start[0], start[1], end[0], end[1]}
+		}
+		t.loc = &dpb.SourceCodeInfo_Location{
+			Path: path,
+			Span: span,
+		}
+	}
+}
+
+func (t *locTrie) countLocs() int {
+	count := 0
+	if t.loc != nil {
+		count = 1
+	}
+	for _, ch := range t.children {
+		count += ch.countLocs()
+	}
+	return count
+}
+
+func (t *locTrie) aggregate(dest *[]*dpb.SourceCodeInfo_Location) {
+	if t.loc != nil {
+		*dest = append(*dest, t.loc)
+	}
+	for _, child := range t.children {
+		child.aggregate(dest)
+	}
+}
+
+func getSpanPositions(span []int32) (start, end []int32) {
+	start = span[:2]
+	if len(span) == 3 {
+		end = []int32{span[0], span[2]}
+	} else {
+		end = span[2:]
+	}
+	return
+}
+
+func compareSlice(a, b []int32) int {
+	end := len(a)
+	if len(b) < end {
+		end = len(b)
+	}
+	for i := 0; i < end; i++ {
+		if a[i] < b[i] {
+			return -1
+		}
+		if a[i] > b[i] {
+			return 1
+		}
+	}
+	if len(a) < len(b) {
+		return -1
+	}
+	if len(a) > len(b) {
+		return 1
+	}
+	return 0
 }
 
 func toNameParts(ident *identNode, offset int) []*optionNamePartNode {
