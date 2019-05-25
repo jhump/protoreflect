@@ -251,9 +251,9 @@ scalarConstant : stringLit {
 	}
 	| name {
 		if $1.val == "true" {
-			$$ = &boolLiteralNode{basicNode: $1.basicNode, val: true}
+			$$ = &boolLiteralNode{basicNode: $1.toBasicNode(), val: true}
 		} else if $1.val == "false" {
-			$$ = &boolLiteralNode{basicNode: $1.basicNode, val: false}
+			$$ = &boolLiteralNode{basicNode: $1.toBasicNode(), val: false}
 		} else if $1.val == "inf" {
 			f := &floatLiteralNode{val: math.Inf(1)}
 			f.setRange($1, $1)
@@ -406,22 +406,26 @@ constantList : constant {
 
 typeIdent : ident
 	| _TYPENAME
+	| typeIdent _TYPENAME {
+        $$ = &identNode{val: $1.val + $2.val}
+        $$.setRange($1, $2)
+	}
 
 field : _REQUIRED typeIdent name '=' _INT_LIT ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{basicNode: $1.basicNode, required: true}
+		lbl := &labelNode{basicNode: $1.toBasicNode(), required: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
 		$$.setRange($1, $6)
 	}
 	| _OPTIONAL typeIdent name '=' _INT_LIT ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{basicNode: $1.basicNode}
+		lbl := &labelNode{basicNode: $1.toBasicNode()}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
 		$$.setRange($1, $6)
 	}
 	| _REPEATED typeIdent name '=' _INT_LIT ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{basicNode: $1.basicNode, repeated: true}
+		lbl := &labelNode{basicNode: $1.toBasicNode(), repeated: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
 		$$.setRange($1, $6)
 	}
@@ -432,19 +436,19 @@ field : _REQUIRED typeIdent name '=' _INT_LIT ';' {
 	}
 	| _REQUIRED typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{basicNode: $1.basicNode, required: true}
+		lbl := &labelNode{basicNode: $1.toBasicNode(), required: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
 		$$.setRange($1, $9)
 	}
 	| _OPTIONAL typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{basicNode: $1.basicNode}
+		lbl := &labelNode{basicNode: $1.toBasicNode()}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
 		$$.setRange($1, $9)
 	}
 	| _REPEATED typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{basicNode: $1.basicNode, repeated: true}
+		lbl := &labelNode{basicNode: $1.toBasicNode(), repeated: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
 		$$.setRange($1, $9)
 	}
@@ -472,7 +476,7 @@ group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageBody '}' {
 		if !unicode.IsUpper(rune($3.val[0])) {
 			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
 		}
-		lbl := &labelNode{basicNode: $1.basicNode, required: true}
+		lbl := &labelNode{basicNode: $1.toBasicNode(), required: true}
 		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, decls: $7}
 		$$.setRange($1, $8)
 	}
@@ -481,7 +485,7 @@ group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageBody '}' {
 		if !unicode.IsUpper(rune($3.val[0])) {
 			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
 		}
-		lbl := &labelNode{basicNode: $1.basicNode}
+		lbl := &labelNode{basicNode: $1.toBasicNode()}
 		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, decls: $7}
 		$$.setRange($1, $8)
 	}
@@ -490,7 +494,7 @@ group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageBody '}' {
 		if !unicode.IsUpper(rune($3.val[0])) {
 			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
 		}
-		lbl := &labelNode{basicNode: $1.basicNode, repeated: true}
+		lbl := &labelNode{basicNode: $1.toBasicNode(), repeated: true}
 		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, decls: $7}
 		$$.setRange($1, $8)
 	}

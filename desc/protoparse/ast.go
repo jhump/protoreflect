@@ -166,6 +166,12 @@ type basicCompositeNode struct {
 	last  node
 }
 
+func (n *basicCompositeNode) toBasicNode() basicNode {
+	// only works on terminals: composite nodes where first
+	// and last are *basicNode (and also equal)
+	return *n.first.(*basicNode)
+}
+
 func (n *basicCompositeNode) start() *SourcePos {
 	return n.first.start()
 }
@@ -282,13 +288,21 @@ const (
 )
 
 type identNode struct {
-	basicNode
+	basicCompositeNode
 	val  string
 	kind identKind
 }
 
 func (n *identNode) value() interface{} {
 	return identifier(n.val)
+}
+
+func (n *identNode) popLeadingComment() *comment {
+	return n.first.(terminalNode).popLeadingComment()
+}
+
+func (n *identNode) pushTrailingComment(c *comment) {
+	n.last.(terminalNode).pushTrailingComment(c)
 }
 
 type optionNode struct {
