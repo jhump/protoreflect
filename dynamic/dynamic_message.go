@@ -1221,7 +1221,6 @@ func (m *Message) putMapField(fd *desc.FieldDescriptor, key interface{}, val int
 		if mp, err = m.parseUnknownField(fd); err != nil {
 			return err
 		} else if mp == nil {
-			mp = map[interface{}]interface{}{}
 			m.internalSetField(fd, map[interface{}]interface{}{ki: vi})
 			return nil
 		}
