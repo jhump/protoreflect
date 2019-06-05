@@ -959,3 +959,18 @@ func checkBuildWithExtensions(t *testing.T, exts *dynamic.ExtensionRegistry, exp
 	}
 	testutil.Require(t, found)
 }
+
+func TestRemoveField(t *testing.T) {
+	msg := NewMessage("FancyMessage").
+		AddField(NewField("one", FieldTypeInt64())).
+		AddField(NewField("two", FieldTypeString())).
+		AddField(NewField("three", FieldTypeString()))
+
+	ok := msg.TryRemoveField("two")
+	children := msg.GetChildren()
+
+	testutil.Require(t, ok)
+	testutil.Eq(t, 2, len(children))
+	testutil.Eq(t, "one", children[0].GetName())
+	testutil.Eq(t, "three", children[1].GetName())
+}
