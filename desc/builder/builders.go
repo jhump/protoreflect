@@ -410,7 +410,7 @@ func deleteBuilder(name string, descs interface{}) interface{} {
 		if c.GetName() == name {
 			head := rv.Slice(0, i)
 			tail := rv.Slice(i+1, rv.Len())
-			return reflect.AppendSlice(head, tail)
+			return reflect.AppendSlice(head, tail).Interface()
 		}
 	}
 	return descs
