@@ -91,10 +91,11 @@ func stripTrailingSlash(url string) string {
 
 // AddMessage adds the given URL and associated message descriptor to the registry.
 func (r *MessageRegistry) AddMessage(url string, md *desc.MessageDescriptor) error {
-	if !strings.HasSuffix(url, "/"+md.GetFullyQualifiedName()) {
+	url = ensureScheme(url)
+	baseUrl := strings.TrimSuffix(url, "/"+md.GetFullyQualifiedName())
+	if url == baseUrl {
 		return fmt.Errorf("URL %s is invalid: it should end with path element %s", url, md.GetFullyQualifiedName())
 	}
-	url = ensureScheme(url)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.types == nil {
@@ -104,16 +105,17 @@ func (r *MessageRegistry) AddMessage(url string, md *desc.MessageDescriptor) err
 	if r.baseUrls == nil {
 		r.baseUrls = map[string]string{}
 	}
-	r.baseUrls[md.GetFullyQualifiedName()] = url
+	r.baseUrls[md.GetFullyQualifiedName()] = baseUrl
 	return nil
 }
 
 // AddEnum adds the given URL and associated enum descriptor to the registry.
 func (r *MessageRegistry) AddEnum(url string, ed *desc.EnumDescriptor) error {
-	if !strings.HasSuffix(url, "/"+ed.GetFullyQualifiedName()) {
+	url = ensureScheme(url)
+	baseUrl := strings.TrimSuffix(url, "/"+ed.GetFullyQualifiedName())
+	if url == baseUrl {
 		return fmt.Errorf("URL %s is invalid: it should end with path element %s", url, ed.GetFullyQualifiedName())
 	}
-	url = ensureScheme(url)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.types == nil {
@@ -123,7 +125,7 @@ func (r *MessageRegistry) AddEnum(url string, ed *desc.EnumDescriptor) error {
 	if r.baseUrls == nil {
 		r.baseUrls = map[string]string{}
 	}
-	r.baseUrls[ed.GetFullyQualifiedName()] = url
+	r.baseUrls[ed.GetFullyQualifiedName()] = baseUrl
 	return nil
 }
 
@@ -147,7 +149,7 @@ func (r *MessageRegistry) addEnumTypesLocked(baseUrl string, enums []*desc.EnumD
 	for _, ed := range enums {
 		url := fmt.Sprintf("%s/%s", baseUrl, ed.GetFullyQualifiedName())
 		r.types[url] = ed
-		r.baseUrls[ed.GetFullyQualifiedName()] = url
+		r.baseUrls[ed.GetFullyQualifiedName()] = baseUrl
 	}
 }
 
@@ -155,7 +157,7 @@ func (r *MessageRegistry) addMessageTypesLocked(baseUrl string, msgs []*desc.Mes
 	for _, md := range msgs {
 		url := fmt.Sprintf("%s/%s", baseUrl, md.GetFullyQualifiedName())
 		r.types[url] = md
-		r.baseUrls[md.GetFullyQualifiedName()] = url
+		r.baseUrls[md.GetFullyQualifiedName()] = baseUrl
 		r.addEnumTypesLocked(baseUrl, md.GetNestedEnumTypes())
 		r.addMessageTypesLocked(baseUrl, md.GetNestedMessageTypes())
 	}
@@ -675,7 +677,18 @@ func syntax(fd *desc.FileDescriptor) ptype.Syntax {
 // The given descriptor must be an enum or message descriptor. This will use any
 // registered URLs and base URLs to determine the appropriate URL for the given
 // type.
+//
+// Deprecated: This method is deprecated due to its use of non-idiomatic naming.
+// Use ComputeURL instead.
 func (r *MessageRegistry) ComputeUrl(d desc.Descriptor) string {
+	return r.ComputeURL(d)
+}
+
+// ComputeURL computes a type URL string for the element described by the given
+// descriptor. The given descriptor must be an enum or message descriptor. This
+// will use any registered URLs and base URLs to determine the appropriate URL
+// for the given type.
+func (r *MessageRegistry) ComputeURL(d desc.Descriptor) string {
 	name, pkg := d.GetFullyQualifiedName(), d.GetFile().GetPackage()
 	r.mu.RLock()
 	baseUrl := r.baseUrls[name]
