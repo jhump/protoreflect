@@ -675,7 +675,18 @@ func syntax(fd *desc.FileDescriptor) ptype.Syntax {
 // The given descriptor must be an enum or message descriptor. This will use any
 // registered URLs and base URLs to determine the appropriate URL for the given
 // type.
+//
+// Deprecated: This method is deprecated due to its use of non-idiomatic naming.
+// Use ComputeURL instead.
 func (r *MessageRegistry) ComputeUrl(d desc.Descriptor) string {
+	return r.ComputeURL(d)
+}
+
+// ComputeURL computes a type URL string for the element described by the given
+// descriptor. The given descriptor must be an enum or message descriptor. This
+// will use any registered URLs and base URLs to determine the appropriate URL
+// for the given type.
+func (r *MessageRegistry) ComputeURL(d desc.Descriptor) string {
 	name, pkg := d.GetFullyQualifiedName(), d.GetFile().GetPackage()
 	r.mu.RLock()
 	baseUrl := r.baseUrls[name]
