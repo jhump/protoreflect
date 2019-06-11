@@ -42,8 +42,9 @@ func init() {
 	standardImports = map[string]*dpb.FileDescriptorProto{}
 	for _, fn := range standardFilenames {
 		fd, err := internal.LoadFileDescriptor(fn)
-		if err == nil {
-			standardImports[fn] = fd
+		if err != nil {
+			panic(err.Error())
 		}
+		standardImports[fn] = fd
 	}
 }
