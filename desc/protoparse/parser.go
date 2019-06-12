@@ -489,7 +489,12 @@ func parseProtoFiles(acc FileAccessor, filenames []string, recursive, validate b
 		if recursive {
 			err = parseProtoFiles(acc, parsed[name].fd.Dependency, true, validate, parsed)
 			if err != nil {
-				return fmt.Errorf("failed to load imports for %q: %s", name, err)
+				switch err.(type) {
+				case ErrorWithSourcePos:
+					return err
+				default:
+					return fmt.Errorf("failed to load imports for %q: %s", name, err)
+				}
 			}
 		}
 	}
