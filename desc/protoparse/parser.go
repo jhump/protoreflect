@@ -466,20 +466,26 @@ func parseProtoFiles(acc FileAccessor, filenames []string, recursive, validate b
 			continue
 		}
 		in, err := acc(name)
-		if err != nil {
-			if d, ok := standardImports[name]; ok {
-				parsed[name] = &parseResult{fd: d}
-				continue
+		if err == nil {
+			// try to parse the bytes accessed
+			func() {
+				defer func() {
+					// if we've already parsed contents, an error
+					// closing need not fail this operation
+					_ = in.Close()
+				}()
+				parsed[name], err = parseProto(name, in, validate)
+			}()
+			if err != nil {
+				return err
 			}
+		} else if d, ok := standardImports[name]; ok {
+			// it's a well-known import
+			parsed[name] = &parseResult{fd: d}
+		} else {
 			return err
 		}
-		func() {
-			defer in.Close()
-			parsed[name], err = parseProto(name, in, validate)
-		}()
-		if err != nil {
-			return err
-		}
+
 		if recursive {
 			err = parseProtoFiles(acc, parsed[name].fd.Dependency, true, validate, parsed)
 			if err != nil {
