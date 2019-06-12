@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"os"
@@ -161,7 +162,7 @@ func eqscalar(expected, actual interface{}) bool {
 	// special-case simple equality for []byte (since slices aren't directly comparable)
 	if e, ok := expected.([]byte); ok {
 		a, ok := actual.([]byte)
-		return ok && string(e) == string(a)
+		return ok && bytes.Equal(e, a)
 	}
 	// and special-cases to handle NaN
 	if e, ok := expected.(float32); ok && math.IsNaN(float64(e)) {
