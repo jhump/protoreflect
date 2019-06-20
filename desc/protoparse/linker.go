@@ -15,12 +15,13 @@ import (
 
 type linker struct {
 	files          map[string]*parseResult
+	errs           *errorHandler
 	descriptorPool map[*dpb.FileDescriptorProto]map[string]proto.Message
 	extensions     map[string]map[int32]string
 }
 
-func newLinker(files map[string]*parseResult) *linker {
-	return &linker{files: files}
+func newLinker(files map[string]*parseResult, errs *errorHandler) *linker {
+	return &linker{files: files, errs: errs}
 }
 
 func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
@@ -74,22 +75,22 @@ func (l *linker) createDescriptorPool() error {
 			prefix += "."
 		}
 		for _, md := range fd.MessageType {
-			if err := addMessageToPool(r, pool, prefix, md); err != nil {
+			if err := addMessageToPool(r, pool, l.errs, prefix, md); err != nil {
 				return err
 			}
 		}
 		for _, fld := range fd.Extension {
-			if err := addFieldToPool(r, pool, prefix, fld); err != nil {
+			if err := addFieldToPool(r, pool, l.errs, prefix, fld); err != nil {
 				return err
 			}
 		}
 		for _, ed := range fd.EnumType {
-			if err := addEnumToPool(r, pool, prefix, ed); err != nil {
+			if err := addEnumToPool(r, pool, l.errs, prefix, ed); err != nil {
 				return err
 			}
 		}
 		for _, sd := range fd.Service {
-			if err := addServiceToPool(r, pool, prefix, sd); err != nil {
+			if err := addServiceToPool(r, pool, l.errs, prefix, sd); err != nil {
 				return err
 			}
 		}
@@ -113,7 +114,9 @@ func (l *linker) createDescriptorPool() error {
 					desc1, desc2 = desc2, desc1
 				}
 				node := l.files[file2].nodes[desc2]
-				return ErrorWithSourcePos{Pos: node.start(), Underlying: fmt.Errorf("duplicate symbol %s: already defined as %s in %q", k, descriptorType(desc1), file1)}
+				if err := l.errs.handleError(ErrorWithSourcePos{Pos: node.start(), Underlying: fmt.Errorf("duplicate symbol %s: already defined as %s in %q", k, descriptorType(desc1), file1)}); err != nil {
+					return err
+				}
 			}
 			pool[k] = entry{file: f.GetName(), msg: v}
 		}
@@ -122,72 +125,74 @@ func (l *linker) createDescriptorPool() error {
 	return nil
 }
 
-func addMessageToPool(r *parseResult, pool map[string]proto.Message, prefix string, md *dpb.DescriptorProto) error {
+func addMessageToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, prefix string, md *dpb.DescriptorProto) error {
 	fqn := prefix + md.GetName()
-	if err := addToPool(r, pool, fqn, md); err != nil {
+	if err := addToPool(r, pool, errs, fqn, md); err != nil {
 		return err
 	}
 	prefix = fqn + "."
 	for _, fld := range md.Field {
-		if err := addFieldToPool(r, pool, prefix, fld); err != nil {
+		if err := addFieldToPool(r, pool, errs, prefix, fld); err != nil {
 			return err
 		}
 	}
 	for _, fld := range md.Extension {
-		if err := addFieldToPool(r, pool, prefix, fld); err != nil {
+		if err := addFieldToPool(r, pool, errs, prefix, fld); err != nil {
 			return err
 		}
 	}
 	for _, nmd := range md.NestedType {
-		if err := addMessageToPool(r, pool, prefix, nmd); err != nil {
+		if err := addMessageToPool(r, pool, errs, prefix, nmd); err != nil {
 			return err
 		}
 	}
 	for _, ed := range md.EnumType {
-		if err := addEnumToPool(r, pool, prefix, ed); err != nil {
+		if err := addEnumToPool(r, pool, errs, prefix, ed); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func addFieldToPool(r *parseResult, pool map[string]proto.Message, prefix string, fld *dpb.FieldDescriptorProto) error {
+func addFieldToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, prefix string, fld *dpb.FieldDescriptorProto) error {
 	fqn := prefix + fld.GetName()
-	return addToPool(r, pool, fqn, fld)
+	return addToPool(r, pool, errs, fqn, fld)
 }
 
-func addEnumToPool(r *parseResult, pool map[string]proto.Message, prefix string, ed *dpb.EnumDescriptorProto) error {
+func addEnumToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, prefix string, ed *dpb.EnumDescriptorProto) error {
 	fqn := prefix + ed.GetName()
-	if err := addToPool(r, pool, fqn, ed); err != nil {
+	if err := addToPool(r, pool, errs, fqn, ed); err != nil {
 		return err
 	}
 	for _, evd := range ed.Value {
 		vfqn := fqn + "." + evd.GetName()
-		if err := addToPool(r, pool, vfqn, evd); err != nil {
+		if err := addToPool(r, pool, errs, vfqn, evd); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func addServiceToPool(r *parseResult, pool map[string]proto.Message, prefix string, sd *dpb.ServiceDescriptorProto) error {
+func addServiceToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, prefix string, sd *dpb.ServiceDescriptorProto) error {
 	fqn := prefix + sd.GetName()
-	if err := addToPool(r, pool, fqn, sd); err != nil {
+	if err := addToPool(r, pool, errs, fqn, sd); err != nil {
 		return err
 	}
 	for _, mtd := range sd.Method {
 		mfqn := fqn + "." + mtd.GetName()
-		if err := addToPool(r, pool, mfqn, mtd); err != nil {
+		if err := addToPool(r, pool, errs, mfqn, mtd); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func addToPool(r *parseResult, pool map[string]proto.Message, fqn string, dsc proto.Message) error {
+func addToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, fqn string, dsc proto.Message) error {
 	if d, ok := pool[fqn]; ok {
 		node := r.nodes[dsc]
-		return ErrorWithSourcePos{Pos: node.start(), Underlying: fmt.Errorf("duplicate symbol %s: already defined as %s", fqn, descriptorType(d))}
+		if err := errs.handleError(ErrorWithSourcePos{Pos: node.start(), Underlying: fmt.Errorf("duplicate symbol %s: already defined as %s", fqn, descriptorType(d))}); err != nil {
+			return err
+		}
 	}
 	pool[fqn] = dsc
 	return nil
@@ -603,14 +608,14 @@ func (l *linker) createdLinkedDescriptors() (map[string]*desc.FileDescriptor, er
 	sort.Strings(names)
 	linked := map[string]*desc.FileDescriptor{}
 	for _, name := range names {
-		if _, err := l.linkFile(name, nil, linked); err != nil {
+		if _, err := l.linkFile(name, nil, nil, linked); err != nil {
 			return nil, err
 		}
 	}
 	return linked, nil
 }
 
-func (l *linker) linkFile(name string, seen []string, linked map[string]*desc.FileDescriptor) (*desc.FileDescriptor, error) {
+func (l *linker) linkFile(name string, rootImportLoc *SourcePos, seen []string, linked map[string]*desc.FileDescriptor) (*desc.FileDescriptor, error) {
 	// check for import cycle
 	for _, s := range seen {
 		if name == s {
@@ -625,7 +630,10 @@ func (l *linker) linkFile(name string, seen []string, linked map[string]*desc.Fi
 				fmt.Fprintf(&msg, "%q", s)
 			}
 			fmt.Fprintf(&msg, " -> %q", name)
-			return nil, fmt.Errorf("cycle found in imports: %s", msg.String())
+			return nil, ErrorWithSourcePos{
+				Underlying: fmt.Errorf("cycle found in imports: %s", msg.String()),
+				Pos:        rootImportLoc,
+			}
 		}
 	}
 	seen = append(seen, name)
@@ -640,12 +648,38 @@ func (l *linker) linkFile(name string, seen []string, linked map[string]*desc.Fi
 		return nil, fmt.Errorf("no descriptor found for %q, imported by %q", name, importer)
 	}
 	var deps []*desc.FileDescriptor
-	for _, dep := range r.fd.Dependency {
-		ldep, err := l.linkFile(dep, seen, linked)
-		if err != nil {
-			return nil, err
+	if rootImportLoc == nil {
+		// try to find a source location for this "root" import
+		decl := r.getFileNode(r.fd)
+		fnode, ok := decl.(*fileNode)
+		if ok {
+			for _, dep := range fnode.imports {
+				ldep, err := l.linkFile(dep.name.val, dep.name.start(), seen, linked)
+				if err != nil {
+					return nil, err
+				}
+				deps = append(deps, ldep)
+			}
+		} else {
+			// no AST? just use the descriptor
+			for _, dep := range r.fd.Dependency {
+				ldep, err := l.linkFile(dep, decl.start(), seen, linked)
+				if err != nil {
+					return nil, err
+				}
+				deps = append(deps, ldep)
+			}
 		}
-		deps = append(deps, ldep)
+	} else {
+		// we can just use the descriptor since we don't need source location
+		// (we'll just attribute any import cycles found to the "root" import)
+		for _, dep := range r.fd.Dependency {
+			ldep, err := l.linkFile(dep, rootImportLoc, seen, linked)
+			if err != nil {
+				return nil, err
+			}
+			deps = append(deps, ldep)
+		}
 	}
 	lfd, err := desc.CreateFileDescriptor(r.fd, deps...)
 	if err != nil {

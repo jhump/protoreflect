@@ -20,8 +20,15 @@ func TestEmptyParse(t *testing.T) {
 			return ioutil.NopCloser(bytes.NewReader(nil)), nil
 		},
 	}
-	_, err := p.ParseFiles("foo.proto")
-	testutil.Require(t, err != nil)
+	fd, err := p.ParseFiles("foo.proto")
+	testutil.Ok(t, err)
+	testutil.Eq(t, 1, len(fd))
+	testutil.Eq(t, "foo.proto", fd[0].GetName())
+	testutil.Eq(t, 0, len(fd[0].GetDependencies()))
+	testutil.Eq(t, 0, len(fd[0].GetMessageTypes()))
+	testutil.Eq(t, 0, len(fd[0].GetEnumTypes()))
+	testutil.Eq(t, 0, len(fd[0].GetExtensions()))
+	testutil.Eq(t, 0, len(fd[0].GetServices()))
 }
 
 func TestSimpleParse(t *testing.T) {
@@ -31,7 +38,7 @@ func TestSimpleParse(t *testing.T) {
 	// testing. We do a *very* shallow check of what was parsed because we know
 	// it won't be fully correct until after linking. (So that will be tested
 	// below, where we parse *and* link.)
-	res, err := parseProtoFile("../../internal/testprotos/desc_test1.proto")
+	res, err := parseFileForTest("../../internal/testprotos/desc_test1.proto")
 	testutil.Ok(t, err)
 	fd := res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test1.proto", fd.GetName())
@@ -40,7 +47,7 @@ func TestSimpleParse(t *testing.T) {
 	testutil.Require(t, hasMessage(fd, "TestMessage"))
 	protos[fd.GetName()] = res
 
-	res, err = parseProtoFile("../../internal/testprotos/desc_test2.proto")
+	res, err = parseFileForTest("../../internal/testprotos/desc_test2.proto")
 	testutil.Ok(t, err)
 	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test2.proto", fd.GetName())
@@ -50,7 +57,7 @@ func TestSimpleParse(t *testing.T) {
 	testutil.Require(t, hasMessage(fd, "Frobnitz"))
 	protos[fd.GetName()] = res
 
-	res, err = parseProtoFile("../../internal/testprotos/desc_test_defaults.proto")
+	res, err = parseFileForTest("../../internal/testprotos/desc_test_defaults.proto")
 	testutil.Ok(t, err)
 	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test_defaults.proto", fd.GetName())
@@ -58,7 +65,7 @@ func TestSimpleParse(t *testing.T) {
 	testutil.Require(t, hasMessage(fd, "PrimitiveDefaults"))
 	protos[fd.GetName()] = res
 
-	res, err = parseProtoFile("../../internal/testprotos/desc_test_field_types.proto")
+	res, err = parseFileForTest("../../internal/testprotos/desc_test_field_types.proto")
 	testutil.Ok(t, err)
 	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test_field_types.proto", fd.GetName())
@@ -67,7 +74,7 @@ func TestSimpleParse(t *testing.T) {
 	testutil.Require(t, hasMessage(fd, "UnaryFields"))
 	protos[fd.GetName()] = res
 
-	res, err = parseProtoFile("../../internal/testprotos/desc_test_options.proto")
+	res, err = parseFileForTest("../../internal/testprotos/desc_test_options.proto")
 	testutil.Ok(t, err)
 	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test_options.proto", fd.GetName())
@@ -77,7 +84,7 @@ func TestSimpleParse(t *testing.T) {
 	testutil.Require(t, hasMessage(fd, "ReallySimpleMessage"))
 	protos[fd.GetName()] = res
 
-	res, err = parseProtoFile("../../internal/testprotos/desc_test_proto3.proto")
+	res, err = parseFileForTest("../../internal/testprotos/desc_test_proto3.proto")
 	testutil.Ok(t, err)
 	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test_proto3.proto", fd.GetName())
@@ -86,7 +93,7 @@ func TestSimpleParse(t *testing.T) {
 	testutil.Require(t, hasService(fd, "TestService"))
 	protos[fd.GetName()] = res
 
-	res, err = parseProtoFile("../../internal/testprotos/desc_test_wellknowntypes.proto")
+	res, err = parseFileForTest("../../internal/testprotos/desc_test_wellknowntypes.proto")
 	testutil.Ok(t, err)
 	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/desc_test_wellknowntypes.proto", fd.GetName())
@@ -94,14 +101,14 @@ func TestSimpleParse(t *testing.T) {
 	testutil.Require(t, hasMessage(fd, "TestWellKnownTypes"))
 	protos[fd.GetName()] = res
 
-	res, err = parseProtoFile("../../internal/testprotos/nopkg/desc_test_nopkg.proto")
+	res, err = parseFileForTest("../../internal/testprotos/nopkg/desc_test_nopkg.proto")
 	testutil.Ok(t, err)
 	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/nopkg/desc_test_nopkg.proto", fd.GetName())
 	testutil.Eq(t, "", fd.GetPackage())
 	protos[fd.GetName()] = res
 
-	res, err = parseProtoFile("../../internal/testprotos/nopkg/desc_test_nopkg_new.proto")
+	res, err = parseFileForTest("../../internal/testprotos/nopkg/desc_test_nopkg_new.proto")
 	testutil.Ok(t, err)
 	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/nopkg/desc_test_nopkg_new.proto", fd.GetName())
@@ -109,7 +116,7 @@ func TestSimpleParse(t *testing.T) {
 	testutil.Require(t, hasMessage(fd, "TopLevel"))
 	protos[fd.GetName()] = res
 
-	res, err = parseProtoFile("../../internal/testprotos/pkg/desc_test_pkg.proto")
+	res, err = parseFileForTest("../../internal/testprotos/pkg/desc_test_pkg.proto")
 	testutil.Ok(t, err)
 	fd = res.fd
 	testutil.Eq(t, "../../internal/testprotos/pkg/desc_test_pkg.proto", fd.GetName())
@@ -142,13 +149,17 @@ func TestSimpleParse(t *testing.T) {
 	testutil.Eq(t, expected, actual)
 }
 
-func parseProtoFile(filename string) (*parseResult, error) {
+func parseFileForTest(filename string) (*parseResult, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	return parseProto(filename, f, true)
+	defer func() {
+		_ = f.Close()
+	}()
+	errs := newErrorHandler(nil)
+	res := parseProto(filename, f, errs, true)
+	return res, errs.getError()
 }
 
 func hasExtension(fd *dpb.FileDescriptorProto, name string) bool {
@@ -214,35 +225,35 @@ func TestBasicValidation(t *testing.T) {
 			errMsg:   `test.proto:1:16: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
-			contents: `enum Foo { V = 0; reserved 5000000000 }`,
+			contents: `enum Foo { V = 0; reserved 5000000000; }`,
 			errMsg:   `test.proto:1:28: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
-			contents: `enum Foo { V = 0; reserved -5000000000 }`,
+			contents: `enum Foo { V = 0; reserved -5000000000; }`,
 			errMsg:   `test.proto:1:28: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
-			contents: `enum Foo { V = 0; reserved 5000000000 to 5 }`,
+			contents: `enum Foo { V = 0; reserved 5000000000 to 5000000001; }`,
 			errMsg:   `test.proto:1:28: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
-			contents: `enum Foo { V = 0; reserved 5 to 5000000000 }`,
+			contents: `enum Foo { V = 0; reserved 5 to 5000000000; }`,
 			errMsg:   `test.proto:1:33: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
-			contents: `enum Foo { V = 0; reserved -5000000000 to -5 }`,
+			contents: `enum Foo { V = 0; reserved -5000000000 to -5; }`,
 			errMsg:   `test.proto:1:28: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
-			contents: `enum Foo { V = 0; reserved -5 to -5000000000 }`,
-			errMsg:   `test.proto:1:34: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
+			contents: `enum Foo { V = 0; reserved -5000000001 to -5000000000; }`,
+			errMsg:   `test.proto:1:28: constant -5000000001 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
-			contents: `enum Foo { V = 0; reserved -5000000000 to 5 }`,
+			contents: `enum Foo { V = 0; reserved -5000000000 to 5; }`,
 			errMsg:   `test.proto:1:28: constant -5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
-			contents: `enum Foo { V = 0; reserved -5 to 5000000000 }`,
+			contents: `enum Foo { V = 0; reserved -5 to 5000000000; }`,
 			errMsg:   `test.proto:1:34: constant 5000000000 is out of range for int32 (-2147483648 to 2147483647)`,
 		},
 		{
@@ -275,11 +286,11 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { optional string s = 1; }`,
-			errMsg:   `test.proto:1:34: field Foo.s: field has label LABEL_OPTIONAL, but proto3 should omit labels other than 'repeated'`,
+			errMsg:   `test.proto:1:34: field Foo.s: field has label LABEL_OPTIONAL, but proto3 must omit labels other than 'repeated'`,
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { required string s = 1; }`,
-			errMsg:   `test.proto:1:34: field Foo.s: field has label LABEL_REQUIRED, but proto3 should omit labels other than 'repeated'`,
+			errMsg:   `test.proto:1:34: field Foo.s: field has label LABEL_REQUIRED, but proto3 must omit labels other than 'repeated'`,
 		},
 		{
 			contents: `message Foo { extensions 1 to max; } extend Foo { required string sss = 100; }`,
@@ -374,8 +385,8 @@ func TestBasicValidation(t *testing.T) {
 			errMsg:   `test.proto:1:26: range start is out-of-range tag: 1000000000 (should be between 0 and 536870911)`,
 		},
 		{
-			contents: `message Foo { extensions 1000000000 to 1000000001; }`,
-			errMsg:   `test.proto:1:26: range start is out-of-range tag: 1000000000 (should be between 0 and 536870911)`,
+			contents: `message Foo { extensions 100 to 1000000000; }`,
+			errMsg:   `test.proto:1:33: range end is out-of-range tag: 1000000000 (should be between 0 and 536870911)`,
 		},
 		{
 			contents: `message Foo { reserved "foo", "foo"; }`,
@@ -396,18 +407,20 @@ func TestBasicValidation(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		_, err := parseProto("test.proto", strings.NewReader(tc.contents), true)
+		errs := newErrorHandler(nil)
+		_ = parseProto("test.proto", strings.NewReader(tc.contents), errs, true)
+		err := errs.getError()
 		if tc.succeeds {
 			testutil.Ok(t, err, "case #%d should succeed", i)
 		} else {
-			testutil.Require(t, err != nil, "case #%d should fail", i)
+			testutil.Nok(t, err, "case #%d should fail", i)
 			testutil.Eq(t, tc.errMsg, err.Error(), "case #%d bad error message", i)
 		}
 	}
 }
 
 func TestAggregateValueInUninterpretedOptions(t *testing.T) {
-	res, err := parseProtoFile("../../internal/testprotos/desc_test_complex.proto")
+	res, err := parseFileForTest("../../internal/testprotos/desc_test_complex.proto")
 	testutil.Ok(t, err)
 	fd := res.fd
 

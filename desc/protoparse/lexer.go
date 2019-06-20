@@ -39,15 +39,13 @@ func (rr *runeReader) unreadRune(r rune) {
 
 func lexError(l protoLexer, pos *SourcePos, err string) {
 	pl := l.(*protoLex)
-	if pl.err == nil {
-		pl.err = ErrorWithSourcePos{Underlying: errors.New(err), Pos: pos}
-	}
+	_ = pl.errs.handleError(ErrorWithSourcePos{Underlying: errors.New(err), Pos: pos})
 }
 
 type protoLex struct {
 	filename string
 	input    *runeReader
-	err      error
+	errs     *errorHandler
 	res      *fileNode
 
 	lineNo int
@@ -62,8 +60,16 @@ type protoLex struct {
 	comments   []comment
 }
 
-func newLexer(in io.Reader) *protoLex {
-	return &protoLex{input: &runeReader{rr: bufio.NewReader(in)}}
+func newTestLexer(in io.Reader) *protoLex {
+	return newLexer(in, "test.proto", newErrorHandler(nil))
+}
+
+func newLexer(in io.Reader, filename string, errs *errorHandler) *protoLex {
+	return &protoLex{
+		input:    &runeReader{rr: bufio.NewReader(in)},
+		filename: filename,
+		errs:     errs,
+	}
 }
 
 var keywords = map[string]int{
@@ -152,10 +158,10 @@ func (l *protoLex) prev() *SourcePos {
 }
 
 func (l *protoLex) Lex(lval *protoSymType) int {
-	if l.err != nil {
-		// if we are already in a failed state, bail
-		lval.err = l.err
-		return _ERROR
+	if l.errs.getError() != nil {
+		// if error reporter already returned non-nil error,
+		// we can skip the rest of the input
+		return 0
 	}
 
 	l.prevLineNo = l.lineNo
@@ -172,7 +178,10 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			l.setRune(lval)
 			return 0
 		} else if err != nil {
-			l.setError(lval, err)
+			// we don't call setError because we don't want it wrapped
+			// with a source position because it's I/O, not syntax
+			lval.err = err
+			_ = l.errs.handleError(err)
 			return _ERROR
 		}
 
@@ -464,8 +473,7 @@ func (l *protoLex) setRune(lval *protoSymType) {
 }
 
 func (l *protoLex) setError(lval *protoSymType, err error) {
-	lval.err = err
-	l.err = err
+	lval.err = l.addSourceError(err)
 }
 
 func (l *protoLex) readNumber(sofar []rune, allowDot bool, allowExp bool) []rune {
@@ -780,8 +788,15 @@ func (l *protoLex) skipToEndOfBlockComment() (string, bool) {
 	}
 }
 
-func (l *protoLex) Error(s string) {
-	if l.err == nil {
-		l.err = ErrorWithSourcePos{Underlying: errors.New(s), Pos: l.prevSym.start()}
+func (l *protoLex) addSourceError(err error) ErrorWithPos {
+	ewp, ok := err.(ErrorWithPos)
+	if !ok {
+		ewp = ErrorWithSourcePos{Pos: l.prev(), Underlying: err}
 	}
+	_ = l.errs.handleError(ewp)
+	return ewp
+}
+
+func (l *protoLex) Error(s string) {
+	_ = l.addSourceError(errors.New(s))
 }

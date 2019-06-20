@@ -8,7 +8,7 @@ import (
 )
 
 func TestLexer(t *testing.T) {
-	l := newLexer(strings.NewReader(`
+	l := newTestLexer(strings.NewReader(`
 	// comment
 
 	/*
@@ -205,7 +205,7 @@ func TestLexerErrors(t *testing.T) {
 		{str: `/* foobar`, errMsg: "unexpected EOF"},
 	}
 	for i, tc := range testCases {
-		l := newLexer(strings.NewReader(tc.str))
+		l := newTestLexer(strings.NewReader(tc.str))
 		var sym protoSymType
 		tok := l.Lex(&sym)
 		testutil.Eq(t, _ERROR, tok)

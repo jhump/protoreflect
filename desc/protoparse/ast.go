@@ -1,23 +1,6 @@
 package protoparse
 
-import "fmt"
-
 // This file defines all of the nodes in the proto AST.
-
-// ErrorWithSourcePos is an error about a proto source file includes information
-// about the location in the file that caused the error.
-type ErrorWithSourcePos struct {
-	Underlying error
-	Pos        *SourcePos
-}
-
-// Error implements the error interface
-func (e ErrorWithSourcePos) Error() string {
-	if e.Pos.Line <= 0 || e.Pos.Col <= 0 {
-		return fmt.Sprintf("%s: %v", e.Pos.Filename, e.Underlying)
-	}
-	return fmt.Sprintf("%s:%d:%d: %v", e.Pos.Filename, e.Pos.Line, e.Pos.Col, e.Underlying)
-}
 
 // SourcePos identifies a location in a proto source file.
 type SourcePos struct {
@@ -30,6 +13,7 @@ func unknownPos(filename string) *SourcePos {
 	return &SourcePos{Filename: filename}
 }
 
+// node is the interface implemented by all nodes in the AST
 type node interface {
 	start() *SourcePos
 	end() *SourcePos
@@ -190,6 +174,10 @@ type fileNode struct {
 	basicCompositeNode
 	syntax *syntaxNode
 	decls  []*fileElement
+
+	// This field is populated after parsing, to make it easier to find
+	// source locations by import name for constructing link errors.
+	imports []*importNode
 }
 
 func (n *fileNode) getSyntax() node {

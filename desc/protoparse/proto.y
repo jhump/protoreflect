@@ -170,6 +170,10 @@ fileDecl : import {
 	| ';' {
 		$$ = []*fileElement{{empty: $1}}
 	}
+	| error ';' {
+	}
+	| error {
+	}
 
 syntax : _SYNTAX '=' stringLit ';' {
 		if $3.val != "proto2" && $3.val != "proto3" {
@@ -329,6 +333,12 @@ aggField : aggFieldEntry
 	| aggFieldEntry ';' {
 		$$ = $1
 	}
+	| error ',' {
+	}
+	| error ';' {
+	}
+	| error {
+	}
 
 aggFieldEntry : aggName ':' scalarConstant {
 		a := &aggregateEntryNode{name: $1, val: $3}
@@ -348,6 +358,8 @@ aggFieldEntry : aggName ':' scalarConstant {
 		a := &aggregateEntryNode{name: $1, val: s}
 		a.setRange($1, $5)
 		$$ = []*aggregateEntryNode{a}
+	}
+	| aggName ':' '[' error ']' {
 	}
 	| aggName ':' aggregate {
 		a := &aggregateEntryNode{name: $1, val: $3}
@@ -373,6 +385,10 @@ aggFieldEntry : aggName ':' scalarConstant {
 		a.setRange($1, $4)
 		$$ = []*aggregateEntryNode{a}
 	}
+	| aggName ':' '<' error '>' {
+	}
+	| aggName '<' error '>' {
+	}
 
 aggName : name {
 		$$ = &aggregateNameNode{name: $1}
@@ -381,6 +397,8 @@ aggName : name {
 	| '[' ident ']' {
 		$$ = &aggregateNameNode{name: $2, isExtension: true}
 		$$.setRange($1, $3)
+	}
+	| '[' error ']' {
 	}
 
 constantList : constant {
@@ -406,6 +424,12 @@ constantList : constant {
 		s := &aggregateLiteralNode{elements: $4}
 		s.setRange($3, $5)
 		$$ = append($1, s)
+	}
+	| '<' error '>' {
+	}
+	| constantList ','  '<' error '>' {
+	}
+	| constantList ';'  '<' error '>' {
 	}
 
 typeIdent : ident
@@ -538,6 +562,10 @@ oneofItem : option {
 	}
 	| ';' {
 		$$ = []*oneOfElement{{empty: $1}}
+	}
+	| error ';' {
+	}
+	| error {
 	}
 
 oneofField : typeIdent name '=' _INT_LIT ';' {
@@ -748,6 +776,10 @@ enumItem : option {
 	| ';' {
 		$$ = []*enumElement{{empty: $1}}
 	}
+	| error ';' {
+	}
+	| error {
+	}
 
 enumField : name '=' _INT_LIT ';' {
 		checkUint64InInt32Range(protolex, $3.start(), $3.val)
@@ -816,6 +848,10 @@ messageItem : field {
 	| ';' {
 		$$ = []*messageElement{{empty: $1}}
 	}
+	| error ';' {
+	}
+	| error {
+	}
 
 extend : _EXTEND typeIdent '{' extendBody '}' {
 		c := 0
@@ -848,6 +884,10 @@ extendItem : field {
 	| ';' {
 		$$ = []*extendElement{{empty: $1}}
 	}
+	| error ';' {
+	}
+	| error {
+	}
 
 service : _SERVICE name '{' serviceBody '}' {
 		$$ = &serviceNode{name: $2, decls: $4}
@@ -873,6 +913,10 @@ serviceItem : option {
 	}
 	| ';' {
 		$$ = []*serviceElement{{empty: $1}}
+	}
+	| error ';' {
+	}
+	| error {
 	}
 
 rpc : _RPC name '(' rpcType ')' _RETURNS '(' rpcType ')' ';' {
@@ -906,6 +950,10 @@ rpcOption : option {
 	}
 	| ';' {
 		$$ = []*optionNode{}
+	}
+	| error ';' {
+	}
+	| error {
 	}
 
 name : _NAME
