@@ -21,8 +21,6 @@ import (
 
 //go:generate goyacc -o proto.y.go -p proto proto.y
 
-var errNoImportPathsForAbsoluteFilePath = errors.New("must specify at least one import path if any absolute file paths are given")
-
 func init() {
 	protoErrorVerbose = true
 
@@ -86,49 +84,6 @@ func FileContentsFromMap(files map[string]string) FileAccessor {
 		}
 		return ioutil.NopCloser(strings.NewReader(contents)), nil
 	}
-}
-
-// ResolveFilenames tries to resolve fileNames into paths that are relative to
-// directories in the given importPaths. The returned slice has the results in
-// the same order as they are supplied in fileNames.
-//
-// The resulting names should be suitable for passing to Parser.ParseFiles.
-//
-// If importPaths is empty and any path is absolute, this returns error.
-// If importPaths is empty and all paths are relative, this returns the original fileNames.
-func ResolveFilenames(importPaths []string, fileNames ...string) ([]string, error) {
-	if len(importPaths) == 0 {
-		if containsAbsFilePath(fileNames) {
-			// We have to do this as otherwise parseProtoFiles can result in duplicate symbols.
-			// For example, assume we import "foo/bar/bar.proto" in a file "/home/alice/dev/foo/bar/baz.proto"
-			// as we call ParseFiles("/home/alice/dev/foo/bar/bar.proto","/home/alice/dev/foo/bar/baz.proto")
-			// with "/home/alice/dev" as our current directory. Due to the recursive nature of parseProtoFiles,
-			// it will discover the import "foo/bar/bar.proto" in the input file, and call parse on this,
-			// adding "foo/bar/bar.proto" to the parsed results, as well as "/home/alice/dev/foo/bar/bar.proto"
-			// from the input file list. This will result in a
-			// 'duplicate symbol SYMBOL: already defined as field in "/home/alice/dev/foo/bar/bar.proto'
-			// error being returned from ParseFiles.
-			return nil, errNoImportPathsForAbsoluteFilePath
-		}
-		return fileNames, nil
-	}
-	absImportPaths, err := absoluteFilePaths(importPaths)
-	if err != nil {
-		return nil, err
-	}
-	absFileNames, err := absoluteFilePaths(fileNames)
-	if err != nil {
-		return nil, err
-	}
-	resolvedFileNames := make([]string, 0, len(fileNames))
-	for _, absFileName := range absFileNames {
-		resolvedFileName, err := resolveAbsFilename(absImportPaths, absFileName)
-		if err != nil {
-			return nil, err
-		}
-		resolvedFileNames = append(resolvedFileNames, resolvedFileName)
-	}
-	return resolvedFileNames, nil
 }
 
 // Parser parses proto source into descriptors.
@@ -299,57 +254,6 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 		fds[i] = fd
 	}
 	return fds, nil
-}
-
-func containsAbsFilePath(filePaths []string) bool {
-	for _, filePath := range filePaths {
-		if filepath.IsAbs(filePath) {
-			return true
-		}
-	}
-	return false
-}
-
-func absoluteFilePaths(filePaths []string) ([]string, error) {
-	absFilePaths := make([]string, 0, len(filePaths))
-	for _, filePath := range filePaths {
-		absFilePath, err := filepath.Abs(filePath)
-		if err != nil {
-			return nil, err
-		}
-		absFilePaths = append(absFilePaths, absFilePath)
-	}
-	return absFilePaths, nil
-}
-
-func resolveAbsFilename(absImportPaths []string, absFileName string) (string, error) {
-	for _, absImportPath := range absImportPaths {
-		if isDescendant(absImportPath, absFileName) {
-			resolvedPath, err := filepath.Rel(absImportPath, absFileName)
-			if err != nil {
-				return "", err
-			}
-			return resolvedPath, nil
-		}
-	}
-	return "", fmt.Errorf("%s does not reside in any import path", absFileName)
-}
-
-// isDescendant returns true if file is a descendant of dir.
-func isDescendant(dir, file string) bool {
-	dir = filepath.Clean(dir)
-	cur := file
-	for {
-		d := filepath.Dir(cur)
-		if d == dir {
-			return true
-		}
-		if d == "." || d == cur {
-			// we've run out of path elements
-			return false
-		}
-		cur = d
-	}
 }
 
 func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {

@@ -439,40 +439,6 @@ func TestParseFilesMessageComments(t *testing.T) {
 	testutil.Eq(t, expected, comments)
 }
 
-func TestResolveFilenames(t *testing.T) {
-	relImportPaths := []string{
-		"../../internal/testprotos/protoparse",
-	}
-	relFilePaths := []string{
-		"../../internal/testprotos/protoparse/a/b/b1.proto",
-		"../../internal/testprotos/protoparse/a/b/b2.proto",
-		"../../internal/testprotos/protoparse/c/c.proto",
-	}
-
-	absImportPaths, err := absoluteFilePaths(relImportPaths)
-	testutil.Require(t, err == nil, "%v", err)
-	absFilePaths, err := absoluteFilePaths(relFilePaths)
-	testutil.Require(t, err == nil, "%v", err)
-	relResolvedFilePaths, err := ResolveFilenames(relImportPaths, relFilePaths...)
-	testutil.Require(t, err == nil, "%v", err)
-	absResolvedFilePaths, err := ResolveFilenames(absImportPaths, absFilePaths...)
-	testutil.Require(t, err == nil, "%v", err)
-
-	p := Parser{ImportPaths: relImportPaths}
-	protos, err := p.ParseFiles(relResolvedFilePaths...)
-	testutil.Ok(t, err)
-	testutil.Eq(t, len(relFilePaths), len(protos))
-
-	p = Parser{ImportPaths: absImportPaths}
-	protos, err = p.ParseFiles(absResolvedFilePaths...)
-	testutil.Ok(t, err)
-	testutil.Eq(t, len(absFilePaths), len(protos))
-
-	_, err = ResolveFilenames([]string{}, absFilePaths...)
-	testutil.Require(t, err != nil)
-	testutil.Eq(t, errNoImportPathsForAbsoluteFilePath, err)
-}
-
 func TestParseFilesWithImportsNoImportPath(t *testing.T) {
 	relFilePaths := []string{
 		"a/b/b1.proto",
