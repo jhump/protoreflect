@@ -494,17 +494,18 @@ func roundTripFile(t *testing.T, fd *desc.FileDescriptor) {
 	// former will be updated to instead depend on the latter (since it is
 	// the actual file that declares used elements).
 	fdp := fd.AsFileDescriptorProto()
-	for i, dep := range fdp.Dependency {
+	needsNopkgNew := false
+	hasNoPkgNew := false
+	for _, dep := range fdp.Dependency {
 		if dep == "nopkg/desc_test_nopkg.proto" {
-			fdp.Dependency[i] = "nopkg/desc_test_nopkg_new.proto"
+			needsNopkgNew = true
 		}
-		if dep == "nopkg/desc_test_nopkg_new.proto" && fdp.GetName() == "nopkg/desc_test_nopkg.proto" {
-			// The file nopkg/desc_test_nopkg.proto actually declares nothing
-			// and *only* has the public import. So the round-tripped version
-			// will have no imports (it declares nothing so it depends on
-			// nothing).
-			fdp.Dependency = append(fdp.Dependency[:i], fdp.Dependency[i+1:]...)
+		if dep == "nopkg/desc_test_nopkg_new.proto" {
+			hasNoPkgNew = false
 		}
+	}
+	if needsNopkgNew && !hasNoPkgNew {
+		fdp.Dependency = append(fdp.Dependency, "nopkg/desc_test_nopkg_new.proto")
 	}
 
 	// Strip any public and weak imports. (The step above should have "fixed"
