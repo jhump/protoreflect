@@ -1022,7 +1022,7 @@ func (fb *FileBuilder) SetProto3(isProto3 bool) *FileBuilder {
 	return fb
 }
 
-func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
+func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescriptorProto, error) {
 	name := fb.name
 	if name == "" {
 		name = uniqueFileName()
@@ -1041,6 +1041,12 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 	addCommentsTo(&sourceInfo, path, &fb.comments)
 	addCommentsTo(&sourceInfo, append(path, internal.File_syntaxTag), &fb.SyntaxComments)
 	addCommentsTo(&sourceInfo, append(path, internal.File_packageTag), &fb.PackageComments)
+
+	imports := make([]string, 0, len(deps))
+	for _, dep := range deps {
+		imports = append(imports, dep.GetName())
+	}
+	sort.Strings(imports)
 
 	messages := make([]*dpb.DescriptorProto, 0, len(fb.messages))
 	for _, mb := range fb.messages {
@@ -1085,6 +1091,7 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 	return &dpb.FileDescriptorProto{
 		Name:           proto.String(name),
 		Package:        pkg,
+		Dependency:     imports,
 		Options:        fb.Options,
 		Syntax:         syntax,
 		MessageType:    messages,

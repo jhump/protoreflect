@@ -2,14 +2,13 @@ package builder
 
 import (
 	"fmt"
-	"github.com/jhump/protoreflect/dynamic"
 	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
 )
 
 type dependencies struct {
@@ -130,14 +129,10 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 		depSlice = append(depSlice, dep)
 	}
 
-	fp, err := fb.buildProto()
+	fp, err := fb.buildProto(depSlice)
 	if err != nil {
 		return nil, err
 	}
-	for _, dep := range depSlice {
-		fp.Dependency = append(fp.Dependency, dep.GetName())
-	}
-	sort.Strings(fp.Dependency)
 
 	// make sure this file name doesn't collide with any of its dependencies
 	fileNames := map[string]struct{}{}

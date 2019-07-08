@@ -38,6 +38,8 @@
 
 syntax = "proto2";
 
+package google.protobuf;
+
 option cc_enable_arenas = true;
 
 option csharp_namespace = "Google.Protobuf.Reflection";
@@ -51,8 +53,6 @@ option java_package = "com.google.protobuf";
 option objc_class_prefix = "GPB";
 
 option optimize_for = SPEED;
-
-package google.protobuf;
 
 // The protocol compiler can output a FileDescriptorSet containing the .proto
 // files it parses.

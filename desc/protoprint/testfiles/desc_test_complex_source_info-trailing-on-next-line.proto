@@ -1,10 +1,10 @@
 syntax = "proto2";
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
-
 package foo.bar;
 
 import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 message Simple {
   optional string name = 1;

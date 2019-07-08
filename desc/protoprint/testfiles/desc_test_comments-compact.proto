@@ -3,11 +3,11 @@
 // This is a third.
 // Syntax comment...
 syntax = "proto2"; // Syntax trailer.
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 // And now the package declaration
 package foo.bar;
 import "google/protobuf/empty.proto";
 import "desc_test_options.proto";
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 // Multiple white space lines (like above) cannot
 // be preserved...
 // We need a request for our RPC service below.
