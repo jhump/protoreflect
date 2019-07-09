@@ -461,6 +461,9 @@ type FileBuilder struct {
 	enums      []*EnumBuilder
 	services   []*ServiceBuilder
 	symbols    map[string]Builder
+
+	explicitDeps    map[*FileBuilder]struct{}
+	explicitImports map[*desc.FileDescriptor]struct{}
 }
 
 // NewFile creates a new FileBuilder for a file with the given name. The
@@ -493,6 +496,11 @@ func FromFile(fd *desc.FileDescriptor) (*FileBuilder, error) {
 				setComments(&fb.PackageComments, loc)
 			}
 		}
+	}
+
+	// add imports explicitly
+	for _, dep := range fd.GetDependencies() {
+		fb.AddImportedDependency(dep)
 	}
 
 	localMessages := map[*desc.MessageDescriptor]*MessageBuilder{}
@@ -959,6 +967,40 @@ func (fb *FileBuilder) TryAddService(sb *ServiceBuilder) error {
 	return nil
 }
 
+// AddDependency adds the given file as an explicit import. Normally,
+// dependencies can be inferred during the build process by finding the files
+// for all referenced types (such as message and enum types used in this file).
+// However, this does not work for custom options, which must be known in order
+// to be interpretable. And they aren't known unless an explicit import is added
+// for the file that contains the custom options.
+//
+// Knowledge of custom options can also be provided by using BuildOptions with
+// an ExtensionRegistry, when building the file.
+func (fb *FileBuilder) AddDependency(dep *FileBuilder) *FileBuilder {
+	if fb.explicitDeps == nil {
+		fb.explicitDeps = map[*FileBuilder]struct{}{}
+	}
+	fb.explicitDeps[dep] = struct{}{}
+	return fb
+}
+
+// AddImportedDependency adds the given file as an explicit import. Normally,
+// dependencies can be inferred during the build process by finding the files
+// for all referenced types (such as message and enum types used in this file).
+// However, this does not work for custom options, which must be known in order
+// to be interpretable. And they aren't known unless an explicit import is added
+// for the file that contains the custom options.
+//
+// Knowledge of custom options can also be provided by using BuildOptions with
+// an ExtensionRegistry, when building the file.
+func (fb *FileBuilder) AddImportedDependency(dep *desc.FileDescriptor) *FileBuilder {
+	if fb.explicitImports == nil {
+		fb.explicitImports = map[*desc.FileDescriptor]struct{}{}
+	}
+	fb.explicitImports[dep] = struct{}{}
+	return fb
+}
+
 // SetOptions sets the file options for this file and returns the file, for
 // method chaining.
 func (fb *FileBuilder) SetOptions(options *dpb.FileOptions) *FileBuilder {
@@ -980,7 +1022,7 @@ func (fb *FileBuilder) SetProto3(isProto3 bool) *FileBuilder {
 	return fb
 }
 
-func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
+func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescriptorProto, error) {
 	name := fb.name
 	if name == "" {
 		name = uniqueFileName()
@@ -999,6 +1041,12 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 	addCommentsTo(&sourceInfo, path, &fb.comments)
 	addCommentsTo(&sourceInfo, append(path, internal.File_syntaxTag), &fb.SyntaxComments)
 	addCommentsTo(&sourceInfo, append(path, internal.File_packageTag), &fb.PackageComments)
+
+	imports := make([]string, 0, len(deps))
+	for _, dep := range deps {
+		imports = append(imports, dep.GetName())
+	}
+	sort.Strings(imports)
 
 	messages := make([]*dpb.DescriptorProto, 0, len(fb.messages))
 	for _, mb := range fb.messages {
@@ -1043,6 +1091,7 @@ func (fb *FileBuilder) buildProto() (*dpb.FileDescriptorProto, error) {
 	return &dpb.FileDescriptorProto{
 		Name:           proto.String(name),
 		Package:        pkg,
+		Dependency:     imports,
 		Options:        fb.Options,
 		Syntax:         syntax,
 		MessageType:    messages,

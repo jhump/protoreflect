@@ -35,6 +35,7 @@
 // A valid .proto file can be translated directly to a FileDescriptorProto
 // without any other information (e.g. without reading its imports).
 syntax = "proto2";
+package google.protobuf;
 option cc_enable_arenas = true;
 option csharp_namespace = "Google.Protobuf.Reflection";
 option go_package = "github.com/golang/protobuf/protoc-gen-go/descriptor;descriptor";
@@ -42,7 +43,6 @@ option java_outer_classname = "DescriptorProtos";
 option java_package = "com.google.protobuf";
 option objc_class_prefix = "GPB";
 option optimize_for = SPEED;
-package google.protobuf;
 // The protocol compiler can output a FileDescriptorSet containing the .proto
 // files it parses.
 message FileDescriptorSet {

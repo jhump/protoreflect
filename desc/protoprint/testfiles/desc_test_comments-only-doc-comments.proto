@@ -1,12 +1,12 @@
 syntax = "proto2";
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
-
 package foo.bar;
 
 import "google/protobuf/empty.proto";
 
 import "desc_test_options.proto";
+
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 // We need a request for our RPC service below.
 message Request {

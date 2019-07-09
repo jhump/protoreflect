@@ -94,7 +94,7 @@ type Printer struct {
 	TrailingCommentsOnSeparateLine bool
 
 	// If true, the printed output will eschew any blank lines, which otherwise
-	// appear between descriptor elements and comment blocks. Note that this if
+	// appear between descriptor elements and comment blocks. Note that if
 	// detached comments are being printed, this will cause them to be merged
 	// into the subsequent leading comments. Similarly, any element trailing
 	// comments will be merged into the subsequent leading comments.
@@ -1967,19 +1967,51 @@ func (a elementSrcOrder) Less(i, j int) bool {
 
 	if (si == nil) != (sj == nil) {
 		// generally, we put unknown elements after known ones;
-		// except package and option elements go first
+		// except package, imports, and option elements go first
 
 		// i will be unknown and j will be known
 		swapped := false
 		if si != nil {
 			si, sj = sj, si
-			// no need to swap ti and tj because we don't use tj anywhere below
-			ti = tj
+			ti, tj = tj, ti
 			swapped = true
 		}
 		switch a.dsc.(type) {
 		case *desc.FileDescriptor:
-			if ti == internal.File_packageTag || ti == internal.File_optionsTag {
+			// NB: These comparisons are *trying* to get things ordered so that
+			// 1) If the package element has no source info, it appears _first_.
+			// 2) If any import element has no source info, it appears _after_
+			//    the package element but _before_ any other element.
+			// 3) If any option element has no source info, it appears _after_
+			//    the package and import elements but _before_ any other element.
+			// If the package, imports, and options are all missing source info,
+			// this will sort them all to the top in expected order. But if they
+			// are mixed (some _do_ have source info, some do not), and elements
+			// with source info have spans that positions them _after_ other
+			// elements in the file, then this Less function will be unstable
+			// since the above dual objectives for imports and options ("before
+			// this but after that") may be in conflict with one another. This
+			// should not cause any problems, other than elements being possibly
+			// sorted in a confusing order.
+			//
+			// Well-formed descriptors should instead have consistent source
+			// info: either all elements have source info or none do. So this
+			// should not be an issue in practice.
+			if ti == internal.File_packageTag {
+				return !swapped
+			}
+			if ti == internal.File_dependencyTag {
+				if tj == internal.File_packageTag {
+					// imports will come *after* package
+					return swapped
+				}
+				return !swapped
+			}
+			if ti == internal.File_optionsTag {
+				if tj == internal.File_packageTag || tj == internal.File_dependencyTag {
+					// options will come *after* package and imports
+					return swapped
+				}
 				return !swapped
 			}
 		case *desc.MessageDescriptor:
