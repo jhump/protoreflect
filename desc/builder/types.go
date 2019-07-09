@@ -3,11 +3,9 @@ package builder
 import (
 	"fmt"
 
-	"github.com/jhump/protoreflect/desc"
-)
-
-import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+
+	"github.com/jhump/protoreflect/desc"
 )
 
 // FieldType represents the type of a field or extension. It can represent a
@@ -183,6 +181,19 @@ func FieldTypeImportedEnum(ed *desc.EnumDescriptor) *FieldType {
 	return &FieldType{
 		fieldType:       dpb.FieldDescriptorProto_TYPE_ENUM,
 		foreignEnumType: ed,
+	}
+}
+
+func fieldTypeFromDescriptor(fld *desc.FieldDescriptor) *FieldType {
+	switch fld.GetType() {
+	case dpb.FieldDescriptorProto_TYPE_GROUP:
+		return &FieldType{fieldType: dpb.FieldDescriptorProto_TYPE_GROUP, foreignMsgType: fld.GetMessageType()}
+	case dpb.FieldDescriptorProto_TYPE_MESSAGE:
+		return FieldTypeImportedMessage(fld.GetMessageType())
+	case dpb.FieldDescriptorProto_TYPE_ENUM:
+		return FieldTypeImportedEnum(fld.GetEnumType())
+	default:
+		return FieldTypeScalar(fld.GetType())
 	}
 }
 
