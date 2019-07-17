@@ -166,12 +166,6 @@ type basicCompositeNode struct {
 	last  node
 }
 
-func (n *basicCompositeNode) toBasicNode() basicNode {
-	// only works on terminals: composite nodes where first
-	// and last are *basicNode (and also equal)
-	return *n.first.(*basicNode)
-}
-
 func (n *basicCompositeNode) start() *SourcePos {
 	return n.first.start()
 }
@@ -426,7 +420,7 @@ func (n *floatLiteralNode) pushTrailingComment(c *comment) {
 }
 
 type boolLiteralNode struct {
-	basicNode
+	*identNode
 	val bool
 }
 
@@ -521,7 +515,7 @@ func (n *fieldNode) getGroupKeyword() node {
 }
 
 type labelNode struct {
-	basicNode
+	*identNode
 	repeated bool
 	required bool
 }
