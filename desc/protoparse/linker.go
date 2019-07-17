@@ -54,6 +54,10 @@ func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
 	// Now that we have linked descriptors, we can interpret any uninterpreted
 	// options that remain.
 	for _, r := range l.files {
+		if r.isShared {
+			// shared descriptors are already linked
+			continue
+		}
 		fd := linked[r.fd.GetName()]
 		if err := interpretFileOptions(r, richFileDescriptorish{FileDescriptor: fd}); err != nil {
 			return nil, err
@@ -224,6 +228,10 @@ func descriptorType(m proto.Message) string {
 func (l *linker) resolveReferences() error {
 	l.extensions = map[string]map[int32]string{}
 	for _, r := range l.files {
+		if r.isShared {
+			// shared descriptors are already resolved
+			continue
+		}
 		fd := r.fd
 		prefix := fd.GetPackage()
 		scopes := []scope{fileScope(fd, l)}

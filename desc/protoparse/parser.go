@@ -187,8 +187,10 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	if p.IncludeSourceCodeInfo {
 		for name, fd := range linkedProtos {
 			pr := protos[name]
-			fd.AsFileDescriptorProto().SourceCodeInfo = pr.generateSourceCodeInfo()
-			internal.RecomputeSourceInfo(fd)
+			if !pr.isShared {
+				fd.AsFileDescriptorProto().SourceCodeInfo = pr.generateSourceCodeInfo()
+				internal.RecomputeSourceInfo(fd)
+			}
 		}
 	}
 	fds := make([]*desc.FileDescriptor, len(filenames))
@@ -314,9 +316,11 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 				protoPaths[prefix] = struct{}{}
 			}
 			f := protos[best]
-			f.fd.Name = proto.String(imp)
-			revisedProtos[imp] = f
-			delete(candidatesAvailable, best)
+			if !f.isShared {
+				f.fd.Name = proto.String(imp)
+				revisedProtos[imp] = f
+				delete(candidatesAvailable, best)
+			}
 		}
 	}
 
@@ -352,12 +356,12 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 				break
 			}
 		}
-		if imp != "" {
-			f := protos[c]
+		f := protos[c]
+		if imp != "" && !f.isShared {
 			f.fd.Name = proto.String(imp)
 			revisedProtos[imp] = f
 		} else {
-			revisedProtos[c] = protos[c]
+			revisedProtos[c] = f
 		}
 	}
 
@@ -385,7 +389,7 @@ func parseProtoFiles(acc FileAccessor, filenames []string, recursive, validate b
 			}
 		} else if d, ok := standardImports[name]; ok {
 			// it's a well-known import
-			parsed[name] = &parseResult{fd: d}
+			parsed[name] = &parseResult{fd: d, isShared: true}
 		} else {
 			return err
 		}
@@ -408,6 +412,10 @@ func parseProtoFiles(acc FileAccessor, filenames []string, recursive, validate b
 type parseResult struct {
 	// the parsed file descriptor
 	fd *dpb.FileDescriptorProto
+
+	// if true, this descriptor is a standard import that was compiled into
+	// the parser and not just-parsed
+	isShared bool
 
 	// if set to true, enables lenient interpretation of options, where
 	// unrecognized options will be left uninterpreted instead of resulting in a
