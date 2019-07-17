@@ -690,11 +690,18 @@ func skipGroup(b *codedBuffer) (int, int, error) {
 				}
 				i++
 			}
-			b.index = i + 1
+			// TODO: This would only overflow if buffer length was MaxInt and we
+			// read the last byte. This is not a real/feasible concern on 64-bit
+			// systems. Something to worry about for 32-bit systems? Do we care?
+			b.index++
 		case proto.WireBytes:
 			l, err := b.decodeVarint()
 			if err != nil {
 				return 0, 0, err
+			}
+			lInt := int(l)
+			if lInt < 0 {
+				return 0, 0, fmt.Errorf("proto: bad byte length %d", lInt)
 			}
 			if !b.skip(int(l)) {
 				return 0, 0, io.ErrUnexpectedEOF
