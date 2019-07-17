@@ -41,6 +41,7 @@ import (
 	rpcType   *rpcTypeNode
 	opts      []*optionNode
 	optNm     []*optionNamePartNode
+	cmpctOpts *compactOptionsNode
 	rngs      []*rangeNode
 	names     []*stringLiteralNode
 	sl        []valueNode
@@ -63,8 +64,9 @@ import (
 %type <fileDecls> fileDecl fileDecls
 %type <imprt>     import
 %type <pkg>       package
-%type <opts>      option fieldOption fieldOptions rpcOption rpcOptions
+%type <opts>      option compactOption compactOptionDecls rpcOption rpcOptions
 %type <optNm>     optionName optionNameRest optionNameComponent
+%type <cmpctOpts> compactOptions
 %type <v>         constant scalarConstant aggregate
 %type <id>        name ident typeIdent keyType
 %type <aggName>   aggName
@@ -434,36 +436,41 @@ field : _REQUIRED typeIdent name '=' _INT_LIT ';' {
 		$$ = &fieldNode{fldType: $1, name: $2, tag: $4}
 		$$.setRange($1, $5)
 	}
-	| _REQUIRED typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
+	| _REQUIRED typeIdent name '=' _INT_LIT compactOptions ';' {
 		checkTag(protolex, $5.start(), $5.val)
 		lbl := &labelNode{identNode: $1, required: true}
-		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
-		$$.setRange($1, $9)
+		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $6}
+		$$.setRange($1, $7)
 	}
-	| _OPTIONAL typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
+	| _OPTIONAL typeIdent name '=' _INT_LIT compactOptions ';' {
 		checkTag(protolex, $5.start(), $5.val)
 		lbl := &labelNode{identNode: $1}
-		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
-		$$.setRange($1, $9)
+		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $6}
+		$$.setRange($1, $7)
 	}
-	| _REPEATED typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
+	| _REPEATED typeIdent name '=' _INT_LIT compactOptions ';' {
 		checkTag(protolex, $5.start(), $5.val)
 		lbl := &labelNode{identNode: $1, repeated: true}
-		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $7}
-		$$.setRange($1, $9)
+		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $6}
+		$$.setRange($1, $7)
 	}
-	| typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
+	| typeIdent name '=' _INT_LIT compactOptions ';' {
 		checkTag(protolex, $4.start(), $4.val)
-		$$ = &fieldNode{fldType: $1, name: $2, tag: $4, options: $6}
-		$$.setRange($1, $8)
+		$$ = &fieldNode{fldType: $1, name: $2, tag: $4, options: $5}
+		$$.setRange($1, $6)
 	}
 
-fieldOptions : fieldOptions ',' fieldOption {
+compactOptions: '[' compactOptionDecls ']' {
+        $$ = &compactOptionsNode{decls: $2}
+        $$.setRange($1, $3)
+    }
+
+compactOptionDecls : compactOptionDecls ',' compactOption {
 		$$ = append($1, $3...)
 	}
-	| fieldOption
+	| compactOption
 
-fieldOption: optionName '=' constant {
+compactOption: optionName '=' constant {
 		n := &optionNameNode{parts: $1}
 		n.setRange($1[0], $1[len($1)-1])
 		o := &optionNode{name: n, val: $3}
@@ -536,10 +543,10 @@ oneofField : typeIdent name '=' _INT_LIT ';' {
 		$$ = &fieldNode{fldType: $1, name: $2, tag: $4}
 		$$.setRange($1, $5)
 	}
-	| typeIdent name '=' _INT_LIT '[' fieldOptions ']' ';' {
+	| typeIdent name '=' _INT_LIT compactOptions ';' {
 		checkTag(protolex, $4.start(), $4.val)
-		$$ = &fieldNode{fldType: $1, name: $2, tag: $4, options: $6}
-		$$.setRange($1, $8)
+		$$ = &fieldNode{fldType: $1, name: $2, tag: $4, options: $5}
+		$$.setRange($1, $6)
 	}
 
 mapField : _MAP '<' keyType ',' typeIdent '>' name '=' _INT_LIT ';' {
@@ -547,10 +554,10 @@ mapField : _MAP '<' keyType ',' typeIdent '>' name '=' _INT_LIT ';' {
 		$$ = &mapFieldNode{mapKeyword: $1, keyType: $3, valueType: $5, name: $7, tag: $9}
 		$$.setRange($1, $10)
 	}
-	| _MAP '<' keyType ',' typeIdent '>' name '=' _INT_LIT '[' fieldOptions ']' ';' {
+	| _MAP '<' keyType ',' typeIdent '>' name '=' _INT_LIT compactOptions ';' {
 		checkTag(protolex, $9.start(), $9.val)
-		$$ = &mapFieldNode{mapKeyword: $1, keyType: $3, valueType: $5, name: $7, tag: $9, options: $11}
-		$$.setRange($1, $13)
+		$$ = &mapFieldNode{mapKeyword: $1, keyType: $3, valueType: $5, name: $7, tag: $9, options: $10}
+		$$.setRange($1, $11)
 	}
 
 keyType : _INT32
@@ -570,9 +577,9 @@ extensions : _EXTENSIONS tagRanges ';' {
 		$$ = &extensionRangeNode{ranges: $2}
 		$$.setRange($1, $3)
 	}
-	| _EXTENSIONS tagRanges '[' fieldOptions ']' ';' {
-		$$ = &extensionRangeNode{ranges: $2, options: $4}
-		$$.setRange($1, $6)
+	| _EXTENSIONS tagRanges compactOptions ';' {
+		$$ = &extensionRangeNode{ranges: $2, options: $3}
+		$$.setRange($1, $4)
 	}
 
 tagRanges : tagRanges ',' tagRange {
@@ -740,20 +747,20 @@ enumField : name '=' _INT_LIT ';' {
 		$$ = &enumValueNode{name: $1, numberP: $3}
 		$$.setRange($1, $4)
 	}
-	|  name '=' _INT_LIT '[' fieldOptions ']' ';' {
+	|  name '=' _INT_LIT compactOptions ';' {
 		checkUint64InInt32Range(protolex, $3.start(), $3.val)
-		$$ = &enumValueNode{name: $1, numberP: $3, options: $5}
-		$$.setRange($1, $7)
+		$$ = &enumValueNode{name: $1, numberP: $3, options: $4}
+		$$.setRange($1, $5)
 	}
 	| name '=' negIntLit ';' {
 		checkInt64InInt32Range(protolex, $3.start(), $3.val)
 		$$ = &enumValueNode{name: $1, numberN: $3}
 		$$.setRange($1, $4)
 	}
-	|  name '=' negIntLit '[' fieldOptions ']' ';' {
+	|  name '=' negIntLit compactOptions ';' {
 		checkInt64InInt32Range(protolex, $3.start(), $3.val)
-		$$ = &enumValueNode{name: $1, numberN: $3, options: $5}
-		$$.setRange($1, $7)
+		$$ = &enumValueNode{name: $1, numberN: $3, options: $4}
+		$$.setRange($1, $5)
 	}
 
 message : _MESSAGE name '{' messageBody '}' {

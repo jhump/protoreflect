@@ -52,6 +52,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   reserved "foo", "bar", "baz";
 
+  // Group comment
   optional group Extras = 3 {
     // this is a custom option
     option (testprotos.mfubar) = false;
@@ -109,6 +110,7 @@ extend /* extendee comment */ Request {
 
 // Service comment
 service /* service name */ RpcService {
+  // option that sets field
   option (testprotos.sfubar) = { id:100 name:"bob"  };
 
   option deprecated = false; // DEPRECATED!
@@ -162,6 +164,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   reserved "foo", "bar", "baz";
 
+  // Group comment
   optional group Extras = 3 {
     // this is a custom option
     option (testprotos.mfubar) = false;
@@ -225,6 +228,7 @@ repeated int32 ids = /* detached tag */ /* tag numero uno */ 1 /*
 // label comment
 optional /* type comment */ string /* name comment */ name = 2 [/* default lead */ default = "fubar" /* default trail */];
 -------- foo.bar.Request.extras (*desc.FieldDescriptor) --------
+// Group comment
 optional group Extras = 3 {
   // this is a custom option
   option (testprotos.mfubar) = false;
@@ -239,6 +243,7 @@ optional group Extras = 3 {
   optional string str = 3; // Trailing comment...
 }
 -------- foo.bar.Request.Extras (*desc.MessageDescriptor) --------
+// Group comment
 message /* group name */ Extras {
   // this is a custom option
   option (testprotos.mfubar) = false;
@@ -325,6 +330,7 @@ extend Request {
 -------- foo.bar.RpcService (*desc.ServiceDescriptor) --------
 // Service comment
 service /* service name */ RpcService {
+  // option that sets field
   option (testprotos.sfubar) = { id:100 name:"bob"  };
 
   option deprecated = false; // DEPRECATED!

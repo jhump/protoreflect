@@ -28,6 +28,7 @@ message Request {
 
   reserved "foo", "bar", "baz";
 
+  // Group comment
   optional group Extras = 3 {
     option (testprotos.mfubar) = false;
 

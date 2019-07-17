@@ -103,7 +103,6 @@ var _ enumValueDecl = (*noSourceNode)(nil)
 type msgDecl interface {
 	node
 	messageName() node
-	reservedNames() []*stringLiteralNode
 }
 
 var _ msgDecl = (*messageNode)(nil)
@@ -191,14 +190,6 @@ type fileNode struct {
 	basicCompositeNode
 	syntax *syntaxNode
 	decls  []*fileElement
-
-	// These fields are populated after parsing, to make it easier to find them
-	// without searching decls. The parse result has a map of descriptors to
-	// nodes which makes the other declarations easily discoverable. But these
-	// elements do not map to descriptors -- they are just stored as strings in
-	// the file descriptor.
-	imports []*importNode
-	pkg     *packageNode
 }
 
 func (n *fileNode) getSyntax() node {
@@ -299,6 +290,18 @@ func (n *identNode) pushTrailingComment(c *comment) {
 	n.last.(terminalNode).pushTrailingComment(c)
 }
 
+type compactOptionsNode struct {
+	basicCompositeNode
+	decls []*optionNode
+}
+
+func (n *compactOptionsNode) Elements() []*optionNode {
+	if n == nil {
+		return nil
+	}
+	return n.decls
+}
+
 type optionNode struct {
 	basicCompositeNode
 	name *optionNameNode
@@ -358,6 +361,7 @@ type valueNode interface {
 	value() interface{}
 }
 
+var _ valueNode = (*identNode)(nil)
 var _ valueNode = (*stringLiteralNode)(nil)
 var _ valueNode = (*intLiteralNode)(nil)
 var _ valueNode = (*negativeIntLiteralNode)(nil)
@@ -472,7 +476,7 @@ type fieldNode struct {
 	fldType *identNode
 	name    *identNode
 	tag     *intLiteralNode
-	options []*optionNode
+	options *compactOptionsNode
 
 	// This field is populated after parsing, to allow lookup of extendee source
 	// locations when field extendees cannot be linked. (Otherwise, this is just
@@ -528,12 +532,6 @@ type groupNode struct {
 	tag          *intLiteralNode
 	decls        []*messageElement
 
-	// This field is populated after parsing, to make it easier to find them
-	// without searching decls. The parse result has a map of descriptors to
-	// nodes which makes the other declarations easily discoverable. But these
-	// elements do not map to descriptors -- they are just stored as strings in
-	// the message descriptor.
-	reserved []*stringLiteralNode
 	// This field is populated after parsing, to allow lookup of extendee source
 	// locations when field extendees cannot be linked. (Otherwise, this is just
 	// stored as a string in the field descriptors defined inside the extend
@@ -550,7 +548,7 @@ func (n *groupNode) fieldName() node {
 }
 
 func (n *groupNode) fieldType() node {
-	return n.name
+	return n.groupKeyword
 }
 
 func (n *groupNode) fieldTag() node {
@@ -570,10 +568,6 @@ func (n *groupNode) getGroupKeyword() node {
 
 func (n *groupNode) messageName() node {
 	return n.name
-}
-
-func (n *groupNode) reservedNames() []*stringLiteralNode {
-	return n.reserved
 }
 
 type oneOfNode struct {
@@ -623,7 +617,7 @@ type mapFieldNode struct {
 	valueType  *identNode
 	name       *identNode
 	tag        *intLiteralNode
-	options    []*optionNode
+	options    *compactOptionsNode
 }
 
 func (n *mapFieldNode) fieldLabel() node {
@@ -652,10 +646,6 @@ func (n *mapFieldNode) getGroupKeyword() node {
 
 func (n *mapFieldNode) messageName() node {
 	return n.name
-}
-
-func (n *mapFieldNode) reservedNames() []*stringLiteralNode {
-	return nil
 }
 
 func (n *mapFieldNode) keyField() *syntheticMapField {
@@ -726,7 +716,7 @@ func (n *syntheticMapField) getGroupKeyword() node {
 type extensionRangeNode struct {
 	basicCompositeNode
 	ranges  []*rangeNode
-	options []*optionNode
+	options *compactOptionsNode
 }
 
 type rangeNode struct {
@@ -753,13 +743,6 @@ type enumNode struct {
 	basicCompositeNode
 	name  *identNode
 	decls []*enumElement
-
-	// This field is populated after parsing, to make it easier to find them
-	// without searching decls. The parse result has a map of descriptors to
-	// nodes which makes the other declarations easily discoverable. But these
-	// elements do not map to descriptors -- they are just stored as strings in
-	// the message descriptor.
-	reserved []*stringLiteralNode
 }
 
 type enumElement struct {
@@ -800,7 +783,7 @@ func (n *enumElement) get() node {
 type enumValueNode struct {
 	basicCompositeNode
 	name    *identNode
-	options []*optionNode
+	options *compactOptionsNode
 
 	// only one of these two will be set:
 
@@ -823,21 +806,10 @@ type messageNode struct {
 	basicCompositeNode
 	name  *identNode
 	decls []*messageElement
-
-	// This field is populated after parsing, to make it easier to find them
-	// without searching decls. The parse result has a map of descriptors to
-	// nodes which makes the other declarations easily discoverable. But these
-	// elements do not map to descriptors -- they are just stored as strings in
-	// the message descriptor.
-	reserved []*stringLiteralNode
 }
 
 func (n *messageNode) messageName() node {
 	return n.name
-}
-
-func (n *messageNode) reservedNames() []*stringLiteralNode {
-	return n.reserved
 }
 
 type messageElement struct {
@@ -1070,10 +1042,6 @@ func (n noSourceNode) getNumber() node {
 
 func (n noSourceNode) messageName() node {
 	return n
-}
-
-func (n noSourceNode) reservedNames() []*stringLiteralNode {
-	return nil
 }
 
 func (n noSourceNode) getInputType() node {
