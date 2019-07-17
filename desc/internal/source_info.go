@@ -40,12 +40,13 @@ func asMapKey(slice []int32) string {
 	//return array.Interface()
 
 	b := make([]byte, len(slice)*4)
-	for i, s := range slice {
-		j := i * 4
+	j := 0
+	for _, s := range slice {
 		b[j] = byte(s)
 		b[j+1] = byte(s >> 8)
 		b[j+2] = byte(s >> 16)
 		b[j+3] = byte(s >> 24)
+		j += 4
 	}
 	return string(b)
 }
