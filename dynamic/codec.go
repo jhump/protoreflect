@@ -36,7 +36,7 @@ func (cb *codedBuffer) eof() bool {
 
 func (cb *codedBuffer) skip(count int) bool {
 	newIndex := cb.index + count
-	if newIndex > len(cb.buf) {
+	if newIndex < cb.index || newIndex > len(cb.buf) {
 		return false
 	}
 	cb.index = newIndex
@@ -258,13 +258,13 @@ func (cb *codedBuffer) decodeRawBytes(alloc bool) (buf []byte, err error) {
 
 	if !alloc {
 		buf = cb.buf[cb.index:end]
-		cb.index += nb
+		cb.index = end
 		return
 	}
 
 	buf = make([]byte, nb)
 	copy(buf, cb.buf[cb.index:])
-	cb.index += nb
+	cb.index = end
 	return
 }
 
