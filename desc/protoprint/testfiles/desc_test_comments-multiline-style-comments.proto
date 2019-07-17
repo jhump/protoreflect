@@ -104,7 +104,7 @@ extend Request {
 service RpcService {
 	option deprecated = false;
 
-	option (testprotos.sfubar) = { id:100 name:"bob" };
+	option (testprotos.sfubar) = { id:100 name:"bob"  };
 
 	option (testprotos.sfubare) = VALUE;
 

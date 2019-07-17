@@ -60,7 +60,7 @@ extend Request {
 // Service comment
 service RpcService {
   option deprecated = false;
-  option (testprotos.sfubar) = { id:100 name:"bob" };
+  option (testprotos.sfubar) = { id:100 name:"bob"  };
   option (testprotos.sfubare) = VALUE;
   // Method comment
   rpc StreamingRpc ( stream Request ) returns ( Request );

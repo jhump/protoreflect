@@ -266,7 +266,7 @@ func (p *Printer) printProto(dsc desc.Descriptor, out io.Writer) error {
 	mf := dynamic.NewMessageFactoryWithExtensionRegistry(&er)
 	fdp := dsc.GetFile().AsFileDescriptorProto()
 	sourceInfo := internal.CreateSourceInfoMap(fdp)
-	extendOptionLocations(sourceInfo, fdp.GetSourceCodeInfo().Location)
+	extendOptionLocations(sourceInfo, fdp.GetSourceCodeInfo().GetLocation())
 
 	path := findElement(dsc)
 	switch d := dsc.(type) {
@@ -449,6 +449,8 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 	})
 	p.newLine(w)
 
+	skip := map[interface{}]bool{}
+
 	elements := elementAddrs{dsc: fd, opts: opts}
 	if fdp.Package != nil {
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_packageTag, elementIndex: 0, order: -3})
@@ -466,7 +468,12 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 	for i := range fd.GetServices() {
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_servicesTag, elementIndex: i})
 	}
-	for i := range fd.GetExtensions() {
+	for i, extd := range fd.GetExtensions() {
+		if extd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP {
+			// we don't emit nested messages for groups since
+			// they get special treatment
+			skip[extd.GetMessageType()] = true
+		}
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_extensionsTag, elementIndex: i})
 	}
 
@@ -477,6 +484,13 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 	var ext *desc.FieldDescriptor
 	for i, el := range elements.addrs {
 		d := elements.at(el)
+		// skip[d] will panic if d is a slice (which it could be for []option),
+		// so just ignore it since we don't try to skip options
+		if reflect.TypeOf(d).Kind() != reflect.Slice && skip[d] {
+			// skip this element
+			continue
+		}
+
 		path = []int32{el.elementType, int32(el.elementIndex)}
 		if el.elementType == internal.File_extensionsTag {
 			fld := d.(*desc.FieldDescriptor)
@@ -680,7 +694,12 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 	for i := range md.GetNestedEnumTypes() {
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_enumsTag, elementIndex: i})
 	}
-	for i := range md.GetNestedExtensions() {
+	for i, extd := range md.GetNestedExtensions() {
+		if extd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP {
+			// we don't emit nested messages for groups since
+			// they get special treatment
+			skip[extd.GetMessageType()] = true
+		}
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_extensionsTag, elementIndex: i})
 	}
 
@@ -840,16 +859,29 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFacto
 		// compute path to group message type
 		groupPath = make([]int32, len(path)-2)
 		copy(groupPath, path)
+
+		var candidates []*desc.MessageDescriptor
+		var parentTag int32
+		switch parent := fld.GetParent().(type) {
+		case *desc.MessageDescriptor:
+			// group in a message
+			candidates = parent.GetNestedMessageTypes()
+			parentTag = internal.Message_nestedMessagesTag
+		case *desc.FileDescriptor:
+			// group that is a top-level extension
+			candidates = parent.GetMessageTypes()
+			parentTag = internal.File_messagesTag
+		}
+
 		var groupMsgIndex int32
-		md := fld.GetParent().(*desc.MessageDescriptor)
-		for i, nmd := range md.GetNestedMessageTypes() {
+		for i, nmd := range candidates {
 			if nmd == fld.GetMessageType() {
 				// found it
 				groupMsgIndex = int32(i)
 				break
 			}
 		}
-		groupPath = append(groupPath, internal.Message_nestedMessagesTag, groupMsgIndex)
+		groupPath = append(groupPath, parentTag, groupMsgIndex)
 
 		// the group message is where the field's comments and position are stored
 		si = sourceInfo.Get(groupPath)

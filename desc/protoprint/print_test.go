@@ -14,6 +14,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
+	_ "github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
@@ -37,19 +38,29 @@ func TestPrinter(t *testing.T) {
 		"sorted":                              {Indent: "   ", SortElements: true, OmitDetachedComments: true},
 		"sorted-AND-multiline-style-comments": {PreferMultiLineStyleComments: true, SortElements: true},
 	}
+
+	// create descriptors to print
 	files := []string{
 		"../../internal/testprotos/desc_test_comments.protoset",
 		"../../internal/testprotos/desc_test_complex_source_info.protoset",
 		"../../internal/testprotos/descriptor.protoset",
 		"../../internal/testprotos/desc_test1.protoset",
 	}
-	for _, file := range files {
-		for name, pr := range prs {
-			fd, err := loadProtoset(file)
-			testutil.Ok(t, err)
+	fds := make([]*desc.FileDescriptor, len(files)+1)
+	for i, file := range files {
+		fd, err := loadProtoset(file)
+		testutil.Ok(t, err)
+		fds[i] = fd
+	}
+	// extra descriptor that has no source info
+	fd, err := desc.LoadFileDescriptor("desc_test2.proto")
+	testutil.Ok(t, err)
+	fds[len(files)] = fd
 
-			baseName := filepath.Base(file)
-			ext := filepath.Ext(file)
+	for _, fd := range fds {
+		for name, pr := range prs {
+			baseName := filepath.Base(fd.GetName())
+			ext := filepath.Ext(baseName)
 			baseName = baseName[:len(baseName)-len(ext)]
 			goldenFile := fmt.Sprintf("%s-%s.proto", baseName, name)
 

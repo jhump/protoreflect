@@ -44,7 +44,7 @@ message Request {
 // Service comment
 service RpcService {
   option deprecated = false;
-  option (.testprotos.sfubar) = { id:100 name:"bob" };
+  option (.testprotos.sfubar) = { id:100 name:"bob"  };
   option (.testprotos.sfubare) = VALUE;
   // Method comment
   rpc StreamingRpc ( stream .foo.bar.Request ) returns ( .foo.bar.Request );
@@ -182,7 +182,7 @@ extend .foo.bar.Request {
 // Service comment
 service RpcService {
   option deprecated = false;
-  option (.testprotos.sfubar) = { id:100 name:"bob" };
+  option (.testprotos.sfubar) = { id:100 name:"bob"  };
   option (.testprotos.sfubare) = VALUE;
   // Method comment
   rpc StreamingRpc ( stream .foo.bar.Request ) returns ( .foo.bar.Request );
