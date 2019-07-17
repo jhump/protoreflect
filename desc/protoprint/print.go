@@ -266,7 +266,7 @@ func (p *Printer) printProto(dsc desc.Descriptor, out io.Writer) error {
 	mf := dynamic.NewMessageFactoryWithExtensionRegistry(&er)
 	fdp := dsc.GetFile().AsFileDescriptorProto()
 	sourceInfo := internal.CreateSourceInfoMap(fdp)
-	extendOptionLocations(sourceInfo)
+	extendOptionLocations(sourceInfo, fdp.GetSourceCodeInfo().Location)
 
 	path := findElement(dsc)
 	switch d := dsc.(type) {
@@ -1523,8 +1523,11 @@ var edges = map[edgeKind]map[int32]edgeKind{
 	},
 }
 
-func extendOptionLocations(sc internal.SourceInfoMap) {
-	for _, loc := range sc {
+func extendOptionLocations(sc internal.SourceInfoMap, locs []*descriptor.SourceCodeInfo_Location) {
+	// we iterate in the order that locations appear in descriptor
+	// for determinism (if we ranged over the map, order and thus
+	// potentially results are non-deterministic)
+	for _, loc := range locs {
 		allowed := edges[edgeKindFile]
 		for i := 0; i+1 < len(loc.Path); i += 2 {
 			nextKind, ok := allowed[loc.Path[i]]

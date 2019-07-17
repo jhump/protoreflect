@@ -1193,9 +1193,9 @@ protodefault:
 //line proto.y:252
 		{
 			if protoDollar[1].id.val == "true" {
-				protoVAL.v = &boolLiteralNode{basicNode: protoDollar[1].id.toBasicNode(), val: true}
+				protoVAL.v = &boolLiteralNode{identNode: protoDollar[1].id, val: true}
 			} else if protoDollar[1].id.val == "false" {
-				protoVAL.v = &boolLiteralNode{basicNode: protoDollar[1].id.toBasicNode(), val: false}
+				protoVAL.v = &boolLiteralNode{identNode: protoDollar[1].id, val: false}
 			} else if protoDollar[1].id.val == "inf" {
 				f := &floatLiteralNode{val: math.Inf(1)}
 				f.setRange(protoDollar[1].id, protoDollar[1].id)
@@ -1423,7 +1423,7 @@ protodefault:
 //line proto.y:414
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
-			lbl := &labelNode{basicNode: protoDollar[1].id.toBasicNode(), required: true}
+			lbl := &labelNode{identNode: protoDollar[1].id, required: true}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[6].b)
 		}
@@ -1432,7 +1432,7 @@ protodefault:
 //line proto.y:420
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
-			lbl := &labelNode{basicNode: protoDollar[1].id.toBasicNode()}
+			lbl := &labelNode{identNode: protoDollar[1].id}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[6].b)
 		}
@@ -1441,7 +1441,7 @@ protodefault:
 //line proto.y:426
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
-			lbl := &labelNode{basicNode: protoDollar[1].id.toBasicNode(), repeated: true}
+			lbl := &labelNode{identNode: protoDollar[1].id, repeated: true}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[6].b)
 		}
@@ -1458,7 +1458,7 @@ protodefault:
 //line proto.y:437
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
-			lbl := &labelNode{basicNode: protoDollar[1].id.toBasicNode(), required: true}
+			lbl := &labelNode{identNode: protoDollar[1].id, required: true}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui, options: protoDollar[7].opts}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[9].b)
 		}
@@ -1467,7 +1467,7 @@ protodefault:
 //line proto.y:443
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
-			lbl := &labelNode{basicNode: protoDollar[1].id.toBasicNode()}
+			lbl := &labelNode{identNode: protoDollar[1].id}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui, options: protoDollar[7].opts}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[9].b)
 		}
@@ -1476,7 +1476,7 @@ protodefault:
 //line proto.y:449
 		{
 			checkTag(protolex, protoDollar[5].ui.start(), protoDollar[5].ui.val)
-			lbl := &labelNode{basicNode: protoDollar[1].id.toBasicNode(), repeated: true}
+			lbl := &labelNode{identNode: protoDollar[1].id, repeated: true}
 			protoVAL.fld = &fieldNode{label: lbl, fldType: protoDollar[2].id, name: protoDollar[3].id, tag: protoDollar[5].ui, options: protoDollar[7].opts}
 			protoVAL.fld.setRange(protoDollar[1].id, protoDollar[9].b)
 		}
@@ -1512,7 +1512,7 @@ protodefault:
 			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
 				lexError(protolex, protoDollar[3].id.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", protoDollar[3].id.val))
 			}
-			lbl := &labelNode{basicNode: protoDollar[1].id.toBasicNode(), required: true}
+			lbl := &labelNode{identNode: protoDollar[1].id, required: true}
 			protoVAL.grp = &groupNode{groupKeyword: protoDollar[2].id, label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
 			protoVAL.grp.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
@@ -1524,7 +1524,7 @@ protodefault:
 			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
 				lexError(protolex, protoDollar[3].id.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", protoDollar[3].id.val))
 			}
-			lbl := &labelNode{basicNode: protoDollar[1].id.toBasicNode()}
+			lbl := &labelNode{identNode: protoDollar[1].id}
 			protoVAL.grp = &groupNode{groupKeyword: protoDollar[2].id, label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
 			protoVAL.grp.setRange(protoDollar[1].id, protoDollar[8].b)
 		}
@@ -1536,7 +1536,7 @@ protodefault:
 			if !unicode.IsUpper(rune(protoDollar[3].id.val[0])) {
 				lexError(protolex, protoDollar[3].id.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", protoDollar[3].id.val))
 			}
-			lbl := &labelNode{basicNode: protoDollar[1].id.toBasicNode(), repeated: true}
+			lbl := &labelNode{identNode: protoDollar[1].id, repeated: true}
 			protoVAL.grp = &groupNode{groupKeyword: protoDollar[2].id, label: lbl, name: protoDollar[3].id, tag: protoDollar[5].ui, decls: protoDollar[7].msgDecls}
 			protoVAL.grp.setRange(protoDollar[1].id, protoDollar[8].b)
 		}

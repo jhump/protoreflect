@@ -3,7 +3,7 @@
 
 :
 desc_test_comments.proto:8:1
-desc_test_comments.proto:119:2
+desc_test_comments.proto:123:2
 
 
  > syntax:
@@ -59,12 +59,12 @@ desc_test_comments.proto:18:34
 
  > message_type:
 desc_test_comments.proto:25:1
-desc_test_comments.proto:89:2
+desc_test_comments.proto:91:2
 
 
  > message_type[0]:
 desc_test_comments.proto:25:1
-desc_test_comments.proto:89:2
+desc_test_comments.proto:91:2
     Leading detached comment [0]:
  Multiple white space lines (like above) cannot
  be preserved...
@@ -93,16 +93,18 @@ desc_test_comments.proto:35:54
  > message_type[0] > options > deprecated:
 desc_test_comments.proto:26:3
 desc_test_comments.proto:26:28
+    Trailing comments:
+ deprecated!
 
 
  > message_type[0] > field:
 desc_test_comments.proto:29:2
-desc_test_comments.proto:66:3
+desc_test_comments.proto:67:3
 
 
  > message_type[0] > field[0]:
 desc_test_comments.proto:29:2
-desc_test_comments.proto:32:92
+desc_test_comments.proto:32:125
     Leading comments:
  A field comment
     Trailing comments:
@@ -139,32 +141,36 @@ desc_test_comments.proto:29:64
 
  > message_type[0] > field[0] > options:
 desc_test_comments.proto:32:5
-desc_test_comments.proto:32:90
+desc_test_comments.proto:32:123
 
 
  > message_type[0] > field[0] > options > packed:
 desc_test_comments.proto:32:5
 desc_test_comments.proto:32:16
+    Trailing comments:
+ packed! 
 
 
  > message_type[0] > field[0] > json_name:
-desc_test_comments.proto:32:18
-desc_test_comments.proto:32:35
+desc_test_comments.proto:32:32
+desc_test_comments.proto:32:49
+    Trailing comments:
+ custom JSON! 
 
 
  > message_type[0] > field[0] > options > ffubar:
-desc_test_comments.proto:32:37
-desc_test_comments.proto:32:62
+desc_test_comments.proto:32:70
+desc_test_comments.proto:32:95
 
 
  > message_type[0] > field[0] > options > ffubar[0]:
-desc_test_comments.proto:32:37
-desc_test_comments.proto:32:62
+desc_test_comments.proto:32:70
+desc_test_comments.proto:32:95
 
 
  > message_type[0] > field[0] > options > ffubarb:
-desc_test_comments.proto:32:64
-desc_test_comments.proto:32:90
+desc_test_comments.proto:32:97
+desc_test_comments.proto:32:123
 
 
  > message_type[0] > options > mfubar:
@@ -334,19 +340,19 @@ desc_test_comments.proto:52:30
 
  > message_type[0] > field[2]:
 desc_test_comments.proto:55:2
-desc_test_comments.proto:66:3
+desc_test_comments.proto:67:3
     Leading comments:
  Group comment
 
 
  > message_type[0] > nested_type:
 desc_test_comments.proto:55:2
-desc_test_comments.proto:66:3
+desc_test_comments.proto:67:3
 
 
  > message_type[0] > nested_type[0]:
 desc_test_comments.proto:55:2
-desc_test_comments.proto:66:3
+desc_test_comments.proto:67:3
 
 
  > message_type[0] > field[2] > label:
@@ -367,78 +373,80 @@ desc_test_comments.proto:55:44
 
 
  > message_type[0] > nested_type[0] > options:
-desc_test_comments.proto:56:3
-desc_test_comments.proto:61:50
+desc_test_comments.proto:57:3
+desc_test_comments.proto:62:50
 
 
  > message_type[0] > nested_type[0] > options > mfubar:
-desc_test_comments.proto:56:3
-desc_test_comments.proto:56:38
+desc_test_comments.proto:57:3
+desc_test_comments.proto:57:38
+    Leading comments:
+ this is a custom option
 
 
  > message_type[0] > nested_type[0] > field:
-desc_test_comments.proto:58:3
-desc_test_comments.proto:64:27
+desc_test_comments.proto:59:3
+desc_test_comments.proto:65:27
 
 
  > message_type[0] > nested_type[0] > field[0]:
-desc_test_comments.proto:58:3
-desc_test_comments.proto:58:27
+desc_test_comments.proto:59:3
+desc_test_comments.proto:59:27
 
 
  > message_type[0] > nested_type[0] > field[0] > label:
-desc_test_comments.proto:58:3
-desc_test_comments.proto:58:11
-
-
- > message_type[0] > nested_type[0] > field[0] > type:
-desc_test_comments.proto:58:12
-desc_test_comments.proto:58:18
-
-
- > message_type[0] > nested_type[0] > field[0] > name:
-desc_test_comments.proto:58:19
-desc_test_comments.proto:58:22
-
-
- > message_type[0] > nested_type[0] > field[0] > number:
-desc_test_comments.proto:58:25
-desc_test_comments.proto:58:26
-
-
- > message_type[0] > nested_type[0] > field[1]:
-desc_test_comments.proto:59:3
-desc_test_comments.proto:59:26
-
-
- > message_type[0] > nested_type[0] > field[1] > label:
 desc_test_comments.proto:59:3
 desc_test_comments.proto:59:11
 
 
- > message_type[0] > nested_type[0] > field[1] > type:
+ > message_type[0] > nested_type[0] > field[0] > type:
 desc_test_comments.proto:59:12
-desc_test_comments.proto:59:17
+desc_test_comments.proto:59:18
+
+
+ > message_type[0] > nested_type[0] > field[0] > name:
+desc_test_comments.proto:59:19
+desc_test_comments.proto:59:22
+
+
+ > message_type[0] > nested_type[0] > field[0] > number:
+desc_test_comments.proto:59:25
+desc_test_comments.proto:59:26
+
+
+ > message_type[0] > nested_type[0] > field[1]:
+desc_test_comments.proto:60:3
+desc_test_comments.proto:60:26
+
+
+ > message_type[0] > nested_type[0] > field[1] > label:
+desc_test_comments.proto:60:3
+desc_test_comments.proto:60:11
+
+
+ > message_type[0] > nested_type[0] > field[1] > type:
+desc_test_comments.proto:60:12
+desc_test_comments.proto:60:17
 
 
  > message_type[0] > nested_type[0] > field[1] > name:
-desc_test_comments.proto:59:18
-desc_test_comments.proto:59:21
+desc_test_comments.proto:60:18
+desc_test_comments.proto:60:21
 
 
  > message_type[0] > nested_type[0] > field[1] > number:
-desc_test_comments.proto:59:24
-desc_test_comments.proto:59:25
+desc_test_comments.proto:60:24
+desc_test_comments.proto:60:25
 
 
  > message_type[0] > nested_type[0] > options > no_standard_descriptor_accessor:
-desc_test_comments.proto:61:3
-desc_test_comments.proto:61:50
+desc_test_comments.proto:62:3
+desc_test_comments.proto:62:50
 
 
  > message_type[0] > nested_type[0] > field[2]:
-desc_test_comments.proto:64:3
-desc_test_comments.proto:64:27
+desc_test_comments.proto:65:3
+desc_test_comments.proto:65:27
     Leading comments:
  Leading comment...
     Trailing comments:
@@ -446,346 +454,353 @@ desc_test_comments.proto:64:27
 
 
  > message_type[0] > nested_type[0] > field[2] > label:
-desc_test_comments.proto:64:3
-desc_test_comments.proto:64:11
+desc_test_comments.proto:65:3
+desc_test_comments.proto:65:11
 
 
  > message_type[0] > nested_type[0] > field[2] > type:
-desc_test_comments.proto:64:12
-desc_test_comments.proto:64:18
+desc_test_comments.proto:65:12
+desc_test_comments.proto:65:18
 
 
  > message_type[0] > nested_type[0] > field[2] > name:
-desc_test_comments.proto:64:19
-desc_test_comments.proto:64:22
+desc_test_comments.proto:65:19
+desc_test_comments.proto:65:22
 
 
  > message_type[0] > nested_type[0] > field[2] > number:
-desc_test_comments.proto:64:25
-desc_test_comments.proto:64:26
+desc_test_comments.proto:65:25
+desc_test_comments.proto:65:26
 
 
  > message_type[0] > enum_type:
-desc_test_comments.proto:68:2
-desc_test_comments.proto:88:3
+desc_test_comments.proto:69:2
+desc_test_comments.proto:90:3
 
 
  > message_type[0] > enum_type[0]:
-desc_test_comments.proto:68:2
-desc_test_comments.proto:88:3
+desc_test_comments.proto:69:2
+desc_test_comments.proto:90:3
 
 
  > message_type[0] > enum_type[0] > name:
-desc_test_comments.proto:68:7
-desc_test_comments.proto:68:22
+desc_test_comments.proto:69:7
+desc_test_comments.proto:69:22
     Trailing comments:
  "super"!
 
 
- > message_type[0] > enum_type[0] > value:
+ > message_type[0] > enum_type[0] > options:
 desc_test_comments.proto:72:3
-desc_test_comments.proto:85:17
+desc_test_comments.proto:89:36
+
+
+ > message_type[0] > enum_type[0] > options > allow_alias:
+desc_test_comments.proto:72:3
+desc_test_comments.proto:72:29
+    Leading comments:
+ allow_alias comments!
+
+
+ > message_type[0] > enum_type[0] > value:
+desc_test_comments.proto:74:3
+desc_test_comments.proto:87:17
 
 
  > message_type[0] > enum_type[0] > value[0]:
-desc_test_comments.proto:72:3
-desc_test_comments.proto:72:72
+desc_test_comments.proto:74:3
+desc_test_comments.proto:74:72
 
 
  > message_type[0] > enum_type[0] > value[0] > name:
-desc_test_comments.proto:72:3
-desc_test_comments.proto:72:8
-
-
- > message_type[0] > enum_type[0] > value[0] > number:
-desc_test_comments.proto:72:11
-desc_test_comments.proto:72:12
-
-
- > message_type[0] > enum_type[0] > value[0] > options:
-desc_test_comments.proto:72:14
-desc_test_comments.proto:72:70
-
-
- > message_type[0] > enum_type[0] > value[0] > options > evfubars:
-desc_test_comments.proto:72:14
-desc_test_comments.proto:72:42
-
-
- > message_type[0] > enum_type[0] > value[0] > options > evfubar:
-desc_test_comments.proto:72:44
-desc_test_comments.proto:72:70
-
-
- > message_type[0] > enum_type[0] > value[1]:
-desc_test_comments.proto:73:3
-desc_test_comments.proto:73:86
-
-
- > message_type[0] > enum_type[0] > value[1] > name:
-desc_test_comments.proto:73:3
-desc_test_comments.proto:73:8
-
-
- > message_type[0] > enum_type[0] > value[1] > number:
-desc_test_comments.proto:73:11
-desc_test_comments.proto:73:12
-
-
- > message_type[0] > enum_type[0] > value[1] > options:
-desc_test_comments.proto:73:15
-desc_test_comments.proto:73:84
-
-
- > message_type[0] > enum_type[0] > value[1] > options > evfubaruf:
-desc_test_comments.proto:73:15
-desc_test_comments.proto:73:43
-
-
- > message_type[0] > enum_type[0] > value[1] > options > evfubaru:
-desc_test_comments.proto:73:59
-desc_test_comments.proto:73:84
-
-
- > message_type[0] > enum_type[0] > value[2]:
-desc_test_comments.proto:74:3
-desc_test_comments.proto:74:13
-
-
- > message_type[0] > enum_type[0] > value[2] > name:
 desc_test_comments.proto:74:3
 desc_test_comments.proto:74:8
 
 
- > message_type[0] > enum_type[0] > value[2] > number:
+ > message_type[0] > enum_type[0] > value[0] > number:
 desc_test_comments.proto:74:11
 desc_test_comments.proto:74:12
 
 
- > message_type[0] > enum_type[0] > value[3]:
+ > message_type[0] > enum_type[0] > value[0] > options:
+desc_test_comments.proto:74:14
+desc_test_comments.proto:74:70
+
+
+ > message_type[0] > enum_type[0] > value[0] > options > evfubars:
+desc_test_comments.proto:74:14
+desc_test_comments.proto:74:42
+
+
+ > message_type[0] > enum_type[0] > value[0] > options > evfubar:
+desc_test_comments.proto:74:44
+desc_test_comments.proto:74:70
+
+
+ > message_type[0] > enum_type[0] > value[1]:
 desc_test_comments.proto:75:3
-desc_test_comments.proto:75:14
+desc_test_comments.proto:75:86
+
+
+ > message_type[0] > enum_type[0] > value[1] > name:
+desc_test_comments.proto:75:3
+desc_test_comments.proto:75:8
+
+
+ > message_type[0] > enum_type[0] > value[1] > number:
+desc_test_comments.proto:75:11
+desc_test_comments.proto:75:12
+
+
+ > message_type[0] > enum_type[0] > value[1] > options:
+desc_test_comments.proto:75:15
+desc_test_comments.proto:75:84
+
+
+ > message_type[0] > enum_type[0] > value[1] > options > evfubaruf:
+desc_test_comments.proto:75:15
+desc_test_comments.proto:75:43
+
+
+ > message_type[0] > enum_type[0] > value[1] > options > evfubaru:
+desc_test_comments.proto:75:59
+desc_test_comments.proto:75:84
+
+
+ > message_type[0] > enum_type[0] > value[2]:
+desc_test_comments.proto:76:3
+desc_test_comments.proto:76:13
+
+
+ > message_type[0] > enum_type[0] > value[2] > name:
+desc_test_comments.proto:76:3
+desc_test_comments.proto:76:8
+
+
+ > message_type[0] > enum_type[0] > value[2] > number:
+desc_test_comments.proto:76:11
+desc_test_comments.proto:76:12
+
+
+ > message_type[0] > enum_type[0] > value[3]:
+desc_test_comments.proto:77:3
+desc_test_comments.proto:77:14
 
 
  > message_type[0] > enum_type[0] > value[3] > name:
-desc_test_comments.proto:75:3
-desc_test_comments.proto:75:9
+desc_test_comments.proto:77:3
+desc_test_comments.proto:77:9
 
 
  > message_type[0] > enum_type[0] > value[3] > number:
-desc_test_comments.proto:75:12
-desc_test_comments.proto:75:13
-
-
- > message_type[0] > enum_type[0] > options:
-desc_test_comments.proto:77:3
-desc_test_comments.proto:87:36
+desc_test_comments.proto:77:12
+desc_test_comments.proto:77:13
 
 
  > message_type[0] > enum_type[0] > options > efubars:
-desc_test_comments.proto:77:3
-desc_test_comments.proto:77:38
+desc_test_comments.proto:79:3
+desc_test_comments.proto:79:38
 
 
  > message_type[0] > enum_type[0] > value[4]:
-desc_test_comments.proto:79:3
-desc_test_comments.proto:79:13
+desc_test_comments.proto:81:3
+desc_test_comments.proto:81:13
 
 
  > message_type[0] > enum_type[0] > value[4] > name:
-desc_test_comments.proto:79:3
-desc_test_comments.proto:79:8
+desc_test_comments.proto:81:3
+desc_test_comments.proto:81:8
 
 
  > message_type[0] > enum_type[0] > value[4] > number:
-desc_test_comments.proto:79:11
-desc_test_comments.proto:79:12
+desc_test_comments.proto:81:11
+desc_test_comments.proto:81:12
 
 
  > message_type[0] > enum_type[0] > value[5]:
-desc_test_comments.proto:80:3
-desc_test_comments.proto:80:15
+desc_test_comments.proto:82:3
+desc_test_comments.proto:82:15
 
 
  > message_type[0] > enum_type[0] > value[5] > name:
-desc_test_comments.proto:80:3
-desc_test_comments.proto:80:10
+desc_test_comments.proto:82:3
+desc_test_comments.proto:82:10
 
 
  > message_type[0] > enum_type[0] > value[5] > number:
-desc_test_comments.proto:80:13
-desc_test_comments.proto:80:14
-
-
- > message_type[0] > enum_type[0] > value[6]:
-desc_test_comments.proto:81:3
-desc_test_comments.proto:81:46
-
-
- > message_type[0] > enum_type[0] > value[6] > name:
-desc_test_comments.proto:81:3
-desc_test_comments.proto:81:10
-
-
- > message_type[0] > enum_type[0] > value[6] > number:
-desc_test_comments.proto:81:13
-desc_test_comments.proto:81:14
-
-
- > message_type[0] > enum_type[0] > value[6] > options:
-desc_test_comments.proto:81:16
-desc_test_comments.proto:81:44
-
-
- > message_type[0] > enum_type[0] > value[6] > options > evfubarsf:
-desc_test_comments.proto:81:16
-desc_test_comments.proto:81:44
-
-
- > message_type[0] > enum_type[0] > value[7]:
-desc_test_comments.proto:82:3
+desc_test_comments.proto:82:13
 desc_test_comments.proto:82:14
 
 
+ > message_type[0] > enum_type[0] > value[6]:
+desc_test_comments.proto:83:3
+desc_test_comments.proto:83:46
+
+
+ > message_type[0] > enum_type[0] > value[6] > name:
+desc_test_comments.proto:83:3
+desc_test_comments.proto:83:10
+
+
+ > message_type[0] > enum_type[0] > value[6] > number:
+desc_test_comments.proto:83:13
+desc_test_comments.proto:83:14
+
+
+ > message_type[0] > enum_type[0] > value[6] > options:
+desc_test_comments.proto:83:16
+desc_test_comments.proto:83:44
+
+
+ > message_type[0] > enum_type[0] > value[6] > options > evfubarsf:
+desc_test_comments.proto:83:16
+desc_test_comments.proto:83:44
+
+
+ > message_type[0] > enum_type[0] > value[7]:
+desc_test_comments.proto:84:3
+desc_test_comments.proto:84:14
+
+
  > message_type[0] > enum_type[0] > value[7] > name:
-desc_test_comments.proto:82:3
-desc_test_comments.proto:82:9
+desc_test_comments.proto:84:3
+desc_test_comments.proto:84:9
 
 
  > message_type[0] > enum_type[0] > value[7] > number:
-desc_test_comments.proto:82:12
-desc_test_comments.proto:82:13
-
-
- > message_type[0] > enum_type[0] > value[8]:
-desc_test_comments.proto:83:3
-desc_test_comments.proto:83:17
-
-
- > message_type[0] > enum_type[0] > value[8] > name:
-desc_test_comments.proto:83:3
-desc_test_comments.proto:83:12
-
-
- > message_type[0] > enum_type[0] > value[8] > number:
-desc_test_comments.proto:83:15
-desc_test_comments.proto:83:16
-
-
- > message_type[0] > enum_type[0] > value[9]:
-desc_test_comments.proto:84:3
+desc_test_comments.proto:84:12
 desc_test_comments.proto:84:13
 
 
- > message_type[0] > enum_type[0] > value[9] > name:
-desc_test_comments.proto:84:3
-desc_test_comments.proto:84:8
-
-
- > message_type[0] > enum_type[0] > value[9] > number:
-desc_test_comments.proto:84:11
-desc_test_comments.proto:84:12
-
-
- > message_type[0] > enum_type[0] > value[10]:
+ > message_type[0] > enum_type[0] > value[8]:
 desc_test_comments.proto:85:3
 desc_test_comments.proto:85:17
 
 
- > message_type[0] > enum_type[0] > value[10] > name:
+ > message_type[0] > enum_type[0] > value[8] > name:
 desc_test_comments.proto:85:3
-desc_test_comments.proto:85:9
-
-
- > message_type[0] > enum_type[0] > value[10] > number:
 desc_test_comments.proto:85:12
+
+
+ > message_type[0] > enum_type[0] > value[8] > number:
+desc_test_comments.proto:85:15
 desc_test_comments.proto:85:16
 
 
- > message_type[0] > enum_type[0] > options > efubar:
+ > message_type[0] > enum_type[0] > value[9]:
+desc_test_comments.proto:86:3
+desc_test_comments.proto:86:13
+
+
+ > message_type[0] > enum_type[0] > value[9] > name:
+desc_test_comments.proto:86:3
+desc_test_comments.proto:86:8
+
+
+ > message_type[0] > enum_type[0] > value[9] > number:
+desc_test_comments.proto:86:11
+desc_test_comments.proto:86:12
+
+
+ > message_type[0] > enum_type[0] > value[10]:
 desc_test_comments.proto:87:3
-desc_test_comments.proto:87:36
+desc_test_comments.proto:87:17
+
+
+ > message_type[0] > enum_type[0] > value[10] > name:
+desc_test_comments.proto:87:3
+desc_test_comments.proto:87:9
+
+
+ > message_type[0] > enum_type[0] > value[10] > number:
+desc_test_comments.proto:87:12
+desc_test_comments.proto:87:16
+
+
+ > message_type[0] > enum_type[0] > options > efubar:
+desc_test_comments.proto:89:3
+desc_test_comments.proto:89:36
 
 
  > extension[0] > extendee:
-desc_test_comments.proto:94:1
-desc_test_comments.proto:94:8
+desc_test_comments.proto:96:1
+desc_test_comments.proto:96:8
     Leading comments:
  extendee comment
 
 
  > extension[1] > extendee:
-desc_test_comments.proto:94:1
-desc_test_comments.proto:94:8
+desc_test_comments.proto:96:1
+desc_test_comments.proto:96:8
 
 
  > extension:
-desc_test_comments.proto:96:2
-desc_test_comments.proto:98:30
+desc_test_comments.proto:98:2
+desc_test_comments.proto:100:30
 
 
  > extension[0]:
-desc_test_comments.proto:96:2
-desc_test_comments.proto:96:30
+desc_test_comments.proto:98:2
+desc_test_comments.proto:98:30
     Leading comments:
  comment for guid1
 
 
  > extension[0] > label:
-desc_test_comments.proto:96:2
-desc_test_comments.proto:96:10
+desc_test_comments.proto:98:2
+desc_test_comments.proto:98:10
 
 
  > extension[0] > type:
-desc_test_comments.proto:96:11
-desc_test_comments.proto:96:17
+desc_test_comments.proto:98:11
+desc_test_comments.proto:98:17
 
 
  > extension[0] > name:
-desc_test_comments.proto:96:18
-desc_test_comments.proto:96:23
+desc_test_comments.proto:98:18
+desc_test_comments.proto:98:23
 
 
  > extension[0] > number:
-desc_test_comments.proto:96:26
-desc_test_comments.proto:96:29
+desc_test_comments.proto:98:26
+desc_test_comments.proto:98:29
 
 
  > extension[1]:
-desc_test_comments.proto:98:2
-desc_test_comments.proto:98:30
+desc_test_comments.proto:100:2
+desc_test_comments.proto:100:30
     Leading comments:
  ... and a comment for guid2
 
 
  > extension[1] > label:
-desc_test_comments.proto:98:2
-desc_test_comments.proto:98:10
+desc_test_comments.proto:100:2
+desc_test_comments.proto:100:10
 
 
  > extension[1] > type:
-desc_test_comments.proto:98:11
-desc_test_comments.proto:98:17
+desc_test_comments.proto:100:11
+desc_test_comments.proto:100:17
 
 
  > extension[1] > name:
-desc_test_comments.proto:98:18
-desc_test_comments.proto:98:23
+desc_test_comments.proto:100:18
+desc_test_comments.proto:100:23
 
 
  > extension[1] > number:
-desc_test_comments.proto:98:26
-desc_test_comments.proto:98:29
+desc_test_comments.proto:100:26
+desc_test_comments.proto:100:29
 
 
  > service:
-desc_test_comments.proto:103:1
-desc_test_comments.proto:119:2
+desc_test_comments.proto:105:1
+desc_test_comments.proto:123:2
 
 
  > service[0]:
-desc_test_comments.proto:103:1
-desc_test_comments.proto:119:2
+desc_test_comments.proto:105:1
+desc_test_comments.proto:123:2
     Leading comments:
  Service comment
     Trailing comments:
@@ -793,57 +808,63 @@ desc_test_comments.proto:119:2
 
 
  > service[0] > name:
-desc_test_comments.proto:103:28
-desc_test_comments.proto:103:38
+desc_test_comments.proto:105:28
+desc_test_comments.proto:105:38
     Leading comments:
  service name 
 
 
  > service[0] > options:
-desc_test_comments.proto:104:2
-desc_test_comments.proto:108:38
+desc_test_comments.proto:107:2
+desc_test_comments.proto:112:38
 
 
  > service[0] > options > sfubar:
-desc_test_comments.proto:104:2
-desc_test_comments.proto:105:40
+desc_test_comments.proto:107:2
+desc_test_comments.proto:109:40
 
 
  > service[0] > options > sfubar > id:
-desc_test_comments.proto:104:2
-desc_test_comments.proto:104:36
+desc_test_comments.proto:107:2
+desc_test_comments.proto:107:36
+    Leading comments:
+ option that sets field
 
 
  > service[0] > options > sfubar > name:
-desc_test_comments.proto:105:2
-desc_test_comments.proto:105:40
+desc_test_comments.proto:109:2
+desc_test_comments.proto:109:40
+    Leading comments:
+ another option that sets field
 
 
  > service[0] > options > deprecated:
-desc_test_comments.proto:106:2
-desc_test_comments.proto:106:28
+desc_test_comments.proto:110:2
+desc_test_comments.proto:110:28
+    Trailing comments:
+ DEPRECATED!
 
 
  > service[0] > options > sfubare:
-desc_test_comments.proto:108:2
-desc_test_comments.proto:108:38
+desc_test_comments.proto:112:2
+desc_test_comments.proto:112:38
 
 
  > service[0] > method:
-desc_test_comments.proto:111:2
-desc_test_comments.proto:118:3
+desc_test_comments.proto:115:2
+desc_test_comments.proto:122:3
 
 
  > service[0] > method[0]:
-desc_test_comments.proto:111:2
-desc_test_comments.proto:112:70
+desc_test_comments.proto:115:2
+desc_test_comments.proto:116:70
     Leading comments:
  Method comment
 
 
  > service[0] > method[0] > name:
-desc_test_comments.proto:111:21
-desc_test_comments.proto:111:33
+desc_test_comments.proto:115:21
+desc_test_comments.proto:115:33
     Leading comments:
  rpc name 
     Trailing comments:
@@ -851,69 +872,69 @@ desc_test_comments.proto:111:33
 
 
  > service[0] > method[0] > client_streaming:
-desc_test_comments.proto:111:66
-desc_test_comments.proto:111:72
+desc_test_comments.proto:115:66
+desc_test_comments.proto:115:72
     Leading comments:
  comment B 
 
 
  > service[0] > method[0] > input_type:
-desc_test_comments.proto:111:89
-desc_test_comments.proto:111:96
+desc_test_comments.proto:115:89
+desc_test_comments.proto:115:96
     Leading comments:
  comment C 
 
 
  > service[0] > method[0] > output_type:
-desc_test_comments.proto:112:43
-desc_test_comments.proto:112:50
+desc_test_comments.proto:116:43
+desc_test_comments.proto:116:50
     Leading comments:
 comment E 
 
 
  > service[0] > method[1]:
-desc_test_comments.proto:114:2
-desc_test_comments.proto:118:3
+desc_test_comments.proto:118:2
+desc_test_comments.proto:122:3
 
 
  > service[0] > method[1] > name:
-desc_test_comments.proto:114:6
-desc_test_comments.proto:114:14
+desc_test_comments.proto:118:6
+desc_test_comments.proto:118:14
 
 
  > service[0] > method[1] > input_type:
-desc_test_comments.proto:114:16
-desc_test_comments.proto:114:23
+desc_test_comments.proto:118:16
+desc_test_comments.proto:118:23
 
 
  > service[0] > method[1] > output_type:
-desc_test_comments.proto:114:34
-desc_test_comments.proto:114:55
+desc_test_comments.proto:118:34
+desc_test_comments.proto:118:55
 
 
  > service[0] > method[1] > options:
-desc_test_comments.proto:115:3
-desc_test_comments.proto:117:42
+desc_test_comments.proto:119:3
+desc_test_comments.proto:121:42
 
 
  > service[0] > method[1] > options > deprecated:
-desc_test_comments.proto:115:3
-desc_test_comments.proto:115:28
+desc_test_comments.proto:119:3
+desc_test_comments.proto:119:28
 
 
  > service[0] > method[1] > options > mtfubar:
-desc_test_comments.proto:116:3
-desc_test_comments.proto:116:39
+desc_test_comments.proto:120:3
+desc_test_comments.proto:120:39
 
 
  > service[0] > method[1] > options > mtfubar[0]:
-desc_test_comments.proto:116:3
-desc_test_comments.proto:116:39
+desc_test_comments.proto:120:3
+desc_test_comments.proto:120:39
 
 
  > service[0] > method[1] > options > mtfubard:
-desc_test_comments.proto:117:3
-desc_test_comments.proto:117:42
+desc_test_comments.proto:121:3
+desc_test_comments.proto:121:42
 ---- desc_test_options.proto ----
 
 

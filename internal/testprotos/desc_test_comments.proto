@@ -23,13 +23,13 @@ import "desc_test_options.proto";
 
 // We need a request for our RPC service below.
 message /* detached message name */ /* request with a capital R */ Request // trailer
-{	option deprecated = true;
+{	option deprecated = true; // deprecated!
 
 	// A field comment
 	repeated int32 ids = /* detached tag */ /* tag numero uno */ 1 /* tag trailer
 		that spans multiple lines...
 		more than two. */
-	  [packed=true, json_name="|foo|", (testprotos.ffubar)="abc", (testprotos.ffubarb)="xyz"];
+	  [packed=true /* packed! */, json_name="|foo|" /* custom JSON! */, (testprotos.ffubar)="abc", (testprotos.ffubarb)="xyz"];
 	// field trailer #1...
 
 	/* lead mfubar */ option (testprotos.mfubar) = true; // trailing mfubar
@@ -53,6 +53,7 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 
 	// Group comment
 	optional group /* group name */ Extras = 3 {
+		// this is a custom option
 		option (testprotos.mfubar) = false;
 
 		optional double dbl = 1;
@@ -67,6 +68,7 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 
 	enum MarioCharacters // "super"!
 	{
+		// allow_alias comments!
 		option allow_alias = true;
 
 		MARIO = 1 [(testprotos.evfubars) = -314, (testprotos.evfubar) = 278];
@@ -101,9 +103,11 @@ Request {
 
 // Service comment
 service /* service name */ RpcService {
+	// option that sets field
 	option(testprotos.sfubar).id= 100;
+	// another option that sets field
 	option(testprotos.sfubar).name= "bob";
-	option deprecated = false;
+	option deprecated = false; // DEPRECATED!
 
 	option (testprotos.sfubare) = VALUE;
 

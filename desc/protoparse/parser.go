@@ -1279,18 +1279,17 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDescriptorProto) error {
 	scope := fmt.Sprintf("enum %s%s", prefix, ed.GetName())
 
+	allowAlias := false
 	if index, err := findOption(res, scope, ed.Options.GetUninterpretedOption(), "allow_alias"); err != nil {
 		return err
 	} else if index >= 0 {
 		opt := ed.Options.UninterpretedOption[index]
-		ed.Options.UninterpretedOption = removeOption(ed.Options.UninterpretedOption, index)
 		valid := false
 		if opt.IdentifierValue != nil {
 			if opt.GetIdentifierValue() == "true" {
-				ed.Options.AllowAlias = proto.Bool(true)
+				allowAlias = true
 				valid = true
 			} else if opt.GetIdentifierValue() == "false" {
-				ed.Options.AllowAlias = proto.Bool(false)
 				valid = true
 			}
 		}
@@ -1305,7 +1304,7 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 		return ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: proto3 requires that first value in enum have numeric value of 0", scope)}
 	}
 
-	if !ed.Options.GetAllowAlias() {
+	if !allowAlias {
 		// make sure all value numbers are distinct
 		vals := map[int32]string{}
 		for _, evd := range ed.Value {
