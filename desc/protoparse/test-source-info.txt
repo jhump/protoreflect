@@ -488,6 +488,18 @@ desc_test_comments.proto:69:22
  "super"!
 
 
+ > message_type[0] > enum_type[0] > options:
+desc_test_comments.proto:72:3
+desc_test_comments.proto:89:36
+
+
+ > message_type[0] > enum_type[0] > options > allow_alias:
+desc_test_comments.proto:72:3
+desc_test_comments.proto:72:29
+    Leading comments:
+ allow_alias comments!
+
+
  > message_type[0] > enum_type[0] > value:
 desc_test_comments.proto:74:3
 desc_test_comments.proto:87:17
@@ -581,11 +593,6 @@ desc_test_comments.proto:77:9
  > message_type[0] > enum_type[0] > value[3] > number:
 desc_test_comments.proto:77:12
 desc_test_comments.proto:77:13
-
-
- > message_type[0] > enum_type[0] > options:
-desc_test_comments.proto:79:3
-desc_test_comments.proto:89:36
 
 
  > message_type[0] > enum_type[0] > options > efubars:
