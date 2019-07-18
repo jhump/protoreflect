@@ -385,7 +385,10 @@ func parseProtoFiles(acc FileAccessor, filenames []string, recursive, validate b
 			}
 		} else if d, ok := standardImports[name]; ok {
 			// it's a well-known import
-			parsed[name] = &parseResult{fd: d}
+			// (we clone it to make sure we're not sharing state with other
+			//  parsers, which could result in unsafe races if multiple
+			//  parsers are trying to access it concurrently)
+			parsed[name] = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
 		} else {
 			return err
 		}
