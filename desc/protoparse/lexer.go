@@ -115,6 +115,25 @@ func (l *protoLex) cur() *SourcePos {
 	}
 }
 
+func (l *protoLex) adjustPos(consumedChars ...rune) {
+	for _, c := range consumedChars {
+		switch c {
+		case '\n':
+			// new line, back to first column
+			l.colNo = 0
+			l.lineNo++
+		case '\r':
+			// no adjustment
+		case '\t':
+			// advance to next tab stop
+			mod := l.colNo % 8
+			l.colNo += 8 - mod
+		default:
+			l.colNo++
+		}
+	}
+}
+
 func (l *protoLex) prev() *SourcePos {
 	if l.prevSym == nil {
 		return &SourcePos{
@@ -274,15 +293,8 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 		prevOffset = l.offset
 
 		l.offset += n
-		if c == '\n' {
-			l.colNo = 0
-			l.lineNo++
-			continue
-		} else if c == '\r' {
-			continue
-		}
-		l.colNo++
-		if c == ' ' || c == '\t' {
+		l.adjustPos(c)
+		if strings.ContainsRune("\n\r\t ", c) {
 			continue
 		}
 
@@ -294,14 +306,14 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 				return int(c)
 			}
 			if cn == '_' || (cn >= 'a' && cn <= 'z') || (cn >= 'A' && cn <= 'Z') {
-				l.colNo++
+				l.adjustPos(cn)
 				token := []rune{c, cn}
 				token = l.readIdentifier(token)
 				setIdent(string(token), identTypeName)
 				return _TYPENAME
 			}
 			if cn >= '0' && cn <= '9' {
-				l.colNo++
+				l.adjustPos(cn)
 				token := []rune{c, cn}
 				token = l.readNumber(token, false, true)
 				f, err := strconv.ParseFloat(string(token), 64)
@@ -351,7 +363,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 					}
 					if (cnn >= '0' && cnn <= '9') || (cnn >= 'a' && cnn <= 'f') || (cnn >= 'A' && cnn <= 'F') {
 						// hexadecimal!
-						l.colNo += 2
+						l.adjustPos(cn, cnn)
 						token := []rune{cnn}
 						token = l.readHexNumber(token)
 						ui, err := strconv.ParseUint(string(token), 16, 64)
@@ -412,19 +424,21 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 				return int(c)
 			}
 			if cn == '/' {
-				l.colNo++
+				l.adjustPos(cn)
 				hitNewline, txt := l.skipToEndOfLineComment()
 				commentPos := pos()
 				commentPos.end.Col++
 				if hitNewline {
-					l.colNo = 0
-					l.lineNo++
+					// we don't do this inside of skipToEndOfLineComment
+					// because we want to know the length of previous
+					// line for calculation above
+					l.adjustPos('\n')
 				}
 				comments = append(comments, &comment{posRange: commentPos, text: txt})
 				continue
 			}
 			if cn == '*' {
-				l.colNo++
+				l.adjustPos(cn)
 				if txt, ok := l.skipToEndOfBlockComment(); !ok {
 					setError(errors.New("block comment never terminates, unexpected EOF"))
 					return _ERROR
@@ -464,7 +478,7 @@ func (l *protoLex) readNumber(sofar []rune, allowDot bool, allowExp bool) []rune
 				l.input.unreadRune(c)
 				break
 			}
-			l.colNo++
+			l.adjustPos(c)
 			token = append(token, c)
 			c = cn
 		} else if c == 'e' || c == 'E' {
@@ -491,23 +505,22 @@ func (l *protoLex) readNumber(sofar []rune, allowDot bool, allowExp bool) []rune
 					l.input.unreadRune(c)
 					break
 				}
-				l.colNo++
+				l.adjustPos(c)
 				token = append(token, c)
-				c = cn
-				cn = cnn
+				c, cn = cn, cnn
 			} else if cn < '0' || cn > '9' {
 				l.input.unreadRune(cn)
 				l.input.unreadRune(c)
 				break
 			}
-			l.colNo++
+			l.adjustPos(c)
 			token = append(token, c)
 			c = cn
 		} else if c < '0' || c > '9' {
 			l.input.unreadRune(c)
 			break
 		}
-		l.colNo++
+		l.adjustPos(c)
 		token = append(token, c)
 	}
 	return token
@@ -524,7 +537,7 @@ func (l *protoLex) readHexNumber(sofar []rune) []rune {
 			l.input.unreadRune(c)
 			break
 		}
-		l.colNo++
+		l.adjustPos(c)
 		token = append(token, c)
 	}
 	return token
@@ -548,14 +561,14 @@ func (l *protoLex) readIdentifier(sofar []rune) []rune {
 				l.input.unreadRune(c)
 				break
 			}
-			l.colNo++
+			l.adjustPos(c)
 			token = append(token, c)
 			c = cn
 		} else if c != '_' && (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') {
 			l.input.unreadRune(c)
 			break
 		}
-		l.colNo++
+		l.adjustPos(c)
 		token = append(token, c)
 	}
 	return token
@@ -572,11 +585,9 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 			return "", err
 		}
 		if c == '\n' {
-			l.colNo = 0
-			l.lineNo++
 			return "", errors.New("encountered end-of-line before end of string literal")
 		}
-		l.colNo++
+		l.adjustPos(c)
 		if c == quote {
 			break
 		}
@@ -589,14 +600,14 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			l.colNo++
+			l.adjustPos(c)
 			if c == 'x' || c == 'X' {
 				// hex escape
 				c, _, err := l.input.readRune()
 				if err != nil {
 					return "", err
 				}
-				l.colNo++
+				l.adjustPos(c)
 				c2, _, err := l.input.readRune()
 				if err != nil {
 					return "", err
@@ -606,7 +617,7 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 					l.input.unreadRune(c2)
 					hex = string(c)
 				} else {
-					l.colNo++
+					l.adjustPos(c2)
 					hex = string([]rune{c, c2})
 				}
 				i, err := strconv.ParseInt(hex, 16, 32)
@@ -626,7 +637,7 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 					l.input.unreadRune(c2)
 					octal = string(c)
 				} else {
-					l.colNo++
+					l.adjustPos(c2)
 					c3, _, err := l.input.readRune()
 					if err != nil {
 						return "", err
@@ -635,7 +646,7 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 						l.input.unreadRune(c3)
 						octal = string([]rune{c, c2})
 					} else {
-						l.colNo++
+						l.adjustPos(c3)
 						octal = string([]rune{c, c2, c3})
 					}
 				}
@@ -656,7 +667,7 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 					if err != nil {
 						return "", err
 					}
-					l.colNo++
+					l.adjustPos(c)
 					u[i] = c
 				}
 				i, err := strconv.ParseInt(string(u), 16, 32)
@@ -673,7 +684,7 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 					if err != nil {
 						return "", err
 					}
-					l.colNo++
+					l.adjustPos(c)
 					u[i] = c
 				}
 				i, err := strconv.ParseInt(string(u), 16, 32)
@@ -725,9 +736,9 @@ func (l *protoLex) skipToEndOfLineComment() (bool, string) {
 			return false, string(txt)
 		}
 		if c == '\n' {
-			return true, string(txt)
+			return true, string(append(txt, '\n'))
 		}
-		l.colNo++
+		l.adjustPos(c)
 		txt = append(txt, c)
 	}
 }
@@ -739,12 +750,7 @@ func (l *protoLex) skipToEndOfBlockComment() (string, bool) {
 		if err != nil {
 			return "", false
 		}
-		if c == '\n' {
-			l.colNo = 0
-			l.lineNo++
-		} else {
-			l.colNo++
-		}
+		l.adjustPos(c)
 		txt = append(txt, c)
 		if c == '*' {
 			c, _, err := l.input.readRune()
@@ -752,7 +758,7 @@ func (l *protoLex) skipToEndOfBlockComment() (string, bool) {
 				return "", false
 			}
 			if c == '/' {
-				l.colNo++
+				l.adjustPos(c)
 				txt = append(txt, c)
 				return string(txt), true
 			}

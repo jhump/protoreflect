@@ -425,7 +425,7 @@ func TestParseFilesMessageComments(t *testing.T) {
 	protos, err := p.ParseFiles("../../internal/testprotos/desc_test1.proto")
 	testutil.Ok(t, err)
 	comments := ""
-	expected := " Comment for TestMessage"
+	expected := " Comment for TestMessage\n"
 	for _, p := range protos {
 		msg := p.FindMessage("testprotos.TestMessage")
 		if msg != nil {

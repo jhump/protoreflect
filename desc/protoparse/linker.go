@@ -379,13 +379,17 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 	switch dsc := dsc.(type) {
 	case *dpb.DescriptorProto:
 		fld.TypeName = proto.String("." + fqn)
+		// if type was tentatively unset, we now know it's actually a message
+		if fld.Type == nil {
+			fld.Type = dpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
+		}
 	case *dpb.EnumDescriptorProto:
 		if fld.GetExtendee() == "" && isProto3(fd) && !proto3 {
 			// fields in a proto3 message cannot refer to proto2 enums
 			return ErrorWithSourcePos{Pos: node.fieldType().start(), Underlying: fmt.Errorf("%s: cannot use proto2 enum %s in a proto3 message", scope, fld.GetTypeName())}
 		}
 		fld.TypeName = proto.String("." + fqn)
-		// the type was tentatively set to message, but now we know it's actually an enum
+		// the type was tentatively unset, but now we know it's actually an enum
 		fld.Type = dpb.FieldDescriptorProto_TYPE_ENUM.Enum()
 	default:
 		otherType := descriptorType(dsc)

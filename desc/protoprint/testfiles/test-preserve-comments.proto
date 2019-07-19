@@ -51,6 +51,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   reserved "foo", "bar", "baz";
 
+  // Group comment
   optional group Extras = 3 {
     // this is a custom option
     option (testprotos.mfubar) = false;
@@ -108,6 +109,7 @@ extend /* extendee comment */ Request {
 
 // Service comment
 service /* service name */ RpcService {
+  // option that sets field
   option (testprotos.sfubar) = { id:100 name:"bob"  };
 
   option deprecated = false; // DEPRECATED!

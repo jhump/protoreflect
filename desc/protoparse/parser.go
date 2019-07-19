@@ -447,25 +447,11 @@ func (r *parseResult) getOptionNamePartNode(o *dpb.UninterpretedOption_NamePart)
 	return r.nodes[o]
 }
 
-func (r *parseResult) getMessageNode(m *dpb.DescriptorProto) msgDecl {
-	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
-	}
-	return r.nodes[m].(msgDecl)
-}
-
 func (r *parseResult) getFieldNode(f *dpb.FieldDescriptorProto) fieldDecl {
 	if r.nodes == nil {
 		return noSourceNode{pos: unknownPos(r.fd.GetName())}
 	}
 	return r.nodes[f].(fieldDecl)
-}
-
-func (r *parseResult) getOneOfNode(o *dpb.OneofDescriptorProto) node {
-	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
-	}
-	return r.nodes[o]
 }
 
 func (r *parseResult) getExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange) rangeDecl {
@@ -482,13 +468,6 @@ func (r *parseResult) getMessageReservedRangeNode(rr *dpb.DescriptorProto_Reserv
 	return r.nodes[rr].(rangeDecl)
 }
 
-func (r *parseResult) getEnumNode(e *dpb.EnumDescriptorProto) node {
-	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
-	}
-	return r.nodes[e]
-}
-
 func (r *parseResult) getEnumValueNode(e *dpb.EnumValueDescriptorProto) enumValueDecl {
 	if r.nodes == nil {
 		return noSourceNode{pos: unknownPos(r.fd.GetName())}
@@ -501,13 +480,6 @@ func (r *parseResult) getEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumR
 		return noSourceNode{pos: unknownPos(r.fd.GetName())}
 	}
 	return r.nodes[rr].(rangeDecl)
-}
-
-func (r *parseResult) getServiceNode(s *dpb.ServiceDescriptorProto) node {
-	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
-	}
-	return r.nodes[s]
 }
 
 func (r *parseResult) getMethodNode(m *dpb.MethodDescriptorProto) methodDecl {
@@ -626,7 +598,6 @@ func (r *parseResult) createFileDescriptor(filename string, file *fileNode) erro
 		} else if decl.extend != nil {
 			r.addExtensions(decl.extend, &fd.Extension, &fd.MessageType, isProto3)
 		} else if decl.imp != nil {
-			file.imports = append(file.imports, decl.imp)
 			index := len(fd.Dependency)
 			fd.Dependency = append(fd.Dependency, decl.imp.name.val)
 			if decl.imp.public {
@@ -647,7 +618,6 @@ func (r *parseResult) createFileDescriptor(filename string, file *fileNode) erro
 			if fd.Package != nil {
 				return ErrorWithSourcePos{Pos: decl.pkg.start(), Underlying: errors.New("files should have only one package declaration")}
 			}
-			file.pkg = decl.pkg
 			fd.Package = proto.String(decl.pkg.name.val)
 		}
 	}
@@ -745,10 +715,28 @@ func asLabel(lbl *labelNode) *dpb.FieldDescriptorProto_Label {
 func (r *parseResult) asFieldDescriptor(node *fieldNode) *dpb.FieldDescriptorProto {
 	fd := newFieldDescriptor(node.name.val, node.fldType.val, int32(node.tag.val), asLabel(node.label))
 	r.putFieldNode(fd, node)
-	if len(node.options) > 0 {
-		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(node.options)}
+	if opts := node.options.Elements(); len(opts) > 0 {
+		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	return fd
+}
+
+var fieldTypes = map[string]dpb.FieldDescriptorProto_Type{
+	"double":   dpb.FieldDescriptorProto_TYPE_DOUBLE,
+	"float":    dpb.FieldDescriptorProto_TYPE_FLOAT,
+	"int32":    dpb.FieldDescriptorProto_TYPE_INT32,
+	"int64":    dpb.FieldDescriptorProto_TYPE_INT64,
+	"uint32":   dpb.FieldDescriptorProto_TYPE_UINT32,
+	"uint64":   dpb.FieldDescriptorProto_TYPE_UINT64,
+	"sint32":   dpb.FieldDescriptorProto_TYPE_SINT32,
+	"sint64":   dpb.FieldDescriptorProto_TYPE_SINT64,
+	"fixed32":  dpb.FieldDescriptorProto_TYPE_FIXED32,
+	"fixed64":  dpb.FieldDescriptorProto_TYPE_FIXED64,
+	"sfixed32": dpb.FieldDescriptorProto_TYPE_SFIXED32,
+	"sfixed64": dpb.FieldDescriptorProto_TYPE_SFIXED64,
+	"bool":     dpb.FieldDescriptorProto_TYPE_BOOL,
+	"string":   dpb.FieldDescriptorProto_TYPE_STRING,
+	"bytes":    dpb.FieldDescriptorProto_TYPE_BYTES,
 }
 
 func newFieldDescriptor(name string, fieldType string, tag int32, lbl *dpb.FieldDescriptorProto_Label) *dpb.FieldDescriptorProto {
@@ -758,41 +746,13 @@ func newFieldDescriptor(name string, fieldType string, tag int32, lbl *dpb.Field
 		Number:   proto.Int32(tag),
 		Label:    lbl,
 	}
-	switch fieldType {
-	case "double":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_DOUBLE.Enum()
-	case "float":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_FLOAT.Enum()
-	case "int32":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_INT32.Enum()
-	case "int64":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_INT64.Enum()
-	case "uint32":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_UINT32.Enum()
-	case "uint64":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_UINT64.Enum()
-	case "sint32":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_SINT32.Enum()
-	case "sint64":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_SINT64.Enum()
-	case "fixed32":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_FIXED32.Enum()
-	case "fixed64":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_FIXED64.Enum()
-	case "sfixed32":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_SFIXED32.Enum()
-	case "sfixed64":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_SFIXED64.Enum()
-	case "bool":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_BOOL.Enum()
-	case "string":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_STRING.Enum()
-	case "bytes":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_BYTES.Enum()
-	default:
-		// NB: we don't have enough info to determine whether this is an enum or a message type,
-		// so we'll change it to enum later once we can ascertain if it's an enum reference
-		fd.Type = dpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
+	t, ok := fieldTypes[fieldType]
+	if ok {
+		fd.Type = t.Enum()
+	} else {
+		// NB: we don't have enough info to determine whether this is an enum
+		// or a message type, so we'll leave Type nil and set it later
+		// (during linking)
 		fd.TypeName = proto.String(fieldType)
 	}
 	return fd
@@ -811,7 +771,7 @@ func (r *parseResult) asGroupDescriptors(group *groupNode, isProto3 bool) (*dpb.
 	r.putFieldNode(fd, group)
 	md := &dpb.DescriptorProto{Name: proto.String(group.name.val)}
 	r.putMessageNode(md, group)
-	r.addMessageDecls(md, &group.reserved, group.decls, isProto3)
+	r.addMessageDecls(md, group.decls, isProto3)
 	return fd, md
 }
 
@@ -826,8 +786,8 @@ func (r *parseResult) asMapDescriptors(mapField *mapFieldNode, isProto3 bool) (*
 	r.putFieldNode(valFd, mapField.valueField())
 	entryName := internal.InitCap(internal.JsonName(mapField.name.val)) + "Entry"
 	fd := newFieldDescriptor(mapField.name.val, entryName, int32(mapField.tag.val), dpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
-	if len(mapField.options) > 0 {
-		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(mapField.options)}
+	if opts := mapField.options.Elements(); len(opts) > 0 {
+		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	r.putFieldNode(fd, mapField)
 	md := &dpb.DescriptorProto{
@@ -840,7 +800,7 @@ func (r *parseResult) asMapDescriptors(mapField *mapFieldNode, isProto3 bool) (*
 }
 
 func (r *parseResult) asExtensionRanges(node *extensionRangeNode) []*dpb.DescriptorProto_ExtensionRange {
-	opts := r.asUninterpretedOptions(node.options)
+	opts := r.asUninterpretedOptions(node.options.Elements())
 	ers := make([]*dpb.DescriptorProto_ExtensionRange, len(node.ranges))
 	for i, rng := range node.ranges {
 		er := &dpb.DescriptorProto_ExtensionRange{
@@ -865,8 +825,8 @@ func (r *parseResult) asEnumValue(ev *enumValueNode) *dpb.EnumValueDescriptorPro
 	}
 	evd := &dpb.EnumValueDescriptorProto{Name: proto.String(ev.name.val), Number: proto.Int32(num)}
 	r.putEnumValueNode(evd, ev)
-	if len(ev.options) > 0 {
-		evd.Options = &dpb.EnumValueOptions{UninterpretedOption: r.asUninterpretedOptions(ev.options)}
+	if opts := ev.options.Elements(); len(opts) > 0 {
+		evd.Options = &dpb.EnumValueOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	return evd
 }
@@ -907,7 +867,6 @@ func (r *parseResult) asEnumDescriptor(en *enumNode) *dpb.EnumDescriptorProto {
 			ed.Value = append(ed.Value, r.asEnumValue(decl.value))
 		} else if decl.reserved != nil {
 			for _, n := range decl.reserved.names {
-				en.reserved = append(en.reserved, n)
 				ed.ReservedName = append(ed.ReservedName, n.val)
 			}
 			for _, rng := range decl.reserved.ranges {
@@ -930,11 +889,11 @@ func (r *parseResult) asEnumReservedRange(rng *rangeNode) *dpb.EnumDescriptorPro
 func (r *parseResult) asMessageDescriptor(node *messageNode, isProto3 bool) *dpb.DescriptorProto {
 	msgd := &dpb.DescriptorProto{Name: proto.String(node.name.val)}
 	r.putMessageNode(msgd, node)
-	r.addMessageDecls(msgd, &node.reserved, node.decls, isProto3)
+	r.addMessageDecls(msgd, node.decls, isProto3)
 	return msgd
 }
 
-func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, reservedNames *[]*stringLiteralNode, decls []*messageElement, isProto3 bool) {
+func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messageElement, isProto3 bool) {
 	for _, decl := range decls {
 		if decl.enum != nil {
 			msgd.EnumType = append(msgd.EnumType, r.asEnumDescriptor(decl.enum))
@@ -978,7 +937,6 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, reservedNames *
 			msgd.NestedType = append(msgd.NestedType, r.asMessageDescriptor(decl.nested, isProto3))
 		} else if decl.reserved != nil {
 			for _, n := range decl.reserved.names {
-				*reservedNames = append(*reservedNames, n)
 				msgd.ReservedName = append(msgd.ReservedName, n.val)
 			}
 			for _, rng := range decl.reserved.ranges {
