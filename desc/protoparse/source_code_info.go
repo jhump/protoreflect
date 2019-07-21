@@ -144,7 +144,7 @@ func (r *parseResult) generateSourceCodeInfoForMessage(sci *sourceCodeInfo, n ms
 			r.generateSourceCodeInfoForField(sci, child.mapField, append(path, internal.Message_fieldsTag, fieldIndex))
 			fieldIndex++
 		case child.oneOf != nil:
-			r.generateSourceCodeInfoForOneOf(sci, child.oneOf, &fieldIndex, append(path, internal.Message_fieldsTag), append(path, internal.Message_oneOfsTag, oneOfIndex))
+			r.generateSourceCodeInfoForOneOf(sci, child.oneOf, &fieldIndex, append(path, internal.Message_fieldsTag), append(dup(path), internal.Message_oneOfsTag, oneOfIndex))
 		case child.nested != nil:
 			r.generateSourceCodeInfoForMessage(sci, child.nested, nil, append(path, internal.Message_nestedMessagesTag, nestedMsgIndex))
 			nestedMsgIndex++
