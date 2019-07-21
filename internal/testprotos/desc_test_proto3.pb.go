@@ -9,8 +9,6 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	pkg "github.com/jhump/protoreflect/internal/testprotos/pkg"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -352,23 +350,6 @@ type TestServiceServer interface {
 	DoSomethingElse(TestService_DoSomethingElseServer) error
 	DoSomethingAgain(*pkg.Bar, TestService_DoSomethingAgainServer) error
 	DoSomethingForever(TestService_DoSomethingForeverServer) error
-}
-
-// UnimplementedTestServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedTestServiceServer struct {
-}
-
-func (*UnimplementedTestServiceServer) DoSomething(ctx context.Context, req *TestRequest) (*pkg.Bar, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DoSomething not implemented")
-}
-func (*UnimplementedTestServiceServer) DoSomethingElse(srv TestService_DoSomethingElseServer) error {
-	return status.Errorf(codes.Unimplemented, "method DoSomethingElse not implemented")
-}
-func (*UnimplementedTestServiceServer) DoSomethingAgain(req *pkg.Bar, srv TestService_DoSomethingAgainServer) error {
-	return status.Errorf(codes.Unimplemented, "method DoSomethingAgain not implemented")
-}
-func (*UnimplementedTestServiceServer) DoSomethingForever(srv TestService_DoSomethingForeverServer) error {
-	return status.Errorf(codes.Unimplemented, "method DoSomethingForever not implemented")
 }
 
 func RegisterTestServiceServer(s *grpc.Server, srv TestServiceServer) {

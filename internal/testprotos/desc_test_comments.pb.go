@@ -11,8 +11,6 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -370,17 +368,6 @@ type RpcServiceServer interface {
 	// Method comment
 	StreamingRpc(RpcService_StreamingRpcServer) error
 	UnaryRpc(context.Context, *Request) (*empty.Empty, error)
-}
-
-// UnimplementedRpcServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedRpcServiceServer struct {
-}
-
-func (*UnimplementedRpcServiceServer) StreamingRpc(srv RpcService_StreamingRpcServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamingRpc not implemented")
-}
-func (*UnimplementedRpcServiceServer) UnaryRpc(ctx context.Context, req *Request) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UnaryRpc not implemented")
 }
 
 func RegisterRpcServiceServer(s *grpc.Server, srv RpcServiceServer) {
