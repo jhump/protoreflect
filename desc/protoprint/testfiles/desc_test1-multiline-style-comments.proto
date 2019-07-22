@@ -1,8 +1,8 @@
 syntax = "proto2";
 
-package testprotos;
-
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
+package testprotos;
 
 /* Comment for TestMessage */
 message TestMessage {

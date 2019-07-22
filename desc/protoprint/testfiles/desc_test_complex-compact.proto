@@ -1,7 +1,7 @@
 syntax = "proto2";
 package foo.bar;
-import "google/protobuf/descriptor.proto";
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+import "google/protobuf/descriptor.proto";
 message Simple {
   optional string name = 1;
   optional uint64 id = 2;
@@ -23,8 +23,6 @@ message Test {
       optional int32 fooblez = 20003;
     }
     message _NestedNested {
-      option (fooblez) = 10101;
-      option (rept) = { foo:"goo" [foo.bar.Test.Nested._NestedNested._garblez]:"boo"  };
       enum EEE {
         OK = 0;
         V1 = 1;
@@ -34,9 +32,11 @@ message Test {
         V5 = 5;
         V6 = 6;
       }
+      option (fooblez) = 10101;
       extend Test {
         optional string _garblez = 100;
       }
+      option (rept) = { foo:"goo" [foo.bar.Test.Nested._NestedNested._garblez]:"boo"  };
       message NestedNestedNested {
         option (rept) = { foo:"hoo" [foo.bar.Test.Nested._NestedNested._garblez]:"spoo"  };
         optional Test Test = 1;
@@ -61,11 +61,11 @@ extend google.protobuf.MessageOptions {
   optional Another a = 20020;
 }
 message Another {
-  option (a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765 > m:<key:"bar" value:200 > m:<key:"foo" value:100 > > fff:OK  };
-  option (eee) = V1;
   option (rept) = { foo:"abc" array:1 array:2 array:3 s:<name:"foo" id:123 > r:<name:"f" > r:<name:"s" > r:<id:456 >  };
   option (rept) = { foo:"def" array:3 array:2 array:1 s:<name:"bar" id:321 > r:<name:"g" > r:<name:"s" >  };
   option (rept) = { foo:"def"  };
+  option (eee) = V1;
+  option (a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765 > m:<key:"bar" value:200 > m:<key:"foo" value:100 > > fff:OK  };
   optional Test test = 1;
   optional Test.Nested._NestedNested.EEE fff = 2 [default = V1];
 }
@@ -199,6 +199,6 @@ extend google.protobuf.FieldOptions {
   optional KeywordCollisions boom = 20036;
 }
 message KeywordCollisionOptions {
-  optional uint64 id = 1 [(bool) = true, (bytes) = "bytes", (default) = 222, (double) = 3.141590, (enum) = true, (extend) = true, (extensions) = true, (false) = -111, (fixed32) = 3232, (fixed64) = 6464, (float) = 3.140000, (import) = true, (int32) = 32, (int64) = 64, (message) = true, (option) = true, (optional) = true, (package) = true, (public) = true, (repeated) = true, (required) = true, (reserved) = true, (rpc) = true, (service) = true, (sfixed32) = -3232, (sfixed64) = -6464, (sint32) = -32, (sint64) = -64, (string) = "string", (syntax) = true, (to) = true, (true) = 111, (uint32) = 3200, (uint64) = 6400, (weak) = true];
+  optional uint64 id = 1 [(syntax) = true, (import) = true, (public) = true, (weak) = true, (package) = true, (string) = "string", (bytes) = "bytes", (bool) = true, (float) = 3.140000, (double) = 3.141590, (int32) = 32, (int64) = 64, (uint32) = 3200, (uint64) = 6400, (sint32) = -32, (sint64) = -64, (fixed32) = 3232, (fixed64) = 6464, (sfixed32) = -3232, (sfixed64) = -6464, (optional) = true, (repeated) = true, (required) = true, (message) = true, (enum) = true, (service) = true, (rpc) = true, (option) = true, (extend) = true, (extensions) = true, (reserved) = true, (to) = true, (true) = 111, (false) = -111, (default) = 222];
   optional string name = 2 [(boom) = { syntax:true import:true public:true weak:true package:true string:"string" bytes:"bytes" int32:32 int64:64 uint32:3200 uint64:6400 sint32:-32 sint64:-64 fixed32:3232 fixed64:6464 sfixed32:-3232 sfixed64:-6464 bool:true float:3.14 double:3.14159 optional:true repeated:true required:true message:true enum:true service:true rpc:true option:true extend:true extensions:true reserved:true to:true true:111 false:-111 default:222  }];
 }
