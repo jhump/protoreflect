@@ -9,8 +9,6 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	descriptor "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -1926,17 +1924,6 @@ func (c *testTestServiceClient) Get(ctx context.Context, in *Test, opts ...grpc.
 type TestTestServiceServer interface {
 	UserAuth(context.Context, *Test) (*Test, error)
 	Get(context.Context, *Test) (*Test, error)
-}
-
-// UnimplementedTestTestServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedTestTestServiceServer struct {
-}
-
-func (*UnimplementedTestTestServiceServer) UserAuth(ctx context.Context, req *Test) (*Test, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UserAuth not implemented")
-}
-func (*UnimplementedTestTestServiceServer) Get(ctx context.Context, req *Test) (*Test, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
 
 func RegisterTestTestServiceServer(s *grpc.Server, srv TestTestServiceServer) {

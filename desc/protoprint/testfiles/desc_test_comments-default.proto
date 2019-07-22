@@ -10,23 +10,25 @@ syntax = "proto2"; // Syntax trailer.
 // And now the package declaration
 package foo.bar;
 
+// option comments FTW!!!
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
 import "google/protobuf/empty.proto";
 
 import "desc_test_options.proto";
-
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 // Multiple white space lines (like above) cannot
 // be preserved...
 
 // We need a request for our RPC service below.
 message Request {
-  option deprecated = true;
-
-  option (testprotos.mfubar) = true;
+  option deprecated = true; // deprecated!
 
   // A field comment
-  repeated int32 ids = 1 [json_name = "|foo|", packed = true, (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"]; // field trailer #1...
+  repeated int32 ids = 1 [packed = true, json_name = "|foo|", (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"]; // field trailer #1...
+
+  // lead mfubar
+  option (testprotos.mfubar) = true; // trailing mfubar
 
   // some detached comments
 
@@ -39,7 +41,7 @@ message Request {
 
   extensions 100 to 200;
 
-  extensions 201 to 250 [(testprotos.exfubar) = "splat!", (testprotos.exfubarb) = "\000\001\002\003\004\005\006\007"];
+  extensions 201 to 250 [(testprotos.exfubarb) = "\000\001\002\003\004\005\006\007", (testprotos.exfubar) = "splat!"];
 
   reserved 10 to 20, 30 to 50;
 
@@ -47,32 +49,32 @@ message Request {
 
   // Group comment
   optional group Extras = 3 {
-    option no_standard_descriptor_accessor = false;
-
+    // this is a custom option
     option (testprotos.mfubar) = false;
 
     optional double dbl = 1;
 
     optional float flt = 2;
 
+    option no_standard_descriptor_accessor = false;
+
     // Leading comment...
     optional string str = 3; // Trailing comment...
   }
 
   enum MarioCharacters {
+    // allow_alias comments!
     option allow_alias = true;
 
-    option (testprotos.efubar) = 123;
+    MARIO = 1 [(testprotos.evfubars) = -314, (testprotos.evfubar) = 278];
 
-    option (testprotos.efubars) = -321;
-
-    MARIO = 1 [(testprotos.evfubar) = 278, (testprotos.evfubars) = -314];
-
-    LUIGI = 2 [(testprotos.evfubaru) = 200, (testprotos.evfubaruf) = 100];
+    LUIGI = 2 [(testprotos.evfubaruf) = 100, (testprotos.evfubaru) = 200];
 
     PEACH = 3;
 
     BOWSER = 4;
+
+    option (testprotos.efubars) = -321;
 
     WARIO = 5;
 
@@ -87,6 +89,8 @@ message Request {
     KAMEK = 8;
 
     SNIFIT = -101;
+
+    option (testprotos.efubar) = 123;
   }
 }
 
@@ -100,9 +104,10 @@ extend Request {
 
 // Service comment
 service RpcService {
-  option deprecated = false;
-
+  // option that sets field
   option (testprotos.sfubar) = { id:100 name:"bob"  };
+
+  option deprecated = false; // DEPRECATED!
 
   option (testprotos.sfubare) = VALUE;
 
