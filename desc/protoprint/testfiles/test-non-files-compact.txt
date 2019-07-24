@@ -4,6 +4,8 @@ package foo.bar;
 import "desc_test_options.proto";
 import "google/protobuf/empty.proto";
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+message AnEmptyMessage {
+}
 // We need a request for our RPC service below.
 message Request {
   option deprecated = true;
@@ -21,6 +23,18 @@ message Request {
     // Leading comment...
     optional string str = 3;
   }
+  // can be this or that
+  oneof abc {
+    string this = 4;
+    int32 that = 5;
+  }
+  // can be these or those
+  oneof xyz {
+    string these = 6;
+    int32 those = 7;
+  }
+  // map field
+  map<string, string> things = 8;
   enum MarioCharacters {
     option allow_alias = true;
     option (.testprotos.efubar) = 123;
@@ -79,6 +93,18 @@ message Request {
     // Leading comment...
     optional string str = 3;
   }
+  // can be this or that
+  oneof abc {
+    string this = 4;
+    int32 that = 5;
+  }
+  // can be these or those
+  oneof xyz {
+    string these = 6;
+    int32 those = 7;
+  }
+  // map field
+  map<string, string> things = 8;
   enum MarioCharacters {
     option allow_alias = true;
     option (.testprotos.efubar) = 123;
@@ -116,6 +142,27 @@ optional group Extras = 3 {
   // Leading comment...
   optional string str = 3;
 }
+-------- foo.bar.Request.this (*desc.FieldDescriptor) --------
+string this = 4;
+-------- foo.bar.Request.that (*desc.FieldDescriptor) --------
+int32 that = 5;
+-------- foo.bar.Request.these (*desc.FieldDescriptor) --------
+string these = 6;
+-------- foo.bar.Request.those (*desc.FieldDescriptor) --------
+int32 those = 7;
+-------- foo.bar.Request.things (*desc.FieldDescriptor) --------
+// map field
+map<string, string> things = 8;
+-------- foo.bar.Request.abc (*desc.OneOfDescriptor) --------
+oneof abc {
+  string this = 4;
+  int32 that = 5;
+}
+-------- foo.bar.Request.xyz (*desc.OneOfDescriptor) --------
+oneof xyz {
+  string these = 6;
+  int32 those = 7;
+}
 -------- foo.bar.Request.Extras (*desc.MessageDescriptor) --------
 // Group comment
 message Extras {
@@ -133,6 +180,16 @@ optional float flt = 2;
 -------- foo.bar.Request.Extras.str (*desc.FieldDescriptor) --------
 // Leading comment...
 optional string str = 3;
+-------- foo.bar.Request.ThingsEntry (*desc.MessageDescriptor) --------
+message ThingsEntry {
+  option map_entry = true;
+  optional string key = 1;
+  optional string value = 2;
+}
+-------- foo.bar.Request.ThingsEntry.key (*desc.FieldDescriptor) --------
+optional string key = 1;
+-------- foo.bar.Request.ThingsEntry.value (*desc.FieldDescriptor) --------
+optional string value = 2;
 -------- foo.bar.Request.MarioCharacters (*desc.EnumDescriptor) --------
 enum MarioCharacters {
   option allow_alias = true;
@@ -172,6 +229,9 @@ MAGIKOOPA = 8;
 KAMEK = 8;
 -------- foo.bar.Request.MarioCharacters.SNIFIT (*desc.EnumValueDescriptor) --------
 SNIFIT = -101;
+-------- foo.bar.AnEmptyMessage (*desc.MessageDescriptor) --------
+message AnEmptyMessage {
+}
 -------- foo.bar.guid1 (*desc.FieldDescriptor) --------
 extend .foo.bar.Request {
   // comment for guid1

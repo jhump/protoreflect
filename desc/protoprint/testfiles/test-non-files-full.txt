@@ -97,6 +97,25 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
     option (testprotos.efubar) = 123;
   }
+
+  // can be this or that
+  oneof abc {
+    string this = 4;
+
+    int32 that = 5;
+  }
+
+
+  // can be these or those
+  oneof xyz {
+    string these = 6;
+
+    int32 those = 7;
+  }
+
+
+  // map field
+  map<string, string> things = 8;
 }
 // And next we'll need some extensions...
 
@@ -106,6 +125,9 @@ extend /* extendee comment */ Request {
 
   // ... and a comment for guid2
   optional uint64 guid2 = 124;
+}
+
+message /* name leading comment */ AnEmptyMessage /* name trailing comment */ {
 }
 
 // Service comment
@@ -209,6 +231,25 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
     option (testprotos.efubar) = 123;
   }
+
+  // can be this or that
+  oneof abc {
+    string this = 4;
+
+    int32 that = 5;
+  }
+
+
+  // can be these or those
+  oneof xyz {
+    string these = 6;
+
+    int32 those = 7;
+  }
+
+
+  // map field
+  map<string, string> things = 8;
 }
 // And next we'll need some extensions...
 -------- foo.bar.Request.ids (*desc.FieldDescriptor) --------
@@ -242,6 +283,29 @@ optional group Extras = 3 {
   // Leading comment...
   optional string str = 3; // Trailing comment...
 }
+-------- foo.bar.Request.this (*desc.FieldDescriptor) --------
+string this = 4;
+-------- foo.bar.Request.that (*desc.FieldDescriptor) --------
+int32 that = 5;
+-------- foo.bar.Request.these (*desc.FieldDescriptor) --------
+string these = 6;
+-------- foo.bar.Request.those (*desc.FieldDescriptor) --------
+int32 those = 7;
+-------- foo.bar.Request.things (*desc.FieldDescriptor) --------
+// map field
+map<string, string> things = 8;
+-------- foo.bar.Request.abc (*desc.OneOfDescriptor) --------
+oneof abc {
+  string this = 4;
+
+  int32 that = 5;
+}
+-------- foo.bar.Request.xyz (*desc.OneOfDescriptor) --------
+oneof xyz {
+  string these = 6;
+
+  int32 those = 7;
+}
 -------- foo.bar.Request.Extras (*desc.MessageDescriptor) --------
 // Group comment
 message /* group name */ Extras {
@@ -264,6 +328,18 @@ optional float flt = 2;
 -------- foo.bar.Request.Extras.str (*desc.FieldDescriptor) --------
 // Leading comment...
 optional string str = 3; // Trailing comment...
+-------- foo.bar.Request.ThingsEntry (*desc.MessageDescriptor) --------
+message ThingsEntry {
+  option map_entry = true;
+
+  optional string key = 1;
+
+  optional string value = 2;
+}
+-------- foo.bar.Request.ThingsEntry.key (*desc.FieldDescriptor) --------
+optional string key = 1;
+-------- foo.bar.Request.ThingsEntry.value (*desc.FieldDescriptor) --------
+optional string value = 2;
 -------- foo.bar.Request.MarioCharacters (*desc.EnumDescriptor) --------
 enum MarioCharacters /* "super"! */ {
   // allow_alias comments!
@@ -317,6 +393,9 @@ MAGIKOOPA = 8;
 KAMEK = 8;
 -------- foo.bar.Request.MarioCharacters.SNIFIT (*desc.EnumValueDescriptor) --------
 SNIFIT = -101;
+-------- foo.bar.AnEmptyMessage (*desc.MessageDescriptor) --------
+message /* name leading comment */ AnEmptyMessage /* name trailing comment */ {
+}
 -------- foo.bar.guid1 (*desc.FieldDescriptor) --------
 extend /* extendee comment */ Request {
   // comment for guid1
