@@ -610,18 +610,23 @@ func (n *oneOfElement) get() node {
 	}
 }
 
-type mapFieldNode struct {
+type mapTypeNode struct {
 	basicCompositeNode
 	mapKeyword *identNode
 	keyType    *identNode
 	valueType  *identNode
-	name       *identNode
-	tag        *intLiteralNode
-	options    *compactOptionsNode
+}
+
+type mapFieldNode struct {
+	basicCompositeNode
+	mapType *mapTypeNode
+	name    *identNode
+	tag     *intLiteralNode
+	options *compactOptionsNode
 }
 
 func (n *mapFieldNode) fieldLabel() node {
-	return n.mapKeyword
+	return nil
 }
 
 func (n *mapFieldNode) fieldName() node {
@@ -629,7 +634,7 @@ func (n *mapFieldNode) fieldName() node {
 }
 
 func (n *mapFieldNode) fieldType() node {
-	return n.mapKeyword
+	return n.mapType
 }
 
 func (n *mapFieldNode) fieldTag() node {
@@ -649,23 +654,21 @@ func (n *mapFieldNode) messageName() node {
 }
 
 func (n *mapFieldNode) keyField() *syntheticMapField {
-	tag := &intLiteralNode{
-		basicNode: basicNode{
-			posRange: posRange{start: n.keyType.start(), end: n.keyType.end()},
-		},
-		val: 1,
-	}
-	return &syntheticMapField{ident: n.keyType, tag: tag}
+	return newSyntheticMapField(n.mapType.keyType, 1)
 }
 
 func (n *mapFieldNode) valueField() *syntheticMapField {
+	return newSyntheticMapField(n.mapType.valueType, 2)
+}
+
+func newSyntheticMapField(ident *identNode, tagNum uint64) *syntheticMapField {
 	tag := &intLiteralNode{
 		basicNode: basicNode{
-			posRange: posRange{start: n.valueType.start(), end: n.valueType.end()},
+			posRange: posRange{start: ident.start(), end: ident.end()},
 		},
-		val: 2,
+		val: tagNum,
 	}
-	return &syntheticMapField{ident: n.valueType, tag: tag}
+	return &syntheticMapField{ident: ident, tag: tag}
 }
 
 type syntheticMapField struct {

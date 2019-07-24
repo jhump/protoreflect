@@ -25,6 +25,7 @@ import (
 	msgDecls  []*messageElement
 	fld       *fieldNode
 	mapFld    *mapFieldNode
+	mapType   *mapTypeNode
 	grp       *groupNode
 	oo        *oneOfNode
 	ooDecls   []*oneOfElement
@@ -79,6 +80,7 @@ import (
 %type <oo>        oneof
 %type <grp>       group
 %type <mapFld>    mapField
+%type <mapType>   mapType
 %type <msg>       message
 %type <msgDecls>  messageItem messageBody
 %type <ooDecls>   oneofItem oneofBody
@@ -549,16 +551,21 @@ oneofField : typeIdent name '=' _INT_LIT ';' {
 		$$.setRange($1, $6)
 	}
 
-mapField : _MAP '<' keyType ',' typeIdent '>' name '=' _INT_LIT ';' {
-		checkTag(protolex, $9.start(), $9.val)
-		$$ = &mapFieldNode{mapKeyword: $1, keyType: $3, valueType: $5, name: $7, tag: $9}
-		$$.setRange($1, $10)
+mapField : mapType name '=' _INT_LIT ';' {
+		checkTag(protolex, $4.start(), $4.val)
+		$$ = &mapFieldNode{mapType: $1, name: $2, tag: $4}
+		$$.setRange($1, $5)
 	}
-	| _MAP '<' keyType ',' typeIdent '>' name '=' _INT_LIT compactOptions ';' {
-		checkTag(protolex, $9.start(), $9.val)
-		$$ = &mapFieldNode{mapKeyword: $1, keyType: $3, valueType: $5, name: $7, tag: $9, options: $10}
-		$$.setRange($1, $11)
+	| mapType name '=' _INT_LIT compactOptions ';' {
+		checkTag(protolex, $4.start(), $4.val)
+		$$ = &mapFieldNode{mapType: $1, name: $2, tag: $4, options: $5}
+		$$.setRange($1, $6)
 	}
+
+mapType : _MAP '<' keyType ',' typeIdent '>' {
+        $$ = &mapTypeNode{mapKeyword: $1, keyType: $3, valueType: $5}
+        $$.setRange($1, $6)
+}
 
 keyType : _INT32
 	| _INT64

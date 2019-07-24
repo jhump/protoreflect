@@ -780,9 +780,9 @@ func (r *parseResult) asMapDescriptors(mapField *mapFieldNode, isProto3 bool) (*
 	if !isProto3 {
 		lbl = dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
 	}
-	keyFd := newFieldDescriptor("key", mapField.keyType.val, 1, lbl)
+	keyFd := newFieldDescriptor("key", mapField.mapType.keyType.val, 1, lbl)
 	r.putFieldNode(keyFd, mapField.keyField())
-	valFd := newFieldDescriptor("value", mapField.valueType.val, 2, lbl)
+	valFd := newFieldDescriptor("value", mapField.mapType.valueType.val, 2, lbl)
 	r.putFieldNode(valFd, mapField.valueField())
 	entryName := internal.InitCap(internal.JsonName(mapField.name.val)) + "Entry"
 	fd := newFieldDescriptor(mapField.name.val, entryName, int32(mapField.tag.val), dpb.FieldDescriptorProto_LABEL_REPEATED.Enum())

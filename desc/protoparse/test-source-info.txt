@@ -869,14 +869,9 @@ desc_test_comments.proto:104:40
 
 
 
- > message_type[0] > field[7] > label:
-desc_test_comments.proto:104:9
-desc_test_comments.proto:104:12
-
-
  > message_type[0] > field[7] > type_name:
 desc_test_comments.proto:104:9
-desc_test_comments.proto:104:12
+desc_test_comments.proto:104:28
 
 
  > message_type[0] > field[7] > name:
