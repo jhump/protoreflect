@@ -112,8 +112,7 @@ func (r *parseResult) generateSourceCodeInfoForMessage(sci *sourceCodeInfo, n ms
 		decls = n.decls
 	case *groupNode:
 		decls = n.decls
-	}
-	if decls == nil {
+	case *mapFieldNode:
 		// map entry so nothing else to do
 		return
 	}
