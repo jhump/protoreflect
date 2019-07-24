@@ -11,6 +11,9 @@ import "google/protobuf/empty.proto";
 // option comments FTW!!!
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
+message AnEmptyMessage {
+}
+
 // We need a request for our RPC service below.
 message Request {
    option deprecated = true; // deprecated!
@@ -38,6 +41,25 @@ message Request {
       // Leading comment...
       optional string str = 3; // Trailing comment...
    }
+
+   // can be this or that
+   oneof abc {
+      string this = 4;
+
+      int32 that = 5;
+   }
+
+
+   // can be these or those
+   oneof xyz {
+      string these = 6;
+
+      int32 those = 7;
+   }
+
+
+   // map field
+   map<string, string> things = 8;
 
    enum MarioCharacters {
       // allow_alias comments!

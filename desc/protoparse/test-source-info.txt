@@ -3,7 +3,7 @@
 
 :
 desc_test_comments.proto:8:1
-desc_test_comments.proto:123:2
+desc_test_comments.proto:139:2
 
 
  > syntax:
@@ -60,7 +60,7 @@ desc_test_comments.proto:18:34
 
  > message_type[0]:
 desc_test_comments.proto:25:1
-desc_test_comments.proto:91:2
+desc_test_comments.proto:105:2
     Leading detached comment [0]:
  Multiple white space lines (like above) cannot
  be preserved...
@@ -755,86 +755,234 @@ desc_test_comments.proto:89:17
 desc_test_comments.proto:89:50
 
 
+ > message_type[0] > oneof_decl[0]:
+desc_test_comments.proto:93:9
+desc_test_comments.proto:96:10
+    Leading comments:
+ can be this or that
+
+
+
+ > message_type[0] > oneof_decl[0] > name:
+desc_test_comments.proto:93:15
+desc_test_comments.proto:93:18
+
+
+ > message_type[0] > field[3]:
+desc_test_comments.proto:94:17
+desc_test_comments.proto:94:33
+
+
+ > message_type[0] > field[3] > type:
+desc_test_comments.proto:94:17
+desc_test_comments.proto:94:23
+
+
+ > message_type[0] > field[3] > name:
+desc_test_comments.proto:94:24
+desc_test_comments.proto:94:28
+
+
+ > message_type[0] > field[3] > number:
+desc_test_comments.proto:94:31
+desc_test_comments.proto:94:32
+
+
+ > message_type[0] > field[4]:
+desc_test_comments.proto:95:17
+desc_test_comments.proto:95:32
+
+
+ > message_type[0] > field[4] > type:
+desc_test_comments.proto:95:17
+desc_test_comments.proto:95:22
+
+
+ > message_type[0] > field[4] > name:
+desc_test_comments.proto:95:23
+desc_test_comments.proto:95:27
+
+
+ > message_type[0] > field[4] > number:
+desc_test_comments.proto:95:30
+desc_test_comments.proto:95:31
+
+
+ > message_type[0] > oneof_decl[1]:
+desc_test_comments.proto:98:9
+desc_test_comments.proto:101:10
+    Leading comments:
+ can be these or those
+
+
+
+ > message_type[0] > oneof_decl[1] > name:
+desc_test_comments.proto:98:15
+desc_test_comments.proto:98:18
+
+
+ > message_type[0] > field[5]:
+desc_test_comments.proto:99:17
+desc_test_comments.proto:99:34
+
+
+ > message_type[0] > field[5] > type:
+desc_test_comments.proto:99:17
+desc_test_comments.proto:99:23
+
+
+ > message_type[0] > field[5] > name:
+desc_test_comments.proto:99:24
+desc_test_comments.proto:99:29
+
+
+ > message_type[0] > field[5] > number:
+desc_test_comments.proto:99:32
+desc_test_comments.proto:99:33
+
+
+ > message_type[0] > field[6]:
+desc_test_comments.proto:100:17
+desc_test_comments.proto:100:33
+
+
+ > message_type[0] > field[6] > type:
+desc_test_comments.proto:100:17
+desc_test_comments.proto:100:22
+
+
+ > message_type[0] > field[6] > name:
+desc_test_comments.proto:100:23
+desc_test_comments.proto:100:28
+
+
+ > message_type[0] > field[6] > number:
+desc_test_comments.proto:100:31
+desc_test_comments.proto:100:32
+
+
+ > message_type[0] > field[7]:
+desc_test_comments.proto:104:9
+desc_test_comments.proto:104:40
+    Leading comments:
+ map field
+
+
+
+ > message_type[0] > field[7] > label:
+desc_test_comments.proto:104:9
+desc_test_comments.proto:104:12
+
+
+ > message_type[0] > field[7] > type_name:
+desc_test_comments.proto:104:9
+desc_test_comments.proto:104:12
+
+
+ > message_type[0] > field[7] > name:
+desc_test_comments.proto:104:29
+desc_test_comments.proto:104:35
+
+
+ > message_type[0] > field[7] > number:
+desc_test_comments.proto:104:38
+desc_test_comments.proto:104:39
+
+
  > extension:
-desc_test_comments.proto:94:1
-desc_test_comments.proto:101:2
+desc_test_comments.proto:108:1
+desc_test_comments.proto:115:2
     Trailing comments:
  extendee trailer...
 
 
 
  > extension[0]:
-desc_test_comments.proto:98:9
-desc_test_comments.proto:98:37
+desc_test_comments.proto:112:9
+desc_test_comments.proto:112:37
     Leading comments:
  comment for guid1
 
 
 
  > extension[0] > extendee:
-desc_test_comments.proto:96:1
-desc_test_comments.proto:96:8
+desc_test_comments.proto:110:1
+desc_test_comments.proto:110:8
     Leading comments:
  extendee comment
 
 
 
  > extension[0] > label:
-desc_test_comments.proto:98:9
-desc_test_comments.proto:98:17
+desc_test_comments.proto:112:9
+desc_test_comments.proto:112:17
 
 
  > extension[0] > type:
-desc_test_comments.proto:98:18
-desc_test_comments.proto:98:24
+desc_test_comments.proto:112:18
+desc_test_comments.proto:112:24
 
 
  > extension[0] > name:
-desc_test_comments.proto:98:25
-desc_test_comments.proto:98:30
+desc_test_comments.proto:112:25
+desc_test_comments.proto:112:30
 
 
  > extension[0] > number:
-desc_test_comments.proto:98:33
-desc_test_comments.proto:98:36
+desc_test_comments.proto:112:33
+desc_test_comments.proto:112:36
 
 
  > extension[1]:
-desc_test_comments.proto:100:9
-desc_test_comments.proto:100:37
+desc_test_comments.proto:114:9
+desc_test_comments.proto:114:37
     Leading comments:
  ... and a comment for guid2
 
 
 
  > extension[1] > extendee:
-desc_test_comments.proto:96:1
-desc_test_comments.proto:96:8
+desc_test_comments.proto:110:1
+desc_test_comments.proto:110:8
 
 
  > extension[1] > label:
-desc_test_comments.proto:100:9
-desc_test_comments.proto:100:17
+desc_test_comments.proto:114:9
+desc_test_comments.proto:114:17
 
 
  > extension[1] > type:
-desc_test_comments.proto:100:18
-desc_test_comments.proto:100:24
+desc_test_comments.proto:114:18
+desc_test_comments.proto:114:24
 
 
  > extension[1] > name:
-desc_test_comments.proto:100:25
-desc_test_comments.proto:100:30
+desc_test_comments.proto:114:25
+desc_test_comments.proto:114:30
 
 
  > extension[1] > number:
-desc_test_comments.proto:100:33
-desc_test_comments.proto:100:36
+desc_test_comments.proto:114:33
+desc_test_comments.proto:114:36
+
+
+ > message_type[1]:
+desc_test_comments.proto:118:1
+desc_test_comments.proto:118:81
+
+
+ > message_type[1] > name:
+desc_test_comments.proto:118:36
+desc_test_comments.proto:118:50
+    Leading comments:
+ name leading comment 
+    Trailing comments:
+ name trailing comment 
 
 
  > service[0]:
-desc_test_comments.proto:105:1
-desc_test_comments.proto:123:2
+desc_test_comments.proto:121:1
+desc_test_comments.proto:139:2
     Leading comments:
  Service comment
 
@@ -844,72 +992,72 @@ desc_test_comments.proto:123:2
 
 
  > service[0] > name:
-desc_test_comments.proto:105:28
-desc_test_comments.proto:105:38
+desc_test_comments.proto:121:28
+desc_test_comments.proto:121:38
     Leading comments:
  service name 
 
 
  > service[0] > options:
-desc_test_comments.proto:107:9
-desc_test_comments.proto:107:43
+desc_test_comments.proto:123:9
+desc_test_comments.proto:123:43
 
 
  > service[0] > options > sfubar > id:
-desc_test_comments.proto:107:9
-desc_test_comments.proto:107:43
+desc_test_comments.proto:123:9
+desc_test_comments.proto:123:43
     Leading comments:
  option that sets field
 
 
 
  > service[0] > options:
-desc_test_comments.proto:109:9
-desc_test_comments.proto:109:47
+desc_test_comments.proto:125:9
+desc_test_comments.proto:125:47
 
 
  > service[0] > options > sfubar > name:
-desc_test_comments.proto:109:9
-desc_test_comments.proto:109:47
+desc_test_comments.proto:125:9
+desc_test_comments.proto:125:47
     Leading comments:
  another option that sets field
 
 
 
  > service[0] > options:
-desc_test_comments.proto:110:9
-desc_test_comments.proto:110:35
+desc_test_comments.proto:126:9
+desc_test_comments.proto:126:35
 
 
  > service[0] > options > deprecated:
-desc_test_comments.proto:110:9
-desc_test_comments.proto:110:35
+desc_test_comments.proto:126:9
+desc_test_comments.proto:126:35
     Trailing comments:
  DEPRECATED!
 
 
 
  > service[0] > options:
-desc_test_comments.proto:112:9
-desc_test_comments.proto:112:45
+desc_test_comments.proto:128:9
+desc_test_comments.proto:128:45
 
 
  > service[0] > options > sfubare:
-desc_test_comments.proto:112:9
-desc_test_comments.proto:112:45
+desc_test_comments.proto:128:9
+desc_test_comments.proto:128:45
 
 
  > service[0] > method[0]:
-desc_test_comments.proto:115:9
-desc_test_comments.proto:116:84
+desc_test_comments.proto:131:9
+desc_test_comments.proto:132:84
     Leading comments:
  Method comment
 
 
 
  > service[0] > method[0] > name:
-desc_test_comments.proto:115:28
-desc_test_comments.proto:115:40
+desc_test_comments.proto:131:28
+desc_test_comments.proto:131:40
     Leading comments:
  rpc name 
     Trailing comments:
@@ -917,74 +1065,74 @@ desc_test_comments.proto:115:40
 
 
  > service[0] > method[0] > client_streaming:
-desc_test_comments.proto:115:73
-desc_test_comments.proto:115:79
+desc_test_comments.proto:131:73
+desc_test_comments.proto:131:79
     Leading comments:
  comment B 
 
 
  > service[0] > method[0] > input_type:
-desc_test_comments.proto:115:96
-desc_test_comments.proto:115:103
+desc_test_comments.proto:131:96
+desc_test_comments.proto:131:103
     Leading comments:
  comment C 
 
 
  > service[0] > method[0] > output_type:
-desc_test_comments.proto:116:57
-desc_test_comments.proto:116:64
+desc_test_comments.proto:132:57
+desc_test_comments.proto:132:64
     Leading comments:
 comment E 
 
 
  > service[0] > method[1]:
-desc_test_comments.proto:118:9
-desc_test_comments.proto:122:10
+desc_test_comments.proto:134:9
+desc_test_comments.proto:138:10
 
 
  > service[0] > method[1] > name:
-desc_test_comments.proto:118:13
-desc_test_comments.proto:118:21
+desc_test_comments.proto:134:13
+desc_test_comments.proto:134:21
 
 
  > service[0] > method[1] > input_type:
-desc_test_comments.proto:118:23
-desc_test_comments.proto:118:30
+desc_test_comments.proto:134:23
+desc_test_comments.proto:134:30
 
 
  > service[0] > method[1] > output_type:
-desc_test_comments.proto:118:41
-desc_test_comments.proto:118:62
+desc_test_comments.proto:134:41
+desc_test_comments.proto:134:62
 
 
  > service[0] > method[1] > options:
-desc_test_comments.proto:119:17
-desc_test_comments.proto:119:42
+desc_test_comments.proto:135:17
+desc_test_comments.proto:135:42
 
 
  > service[0] > method[1] > options > deprecated:
-desc_test_comments.proto:119:17
-desc_test_comments.proto:119:42
+desc_test_comments.proto:135:17
+desc_test_comments.proto:135:42
 
 
  > service[0] > method[1] > options:
-desc_test_comments.proto:120:17
-desc_test_comments.proto:120:53
+desc_test_comments.proto:136:17
+desc_test_comments.proto:136:53
 
 
  > service[0] > method[1] > options > mtfubar[0]:
-desc_test_comments.proto:120:17
-desc_test_comments.proto:120:53
+desc_test_comments.proto:136:17
+desc_test_comments.proto:136:53
 
 
  > service[0] > method[1] > options:
-desc_test_comments.proto:121:17
-desc_test_comments.proto:121:56
+desc_test_comments.proto:137:17
+desc_test_comments.proto:137:56
 
 
  > service[0] > method[1] > options > mtfubard:
-desc_test_comments.proto:121:17
-desc_test_comments.proto:121:56
+desc_test_comments.proto:137:17
+desc_test_comments.proto:137:56
 ---- desc_test_options.proto ----
 
 
