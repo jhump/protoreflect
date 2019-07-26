@@ -10,6 +10,7 @@ message TestMessage {
 	message NestedMessage {
 		/* Comment for AnotherNestedMessage */
 		message AnotherNestedMessage {
+			/* Comment for AnotherTestMessage extensions (1) */
 			extend AnotherTestMessage {
 				/* Comment for flags */
 				repeated bool flags = 200 [packed = true];
@@ -123,13 +124,17 @@ message AnotherTestMessage {
 	extensions 100 to 200;
 }
 
+/* Comment for AnotherTestMessage extensions (2) */
 extend AnotherTestMessage {
 	/* Comment for xtm */
 	optional TestMessage xtm = 100;
 
 	/* Comment for xs */
 	optional string xs = 101;
+}
 
+/* Comment for AnotherTestMessage extensions (3) */
+extend AnotherTestMessage {
 	/* Comment for xi */
 	optional int32 xi = 102;
 
