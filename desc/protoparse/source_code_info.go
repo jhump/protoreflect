@@ -412,7 +412,10 @@ func (sci *sourceCodeInfo) newLoc(n node, path []int32) {
 		trailingComments = nil
 	}
 	detached := groupComments(leadingComments)
-	trail := combineComments(trailingComments)
+	var trail *string
+	if str, ok := combineComments(trailingComments); ok {
+		trail = proto.String(str)
+	}
 	var lead *string
 	if len(leadingComments) > 0 && leadingComments[len(leadingComments)-1].end.Line >= n.start().Line-1 {
 		lead = proto.String(detached[len(detached)-1])
@@ -436,19 +439,19 @@ func makeSpan(start, end *SourcePos) []int32 {
 	return []int32{int32(start.Line) - 1, int32(start.Col) - 1, int32(end.Line) - 1, int32(end.Col) - 1}
 }
 
-func (sci *sourceCodeInfo) commentUsed(c []*comment) bool {
+func (sci *sourceCodeInfo) commentUsed(c []comment) bool {
 	if len(c) == 0 {
 		return false
 	}
-	if _, ok := sci.commentsUsed[c[0]]; ok {
+	if _, ok := sci.commentsUsed[&c[0]]; ok {
 		return true
 	}
 
-	sci.commentsUsed[c[0]] = struct{}{}
+	sci.commentsUsed[&c[0]] = struct{}{}
 	return false
 }
 
-func groupComments(comments []*comment) []string {
+func groupComments(comments []comment) []string {
 	if len(comments) == 0 {
 		return nil
 	}
@@ -463,20 +466,23 @@ func groupComments(comments []*comment) []string {
 		singleLineStyle = strings.HasPrefix(comments[i].text, "//")
 		if !singleLineStyle || prevSingleLine != singleLineStyle || c.start.Line > line+1 {
 			// new group!
-			groups = append(groups, *combineComments(comments[start:i]))
+			if str, ok := combineComments(comments[start:i]); ok {
+				groups = append(groups, str)
+			}
 			start = i
 		}
 		line = c.end.Line
 	}
 	// don't forget last group
-	groups = append(groups, *combineComments(comments[start:]))
-
+	if str, ok := combineComments(comments[start:]); ok {
+		groups = append(groups, str)
+	}
 	return groups
 }
 
-func combineComments(comments []*comment) *string {
+func combineComments(comments []comment) (string, bool) {
 	if len(comments) == 0 {
-		return nil
+		return "", false
 	}
 	var buf bytes.Buffer
 	for _, c := range comments {
@@ -512,7 +518,7 @@ func combineComments(comments []*comment) *string {
 			}
 		}
 	}
-	return proto.String(buf.String())
+	return buf.String(), true
 }
 
 func dup(p []int32) []int32 {
