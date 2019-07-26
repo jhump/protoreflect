@@ -33,14 +33,14 @@ func unknownPos(filename string) *SourcePos {
 type node interface {
 	start() *SourcePos
 	end() *SourcePos
-	leadingComments() []*comment
-	trailingComments() []*comment
+	leadingComments() []comment
+	trailingComments() []comment
 }
 
 type terminalNode interface {
 	node
-	popLeadingComment() *comment
-	pushTrailingComment(*comment)
+	popLeadingComment() comment
+	pushTrailingComment(comment)
 }
 
 var _ terminalNode = (*basicNode)(nil)
@@ -120,38 +120,38 @@ var _ methodDecl = (*methodNode)(nil)
 var _ methodDecl = (*noSourceNode)(nil)
 
 type posRange struct {
-	start, end *SourcePos
+	start, end SourcePos
 }
 
 type basicNode struct {
 	posRange
-	leading  []*comment
-	trailing []*comment
+	leading  []comment
+	trailing []comment
 }
 
 func (n *basicNode) start() *SourcePos {
-	return n.posRange.start
+	return &n.posRange.start
 }
 
 func (n *basicNode) end() *SourcePos {
-	return n.posRange.end
+	return &n.posRange.end
 }
 
-func (n *basicNode) leadingComments() []*comment {
+func (n *basicNode) leadingComments() []comment {
 	return n.leading
 }
 
-func (n *basicNode) trailingComments() []*comment {
+func (n *basicNode) trailingComments() []comment {
 	return n.trailing
 }
 
-func (n *basicNode) popLeadingComment() *comment {
+func (n *basicNode) popLeadingComment() comment {
 	c := n.leading[0]
 	n.leading = n.leading[1:]
 	return c
 }
 
-func (n *basicNode) pushTrailingComment(c *comment) {
+func (n *basicNode) pushTrailingComment(c comment) {
 	n.trailing = append(n.trailing, c)
 }
 
@@ -173,11 +173,11 @@ func (n *basicCompositeNode) end() *SourcePos {
 	return n.last.end()
 }
 
-func (n *basicCompositeNode) leadingComments() []*comment {
+func (n *basicCompositeNode) leadingComments() []comment {
 	return n.first.leadingComments()
 }
 
-func (n *basicCompositeNode) trailingComments() []*comment {
+func (n *basicCompositeNode) trailingComments() []comment {
 	return n.last.trailingComments()
 }
 
@@ -216,11 +216,11 @@ func (n *fileElement) end() *SourcePos {
 	return n.get().end()
 }
 
-func (n *fileElement) leadingComments() []*comment {
+func (n *fileElement) leadingComments() []comment {
 	return n.get().leadingComments()
 }
 
-func (n *fileElement) trailingComments() []*comment {
+func (n *fileElement) trailingComments() []comment {
 	return n.get().trailingComments()
 }
 
@@ -282,11 +282,11 @@ func (n *identNode) value() interface{} {
 	return identifier(n.val)
 }
 
-func (n *identNode) popLeadingComment() *comment {
+func (n *identNode) popLeadingComment() comment {
 	return n.first.(terminalNode).popLeadingComment()
 }
 
-func (n *identNode) pushTrailingComment(c *comment) {
+func (n *identNode) pushTrailingComment(c comment) {
 	n.last.(terminalNode).pushTrailingComment(c)
 }
 
@@ -380,11 +380,11 @@ func (n *stringLiteralNode) value() interface{} {
 	return n.val
 }
 
-func (n *stringLiteralNode) popLeadingComment() *comment {
+func (n *stringLiteralNode) popLeadingComment() comment {
 	return n.first.(terminalNode).popLeadingComment()
 }
 
-func (n *stringLiteralNode) pushTrailingComment(c *comment) {
+func (n *stringLiteralNode) pushTrailingComment(c comment) {
 	n.last.(terminalNode).pushTrailingComment(c)
 }
 
@@ -415,11 +415,11 @@ func (n *floatLiteralNode) value() interface{} {
 	return n.val
 }
 
-func (n *floatLiteralNode) popLeadingComment() *comment {
+func (n *floatLiteralNode) popLeadingComment() comment {
 	return n.first.(terminalNode).popLeadingComment()
 }
 
-func (n *floatLiteralNode) pushTrailingComment(c *comment) {
+func (n *floatLiteralNode) pushTrailingComment(c comment) {
 	n.last.(terminalNode).pushTrailingComment(c)
 }
 
@@ -591,11 +591,11 @@ func (n *oneOfElement) end() *SourcePos {
 	return n.get().end()
 }
 
-func (n *oneOfElement) leadingComments() []*comment {
+func (n *oneOfElement) leadingComments() []comment {
 	return n.get().leadingComments()
 }
 
-func (n *oneOfElement) trailingComments() []*comment {
+func (n *oneOfElement) trailingComments() []comment {
 	return n.get().trailingComments()
 }
 
@@ -664,7 +664,7 @@ func (n *mapFieldNode) valueField() *syntheticMapField {
 func newSyntheticMapField(ident *identNode, tagNum uint64) *syntheticMapField {
 	tag := &intLiteralNode{
 		basicNode: basicNode{
-			posRange: posRange{start: ident.start(), end: ident.end()},
+			posRange: posRange{start: *ident.start(), end: *ident.end()},
 		},
 		val: tagNum,
 	}
@@ -684,11 +684,11 @@ func (n *syntheticMapField) end() *SourcePos {
 	return n.ident.end()
 }
 
-func (n *syntheticMapField) leadingComments() []*comment {
+func (n *syntheticMapField) leadingComments() []comment {
 	return nil
 }
 
-func (n *syntheticMapField) trailingComments() []*comment {
+func (n *syntheticMapField) trailingComments() []comment {
 	return nil
 }
 
@@ -764,11 +764,11 @@ func (n *enumElement) end() *SourcePos {
 	return n.get().end()
 }
 
-func (n *enumElement) leadingComments() []*comment {
+func (n *enumElement) leadingComments() []comment {
 	return n.get().leadingComments()
 }
 
-func (n *enumElement) trailingComments() []*comment {
+func (n *enumElement) trailingComments() []comment {
 	return n.get().trailingComments()
 }
 
@@ -838,11 +838,11 @@ func (n *messageElement) end() *SourcePos {
 	return n.get().end()
 }
 
-func (n *messageElement) leadingComments() []*comment {
+func (n *messageElement) leadingComments() []comment {
 	return n.get().leadingComments()
 }
 
-func (n *messageElement) trailingComments() []*comment {
+func (n *messageElement) trailingComments() []comment {
 	return n.get().trailingComments()
 }
 
@@ -894,11 +894,11 @@ func (n *extendElement) end() *SourcePos {
 	return n.get().end()
 }
 
-func (n *extendElement) leadingComments() []*comment {
+func (n *extendElement) leadingComments() []comment {
 	return n.get().leadingComments()
 }
 
-func (n *extendElement) trailingComments() []*comment {
+func (n *extendElement) trailingComments() []comment {
 	return n.get().trailingComments()
 }
 
@@ -934,11 +934,11 @@ func (n *serviceElement) end() *SourcePos {
 	return n.get().end()
 }
 
-func (n *serviceElement) leadingComments() []*comment {
+func (n *serviceElement) leadingComments() []comment {
 	return n.get().leadingComments()
 }
 
-func (n *serviceElement) trailingComments() []*comment {
+func (n *serviceElement) trailingComments() []comment {
 	return n.get().trailingComments()
 }
 
@@ -987,11 +987,11 @@ func (n noSourceNode) end() *SourcePos {
 	return n.pos
 }
 
-func (n noSourceNode) leadingComments() []*comment {
+func (n noSourceNode) leadingComments() []comment {
 	return nil
 }
 
-func (n noSourceNode) trailingComments() []*comment {
+func (n noSourceNode) trailingComments() []comment {
 	return nil
 }
 

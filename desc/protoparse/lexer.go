@@ -106,8 +106,8 @@ var keywords = map[string]int{
 	"returns":    _RETURNS,
 }
 
-func (l *protoLex) cur() *SourcePos {
-	return &SourcePos{
+func (l *protoLex) cur() SourcePos {
+	return SourcePos{
 		Filename: l.filename,
 		Offset:   l.offset,
 		Line:     l.lineNo + 1,
@@ -156,11 +156,11 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 	prevLineNo := l.lineNo
 	prevColNo := l.colNo
 	prevOffset := l.offset
-	var comments []*comment
+	var comments []comment
 
 	pos := func() posRange {
 		return posRange{
-			start: &SourcePos{
+			start: SourcePos{
 				Filename: l.filename,
 				Offset:   prevOffset,
 				Line:     prevLineNo + 1,
@@ -434,7 +434,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 					// line for calculation above
 					l.adjustPos('\n')
 				}
-				comments = append(comments, &comment{posRange: commentPos, text: txt})
+				comments = append(comments, comment{posRange: commentPos, text: txt})
 				continue
 			}
 			if cn == '*' {
@@ -443,7 +443,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 					setError(errors.New("block comment never terminates, unexpected EOF"))
 					return _ERROR
 				} else {
-					comments = append(comments, &comment{posRange: pos(), text: txt})
+					comments = append(comments, comment{posRange: pos(), text: txt})
 				}
 				continue
 			}

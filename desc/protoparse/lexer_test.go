@@ -173,7 +173,7 @@ foo
 		}
 		testutil.Eq(t, len(exp.comments)-exp.trailCount, len(n.leadingComments()), "case %d: wrong number of comments", i)
 		for ci := range exp.comments {
-			var c *comment
+			var c comment
 			if ci < exp.trailCount {
 				c = prev.trailingComments()[ci]
 			} else {
