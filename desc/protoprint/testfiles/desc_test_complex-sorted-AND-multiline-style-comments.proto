@@ -258,7 +258,9 @@ extend google.protobuf.ExtensionRangeOptions {
 
 extend google.protobuf.FieldOptions {
   optional Rule rules = 1234;
+}
 
+extend google.protobuf.FieldOptions {
   optional bool syntax = 20001;
 
   optional bool import = 20002;

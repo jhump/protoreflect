@@ -119,13 +119,14 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 }
 // And next we'll need some extensions...
 
-extend /* extendee comment */ Request {
+extend /* extendee comment */ Request /* extendee trailer */ {
   // comment for guid1
   optional uint64 guid1 = 123;
 
   // ... and a comment for guid2
   optional uint64 guid2 = 124;
 }
+// extend trailer...
 
 message /* name leading comment */ AnEmptyMessage /* name trailing comment */ {
 }
@@ -397,7 +398,7 @@ SNIFIT = -101;
 message /* name leading comment */ AnEmptyMessage /* name trailing comment */ {
 }
 -------- foo.bar.guid1 (*desc.FieldDescriptor) --------
-extend /* extendee comment */ Request {
+extend /* extendee comment */ Request /* extendee trailer */ {
   // comment for guid1
   optional uint64 guid1 = 123;
 }
