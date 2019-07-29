@@ -62,7 +62,7 @@ func (cb *Buffer) EOF() bool {
 // are skipped and true is returned.
 func (cb *Buffer) Skip(count int) bool {
 	newIndex := cb.index + count
-	if newIndex > len(cb.buf) {
+	if newIndex < cb.index || newIndex > len(cb.buf) {
 		return false
 	}
 	cb.index = newIndex
@@ -309,13 +309,13 @@ func (cb *Buffer) DecodeRawBytes(alloc bool) (buf []byte, err error) {
 
 	if !alloc {
 		buf = cb.buf[cb.index:end]
-		cb.index += nb
+		cb.index = end
 		return
 	}
 
 	buf = make([]byte, nb)
 	copy(buf, cb.buf[cb.index:])
-	cb.index += nb
+	cb.index = end
 	return
 }
 
@@ -395,13 +395,20 @@ func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
 				}
 				i++
 			}
-			cb.index = i + 1
+			// TODO: This would only overflow if buffer length was MaxInt and we
+			// read the last byte. This is not a real/feasible concern on 64-bit
+			// systems. Something to worry about for 32-bit systems? Do we care?
+			cb.index++
 		case proto.WireBytes:
 			l, err := cb.DecodeVarint()
 			if err != nil {
 				return 0, 0, err
 			}
-			if !cb.Skip(int(l)) {
+			lInt := int(l)
+			if lInt < 0 {
+				return 0, 0, fmt.Errorf("proto: bad byte length %d", lInt)
+			}
+			if !cb.Skip(lInt) {
 				return 0, 0, io.ErrUnexpectedEOF
 			}
 		case proto.WireStartGroup:
