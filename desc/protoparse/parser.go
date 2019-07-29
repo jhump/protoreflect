@@ -626,6 +626,9 @@ func (r *parseResult) createFileDescriptor(filename string, file *fileNode) erro
 }
 
 func (r *parseResult) asUninterpretedOptions(nodes []*optionNode) []*dpb.UninterpretedOption {
+	if len(nodes) == 0 {
+		return nil
+	}
 	opts := make([]*dpb.UninterpretedOption, len(nodes))
 	for i, n := range nodes {
 		opts[i] = r.asUninterpretedOption(n)
