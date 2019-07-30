@@ -11,8 +11,13 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"reflect"
+	"sort"
 
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/golang/protobuf/proto"
+
+	"github.com/jhump/protoreflect/desc"
 )
 
 // ErrOverflow is returned when an integer is too large to be represented.
@@ -60,13 +65,16 @@ func (cb *Buffer) EOF() bool {
 // the input has fewer bytes than the given count, false is returned
 // and the buffer is unchanged. Otherwise, the given number of bytes
 // are skipped and true is returned.
-func (cb *Buffer) Skip(count int) bool {
+func (cb *Buffer) Skip(count int) error {
+	if count < 0 {
+		return fmt.Errorf("proto: bad byte length %d", count)
+	}
 	newIndex := cb.index + count
 	if newIndex < cb.index || newIndex > len(cb.buf) {
-		return false
+		return io.ErrUnexpectedEOF
 	}
 	cb.index = newIndex
-	return true
+	return nil
 }
 
 // Len returns the remaining number of bytes in the buffer.
@@ -372,12 +380,12 @@ func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
 		// skip past the field's data
 		switch wireType {
 		case proto.WireFixed32:
-			if !cb.Skip(4) {
-				return 0, 0, io.ErrUnexpectedEOF
+			if err := cb.Skip(4); err != nil {
+				return 0, 0, err
 			}
 		case proto.WireFixed64:
-			if !cb.Skip(8) {
-				return 0, 0, io.ErrUnexpectedEOF
+			if err := cb.Skip(8); err != nil {
+				return 0, 0, err
 			}
 		case proto.WireVarint:
 			// skip varint by finding last byte (has high bit unset)
@@ -404,12 +412,8 @@ func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
 			if err != nil {
 				return 0, 0, err
 			}
-			lInt := int(l)
-			if lInt < 0 {
-				return 0, 0, fmt.Errorf("proto: bad byte length %d", lInt)
-			}
-			if !cb.Skip(lInt) {
-				return 0, 0, io.ErrUnexpectedEOF
+			if err := cb.Skip(int(l)); err != nil {
+				return 0, 0, err
 			}
 		case proto.WireStartGroup:
 			if err := cb.SkipGroup(); err != nil {
@@ -506,17 +510,299 @@ func (cb *Buffer) EncodeRawBytes(b []byte) error {
 }
 
 func (cb *Buffer) EncodeMessage(pm proto.Message) error {
+	return cb.encodeMessage(pm, false)
+}
+
+func (cb *Buffer) EncodeMessageDeterministic(pm proto.Message) error {
+	return cb.encodeMessage(pm, true)
+}
+
+func (cb *Buffer) encodeMessage(pm proto.Message, deterministic bool) error {
 	bytes, err := proto.Marshal(pm)
 	if err != nil {
 		return err
 	}
-	if len(bytes) == 0 {
-		return nil
-	}
+	return cb.EncodeRawBytes(bytes)
+}
 
-	if err := cb.EncodeVarint(uint64(len(bytes))); err != nil {
+func (cb *Buffer) EncodeFieldValue(fd *desc.FieldDescriptor, val interface{}) error {
+	return cb.encodeField(fd, val, false)
+}
+
+func (cb *Buffer) EncodeFieldValueDeterministic(fd *desc.FieldDescriptor, val interface{}) error {
+	return cb.encodeField(fd, val, true)
+}
+
+func (b *Buffer) encodeField(fd *desc.FieldDescriptor, val interface{}, deterministic bool) error {
+	if fd.IsMap() {
+		mp := val.(map[interface{}]interface{})
+		entryType := fd.GetMessageType()
+		keyType := entryType.FindFieldByNumber(1)
+		valType := entryType.FindFieldByNumber(2)
+		var entryBuffer Buffer
+		if deterministic {
+			keys := make([]interface{}, 0, len(mp))
+			for k := range mp {
+				keys = append(keys, k)
+			}
+			sort.Sort(sortable(keys))
+			for _, k := range keys {
+				v := mp[k]
+				entryBuffer.Reset()
+				if err := entryBuffer.encodeFieldElement(keyType, k, deterministic); err != nil {
+					return err
+				}
+				if err := entryBuffer.encodeFieldElement(valType, v, deterministic); err != nil {
+					return err
+				}
+				if err := b.EncodeTagAndWireType(fd.GetNumber(), proto.WireBytes); err != nil {
+					return err
+				}
+				if err := b.EncodeRawBytes(entryBuffer.Bytes()); err != nil {
+					return err
+				}
+			}
+		} else {
+			for k, v := range mp {
+				entryBuffer.Reset()
+				if err := entryBuffer.encodeFieldElement(keyType, k, deterministic); err != nil {
+					return err
+				}
+				if err := entryBuffer.encodeFieldElement(valType, v, deterministic); err != nil {
+					return err
+				}
+				if err := b.EncodeTagAndWireType(fd.GetNumber(), proto.WireBytes); err != nil {
+					return err
+				}
+				if err := b.EncodeRawBytes(entryBuffer.Bytes()); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	} else if fd.IsRepeated() {
+		sl := val.([]interface{})
+		wt, err := getWireType(fd.GetType())
+		if err != nil {
+			return err
+		}
+		if isPacked(fd) && len(sl) > 1 &&
+			(wt == proto.WireVarint || wt == proto.WireFixed32 || wt == proto.WireFixed64) {
+			// packed repeated field
+			var packedBuffer Buffer
+			for _, v := range sl {
+				if err := packedBuffer.encodeFieldValue(fd, v, deterministic); err != nil {
+					return err
+				}
+			}
+			if err := b.EncodeTagAndWireType(fd.GetNumber(), proto.WireBytes); err != nil {
+				return err
+			}
+			return b.EncodeRawBytes(packedBuffer.Bytes())
+		} else {
+			// non-packed repeated field
+			for _, v := range sl {
+				if err := b.encodeFieldElement(fd, v, deterministic); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	} else {
+		return b.encodeFieldElement(fd, val, deterministic)
+	}
+}
+
+func isPacked(fd *desc.FieldDescriptor) bool {
+	opts := fd.AsFieldDescriptorProto().GetOptions()
+	// if set, use that value
+	if opts != nil && opts.Packed != nil {
+		return opts.GetPacked()
+	}
+	// if unset: proto2 defaults to false, proto3 to true
+	return fd.GetFile().IsProto3()
+}
+
+// sortable is used to sort map keys. Values will be integers (int32, int64, uint32, and uint64),
+// bools, or strings.
+type sortable []interface{}
+
+func (s sortable) Len() int {
+	return len(s)
+}
+
+func (s sortable) Less(i, j int) bool {
+	vi := s[i]
+	vj := s[j]
+	switch reflect.TypeOf(vi).Kind() {
+	case reflect.Int32:
+		return vi.(int32) < vj.(int32)
+	case reflect.Int64:
+		return vi.(int64) < vj.(int64)
+	case reflect.Uint32:
+		return vi.(uint32) < vj.(uint32)
+	case reflect.Uint64:
+		return vi.(uint64) < vj.(uint64)
+	case reflect.String:
+		return vi.(string) < vj.(string)
+	case reflect.Bool:
+		return !vi.(bool) && vj.(bool)
+	default:
+		panic(fmt.Sprintf("cannot compare keys of type %v", reflect.TypeOf(vi)))
+	}
+}
+
+func (s sortable) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (b *Buffer) encodeFieldElement(fd *desc.FieldDescriptor, val interface{}, deterministic bool) error {
+	wt, err := getWireType(fd.GetType())
+	if err != nil {
 		return err
 	}
-	cb.buf = append(cb.buf, bytes...)
+	if err := b.EncodeTagAndWireType(fd.GetNumber(), wt); err != nil {
+		return err
+	}
+	if err := b.encodeFieldValue(fd, val, deterministic); err != nil {
+		return err
+	}
+	if wt == proto.WireStartGroup {
+		return b.EncodeTagAndWireType(fd.GetNumber(), proto.WireEndGroup)
+	}
 	return nil
+}
+
+type deterministicMarshaler interface {
+	MarshalDeterministic() ([]byte, error)
+}
+
+func (b *Buffer) encodeFieldValue(fd *desc.FieldDescriptor, val interface{}, deterministic bool) error {
+	switch fd.GetType() {
+	case descriptor.FieldDescriptorProto_TYPE_BOOL:
+		v := val.(bool)
+		if v {
+			return b.EncodeVarint(1)
+		} else {
+			return b.EncodeVarint(0)
+		}
+
+	case descriptor.FieldDescriptorProto_TYPE_ENUM,
+		descriptor.FieldDescriptorProto_TYPE_INT32:
+		v := val.(int32)
+		return b.EncodeVarint(uint64(v))
+
+	case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
+		v := val.(int32)
+		return b.EncodeFixed32(uint64(v))
+
+	case descriptor.FieldDescriptorProto_TYPE_SINT32:
+		v := val.(int32)
+		return b.EncodeVarint(EncodeZigZag32(v))
+
+	case descriptor.FieldDescriptorProto_TYPE_UINT32:
+		v := val.(uint32)
+		return b.EncodeVarint(uint64(v))
+
+	case descriptor.FieldDescriptorProto_TYPE_FIXED32:
+		v := val.(uint32)
+		return b.EncodeFixed32(uint64(v))
+
+	case descriptor.FieldDescriptorProto_TYPE_INT64:
+		v := val.(int64)
+		return b.EncodeVarint(uint64(v))
+
+	case descriptor.FieldDescriptorProto_TYPE_SFIXED64:
+		v := val.(int64)
+		return b.EncodeFixed64(uint64(v))
+
+	case descriptor.FieldDescriptorProto_TYPE_SINT64:
+		v := val.(int64)
+		return b.EncodeVarint(EncodeZigZag64(v))
+
+	case descriptor.FieldDescriptorProto_TYPE_UINT64:
+		v := val.(uint64)
+		return b.EncodeVarint(v)
+
+	case descriptor.FieldDescriptorProto_TYPE_FIXED64:
+		v := val.(uint64)
+		return b.EncodeFixed64(v)
+
+	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+		v := val.(float64)
+		return b.EncodeFixed64(math.Float64bits(v))
+
+	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
+		v := val.(float32)
+		return b.EncodeFixed32(uint64(math.Float32bits(v)))
+
+	case descriptor.FieldDescriptorProto_TYPE_BYTES:
+		v := val.([]byte)
+		return b.EncodeRawBytes(v)
+
+	case descriptor.FieldDescriptorProto_TYPE_STRING:
+		v := val.(string)
+		return b.EncodeRawBytes(([]byte)(v))
+
+	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
+		return b.encodeMessage(val.(proto.Message), deterministic)
+
+	case descriptor.FieldDescriptorProto_TYPE_GROUP:
+		// just append the nested message to this buffer
+		var bb []byte
+		if dm, ok := val.(deterministicMarshaler); ok && deterministic {
+			var err error
+			bb, err = dm.MarshalDeterministic()
+			if err != nil {
+				return err
+			}
+		} else {
+			var err error
+			bb, err = proto.Marshal(val.(proto.Message))
+			if err != nil {
+				return err
+			}
+		}
+		_, err := b.Write(bb)
+		return err
+		// whosoever writeth start-group tag (e.g. caller) is responsible for writing end-group tag
+
+	default:
+		return fmt.Errorf("unrecognized field type: %v", fd.GetType())
+	}
+}
+
+func getWireType(t descriptor.FieldDescriptorProto_Type) (int8, error) {
+	switch t {
+	case descriptor.FieldDescriptorProto_TYPE_ENUM,
+		descriptor.FieldDescriptorProto_TYPE_BOOL,
+		descriptor.FieldDescriptorProto_TYPE_INT32,
+		descriptor.FieldDescriptorProto_TYPE_SINT32,
+		descriptor.FieldDescriptorProto_TYPE_UINT32,
+		descriptor.FieldDescriptorProto_TYPE_INT64,
+		descriptor.FieldDescriptorProto_TYPE_SINT64,
+		descriptor.FieldDescriptorProto_TYPE_UINT64:
+		return proto.WireVarint, nil
+
+	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
+		descriptor.FieldDescriptorProto_TYPE_SFIXED32,
+		descriptor.FieldDescriptorProto_TYPE_FLOAT:
+		return proto.WireFixed32, nil
+
+	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
+		descriptor.FieldDescriptorProto_TYPE_SFIXED64,
+		descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+		return proto.WireFixed64, nil
+
+	case descriptor.FieldDescriptorProto_TYPE_BYTES,
+		descriptor.FieldDescriptorProto_TYPE_STRING,
+		descriptor.FieldDescriptorProto_TYPE_MESSAGE:
+		return proto.WireBytes, nil
+
+	case descriptor.FieldDescriptorProto_TYPE_GROUP:
+		return proto.WireStartGroup, nil
+
+	default:
+		return 0, proto.ErrInternalBadWireType
+	}
 }

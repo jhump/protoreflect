@@ -40,7 +40,7 @@ func TestBinaryMapKeyFields(t *testing.T) {
 	binaryTranslationParty(t, mapKeyFieldsMsg, false)
 }
 
-func TestMarshalMapValueFields(t *testing.T) {
+func TestBinaryMapValueFields(t *testing.T) {
 	// translation party wants deterministic marshalling to bytes
 	defaultDeterminism = true
 	defer func() {
@@ -166,8 +166,22 @@ func binaryTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 		marshalAppendPrefix,
 	}
 
+	protoMarshal := func(m proto.Message) ([]byte, error) {
+		if defaultDeterminism {
+			mm, ok := m.(interface {
+				XXX_Size() int
+				XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+			})
+			if ok {
+				bb := make([]byte, 0, mm.XXX_Size())
+				return mm.XXX_Marshal(bb, true)
+			}
+		}
+		return proto.Marshal(m)
+	}
+
 	for _, marshalFn := range marshalMethods {
-		doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalFn, (*Message).Unmarshal, includesNaN)
+		doTranslationParty(t, msg, protoMarshal, proto.Unmarshal, marshalFn, (*Message).Unmarshal, includesNaN, true)
 	}
 }
 

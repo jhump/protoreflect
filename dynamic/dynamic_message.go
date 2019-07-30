@@ -2295,7 +2295,11 @@ func (m *Message) mergeInto(pm proto.Message) error {
 		var b codec.Buffer
 		for tag := range unknownTags {
 			fd := m.FindFieldDescriptor(tag)
-			if err := marshalField(tag, fd, m.values[tag], &b, false); err != nil {
+			if defaultDeterminism {
+				if err := b.EncodeFieldValueDeterministic(fd, m.values[tag]); err != nil {
+					return err
+				}
+			} else if err := b.EncodeFieldValue(fd, m.values[tag]); err != nil {
 				return err
 			}
 		}

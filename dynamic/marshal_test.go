@@ -188,7 +188,7 @@ var mapValueFieldsInfNanMsg = &testprotos.MapValFields{
 func doTranslationParty(t *testing.T, msg proto.Message,
 	marshalPm func(proto.Message) ([]byte, error), unmarshalPm func([]byte, proto.Message) error,
 	marshalDm func(*Message) ([]byte, error), unmarshalDm func(*Message, []byte) error,
-	includesNaN bool) {
+	includesNaN, compareBytes bool) {
 
 	md, err := desc.LoadMessageDescriptorForMessage(msg)
 	testutil.Ok(t, err)
@@ -214,6 +214,9 @@ func doTranslationParty(t *testing.T, msg proto.Message,
 	if !includesNaN {
 		// NaN fields are never equal so this would always be false
 		testutil.Ceq(t, msg, msg2, eqpm)
+	}
+	if compareBytes {
+		testutil.Eq(t, b, b2a)
 	}
 
 	// and back again
