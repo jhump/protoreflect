@@ -14,8 +14,8 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc"
 )
@@ -28,6 +28,13 @@ var ErrOverflow = errors.New("proto: integer overflow")
 type Buffer struct {
 	buf   []byte
 	index int
+
+	// tmp is used when another byte slice is needed, such as when
+	// serializing messages, since we need to know the length before
+	// we can write the length prefix; by caching this, including
+	// after it is grown by serialization operations, we reduce the
+	// number of allocations needed
+	tmp []byte
 }
 
 // NewBuffer creates a new buffer with the given slice of bytes as the
@@ -518,11 +525,78 @@ func (cb *Buffer) EncodeMessageDeterministic(pm proto.Message) error {
 }
 
 func (cb *Buffer) encodeMessage(pm proto.Message, deterministic bool) error {
-	bytes, err := proto.Marshal(pm)
+	bytes, err := marshalMessage(cb.tmp, pm, deterministic)
 	if err != nil {
 		return err
 	}
+	// save truncated buffer if it was grown (so we can re-use it and
+	// curtail future allocations)
+	if cap(bytes) > cap(cb.tmp) {
+		cb.tmp = bytes[:0]
+	}
 	return cb.EncodeRawBytes(bytes)
+}
+
+func marshalMessage(b []byte, pm proto.Message, deterministic bool) ([]byte, error) {
+	// we try to use the most efficient way to marshal to existing slice
+	nm, ok := pm.(interface {
+		// this interface is implemented by generated messages
+		XXX_Size() int
+		XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+	})
+	if ok {
+		sz := nm.XXX_Size()
+		if cap(b) < len(b)+sz {
+			// re-allocate to fit
+			bytes := make([]byte, len(b), len(b)+sz)
+			copy(bytes, b)
+			b = bytes
+		}
+		return nm.XXX_Marshal(b, deterministic)
+	}
+
+	if deterministic {
+		// see if the message has custom deterministic methods, preferring an
+		// "append" method over one that must always re-allocate
+		madm, ok := pm.(interface {
+			MarshalAppendDeterministic(b []byte) ([]byte, error)
+		})
+		if ok {
+			return madm.MarshalAppendDeterministic(b)
+		}
+
+		mdm, ok := pm.(interface {
+			MarshalDeterministic() ([]byte, error)
+		})
+		if ok {
+			bytes, err := mdm.MarshalDeterministic()
+			if err != nil {
+				return nil, err
+			}
+			if len(b) == 0 {
+				return bytes, nil
+			}
+			return append(b, bytes...), nil
+		}
+	}
+
+	mam, ok := pm.(interface {
+		// see if we can append the message, vs. having to re-allocate
+		MarshalAppend(b []byte) ([]byte, error)
+	})
+	if ok {
+		return mam.MarshalAppend(b)
+	}
+
+	// lowest common denominator
+	bytes, err := proto.Marshal(pm)
+	if err != nil {
+		return nil, err
+	}
+	if len(b) == 0 {
+		return bytes, nil
+	}
+	return append(b, bytes...), nil
 }
 
 func (cb *Buffer) EncodeFieldValue(fd *desc.FieldDescriptor, val interface{}) error {
@@ -673,19 +747,14 @@ func (b *Buffer) encodeFieldElement(fd *desc.FieldDescriptor, val interface{}, d
 	return nil
 }
 
-type deterministicMarshaler interface {
-	MarshalDeterministic() ([]byte, error)
-}
-
 func (b *Buffer) encodeFieldValue(fd *desc.FieldDescriptor, val interface{}, deterministic bool) error {
 	switch fd.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
 		v := val.(bool)
 		if v {
 			return b.EncodeVarint(1)
-		} else {
-			return b.EncodeVarint(0)
 		}
+		return b.EncodeVarint(0)
 
 	case descriptor.FieldDescriptorProto_TYPE_ENUM,
 		descriptor.FieldDescriptorProto_TYPE_INT32:
@@ -749,22 +818,12 @@ func (b *Buffer) encodeFieldValue(fd *desc.FieldDescriptor, val interface{}, det
 
 	case descriptor.FieldDescriptorProto_TYPE_GROUP:
 		// just append the nested message to this buffer
-		var bb []byte
-		if dm, ok := val.(deterministicMarshaler); ok && deterministic {
-			var err error
-			bb, err = dm.MarshalDeterministic()
-			if err != nil {
-				return err
-			}
-		} else {
-			var err error
-			bb, err = proto.Marshal(val.(proto.Message))
-			if err != nil {
-				return err
-			}
+		bytes, err := marshalMessage(b.buf, val.(proto.Message), deterministic)
+		if err != nil {
+			return err
 		}
-		_, err := b.Write(bb)
-		return err
+		b.buf = bytes
+		return nil
 		// whosoever writeth start-group tag (e.g. caller) is responsible for writing end-group tag
 
 	default:

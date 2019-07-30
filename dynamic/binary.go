@@ -57,6 +57,20 @@ func (m *Message) MarshalDeterministic() ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+// MarshalAppendDeterministic behaves exactly the same as MarshalDeterministic,
+// except instead of allocating a new byte slice to marshal into, it uses the
+// provided byte slice. The backing array for the returned byte slice *may* be
+// the same as the one that was passed in, but it's not guaranteed as a new
+// backing array will automatically be allocated if more bytes need to be written
+// than the provided buffer has capacity for.
+func (m *Message) MarshalAppendDeterministic(b []byte) ([]byte, error) {
+	codedBuf := codec.NewBuffer(b)
+	if err := m.marshal(codedBuf, defaultDeterminism); err != nil {
+		return nil, err
+	}
+	return codedBuf.Bytes(), nil
+}
+
 func (m *Message) marshal(b *codec.Buffer, deterministic bool) error {
 	if err := m.marshalKnownFields(b, deterministic); err != nil {
 		return err
