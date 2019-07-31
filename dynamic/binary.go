@@ -65,7 +65,7 @@ func (m *Message) MarshalDeterministic() ([]byte, error) {
 // than the provided buffer has capacity for.
 func (m *Message) MarshalAppendDeterministic(b []byte) ([]byte, error) {
 	codedBuf := codec.NewBuffer(b)
-	if err := m.marshal(codedBuf, defaultDeterminism); err != nil {
+	if err := m.marshal(codedBuf, true); err != nil {
 		return nil, err
 	}
 	return codedBuf.Bytes(), nil
