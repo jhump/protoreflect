@@ -123,7 +123,7 @@ func (m *Message) marshalUnknownFields(b *codec.Buffer) error {
 					return err
 				}
 			default:
-				return codec.ErrInternalBadWireType
+				return codec.ErrBadWireType
 			}
 		}
 	}
@@ -153,12 +153,12 @@ func (m *Message) unmarshal(buf *codec.Buffer, isGroup bool) error {
 	for !buf.EOF() {
 		fd, val, err := buf.DecodeFieldValue(m.FindFieldDescriptor, m.mf)
 		if err != nil {
-			if err == codec.ErrWireEndGroup {
+			if err == codec.ErrWireTypeEndGroup {
 				if isGroup {
 					// finished parsing group
 					return nil
 				}
-				return codec.ErrInternalBadWireType
+				return codec.ErrBadWireType
 			}
 			return err
 		}

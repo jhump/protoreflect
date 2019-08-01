@@ -1756,7 +1756,7 @@ func (m *Message) parseUnknownField(fd *desc.FieldDescriptor) (interface{}, erro
 		if unk.Encoding == proto.WireBytes || unk.Encoding == proto.WireStartGroup {
 			val, err = codec.DecodeLengthDelimitedField(fd, unk.Contents, m.mf)
 		} else {
-			val, err = codec.DecodeSimpleField(fd, unk.Value)
+			val, err = codec.DecodeScalarField(fd, unk.Value)
 		}
 		if err != nil {
 			return nil, err
