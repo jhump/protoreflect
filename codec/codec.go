@@ -653,20 +653,11 @@ func (b *Buffer) decodeKnownField(fd *desc.FieldDescriptor, encoding int8, fact 
 		}
 
 	case proto.WireBytes:
-		if fd.GetType() == descriptor.FieldDescriptorProto_TYPE_BYTES {
-			val, err = b.DecodeRawBytes(true) // defensive copy
-		} else if fd.GetType() == descriptor.FieldDescriptorProto_TYPE_STRING {
-			var raw []byte
-			raw, err = b.DecodeRawBytes(true) // defensive copy
-			if err == nil {
-				val = string(raw)
-			}
-		} else {
-			var raw []byte
-			raw, err = b.DecodeRawBytes(false)
-			if err == nil {
-				val, err = DecodeLengthDelimitedField(fd, raw, fact)
-			}
+		alloc := fd.GetType() == descriptor.FieldDescriptorProto_TYPE_BYTES
+		var raw []byte
+		raw, err = b.DecodeRawBytes(alloc)
+		if err == nil {
+			val, err = DecodeLengthDelimitedField(fd, raw, fact)
 		}
 
 	case proto.WireStartGroup:
