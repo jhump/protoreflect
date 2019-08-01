@@ -72,7 +72,7 @@ func TestLinkerValidation(t *testing.T) {
 			map[string]string{
 				"foo.proto": "import \"foo2.proto\"; message fubar{}",
 			},
-			"failed to load imports for \"foo.proto\": file not found: foo2.proto",
+			"foo.proto: failed to load imports: file not found: foo2.proto",
 		},
 		{
 			map[string]string{

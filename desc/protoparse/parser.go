@@ -400,7 +400,10 @@ func parseProtoFiles(acc FileAccessor, filenames []string, recursive, validate b
 				case ErrorWithSourcePos:
 					return err
 				default:
-					return fmt.Errorf("failed to load imports for %q: %s", name, err)
+					return ErrorWithSourcePos{
+						Pos:        unknownPos(name),
+						Underlying: fmt.Errorf("failed to load imports: %v", err),
+					}
 				}
 			}
 		}
