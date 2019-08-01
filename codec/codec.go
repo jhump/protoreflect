@@ -23,6 +23,31 @@ import (
 // ErrOverflow is returned when an integer is too large to be represented.
 var ErrOverflow = errors.New("proto: integer overflow")
 
+var ErrInternalBadWireType = errors.New("proto: bad wiretype")
+
+var varintTypes = map[descriptor.FieldDescriptorProto_Type]bool{}
+var fixed32Types = map[descriptor.FieldDescriptorProto_Type]bool{}
+var fixed64Types = map[descriptor.FieldDescriptorProto_Type]bool{}
+
+func init() {
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_BOOL] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_INT32] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_INT64] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_UINT32] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_UINT64] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_SINT32] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_SINT64] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_ENUM] = true
+
+	fixed32Types[descriptor.FieldDescriptorProto_TYPE_FIXED32] = true
+	fixed32Types[descriptor.FieldDescriptorProto_TYPE_SFIXED32] = true
+	fixed32Types[descriptor.FieldDescriptorProto_TYPE_FLOAT] = true
+
+	fixed64Types[descriptor.FieldDescriptorProto_TYPE_FIXED64] = true
+	fixed64Types[descriptor.FieldDescriptorProto_TYPE_SFIXED64] = true
+	fixed64Types[descriptor.FieldDescriptorProto_TYPE_DOUBLE] = true
+}
+
 // Buffer is a reader and a writer that wraps a slice of bytes and also
 // provides API for decoding and encoding the protobuf binary format.
 type Buffer struct {
@@ -35,12 +60,23 @@ type Buffer struct {
 	// after it is grown by serialization operations, we reduce the
 	// number of allocations needed
 	tmp []byte
+
+	deterministic bool
 }
 
 // NewBuffer creates a new buffer with the given slice of bytes as the
 // buffer's initial contents.
 func NewBuffer(buf []byte) *Buffer {
 	return &Buffer{buf: buf}
+}
+
+// SetDeterministic sets this buffer to encode messages deterministically. This
+// is useful for tests. But the overhead is non-zero, so it should not likely be
+// used outside of tests. When true, map fields in a message must have their
+// keys sorted before serialization to ensure deterministic output. Otherwise,
+// values in a map field will be serialized in map iteration order.
+func (cb *Buffer) SetDeterministic(deterministic bool) {
+	cb.deterministic = deterministic
 }
 
 // Reset resets this buffer back to empty. Any subsequent writes/encodes
@@ -350,11 +386,13 @@ func (cb *Buffer) ReadGroup(alloc bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	var results []byte
 	if !alloc {
-		return cb.buf[cb.index:dataEnd], nil
+		results = cb.buf[cb.index:dataEnd]
+	} else {
+		results = make([]byte, dataEnd-cb.index)
+		copy(results, cb.buf[cb.index:])
 	}
-	results := make([]byte, dataEnd-cb.index)
-	copy(results, cb.buf[cb.index:])
 	cb.index = groupEnd
 	return results, nil
 }
@@ -413,7 +451,7 @@ func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
 			// TODO: This would only overflow if buffer length was MaxInt and we
 			// read the last byte. This is not a real/feasible concern on 64-bit
 			// systems. Something to worry about for 32-bit systems? Do we care?
-			cb.index++
+			cb.index = i + 1
 		case proto.WireBytes:
 			l, err := cb.DecodeVarint()
 			if err != nil {
@@ -429,9 +467,260 @@ func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
 		case proto.WireEndGroup:
 			return cb.index, fieldStart, nil
 		default:
-			return 0, 0, proto.ErrInternalBadWireType
+			return 0, 0, ErrInternalBadWireType
 		}
 	}
+}
+
+type MessageFactory interface {
+	NewMessage(md *desc.MessageDescriptor) proto.Message
+}
+
+// UnknownField represents a field that was parsed from the binary wire
+// format for a message, but was not a recognized field number. Enough
+// information is preserved so that re-serializing the message won't lose
+// any of the unrecognized data.
+type UnknownField struct {
+	Tag int32
+	// Encoding indicates how the unknown field was encoded on the wire. If it
+	// is proto.WireBytes or proto.WireGroupStart then Contents will be set to
+	// the raw bytes. If it is proto.WireTypeFixed32 then the data is in the least
+	// significant 32 bits of Value. Otherwise, the data is in all 64 bits of
+	// Value.
+	Encoding int8
+	Contents []byte
+	Value    uint64
+}
+
+var ErrWireEndGroup = errors.New("wire type end group")
+
+// DecodeFieldValue
+func (cb *Buffer) DecodeFieldValue(fieldFinder func(int32) *desc.FieldDescriptor, fact MessageFactory) (*desc.FieldDescriptor, interface{}, error) {
+	if cb.EOF() {
+		return nil, nil, io.EOF
+	}
+	tagNumber, wireType, err := cb.DecodeTagAndWireType()
+	if err != nil {
+		return nil, nil, err
+	}
+	if wireType == proto.WireEndGroup {
+		return nil, tagNumber, ErrWireEndGroup
+	}
+	fd := fieldFinder(tagNumber)
+	if fd == nil {
+		val, err := cb.decodeUnknownField(tagNumber, wireType)
+		return nil, val, err
+	}
+	val, err := cb.decodeKnownField(fd, wireType, fact)
+	return fd, val, err
+}
+
+func DecodeSimpleField(fd *desc.FieldDescriptor, v uint64) (interface{}, error) {
+	switch fd.GetType() {
+	case descriptor.FieldDescriptorProto_TYPE_BOOL:
+		return v != 0, nil
+	case descriptor.FieldDescriptorProto_TYPE_UINT32,
+		descriptor.FieldDescriptorProto_TYPE_FIXED32:
+		if v > math.MaxUint32 {
+			return nil, ErrOverflow
+		}
+		return uint32(v), nil
+
+	case descriptor.FieldDescriptorProto_TYPE_INT32,
+		descriptor.FieldDescriptorProto_TYPE_ENUM:
+		s := int64(v)
+		if s > math.MaxInt32 || s < math.MinInt32 {
+			return nil, ErrOverflow
+		}
+		return int32(s), nil
+
+	case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
+		if v > math.MaxUint32 {
+			return nil, ErrOverflow
+		}
+		return int32(v), nil
+
+	case descriptor.FieldDescriptorProto_TYPE_SINT32:
+		if v > math.MaxUint32 {
+			return nil, ErrOverflow
+		}
+		return DecodeZigZag32(v), nil
+
+	case descriptor.FieldDescriptorProto_TYPE_UINT64,
+		descriptor.FieldDescriptorProto_TYPE_FIXED64:
+		return v, nil
+
+	case descriptor.FieldDescriptorProto_TYPE_INT64,
+		descriptor.FieldDescriptorProto_TYPE_SFIXED64:
+		return int64(v), nil
+
+	case descriptor.FieldDescriptorProto_TYPE_SINT64:
+		return DecodeZigZag64(v), nil
+
+	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
+		if v > math.MaxUint32 {
+			return nil, ErrOverflow
+		}
+		return math.Float32frombits(uint32(v)), nil
+
+	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+		return math.Float64frombits(v), nil
+
+	default:
+		// bytes, string, message, and group cannot be represented as a simple numeric value
+		return nil, fmt.Errorf("bad input; field %s requires length-delimited wire type", fd.GetFullyQualifiedName())
+	}
+}
+
+func DecodeLengthDelimitedField(fd *desc.FieldDescriptor, bytes []byte, mf MessageFactory) (interface{}, error) {
+	switch {
+	case fd.GetType() == descriptor.FieldDescriptorProto_TYPE_BYTES:
+		return bytes, nil
+
+	case fd.GetType() == descriptor.FieldDescriptorProto_TYPE_STRING:
+		return string(bytes), nil
+
+	case fd.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE ||
+		fd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP:
+		msg := mf.NewMessage(fd.GetMessageType())
+		err := proto.Unmarshal(bytes, msg)
+		if err != nil {
+			return nil, err
+		} else {
+			return msg, nil
+		}
+
+	default:
+		// even if the field is not repeated or not packed, we still parse it as such for
+		// backwards compatibility (e.g. message we are de-serializing could have been both
+		// repeated and packed at the time of serialization)
+		packedBuf := NewBuffer(bytes)
+		var slice []interface{}
+		var val interface{}
+		for !packedBuf.EOF() {
+			var v uint64
+			var err error
+			if varintTypes[fd.GetType()] {
+				v, err = packedBuf.DecodeVarint()
+			} else if fixed32Types[fd.GetType()] {
+				v, err = packedBuf.DecodeFixed32()
+			} else if fixed64Types[fd.GetType()] {
+				v, err = packedBuf.DecodeFixed64()
+			} else {
+				return nil, fmt.Errorf("bad input; cannot parse length-delimited wire type for field %s", fd.GetFullyQualifiedName())
+			}
+			if err != nil {
+				return nil, err
+			}
+			val, err = DecodeSimpleField(fd, v)
+			if err != nil {
+				return nil, err
+			}
+			if fd.IsRepeated() {
+				slice = append(slice, val)
+			}
+		}
+		if fd.IsRepeated() {
+			return slice, nil
+		} else {
+			// if not a repeated field, last value wins
+			return val, nil
+		}
+	}
+}
+
+func (b *Buffer) decodeKnownField(fd *desc.FieldDescriptor, encoding int8, fact MessageFactory) (interface{}, error) {
+	var val interface{}
+	var err error
+	switch encoding {
+	case proto.WireFixed32:
+		var num uint64
+		num, err = b.DecodeFixed32()
+		if err == nil {
+			val, err = DecodeSimpleField(fd, num)
+		}
+	case proto.WireFixed64:
+		var num uint64
+		num, err = b.DecodeFixed64()
+		if err == nil {
+			val, err = DecodeSimpleField(fd, num)
+		}
+	case proto.WireVarint:
+		var num uint64
+		num, err = b.DecodeVarint()
+		if err == nil {
+			val, err = DecodeSimpleField(fd, num)
+		}
+
+	case proto.WireBytes:
+		if fd.GetType() == descriptor.FieldDescriptorProto_TYPE_BYTES {
+			val, err = b.DecodeRawBytes(true) // defensive copy
+		} else if fd.GetType() == descriptor.FieldDescriptorProto_TYPE_STRING {
+			var raw []byte
+			raw, err = b.DecodeRawBytes(true) // defensive copy
+			if err == nil {
+				val = string(raw)
+			}
+		} else {
+			var raw []byte
+			raw, err = b.DecodeRawBytes(false)
+			if err == nil {
+				val, err = DecodeLengthDelimitedField(fd, raw, fact)
+			}
+		}
+
+	case proto.WireStartGroup:
+		if fd.GetMessageType() == nil {
+			return nil, fmt.Errorf("cannot parse field %s from group-encoded wire type", fd.GetFullyQualifiedName())
+		}
+		msg := fact.NewMessage(fd.GetMessageType())
+		//if dm, ok := msg.(*Message); ok {
+		//	err = dm.unmarshal(b, true)
+		//	if err == nil {
+		//		val = dm
+		//	}
+		//} else {
+		var data []byte
+		data, err = b.ReadGroup(false)
+		if err == nil {
+			err = proto.Unmarshal(data, msg)
+			if err == nil {
+				val = msg
+			}
+		}
+		//}
+
+	default:
+		return nil, ErrInternalBadWireType
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return val, nil
+}
+
+func (b *Buffer) decodeUnknownField(tagNumber int32, encoding int8) (interface{}, error) {
+	u := UnknownField{Tag: tagNumber, Encoding: encoding}
+	var err error
+	switch encoding {
+	case proto.WireFixed32:
+		u.Value, err = b.DecodeFixed32()
+	case proto.WireFixed64:
+		u.Value, err = b.DecodeFixed64()
+	case proto.WireVarint:
+		u.Value, err = b.DecodeVarint()
+	case proto.WireBytes:
+		u.Contents, err = b.DecodeRawBytes(true)
+	case proto.WireStartGroup:
+		u.Contents, err = b.ReadGroup(true)
+	default:
+		err = ErrInternalBadWireType
+	}
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
 }
 
 // Write implements the io.Writer interface. It always returns
@@ -516,16 +805,20 @@ func (cb *Buffer) EncodeRawBytes(b []byte) error {
 	return nil
 }
 
+// EncodeMessage writes the given message to the buffer.
 func (cb *Buffer) EncodeMessage(pm proto.Message) error {
-	return cb.encodeMessage(pm, false)
+	bytes, err := marshalMessage(cb.buf, pm, cb.deterministic)
+	if err != nil {
+		return err
+	}
+	cb.buf = bytes
+	return nil
 }
 
-func (cb *Buffer) EncodeMessageDeterministic(pm proto.Message) error {
-	return cb.encodeMessage(pm, true)
-}
-
-func (cb *Buffer) encodeMessage(pm proto.Message, deterministic bool) error {
-	bytes, err := marshalMessage(cb.tmp, pm, deterministic)
+// EncodeDelimitedMessage writes the given message to the buffer with a
+// varint-encoded length prefix (the delimiter).
+func (cb *Buffer) EncodeDelimitedMessage(pm proto.Message) error {
+	bytes, err := marshalMessage(cb.tmp, pm, cb.deterministic)
 	if err != nil {
 		return err
 	}
@@ -600,21 +893,13 @@ func marshalMessage(b []byte, pm proto.Message, deterministic bool) ([]byte, err
 }
 
 func (cb *Buffer) EncodeFieldValue(fd *desc.FieldDescriptor, val interface{}) error {
-	return cb.encodeField(fd, val, false)
-}
-
-func (cb *Buffer) EncodeFieldValueDeterministic(fd *desc.FieldDescriptor, val interface{}) error {
-	return cb.encodeField(fd, val, true)
-}
-
-func (b *Buffer) encodeField(fd *desc.FieldDescriptor, val interface{}, deterministic bool) error {
 	if fd.IsMap() {
 		mp := val.(map[interface{}]interface{})
 		entryType := fd.GetMessageType()
 		keyType := entryType.FindFieldByNumber(1)
 		valType := entryType.FindFieldByNumber(2)
 		var entryBuffer Buffer
-		if deterministic {
+		if cb.deterministic {
 			keys := make([]interface{}, 0, len(mp))
 			for k := range mp {
 				keys = append(keys, k)
@@ -623,32 +908,32 @@ func (b *Buffer) encodeField(fd *desc.FieldDescriptor, val interface{}, determin
 			for _, k := range keys {
 				v := mp[k]
 				entryBuffer.Reset()
-				if err := entryBuffer.encodeFieldElement(keyType, k, deterministic); err != nil {
+				if err := entryBuffer.encodeFieldElement(keyType, k); err != nil {
 					return err
 				}
-				if err := entryBuffer.encodeFieldElement(valType, v, deterministic); err != nil {
+				if err := entryBuffer.encodeFieldElement(valType, v); err != nil {
 					return err
 				}
-				if err := b.EncodeTagAndWireType(fd.GetNumber(), proto.WireBytes); err != nil {
+				if err := cb.EncodeTagAndWireType(fd.GetNumber(), proto.WireBytes); err != nil {
 					return err
 				}
-				if err := b.EncodeRawBytes(entryBuffer.Bytes()); err != nil {
+				if err := cb.EncodeRawBytes(entryBuffer.Bytes()); err != nil {
 					return err
 				}
 			}
 		} else {
 			for k, v := range mp {
 				entryBuffer.Reset()
-				if err := entryBuffer.encodeFieldElement(keyType, k, deterministic); err != nil {
+				if err := entryBuffer.encodeFieldElement(keyType, k); err != nil {
 					return err
 				}
-				if err := entryBuffer.encodeFieldElement(valType, v, deterministic); err != nil {
+				if err := entryBuffer.encodeFieldElement(valType, v); err != nil {
 					return err
 				}
-				if err := b.EncodeTagAndWireType(fd.GetNumber(), proto.WireBytes); err != nil {
+				if err := cb.EncodeTagAndWireType(fd.GetNumber(), proto.WireBytes); err != nil {
 					return err
 				}
-				if err := b.EncodeRawBytes(entryBuffer.Bytes()); err != nil {
+				if err := cb.EncodeRawBytes(entryBuffer.Bytes()); err != nil {
 					return err
 				}
 			}
@@ -665,25 +950,25 @@ func (b *Buffer) encodeField(fd *desc.FieldDescriptor, val interface{}, determin
 			// packed repeated field
 			var packedBuffer Buffer
 			for _, v := range sl {
-				if err := packedBuffer.encodeFieldValue(fd, v, deterministic); err != nil {
+				if err := packedBuffer.encodeFieldValue(fd, v); err != nil {
 					return err
 				}
 			}
-			if err := b.EncodeTagAndWireType(fd.GetNumber(), proto.WireBytes); err != nil {
+			if err := cb.EncodeTagAndWireType(fd.GetNumber(), proto.WireBytes); err != nil {
 				return err
 			}
-			return b.EncodeRawBytes(packedBuffer.Bytes())
+			return cb.EncodeRawBytes(packedBuffer.Bytes())
 		} else {
 			// non-packed repeated field
 			for _, v := range sl {
-				if err := b.encodeFieldElement(fd, v, deterministic); err != nil {
+				if err := cb.encodeFieldElement(fd, v); err != nil {
 					return err
 				}
 			}
 			return nil
 		}
 	} else {
-		return b.encodeFieldElement(fd, val, deterministic)
+		return cb.encodeFieldElement(fd, val)
 	}
 }
 
@@ -730,7 +1015,7 @@ func (s sortable) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (b *Buffer) encodeFieldElement(fd *desc.FieldDescriptor, val interface{}, deterministic bool) error {
+func (b *Buffer) encodeFieldElement(fd *desc.FieldDescriptor, val interface{}) error {
 	wt, err := getWireType(fd.GetType())
 	if err != nil {
 		return err
@@ -738,7 +1023,7 @@ func (b *Buffer) encodeFieldElement(fd *desc.FieldDescriptor, val interface{}, d
 	if err := b.EncodeTagAndWireType(fd.GetNumber(), wt); err != nil {
 		return err
 	}
-	if err := b.encodeFieldValue(fd, val, deterministic); err != nil {
+	if err := b.encodeFieldValue(fd, val); err != nil {
 		return err
 	}
 	if wt == proto.WireStartGroup {
@@ -747,7 +1032,7 @@ func (b *Buffer) encodeFieldElement(fd *desc.FieldDescriptor, val interface{}, d
 	return nil
 }
 
-func (b *Buffer) encodeFieldValue(fd *desc.FieldDescriptor, val interface{}, deterministic bool) error {
+func (b *Buffer) encodeFieldValue(fd *desc.FieldDescriptor, val interface{}) error {
 	switch fd.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
 		v := val.(bool)
@@ -814,16 +1099,11 @@ func (b *Buffer) encodeFieldValue(fd *desc.FieldDescriptor, val interface{}, det
 		return b.EncodeRawBytes(([]byte)(v))
 
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		return b.encodeMessage(val.(proto.Message), deterministic)
+		return b.EncodeDelimitedMessage(val.(proto.Message))
 
 	case descriptor.FieldDescriptorProto_TYPE_GROUP:
 		// just append the nested message to this buffer
-		bytes, err := marshalMessage(b.buf, val.(proto.Message), deterministic)
-		if err != nil {
-			return err
-		}
-		b.buf = bytes
-		return nil
+		return b.EncodeMessage(val.(proto.Message))
 		// whosoever writeth start-group tag (e.g. caller) is responsible for writing end-group tag
 
 	default:
@@ -862,6 +1142,6 @@ func getWireType(t descriptor.FieldDescriptorProto_Type) (int8, error) {
 		return proto.WireStartGroup, nil
 
 	default:
-		return 0, proto.ErrInternalBadWireType
+		return 0, ErrInternalBadWireType
 	}
 }

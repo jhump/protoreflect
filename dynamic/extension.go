@@ -37,11 +37,8 @@ func SetExtension(msg proto.Message, extd *desc.FieldDescriptor, val interface{}
 	}
 
 	var b codec.Buffer
-	if defaultDeterminism {
-		if err := b.EncodeFieldValueDeterministic(extd, val); err != nil {
-			return err
-		}
-	} else if err := b.EncodeFieldValue(extd, val); err != nil {
+	b.SetDeterministic(defaultDeterminism)
+	if err := b.EncodeFieldValue(extd, val); err != nil {
 		return err
 	}
 	proto.SetRawExtension(msg, extd.GetNumber(), b.Bytes())

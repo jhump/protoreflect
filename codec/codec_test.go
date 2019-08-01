@@ -43,7 +43,7 @@ func TestEncodeMessage(t *testing.T) {
 	// old proto.Marshal implementation for non-deterministic marshaling
 	cm := (*TestMessage)(pm)
 
-	testCases := []struct{
+	testCases := []struct {
 		Name string
 		Msg  proto.Message
 	}{
@@ -51,50 +51,84 @@ func TestEncodeMessage(t *testing.T) {
 		{Name: "dynamic", Msg: dm},
 		{Name: "custom", Msg: cm},
 	}
+	dels := []struct {
+		Name      string
+		Delimited bool
+	}{
+		{Name: "not delimited", Delimited: false},
+		{Name: "delimited", Delimited: true},
+	}
 
 	var bytes []byte
 
-	t.Run("deterministic", func(t *testing.T) {
-		for _, tc := range testCases {
-			t.Run(tc.Name, func(t *testing.T) {
-				var cb codec.Buffer
-				err := cb.EncodeMessageDeterministic(tc.Msg)
-				testutil.Ok(t, err)
-				b := cb.Bytes()
-				if bytes == nil {
-					bytes = b
-				} else {
-					// The generated proto message is the benchmark.
-					// Ensure that the others match its output.
-					testutil.Eq(t, bytes, b)
+	for _, dl := range dels {
+		t.Run(dl.Name, func(t *testing.T) {
+			t.Run("deterministic", func(t *testing.T) {
+				for _, tc := range testCases {
+					t.Run(tc.Name, func(t *testing.T) {
+						var cb codec.Buffer
+						cb.SetDeterministic(true)
+						if dl.Delimited {
+							err := cb.EncodeDelimitedMessage(tc.Msg)
+							testutil.Ok(t, err)
+						} else {
+							err := cb.EncodeMessage(tc.Msg)
+							testutil.Ok(t, err)
+						}
+						b := cb.Bytes()
+						if bytes == nil {
+							bytes = b
+						} else if dl.Delimited {
+							// delimited writes have varint-encoded length prefix
+							var lenBuf codec.Buffer
+							err := lenBuf.EncodeVarint(uint64(len(bytes)))
+							testutil.Ok(t, err)
+							testutil.Eq(t, append(lenBuf.Bytes(), bytes...), b)
+						} else {
+							// The generated proto message is the benchmark.
+							// Ensure that the others match its output.
+							testutil.Eq(t, bytes, b)
+						}
+					})
 				}
 			})
-		}
-	})
 
-	t.Run("non-deterministic", func(t *testing.T) {
-		for _, tc := range testCases {
-			t.Run(tc.Name, func(t *testing.T) {
-				var cb codec.Buffer
-				err := cb.EncodeMessage(tc.Msg)
-				testutil.Ok(t, err)
+			t.Run("non-deterministic", func(t *testing.T) {
+				for _, tc := range testCases {
+					t.Run(tc.Name, func(t *testing.T) {
+						var cb codec.Buffer
+						if dl.Delimited {
+							err := cb.EncodeDelimitedMessage(tc.Msg)
+							testutil.Ok(t, err)
+						} else {
+							err := cb.EncodeMessage(tc.Msg)
+							testutil.Ok(t, err)
+						}
 
-				l, err := cb.DecodeVarint()
-				testutil.Ok(t, err)
-				b := cb.Bytes()
-				testutil.Eq(t, int(l), len(b))
-				// we can't compare byte slices to benchmark since the
-				// message contains a map and we are not using deterministic
-				// marshal method; so verify that unmarshaling the bytes
-				// results in an equal message as the original
-				var pm2 testprotos.Test
-				err = proto.Unmarshal(b, &pm2)
-				testutil.Ok(t, err)
+						var b []byte
+						if dl.Delimited {
+							// delimited writes have varint-encoded length prefix
+							l, err := cb.DecodeVarint()
+							testutil.Ok(t, err)
+							b = cb.Bytes()
+							testutil.Eq(t, int(l), len(b))
+						} else {
+							b = cb.Bytes()
+						}
+						// we can't compare byte slices to benchmark since the
+						// message contains a map and we are not using deterministic
+						// marshal method; so verify that unmarshaling the bytes
+						// results in an equal message as the original
+						var pm2 testprotos.Test
+						err = proto.Unmarshal(b, &pm2)
+						testutil.Ok(t, err)
 
-				testutil.Require(t, proto.Equal(pm, &pm2))
+						testutil.Require(t, proto.Equal(pm, &pm2))
+					})
+				}
 			})
-		}
-	})
+		})
+	}
 }
 
 // NB: other field types are well-exercised by dynamic.Message serialization tests
@@ -126,7 +160,7 @@ func TestEncodeFieldValue_Group(t *testing.T) {
 	// old proto.Marshal implementation for non-deterministic marshaling
 	cm := (*TestGroup)(pm)
 
-	testCases := []struct{
+	testCases := []struct {
 		Name string
 		Msg  proto.Message
 	}{
@@ -135,22 +169,23 @@ func TestEncodeFieldValue_Group(t *testing.T) {
 		{Name: "custom", Msg: cm},
 	}
 
-	methods := []struct{
-		Name string
-		Func func(*codec.Buffer, *desc.FieldDescriptor, interface{}) error
+	dets := []struct {
+		Name          string
+		Deterministic bool
 	}{
-		{Name: "deterministic", Func: (*codec.Buffer).EncodeFieldValueDeterministic},
-		{Name: "non-deterministic", Func: (*codec.Buffer).EncodeFieldValue},
+		{Name: "deterministic", Deterministic: true},
+		{Name: "non-deterministic", Deterministic: false},
 	}
 
 	var bytes []byte
 
-	for _, mtd := range methods {
-		t.Run(mtd.Name, func(t *testing.T) {
+	for _, det := range dets {
+		t.Run(det.Name, func(t *testing.T) {
 			for _, tc := range testCases {
 				t.Run(tc.Name, func(t *testing.T) {
 					var cb codec.Buffer
-					err := mtd.Func(&cb, rrFd, tc.Msg)
+					cb.SetDeterministic(det.Deterministic)
+					err := cb.EncodeFieldValue(rrFd, tc.Msg)
 					testutil.Ok(t, err)
 					b := cb.Bytes()
 					if bytes == nil {
