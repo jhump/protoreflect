@@ -18,7 +18,6 @@ matrix:
     - go: tip
       env:
       - GOPROXY=direct
-      - GOSUMDB=off
 
 # accomodate forks
 before_install:
