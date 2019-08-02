@@ -190,7 +190,10 @@ func TestErrorReporting(t *testing.T) {
 		testutil.Eq(t, len(tc.expectedErrs), count, "case #%d: parse should have called reporter %d times", i+1, len(tc.expectedErrs))
 		testutil.Eq(t, len(tc.expectedErrs), len(reported), "case #%d: wrong number of errors reported", i+1)
 		for j := range tc.expectedErrs {
-			testutil.Require(t, strings.Contains(reported[j].Error(), tc.expectedErrs[j]), "case #%d: parse error[%d] have %q; instead got %q", i+1, j, tc.expectedErrs[j], reported[j].Error())
+			testutil.Eq(t, tc.expectedErrs[j], reported[j].Error(), "case #%d: parse error[%d] have %q; instead got %q", i+1, j, tc.expectedErrs[j], reported[j].Error())
+			split := strings.SplitN(tc.expectedErrs[j], ":", 4)
+			testutil.Eq(t, 4, len(split), "case #%d: expected %q [%d] to contain at least 4 elements split by :", i+1, tc.expectedErrs[j], j)
+			testutil.Eq(t, split[3], " "+reported[j].GetUnderlying().Error(), "case #%d: parse error underlying[%d] have %q; instead got %q", i+1, j, split[3], reported[j].GetUnderlying().Error())
 		}
 
 		count = 0

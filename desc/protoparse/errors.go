@@ -58,9 +58,12 @@ func (h *errorHandler) getError() error {
 
 // ErrorWithPos is an error about a proto source file that includes information
 // about the location in the file that caused the error.
+//
+// The value of Error() will contain both the SourcePos and Underlying error.
 type ErrorWithPos interface {
 	error
 	GetPosition() SourcePos
+	GetUnderlying() error
 }
 
 // ErrorWithSourcePos is an error about a proto source file that includes
@@ -88,6 +91,12 @@ func (e ErrorWithSourcePos) Error() string {
 // proto source that caused the error.
 func (e ErrorWithSourcePos) GetPosition() SourcePos {
 	return *e.Pos
+}
+
+// GetUnderlying implements the ErrorWithPos interface, supplying the
+// underlying error. This error will not include location information.
+func (e ErrorWithSourcePos) GetUnderlying() error {
+	return e.Underlying
 }
 
 var _ ErrorWithPos = ErrorWithSourcePos{}
