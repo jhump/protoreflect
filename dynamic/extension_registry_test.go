@@ -14,7 +14,8 @@ func TestExtensionRegistry_AddExtension(t *testing.T) {
 	file, err := desc.LoadFileDescriptor("desc_test1.proto")
 	testutil.Ok(t, err)
 
-	er.AddExtension(file.GetExtensions()...)
+	err = er.AddExtension(file.GetExtensions()...)
+	testutil.Ok(t, err)
 
 	fds := er.AllExtensionsForType("testprotos.AnotherTestMessage")
 	sort.Sort(fields(fds))
@@ -32,7 +33,8 @@ func TestExtensionRegistry_AddExtension(t *testing.T) {
 func TestExtensionRegistry_AddExtensionDesc(t *testing.T) {
 	er := &ExtensionRegistry{}
 
-	er.AddExtensionDesc(testprotos.E_Xtm, testprotos.E_Xs, testprotos.E_Xi)
+	err := er.AddExtensionDesc(testprotos.E_Xtm, testprotos.E_Xs, testprotos.E_Xi)
+	testutil.Ok(t, err)
 
 	fds := er.AllExtensionsForType("testprotos.AnotherTestMessage")
 	sort.Sort(fields(fds))

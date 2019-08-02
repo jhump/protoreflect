@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
@@ -39,7 +40,7 @@ func TestBinaryMapKeyFields(t *testing.T) {
 	binaryTranslationParty(t, mapKeyFieldsMsg, false)
 }
 
-func TestMarshalMapValueFields(t *testing.T) {
+func TestBinaryMapValueFields(t *testing.T) {
 	// translation party wants deterministic marshalling to bytes
 	defaultDeterminism = true
 	defer func() {
@@ -67,70 +68,70 @@ func TestBinaryUnknownFields(t *testing.T) {
 	})
 	baseLen := len(b)
 	testutil.Ok(t, err)
-	buf := newCodedBuffer(b)
+	buf := codec.NewBuffer(b)
 
 	// and unknown fields:
 	//   varint encoded field
-	buf.encodeTagAndWireType(1234, proto.WireVarint)
-	buf.encodeVarint(987654)
+	_ = buf.EncodeTagAndWireType(1234, proto.WireVarint)
+	_ = buf.EncodeVarint(987654)
 	//   fixed 64
-	buf.encodeTagAndWireType(2345, proto.WireFixed64)
-	buf.encodeFixed64(123456789)
+	_ = buf.EncodeTagAndWireType(2345, proto.WireFixed64)
+	_ = buf.EncodeFixed64(123456789)
 	//   fixed 32, also repeated
-	buf.encodeTagAndWireType(3456, proto.WireFixed32)
-	buf.encodeFixed32(123456)
-	buf.encodeTagAndWireType(3456, proto.WireFixed32)
-	buf.encodeFixed32(123457)
-	buf.encodeTagAndWireType(3456, proto.WireFixed32)
-	buf.encodeFixed32(123458)
-	buf.encodeTagAndWireType(3456, proto.WireFixed32)
-	buf.encodeFixed32(123459)
+	_ = buf.EncodeTagAndWireType(3456, proto.WireFixed32)
+	_ = buf.EncodeFixed32(123456)
+	_ = buf.EncodeTagAndWireType(3456, proto.WireFixed32)
+	_ = buf.EncodeFixed32(123457)
+	_ = buf.EncodeTagAndWireType(3456, proto.WireFixed32)
+	_ = buf.EncodeFixed32(123458)
+	_ = buf.EncodeTagAndWireType(3456, proto.WireFixed32)
+	_ = buf.EncodeFixed32(123459)
 	//   length-encoded
-	buf.encodeTagAndWireType(4567, proto.WireBytes)
-	buf.encodeRawBytes([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+	_ = buf.EncodeTagAndWireType(4567, proto.WireBytes)
+	_ = buf.EncodeRawBytes([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 	//   and... group!
-	buf.encodeTagAndWireType(5678, proto.WireStartGroup)
+	_ = buf.EncodeTagAndWireType(5678, proto.WireStartGroup)
 	{
-		buf.encodeTagAndWireType(1, proto.WireVarint)
-		buf.encodeVarint(1)
-		buf.encodeTagAndWireType(2, proto.WireFixed32)
-		buf.encodeFixed32(2)
-		buf.encodeTagAndWireType(3, proto.WireFixed64)
-		buf.encodeFixed64(3)
-		buf.encodeTagAndWireType(4, proto.WireBytes)
-		buf.encodeRawBytes([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+		_ = buf.EncodeTagAndWireType(1, proto.WireVarint)
+		_ = buf.EncodeVarint(1)
+		_ = buf.EncodeTagAndWireType(2, proto.WireFixed32)
+		_ = buf.EncodeFixed32(2)
+		_ = buf.EncodeTagAndWireType(3, proto.WireFixed64)
+		_ = buf.EncodeFixed64(3)
+		_ = buf.EncodeTagAndWireType(4, proto.WireBytes)
+		_ = buf.EncodeRawBytes([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
 		// nested group
-		buf.encodeTagAndWireType(5, proto.WireStartGroup)
+		_ = buf.EncodeTagAndWireType(5, proto.WireStartGroup)
 		{
-			buf.encodeTagAndWireType(1, proto.WireVarint)
-			buf.encodeVarint(1)
-			buf.encodeTagAndWireType(1, proto.WireVarint)
-			buf.encodeVarint(2)
-			buf.encodeTagAndWireType(1, proto.WireVarint)
-			buf.encodeVarint(3)
-			buf.encodeTagAndWireType(2, proto.WireBytes)
-			buf.encodeRawBytes([]byte("lorem ipsum"))
+			_ = buf.EncodeTagAndWireType(1, proto.WireVarint)
+			_ = buf.EncodeVarint(1)
+			_ = buf.EncodeTagAndWireType(1, proto.WireVarint)
+			_ = buf.EncodeVarint(2)
+			_ = buf.EncodeTagAndWireType(1, proto.WireVarint)
+			_ = buf.EncodeVarint(3)
+			_ = buf.EncodeTagAndWireType(2, proto.WireBytes)
+			_ = buf.EncodeRawBytes([]byte("lorem ipsum"))
 		}
-		buf.encodeTagAndWireType(5, proto.WireEndGroup)
+		_ = buf.EncodeTagAndWireType(5, proto.WireEndGroup)
 	}
-	buf.encodeTagAndWireType(5678, proto.WireEndGroup)
-	testutil.Require(t, len(buf.buf) > baseLen) // sanity check
+	_ = buf.EncodeTagAndWireType(5678, proto.WireEndGroup)
+	testutil.Require(t, buf.Len() > baseLen) // sanity check
 
 	var msg testprotos.TestMessage
-	err = proto.Unmarshal(buf.buf, &msg)
+	err = proto.Unmarshal(buf.Bytes(), &msg)
 	testutil.Ok(t, err)
 	// make sure unrecognized fields parsed correctly
-	testutil.Eq(t, buf.buf[baseLen:], msg.XXX_unrecognized)
+	testutil.Eq(t, buf.Bytes()[baseLen:], msg.XXX_unrecognized)
 
 	// make sure dynamic message's round trip generates same bytes
 	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.TestMessage)(nil))
 	testutil.Ok(t, err)
 	dm := NewMessage(md)
-	err = dm.Unmarshal(buf.buf)
+	err = dm.Unmarshal(buf.Bytes())
 	testutil.Ok(t, err)
 	bb, err := dm.Marshal()
 	testutil.Ok(t, err)
-	testutil.Eq(t, buf.buf, bb)
+	testutil.Eq(t, buf.Bytes(), bb)
 
 	// now try a full translation party to ensure unknown bits remain correct throughout
 	binaryTranslationParty(t, &msg, false)
@@ -165,8 +166,22 @@ func binaryTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 		marshalAppendPrefix,
 	}
 
+	protoMarshal := func(m proto.Message) ([]byte, error) {
+		if defaultDeterminism {
+			mm, ok := m.(interface {
+				XXX_Size() int
+				XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+			})
+			if ok {
+				bb := make([]byte, 0, mm.XXX_Size())
+				return mm.XXX_Marshal(bb, true)
+			}
+		}
+		return proto.Marshal(m)
+	}
+
 	for _, marshalFn := range marshalMethods {
-		doTranslationParty(t, msg, proto.Marshal, proto.Unmarshal, marshalFn, (*Message).Unmarshal, includesNaN)
+		doTranslationParty(t, msg, protoMarshal, proto.Unmarshal, marshalFn, (*Message).Unmarshal, includesNaN, true)
 	}
 }
 

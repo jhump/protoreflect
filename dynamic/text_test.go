@@ -162,10 +162,14 @@ func TestTextLenientParsing(t *testing.T) {
 func textTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 	doTranslationParty(t, msg,
 		func(pm proto.Message) ([]byte, error) {
-			return []byte(proto.MarshalTextString(pm)), nil
+			return []byte(proto.CompactTextString(pm)), nil
 		},
 		func(b []byte, pm proto.Message) error {
 			return proto.UnmarshalText(string(b), pm)
 		},
-		(*Message).MarshalText, (*Message).UnmarshalText, includesNaN)
+		(*Message).MarshalText, (*Message).UnmarshalText, includesNaN,
+		// we don't compare bytes because we can't really make the proto and dynamic
+		// marshal methods work the same due to API differences in how to enable
+		// indentation/pretty-printing
+		false)
 }
