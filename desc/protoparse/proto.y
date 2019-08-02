@@ -434,9 +434,17 @@ constantList : constant {
 
 typeIdent : ident
 	| _TYPENAME
+	| '.' ident {
+        $$ = &identNode{val: "." + $2.val}
+        $$.setRange($1, $2)
+	}
 	| typeIdent _TYPENAME {
         $$ = &identNode{val: $1.val + $2.val}
         $$.setRange($1, $2)
+	}
+	| typeIdent '.' ident {
+        $$ = &identNode{val: $1.val + "." + $3.val}
+        $$.setRange($1, $3)
 	}
 
 field : _REQUIRED typeIdent name '=' _INT_LIT ';' {

@@ -11,7 +11,9 @@ message Simple {
 	optional uint64 id = 2;
 }
 
-extend google.protobuf.ExtensionRangeOptions {
+extend . google. // identifier broken up strangely should still be accepted
+  protobuf .
+   ExtensionRangeOptions {
 	optional string label = 20000;
 }
 
