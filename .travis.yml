@@ -16,6 +16,9 @@ matrix:
     - go: "1.12"
       env: GO111MODULE=on
     - go: tip
+      env:
+      - GOPROXY=direct
+      - GOSUMDB=off
 
 # accomodate forks
 before_install:
