@@ -143,7 +143,7 @@ func (r *parseResult) generateSourceCodeInfoForMessage(sci *sourceCodeInfo, n ms
 			r.generateSourceCodeInfoForField(sci, child.mapField, append(path, internal.Message_fieldsTag, fieldIndex))
 			fieldIndex++
 		case child.oneOf != nil:
-			r.generateSourceCodeInfoForOneOf(sci, child.oneOf, &fieldIndex, append(path, internal.Message_fieldsTag), append(dup(path), internal.Message_oneOfsTag, oneOfIndex))
+			r.generateSourceCodeInfoForOneOf(sci, child.oneOf, &fieldIndex, &nestedMsgIndex, append(path, internal.Message_fieldsTag), append(dup(path), internal.Message_nestedMessagesTag), append(dup(path), internal.Message_oneOfsTag, oneOfIndex))
 			oneOfIndex++
 		case child.nested != nil:
 			r.generateSourceCodeInfoForMessage(sci, child.nested, nil, append(path, internal.Message_nestedMessagesTag, nestedMsgIndex))
@@ -250,7 +250,7 @@ func (r *parseResult) generateSourceCodeInfoForExtensions(sci *sourceCodeInfo, n
 	}
 }
 
-func (r *parseResult) generateSourceCodeInfoForOneOf(sci *sourceCodeInfo, n *oneOfNode, fieldIndex *int32, fieldPath, oneOfPath []int32) {
+func (r *parseResult) generateSourceCodeInfoForOneOf(sci *sourceCodeInfo, n *oneOfNode, fieldIndex, nestedMsgIndex *int32, fieldPath, nestedMsgPath, oneOfPath []int32) {
 	sci.newLoc(n, oneOfPath)
 	sci.newLoc(n.name, append(oneOfPath, internal.OneOf_nameTag))
 
@@ -262,6 +262,12 @@ func (r *parseResult) generateSourceCodeInfoForOneOf(sci *sourceCodeInfo, n *one
 		case child.field != nil:
 			r.generateSourceCodeInfoForField(sci, child.field, append(fieldPath, *fieldIndex))
 			*fieldIndex++
+		case child.group != nil:
+			fldPath := append(fieldPath, *fieldIndex)
+			r.generateSourceCodeInfoForField(sci, child.group, fldPath)
+			*fieldIndex++
+			r.generateSourceCodeInfoForMessage(sci, child.group, fldPath, append(nestedMsgPath, *nestedMsgIndex))
+			*nestedMsgIndex++
 		}
 	}
 }

@@ -78,7 +78,7 @@ import (
 %type <agg>       aggFields aggField aggFieldEntry
 %type <fld>       field oneofField
 %type <oo>        oneof
-%type <grp>       group
+%type <grp>       group oneofGroup
 %type <mapFld>    mapField
 %type <mapType>   mapType
 %type <msg>       message
@@ -568,6 +568,9 @@ oneofItem : option {
 	| oneofField {
 		$$ = []*oneOfElement{{field: $1}}
 	}
+	| oneofGroup {
+		$$ = []*oneOfElement{{group: $1}}
+	}
 	| ';' {
 		$$ = []*oneOfElement{{empty: $1}}
 	}
@@ -585,6 +588,15 @@ oneofField : typeIdent name '=' _INT_LIT ';' {
 		checkTag(protolex, $4.start(), $4.val)
 		$$ = &fieldNode{fldType: $1, name: $2, tag: $4, options: $5}
 		$$.setRange($1, $6)
+	}
+
+oneofGroup : _GROUP name '=' _INT_LIT '{' messageBody '}' {
+		checkTag(protolex, $4.start(), $4.val)
+		if !unicode.IsUpper(rune($2.val[0])) {
+			lexError(protolex, $2.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $2.val))
+		}
+		$$ = &groupNode{groupKeyword: $1, name: $2, tag: $4, decls: $6}
+		$$.setRange($1, $7)
 	}
 
 mapField : mapType name '=' _INT_LIT ';' {

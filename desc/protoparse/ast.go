@@ -528,6 +528,10 @@ type groupNode struct {
 }
 
 func (n *groupNode) fieldLabel() node {
+	if n.label == nil {
+		// return nil interface to indicate absence, not a typed nil
+		return nil
+	}
 	return n.label
 }
 
@@ -568,6 +572,7 @@ type oneOfElement struct {
 	// a discriminated union: only one field will be set
 	option *optionNode
 	field  *fieldNode
+	group  *groupNode
 	empty  *basicNode
 }
 

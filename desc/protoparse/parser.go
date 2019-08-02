@@ -999,6 +999,11 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messag
 					fd := r.asFieldDescriptor(oodecl.field)
 					fd.OneofIndex = proto.Int32(int32(oodIndex))
 					msgd.Field = append(msgd.Field, fd)
+				} else if oodecl.group != nil {
+					fd, md := r.asGroupDescriptors(oodecl.group, isProto3)
+					fd.OneofIndex = proto.Int32(int32(oodIndex))
+					msgd.Field = append(msgd.Field, fd)
+					msgd.NestedType = append(msgd.NestedType, md)
 				}
 			}
 		} else if decl.option != nil {

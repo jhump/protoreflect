@@ -788,10 +788,12 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 				ood := d.GetOneOf()
 				if ood == nil {
 					p.printField(d, mf, w, sourceInfo, childPath, scope, indent)
-				} else if !skip[ood] {
+				} else {
 					// print the one-of, including all of its fields
 					p.printOneOf(ood, elements, i, mf, w, sourceInfo, path, indent, d.AsFieldDescriptorProto().GetOneofIndex())
-					skip[ood] = true
+					for _, fld := range ood.GetChoices() {
+						skip[fld] = true
+					}
 				}
 			}
 		case *desc.MessageDescriptor:

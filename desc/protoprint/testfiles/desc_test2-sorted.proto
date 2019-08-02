@@ -21,7 +21,6 @@ message Frobnitz {
       TestMessage.NestedEnum c2 = 4;
    }
 
-
    optional TestMessage.NestedMessage d = 5;
 
    optional TestMessage.NestedEnum e = 6 [default = VALUE2];
@@ -35,8 +34,6 @@ message Frobnitz {
 
       uint32 g3 = 10;
    }
-
-
 }
 
 message Whatchamacallit {

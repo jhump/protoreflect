@@ -120,7 +120,6 @@ message AnotherTestMessage {
     int64 int = 8;
   }
 
-
   extensions 100 to 200;
 }
 

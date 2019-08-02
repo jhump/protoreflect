@@ -79,14 +79,12 @@ message Request {
     int32 that = 5;
   }
 
-
   // can be these or those
   oneof xyz {
     string these = 6;
 
     int32 those = 7;
   }
-
 
   // map field
   map<string, string> things = 8;
