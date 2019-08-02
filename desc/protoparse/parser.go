@@ -134,6 +134,14 @@ type Parser struct {
 	// fields, excluding enums. (Interpreting default values for enum fields
 	// requires resolving enum names, which requires linking.)
 	InterpretOptionsInUnlinkedFiles bool
+
+	// A custom reporter of syntax and link errors. If not specified, the
+	// default reporter just returns the reported error, which causes parsing
+	// to abort after encountering a single error.
+	//
+	// The reporter is not invoked for system or I/O errors, only for syntax and
+	// link errors.
+	ErrorReporter ErrorReporter
 }
 
 // ParseFiles parses the named files into descriptors. The returned slice has
@@ -146,6 +154,12 @@ type Parser struct {
 // files -- e.g. google/protobuf/*.proto -- without needing to supply sources
 // for these files. Like protoc, this parser has a built-in version of these
 // files it can use if they aren't explicitly supplied.
+//
+// If the Parser has no ErrorReporter set and a syntax or link error occurs,
+// parsing will abort with the first such error encountered. If there is an
+// ErrorReporter configured and it returns non-nil, parsing will abort with the
+// error it returns. If syntax or link errors are encountered but the configured
+// ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) {
 	accessor := p.Accessor
 	if accessor == nil {
@@ -173,14 +187,17 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	}
 
 	protos := map[string]*parseResult{}
-	err := parseProtoFiles(accessor, filenames, true, true, protos)
-	if err != nil {
+	results := &parseResults{resultsByFilename: protos}
+	errs := newErrorHandler(p.ErrorReporter)
+	parseProtoFiles(accessor, filenames, errs, true, true, results)
+	if err := errs.getError(); err != nil {
 		return nil, err
 	}
 	if p.InferImportPaths {
+		// TODO: if this re-writes one of the names in filenames, lookups below will break
 		protos = fixupFilenames(protos)
 	}
-	linkedProtos, err := newLinker(protos).linkFiles()
+	linkedProtos, err := newLinker(results, errs).linkFiles()
 	if err != nil {
 		return nil, err
 	}
@@ -224,6 +241,12 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 // This method will still validate the syntax of parsed files. If the parser's
 // ValidateUnlinkedFiles field is true, additional checks, beyond syntax will
 // also be performed.
+//
+// If the Parser has no ErrorReporter set and a syntax or link error occurs,
+// parsing will abort with the first such error encountered. If there is an
+// ErrorReporter configured and it returns non-nil, parsing will abort with the
+// error it returns. If syntax or link errors are encountered but the configured
+// ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescriptorProto, error) {
 	accessor := p.Accessor
 	if accessor == nil {
@@ -233,11 +256,13 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 	}
 
 	protos := map[string]*parseResult{}
-	err := parseProtoFiles(accessor, filenames, false, p.ValidateUnlinkedFiles, protos)
-	if err != nil {
+	errs := newErrorHandler(p.ErrorReporter)
+	parseProtoFiles(accessor, filenames, errs, false, p.ValidateUnlinkedFiles, &parseResults{resultsByFilename: protos})
+	if err := errs.getError(); err != nil {
 		return nil, err
 	}
 	if p.InferImportPaths {
+		// TODO: if this re-writes one of the names in filenames, lookups below will break
 		protos = fixupFilenames(protos)
 	}
 	fds := make([]*dpb.FileDescriptorProto, len(filenames))
@@ -246,7 +271,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 		fd := pr.fd
 		if p.InterpretOptionsInUnlinkedFiles {
 			pr.lenient = true
-			interpretFileOptions(pr, poorFileDescriptorish{FileDescriptorProto: fd})
+			_ = interpretFileOptions(pr, poorFileDescriptorish{FileDescriptorProto: fd})
 		}
 		if p.IncludeSourceCodeInfo {
 			fd.SourceCodeInfo = pr.generateSourceCodeInfo()
@@ -364,51 +389,103 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	return revisedProtos
 }
 
-func parseProtoFiles(acc FileAccessor, filenames []string, recursive, validate bool, parsed map[string]*parseResult) error {
+func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, recursive, validate bool, parsed *parseResults) {
 	for _, name := range filenames {
-		if _, ok := parsed[name]; ok {
-			continue
+		parseProtoFile(acc, name, nil, errs, recursive, validate, parsed)
+		if errs.err != nil {
+			return
 		}
-		in, err := acc(name)
-		if err == nil {
-			// try to parse the bytes accessed
-			func() {
-				defer func() {
-					// if we've already parsed contents, an error
-					// closing need not fail this operation
-					_ = in.Close()
-				}()
-				parsed[name], err = parseProto(name, in, validate)
-			}()
-			if err != nil {
-				return err
-			}
-		} else if d, ok := standardImports[name]; ok {
-			// it's a well-known import
-			// (we clone it to make sure we're not sharing state with other
-			//  parsers, which could result in unsafe races if multiple
-			//  parsers are trying to access it concurrently)
-			parsed[name] = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
-		} else {
-			return err
-		}
+	}
+}
 
-		if recursive {
-			err = parseProtoFiles(acc, parsed[name].fd.Dependency, true, validate, parsed)
-			if err != nil {
-				switch err.(type) {
-				case ErrorWithSourcePos:
-					return err
-				default:
-					return fmt.Errorf("failed to load imports for %q: %s", name, err)
+func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, recursive, validate bool, parsed *parseResults) {
+	if parsed.has(filename) {
+		return
+	}
+	in, err := acc(filename)
+	var result *parseResult
+	if err == nil {
+		// try to parse the bytes accessed
+		func() {
+			defer func() {
+				// if we've already parsed contents, an error
+				// closing need not fail this operation
+				_ = in.Close()
+			}()
+			result = parseProto(filename, in, errs, validate)
+		}()
+	} else if d, ok := standardImports[filename]; ok {
+		// it's a well-known import
+		// (we clone it to make sure we're not sharing state with other
+		//  parsers, which could result in unsafe races if multiple
+		//  parsers are trying to access it concurrently)
+		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
+	} else {
+		if !strings.Contains(err.Error(), filename) {
+			// an error message that doesn't indicate the file is awful!
+			err = fmt.Errorf("%s: %v", filename, err)
+		}
+		if _, ok := err.(ErrorWithPos); !ok && importLoc != nil {
+			// error has no source position? report it as the import line
+			err = ErrorWithSourcePos{
+				Pos:        importLoc,
+				Underlying: err,
+			}
+		}
+		_ = errs.handleError(err)
+		return
+	}
+
+	parsed.add(filename, result)
+
+	if errs.getError() != nil {
+		return // abort
+	}
+
+	if recursive {
+		fd := result.fd
+		decl := result.getFileNode(fd)
+		fnode, ok := decl.(*fileNode)
+		if !ok {
+			// no AST for this file? use imports in descriptor
+			for _, dep := range fd.Dependency {
+				parseProtoFile(acc, dep, decl.start(), errs, true, validate, parsed)
+				if errs.getError() != nil {
+					return // abort
 				}
+			}
+			return
+		}
+		// we have an AST; use it so we can report import location in errors
+		for _, dep := range fnode.imports {
+			parseProtoFile(acc, dep.name.val, dep.name.start(), errs, true, validate, parsed)
+			if errs.getError() != nil {
+				return // abort
 			}
 		}
 	}
-	return nil
+}
+
+type parseResults struct {
+	resultsByFilename map[string]*parseResult
+	filenames         []string
+}
+
+func (r *parseResults) has(filename string) bool {
+	_, ok := r.resultsByFilename[filename]
+	return ok
+}
+
+func (r *parseResults) add(filename string, result *parseResult) {
+	r.resultsByFilename[filename] = result
+	r.filenames = append(r.filenames, filename)
 }
 
 type parseResult struct {
+	// handles any errors encountered during parsing, construction of file descriptor,
+	// or validation
+	errs *errorHandler
+
 	// the parsed file descriptor
 	fd *dpb.FileDescriptorProto
 
@@ -541,46 +618,38 @@ func (r *parseResult) putMethodNode(m *dpb.MethodDescriptorProto, n *methodNode)
 	r.nodes[m] = n
 }
 
-func parseProto(filename string, r io.Reader, validate bool) (*parseResult, error) {
-	lx := newLexer(r)
-	lx.filename = filename
+func parseProto(filename string, r io.Reader, errs *errorHandler, validate bool) *parseResult {
+	lx := newLexer(r, filename, errs)
 	protoParse(lx)
-	if lx.err != nil {
-		if _, ok := lx.err.(ErrorWithSourcePos); ok {
-			return nil, lx.err
-		} else {
-			return nil, ErrorWithSourcePos{Pos: lx.prev(), Underlying: lx.err}
-		}
-	}
-	// parser will not return an error if input is empty, so we
-	// need to also check if the result is non-nil
-	if lx.res == nil {
-		return nil, ErrorWithSourcePos{Pos: lx.prev(), Underlying: errors.New("input is empty")}
+
+	res := createParseResult(filename, lx.res, errs)
+	if validate {
+		basicValidate(res)
 	}
 
-	res, err := createParseResult(filename, lx.res)
-	if err != nil {
-		return nil, err
-	}
-	if validate {
-		if err := basicValidate(res); err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
+	return res
 }
 
-func createParseResult(filename string, file *fileNode) (*parseResult, error) {
+func createParseResult(filename string, file *fileNode, errs *errorHandler) *parseResult {
 	res := &parseResult{
+		errs:               errs,
 		nodes:              map[proto.Message]node{},
 		interpretedOptions: map[*optionNode][]int32{},
 	}
-	err := res.createFileDescriptor(filename, file)
-	return res, err
+	if file == nil {
+		// nil AST means there was an error that prevented any parsing
+		// or the file was empty; synthesize empty non-nil AST
+		file = &fileNode{}
+		n := noSourceNode{pos: unknownPos(filename)}
+		file.setRange(&n, &n)
+	}
+	res.createFileDescriptor(filename, file)
+	return res
 }
 
-func (r *parseResult) createFileDescriptor(filename string, file *fileNode) error {
+func (r *parseResult) createFileDescriptor(filename string, file *fileNode) {
 	fd := &dpb.FileDescriptorProto{Name: proto.String(filename)}
+	r.fd = fd
 	r.putFileNode(fd, file)
 
 	isProto3 := false
@@ -598,6 +667,7 @@ func (r *parseResult) createFileDescriptor(filename string, file *fileNode) erro
 		} else if decl.extend != nil {
 			r.addExtensions(decl.extend, &fd.Extension, &fd.MessageType, isProto3)
 		} else if decl.imp != nil {
+			file.imports = append(file.imports, decl.imp)
 			index := len(fd.Dependency)
 			fd.Dependency = append(fd.Dependency, decl.imp.name.val)
 			if decl.imp.public {
@@ -616,13 +686,13 @@ func (r *parseResult) createFileDescriptor(filename string, file *fileNode) erro
 			fd.Service = append(fd.Service, r.asServiceDescriptor(decl.service))
 		} else if decl.pkg != nil {
 			if fd.Package != nil {
-				return ErrorWithSourcePos{Pos: decl.pkg.start(), Underlying: errors.New("files should have only one package declaration")}
+				if r.errs.handleError(ErrorWithSourcePos{Pos: decl.pkg.start(), Underlying: errors.New("files should have only one package declaration")}) != nil {
+					return
+				}
 			}
 			fd.Package = proto.String(decl.pkg.name.val)
 		}
 	}
-	r.fd = fd
-	return nil
 }
 
 func (r *parseResult) asUninterpretedOptions(nodes []*optionNode) []*dpb.UninterpretedOption {
@@ -998,7 +1068,9 @@ func checkInt64InInt32Range(lex protoLexer, pos *SourcePos, v int64) {
 }
 
 func checkTag(lex protoLexer, pos *SourcePos, v uint64) {
-	if v > internal.MaxTag {
+	if v < 1 {
+		lexError(lex, pos, fmt.Sprintf("tag number %d must be greater than zero", v))
+	} else if v > internal.MaxTag {
 		lexError(lex, pos, fmt.Sprintf("tag number %d is higher than max allowed tag number (%d)", v, internal.MaxTag))
 	} else if v >= internal.SpecialReservedStart && v <= internal.SpecialReservedEnd {
 		lexError(lex, pos, fmt.Sprintf("tag number %d is in disallowed reserved range %d-%d", v, internal.SpecialReservedStart, internal.SpecialReservedEnd))
@@ -1085,28 +1157,27 @@ func writeEscapedBytes(buf *bytes.Buffer, b []byte) {
 	}
 }
 
-func basicValidate(res *parseResult) error {
+func basicValidate(res *parseResult) {
 	fd := res.fd
 	isProto3 := fd.GetSyntax() == "proto3"
 
 	for _, md := range fd.MessageType {
-		if err := validateMessage(res, isProto3, "", md); err != nil {
-			return err
+		if validateMessage(res, isProto3, "", md) != nil {
+			return
 		}
 	}
 
 	for _, ed := range fd.EnumType {
-		if err := validateEnum(res, isProto3, "", ed); err != nil {
-			return err
+		if validateEnum(res, isProto3, "", ed) != nil {
+			return
 		}
 	}
 
 	for _, fld := range fd.Extension {
-		if err := validateField(res, isProto3, "", fld); err != nil {
-			return err
+		if validateField(res, isProto3, "", fld) != nil {
+			return
 		}
 	}
-	return nil
 }
 
 func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.DescriptorProto) error {
@@ -1137,11 +1208,15 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 
 	if isProto3 && len(md.ExtensionRange) > 0 {
 		n := res.getExtensionRangeNode(md.ExtensionRange[0])
-		return ErrorWithSourcePos{Pos: n.start(), Underlying: fmt.Errorf("%s: extension ranges are not allowed in proto3", scope)}
+		if err := res.errs.handleError(ErrorWithSourcePos{Pos: n.start(), Underlying: fmt.Errorf("%s: extension ranges are not allowed in proto3", scope)}); err != nil {
+			return err
+		}
 	}
 
 	if index, err := findOption(res, scope, md.Options.GetUninterpretedOption(), "map_entry"); err != nil {
-		return err
+		if err := res.errs.handleError(err); err != nil {
+			return err
+		}
 	} else if index >= 0 {
 		opt := md.Options.UninterpretedOption[index]
 		optn := res.getOptionNode(opt)
@@ -1149,14 +1224,19 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 		valid := false
 		if opt.IdentifierValue != nil {
 			if opt.GetIdentifierValue() == "true" {
-				return ErrorWithSourcePos{Pos: optn.getValue().start(), Underlying: fmt.Errorf("%s: map_entry option should not be set explicitly; use map type instead", scope)}
-			} else if opt.GetIdentifierValue() == "false" {
-				md.Options.MapEntry = proto.Bool(false)
 				valid = true
+				if err := res.errs.handleError(ErrorWithSourcePos{Pos: optn.getValue().start(), Underlying: fmt.Errorf("%s: map_entry option should not be set explicitly; use map type instead", scope)}); err != nil {
+					return err
+				}
+			} else if opt.GetIdentifierValue() == "false" {
+				valid = true
+				md.Options.MapEntry = proto.Bool(false)
 			}
 		}
 		if !valid {
-			return ErrorWithSourcePos{Pos: optn.getValue().start(), Underlying: fmt.Errorf("%s: expecting bool value for map_entry option", scope)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: optn.getValue().start(), Underlying: fmt.Errorf("%s: expecting bool value for map_entry option", scope)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1170,7 +1250,9 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	sort.Sort(rsvd)
 	for i := 1; i < len(rsvd); i++ {
 		if rsvd[i].start < rsvd[i-1].end {
-			return ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end-1, rsvd[i].start, rsvd[i].end-1)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end-1, rsvd[i].start, rsvd[i].end-1)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1183,7 +1265,9 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	sort.Sort(exts)
 	for i := 1; i < len(exts); i++ {
 		if exts[i].start < exts[i-1].end {
-			return ErrorWithSourcePos{Pos: exts[i].node.start(), Underlying: fmt.Errorf("%s: extension ranges overlap: %d to %d and %d to %d", scope, exts[i-1].start, exts[i-1].end-1, exts[i].start, exts[i].end-1)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: exts[i].node.start(), Underlying: fmt.Errorf("%s: extension ranges overlap: %d to %d and %d to %d", scope, exts[i-1].start, exts[i-1].end-1, exts[i].start, exts[i].end-1)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1200,7 +1284,9 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 				pos = exts[j].node.start()
 			}
 			// ranges overlap
-			return ErrorWithSourcePos{Pos: pos, Underlying: fmt.Errorf("%s: extension range %d to %d overlaps reserved range %d to %d", scope, exts[j].start, exts[j].end-1, rsvd[i].start, rsvd[i].end-1)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: pos, Underlying: fmt.Errorf("%s: extension range %d to %d overlaps reserved range %d to %d", scope, exts[j].start, exts[j].end-1, rsvd[i].start, rsvd[i].end-1)}); err != nil {
+				return err
+			}
 		}
 		if rsvd[i].start < exts[j].start {
 			i++
@@ -1219,21 +1305,29 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	for _, fld := range md.Field {
 		fn := res.getFieldNode(fld)
 		if _, ok := rsvdNames[fld.GetName()]; ok {
-			return ErrorWithSourcePos{Pos: fn.fieldName().start(), Underlying: fmt.Errorf("%s: field %s is using a reserved name", scope, fld.GetName())}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: fn.fieldName().start(), Underlying: fmt.Errorf("%s: field %s is using a reserved name", scope, fld.GetName())}); err != nil {
+				return err
+			}
 		}
 		if existing := fieldTags[fld.GetNumber()]; existing != "" {
-			return ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: fields %s and %s both have the same tag %d", scope, existing, fld.GetName(), fld.GetNumber())}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: fields %s and %s both have the same tag %d", scope, existing, fld.GetName(), fld.GetNumber())}); err != nil {
+				return err
+			}
 		}
 		fieldTags[fld.GetNumber()] = fld.GetName()
 		// check reserved ranges
 		r := sort.Search(len(rsvd), func(index int) bool { return rsvd[index].end > fld.GetNumber() })
 		if r < len(rsvd) && rsvd[r].start <= fld.GetNumber() {
-			return ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: field %s is using tag %d which is in reserved range %d to %d", scope, fld.GetName(), fld.GetNumber(), rsvd[r].start, rsvd[r].end-1)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: field %s is using tag %d which is in reserved range %d to %d", scope, fld.GetName(), fld.GetNumber(), rsvd[r].start, rsvd[r].end-1)}); err != nil {
+				return err
+			}
 		}
 		// and check extension ranges
 		e := sort.Search(len(exts), func(index int) bool { return exts[index].end > fld.GetNumber() })
 		if e < len(exts) && exts[e].start <= fld.GetNumber() {
-			return ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: field %s is using tag %d which is in extension range %d to %d", scope, fld.GetName(), fld.GetNumber(), exts[e].start, exts[e].end-1)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: field %s is using tag %d which is in extension range %d to %d", scope, fld.GetName(), fld.GetNumber(), exts[e].start, exts[e].end-1)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1245,7 +1339,9 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 
 	allowAlias := false
 	if index, err := findOption(res, scope, ed.Options.GetUninterpretedOption(), "allow_alias"); err != nil {
-		return err
+		if err := res.errs.handleError(err); err != nil {
+			return err
+		}
 	} else if index >= 0 {
 		opt := ed.Options.UninterpretedOption[index]
 		valid := false
@@ -1259,13 +1355,17 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 		}
 		if !valid {
 			optNode := res.getOptionNode(opt)
-			return ErrorWithSourcePos{Pos: optNode.getValue().start(), Underlying: fmt.Errorf("%s: expecting bool value for allow_alias option", scope)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: optNode.getValue().start(), Underlying: fmt.Errorf("%s: expecting bool value for allow_alias option", scope)}); err != nil {
+				return err
+			}
 		}
 	}
 
 	if isProto3 && ed.Value[0].GetNumber() != 0 {
 		evNode := res.getEnumValueNode(ed.Value[0])
-		return ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: proto3 requires that first value in enum have numeric value of 0", scope)}
+		if err := res.errs.handleError(ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: proto3 requires that first value in enum have numeric value of 0", scope)}); err != nil {
+			return err
+		}
 	}
 
 	if !allowAlias {
@@ -1274,7 +1374,9 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 		for _, evd := range ed.Value {
 			if existing := vals[evd.GetNumber()]; existing != "" {
 				evNode := res.getEnumValueNode(evd)
-				return ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: values %s and %s both have the same numeric value %d; use allow_alias option if intentional", scope, existing, evd.GetName(), evd.GetNumber())}
+				if err := res.errs.handleError(ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: values %s and %s both have the same numeric value %d; use allow_alias option if intentional", scope, existing, evd.GetName(), evd.GetNumber())}); err != nil {
+					return err
+				}
 			}
 			vals[evd.GetNumber()] = evd.GetName()
 		}
@@ -1289,7 +1391,9 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 	sort.Sort(rsvd)
 	for i := 1; i < len(rsvd); i++ {
 		if rsvd[i].start <= rsvd[i-1].end {
-			return ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end, rsvd[i].start, rsvd[i].end)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end, rsvd[i].start, rsvd[i].end)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1302,12 +1406,16 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 	for _, ev := range ed.Value {
 		evn := res.getEnumValueNode(ev)
 		if _, ok := rsvdNames[ev.GetName()]; ok {
-			return ErrorWithSourcePos{Pos: evn.getName().start(), Underlying: fmt.Errorf("%s: value %s is using a reserved name", scope, ev.GetName())}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: evn.getName().start(), Underlying: fmt.Errorf("%s: value %s is using a reserved name", scope, ev.GetName())}); err != nil {
+				return err
+			}
 		}
 		// check reserved ranges
 		r := sort.Search(len(rsvd), func(index int) bool { return rsvd[index].end >= ev.GetNumber() })
 		if r < len(rsvd) && rsvd[r].start <= ev.GetNumber() {
-			return ErrorWithSourcePos{Pos: evn.getNumber().start(), Underlying: fmt.Errorf("%s: value %s is using number %d which is in reserved range %d to %d", scope, ev.GetName(), ev.GetNumber(), rsvd[r].start, rsvd[r].end)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: evn.getNumber().start(), Underlying: fmt.Errorf("%s: value %s is using number %d which is in reserved range %d to %d", scope, ev.GetName(), ev.GetNumber(), rsvd[r].start, rsvd[r].end)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1321,23 +1429,34 @@ func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.Fiel
 	if isProto3 {
 		if fld.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP {
 			n := node.(*groupNode)
-			return ErrorWithSourcePos{Pos: n.groupKeyword.start(), Underlying: fmt.Errorf("%s: groups are not allowed in proto3", scope)}
-		}
-		if fld.Label != nil && fld.GetLabel() != dpb.FieldDescriptorProto_LABEL_REPEATED {
-			return ErrorWithSourcePos{Pos: node.fieldLabel().start(), Underlying: fmt.Errorf("%s: field has label %v, but proto3 should omit labels other than 'repeated'", scope, fld.GetLabel())}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: n.groupKeyword.start(), Underlying: fmt.Errorf("%s: groups are not allowed in proto3", scope)}); err != nil {
+				return err
+			}
+		} else if fld.Label != nil && fld.GetLabel() != dpb.FieldDescriptorProto_LABEL_REPEATED {
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: node.fieldLabel().start(), Underlying: fmt.Errorf("%s: field has label %v, but proto3 must omit labels other than 'repeated'", scope, fld.GetLabel())}); err != nil {
+				return err
+			}
 		}
 		if index, err := findOption(res, scope, fld.Options.GetUninterpretedOption(), "default"); err != nil {
-			return err
+			if err := res.errs.handleError(err); err != nil {
+				return err
+			}
 		} else if index >= 0 {
 			optNode := res.getOptionNode(fld.Options.GetUninterpretedOption()[index])
-			return ErrorWithSourcePos{Pos: optNode.getName().start(), Underlying: fmt.Errorf("%s: default values are not allowed in proto3", scope)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: optNode.getName().start(), Underlying: fmt.Errorf("%s: default values are not allowed in proto3", scope)}); err != nil {
+				return err
+			}
 		}
 	} else {
 		if fld.Label == nil && fld.OneofIndex == nil {
-			return ErrorWithSourcePos{Pos: node.fieldName().start(), Underlying: fmt.Errorf("%s: field has no label, but proto2 must indicate 'optional' or 'required'", scope)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: node.fieldName().start(), Underlying: fmt.Errorf("%s: field has no label, but proto2 must indicate 'optional' or 'required'", scope)}); err != nil {
+				return err
+			}
 		}
 		if fld.GetExtendee() != "" && fld.Label != nil && fld.GetLabel() == dpb.FieldDescriptorProto_LABEL_REQUIRED {
-			return ErrorWithSourcePos{Pos: node.fieldLabel().start(), Underlying: fmt.Errorf("%s: extension fields cannot be 'required'", scope)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: node.fieldLabel().start(), Underlying: fmt.Errorf("%s: extension fields cannot be 'required'", scope)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1345,6 +1464,7 @@ func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.Fiel
 	if fld.Label == nil {
 		fld.Label = dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
 	}
+
 	return nil
 }
 

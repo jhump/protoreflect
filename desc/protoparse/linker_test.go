@@ -72,14 +72,14 @@ func TestLinkerValidation(t *testing.T) {
 			map[string]string{
 				"foo.proto": "import \"foo2.proto\"; message fubar{}",
 			},
-			"failed to load imports for \"foo.proto\": file not found: foo2.proto",
+			`foo.proto:1:8: file not found: foo2.proto`,
 		},
 		{
 			map[string]string{
 				"foo.proto":  "import \"foo2.proto\"; message fubar{}",
 				"foo2.proto": "import \"foo.proto\"; message baz{}",
 			},
-			"cycle found in imports: \"foo.proto\" -> \"foo2.proto\" -> \"foo.proto\"",
+			`foo.proto:1:8: cycle found in imports: "foo.proto" -> "foo2.proto" -> "foo.proto"`,
 		},
 		{
 			map[string]string{
