@@ -4,7 +4,7 @@ golang.org/x/net v0.0.0-20180530234432-1e491301e022 h1:MVYFTUmVD3/+ERcvRRI+P/C2+
 golang.org/x/net v0.0.0-20180530234432-1e491301e022/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/text v0.3.0 h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
-google.golang.org/genproto v0.0.0-20170818100345-ee236bd376b0 h1:jgaHBfsPDMBDKsth1hPtI1HcOyecWndWOFSGW21VgaM=
-google.golang.org/genproto v0.0.0-20170818100345-ee236bd376b0/go.mod h1:JiN7NxoALGmiZfu7CAH4rXhgtRTLTxftemlI0sWmxmc=
+google.golang.org/genproto v0.0.0-20170818010345-ee236bd376b0 h1:ZvI3lsq5AIkr7axxmT3tfwFlJVRFLqe6Fp0W03+MJ38=
+google.golang.org/genproto v0.0.0-20170818010345-ee236bd376b0/go.mod h1:JiN7NxoALGmiZfu7CAH4rXhgtRTLTxftemlI0sWmxmc=
 google.golang.org/grpc v1.8.0 h1:HN69LlNA/SpyBIRxTfuU0QOntYfdeEeBWlVhRHRCOyw=
 google.golang.org/grpc v1.8.0/go.mod h1:yo6s7OP7yaDglbqo1J04qKzAhqBH6lvTonzMVmEdcZw=
