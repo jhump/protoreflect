@@ -489,19 +489,6 @@ func (l *protoLex) readNumber(sofar []rune, allowDot bool, allowExp bool) []rune
 				break
 			}
 			allowDot = false
-			cn, _, err := l.input.readRune()
-			if err != nil {
-				l.input.unreadRune(c)
-				break
-			}
-			if cn < '0' || cn > '9' {
-				l.input.unreadRune(cn)
-				l.input.unreadRune(c)
-				break
-			}
-			l.adjustPos(c)
-			token = append(token, c)
-			c = cn
 		} else if c == 'e' || c == 'E' {
 			if !allowExp {
 				l.input.unreadRune(c)

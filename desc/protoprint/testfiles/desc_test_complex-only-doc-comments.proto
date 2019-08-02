@@ -179,9 +179,13 @@ message Rule {
     RepeatedRule repeated = 2;
 
     IntRule int = 3;
+
+    group FloatRule = 4 {
+      optional double min_val = 1;
+
+      optional double max_val = 2;
+    }
   }
-
-
 }
 
 extend google.protobuf.FieldOptions {

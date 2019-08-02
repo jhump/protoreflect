@@ -113,3 +113,12 @@ message EnumDefaults {
 	optional Number one = 6 [default = ONE];
 	optional Number dos = 7 [default = DOS];
 }
+
+message MoarFloats {
+	optional float a = 1 [default = 1];
+	optional float b = 2 [default = 1.];
+	optional float c = 3 [default = 1.01];
+	optional float d = 4 [default = .1];
+	optional float e = 5 [default = 1.e5];
+	optional float f = 6 [default = 1.e-5];
+}
