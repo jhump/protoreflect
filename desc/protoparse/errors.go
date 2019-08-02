@@ -60,10 +60,11 @@ func (h *errorHandler) getError() error {
 // about the location in the file that caused the error.
 //
 // The value of Error() will contain both the SourcePos and Underlying error.
+// The value of Unwrap() will only be the Underlying error.
 type ErrorWithPos interface {
 	error
 	GetPosition() SourcePos
-	GetUnderlying() error
+	Unwrap() error
 }
 
 // ErrorWithSourcePos is an error about a proto source file that includes
@@ -93,9 +94,9 @@ func (e ErrorWithSourcePos) GetPosition() SourcePos {
 	return *e.Pos
 }
 
-// GetUnderlying implements the ErrorWithPos interface, supplying the
-// underlying error. This error will not include location information.
-func (e ErrorWithSourcePos) GetUnderlying() error {
+// Unwrap implements the ErrorWithPos interface, supplying the underlying
+// error. This error will not include location information.
+func (e ErrorWithSourcePos) Unwrap() error {
 	return e.Underlying
 }
 
