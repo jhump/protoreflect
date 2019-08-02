@@ -187,15 +187,17 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	}
 
 	protos := map[string]*parseResult{}
+	results := &parseResults{resultsByFilename: protos}
 	errs := newErrorHandler(p.ErrorReporter)
-	parseProtoFiles(accessor, filenames, errs, true, true, protos)
+	parseProtoFiles(accessor, filenames, errs, true, true, results)
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
 	if p.InferImportPaths {
+		// TODO: if this re-writes one of the names in filenames, lookups below will break
 		protos = fixupFilenames(protos)
 	}
-	linkedProtos, err := newLinker(protos, errs).linkFiles()
+	linkedProtos, err := newLinker(results, errs).linkFiles()
 	if err != nil {
 		return nil, err
 	}
@@ -255,11 +257,12 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 
 	protos := map[string]*parseResult{}
 	errs := newErrorHandler(p.ErrorReporter)
-	parseProtoFiles(accessor, filenames, errs, false, p.ValidateUnlinkedFiles, protos)
+	parseProtoFiles(accessor, filenames, errs, false, p.ValidateUnlinkedFiles, &parseResults{resultsByFilename: protos})
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
 	if p.InferImportPaths {
+		// TODO: if this re-writes one of the names in filenames, lookups below will break
 		protos = fixupFilenames(protos)
 	}
 	fds := make([]*dpb.FileDescriptorProto, len(filenames))
@@ -386,20 +389,21 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	return revisedProtos
 }
 
-func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, recursive, validate bool, parsed map[string]*parseResult) {
+func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, recursive, validate bool, parsed *parseResults) {
 	for _, name := range filenames {
 		parseProtoFile(acc, name, nil, errs, recursive, validate, parsed)
-		if errs.getError() != nil {
+		if errs.err != nil {
 			return
 		}
 	}
 }
 
-func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, recursive, validate bool, parsed map[string]*parseResult) {
-	if _, ok := parsed[filename]; ok {
+func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, recursive, validate bool, parsed *parseResults) {
+	if parsed.has(filename) {
 		return
 	}
 	in, err := acc(filename)
+	var result *parseResult
 	if err == nil {
 		// try to parse the bytes accessed
 		func() {
@@ -408,14 +412,14 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 				// closing need not fail this operation
 				_ = in.Close()
 			}()
-			parsed[filename] = parseProto(filename, in, errs, validate)
+			result = parseProto(filename, in, errs, validate)
 		}()
 	} else if d, ok := standardImports[filename]; ok {
 		// it's a well-known import
 		// (we clone it to make sure we're not sharing state with other
 		//  parsers, which could result in unsafe races if multiple
 		//  parsers are trying to access it concurrently)
-		parsed[filename] = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
+		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
 	} else {
 		if !strings.Contains(err.Error(), filename) {
 			// an error message that doesn't indicate the file is awful!
@@ -432,13 +436,15 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 		return
 	}
 
+	parsed.add(filename, result)
+
 	if errs.getError() != nil {
 		return // abort
 	}
 
 	if recursive {
-		fd := parsed[filename].fd
-		decl := parsed[filename].getFileNode(fd)
+		fd := result.fd
+		decl := result.getFileNode(fd)
 		fnode, ok := decl.(*fileNode)
 		if !ok {
 			// no AST for this file? use imports in descriptor
@@ -458,6 +464,21 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 			}
 		}
 	}
+}
+
+type parseResults struct {
+	resultsByFilename map[string]*parseResult
+	filenames         []string
+}
+
+func (r *parseResults) has(filename string) bool {
+	_, ok := r.resultsByFilename[filename]
+	return ok
+}
+
+func (r *parseResults) add(filename string, result *parseResult) {
+	r.resultsByFilename[filename] = result
+	r.filenames = append(r.filenames, filename)
 }
 
 type parseResult struct {
@@ -602,7 +623,7 @@ func parseProto(filename string, r io.Reader, errs *errorHandler, validate bool)
 	protoParse(lx)
 
 	res := createParseResult(filename, lx.res, errs)
-	if validate && errs.getError() == nil {
+	if validate {
 		basicValidate(res)
 	}
 
@@ -1047,7 +1068,9 @@ func checkInt64InInt32Range(lex protoLexer, pos *SourcePos, v int64) {
 }
 
 func checkTag(lex protoLexer, pos *SourcePos, v uint64) {
-	if v > internal.MaxTag {
+	if v < 1 {
+		lexError(lex, pos, fmt.Sprintf("tag number %d must be greater than zero", v))
+	} else if v > internal.MaxTag {
 		lexError(lex, pos, fmt.Sprintf("tag number %d is higher than max allowed tag number (%d)", v, internal.MaxTag))
 	} else if v >= internal.SpecialReservedStart && v <= internal.SpecialReservedEnd {
 		lexError(lex, pos, fmt.Sprintf("tag number %d is in disallowed reserved range %d-%d", v, internal.SpecialReservedStart, internal.SpecialReservedEnd))

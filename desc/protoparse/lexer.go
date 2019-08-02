@@ -158,7 +158,7 @@ func (l *protoLex) prev() *SourcePos {
 }
 
 func (l *protoLex) Lex(lval *protoSymType) int {
-	if l.errs.getError() != nil {
+	if l.errs.err != nil {
 		// if error reporter already returned non-nil error,
 		// we can skip the rest of the input
 		return 0
