@@ -795,12 +795,12 @@ enumItem : option {
 
 enumField : name '=' intLit ';' {
 		checkInt64InInt32Range(protolex, $3.start(), $3.val)
-		$$ = &enumValueNode{name: $1, numberN: $3}
+		$$ = &enumValueNode{name: $1, number: $3}
 		$$.setRange($1, $4)
 	}
 	|  name '=' intLit compactOptions ';' {
 		checkInt64InInt32Range(protolex, $3.start(), $3.val)
-		$$ = &enumValueNode{name: $1, numberN: $3, options: $4}
+		$$ = &enumValueNode{name: $1, number: $3, options: $4}
 		$$.setRange($1, $5)
 	}
 

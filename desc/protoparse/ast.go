@@ -790,11 +790,7 @@ type enumValueNode struct {
 	basicCompositeNode
 	name    *identNode
 	options *compactOptionsNode
-
-	// only one of these two will be set:
-
-	numberP *intLiteralNode  // positive numeric value
-	numberN *compoundIntNode // negative numeric value
+	number  *compoundIntNode
 }
 
 func (n *enumValueNode) getName() node {
@@ -802,10 +798,7 @@ func (n *enumValueNode) getName() node {
 }
 
 func (n *enumValueNode) getNumber() node {
-	if n.numberP != nil {
-		return n.numberP
-	}
-	return n.numberN
+	return n.number
 }
 
 type messageNode struct {

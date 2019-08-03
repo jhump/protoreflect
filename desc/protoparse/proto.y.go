@@ -2088,7 +2088,7 @@ protodefault:
 //line proto.y:796
 		{
 			checkInt64InInt32Range(protolex, protoDollar[3].il.start(), protoDollar[3].il.val)
-			protoVAL.env = &enumValueNode{name: protoDollar[1].id, numberN: protoDollar[3].il}
+			protoVAL.env = &enumValueNode{name: protoDollar[1].id, number: protoDollar[3].il}
 			protoVAL.env.setRange(protoDollar[1].id, protoDollar[4].b)
 		}
 	case 158:
@@ -2096,7 +2096,7 @@ protodefault:
 //line proto.y:801
 		{
 			checkInt64InInt32Range(protolex, protoDollar[3].il.start(), protoDollar[3].il.val)
-			protoVAL.env = &enumValueNode{name: protoDollar[1].id, numberN: protoDollar[3].il, options: protoDollar[4].cmpctOpts}
+			protoVAL.env = &enumValueNode{name: protoDollar[1].id, number: protoDollar[3].il, options: protoDollar[4].cmpctOpts}
 			protoVAL.env.setRange(protoDollar[1].id, protoDollar[5].b)
 		}
 	case 159:

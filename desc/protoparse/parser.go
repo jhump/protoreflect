@@ -888,12 +888,7 @@ func (r *parseResult) asExtensionRanges(node *extensionRangeNode) []*dpb.Descrip
 }
 
 func (r *parseResult) asEnumValue(ev *enumValueNode) *dpb.EnumValueDescriptorProto {
-	var num int32
-	if ev.numberP != nil {
-		num = int32(ev.numberP.val)
-	} else {
-		num = int32(ev.numberN.val)
-	}
+	num := int32(ev.number.val)
 	evd := &dpb.EnumValueDescriptorProto{Name: proto.String(ev.name.val), Number: proto.Int32(num)}
 	r.putEnumValueNode(evd, ev)
 	if opts := ev.options.Elements(); len(opts) > 0 {
