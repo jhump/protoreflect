@@ -86,10 +86,20 @@ foo
 		{t: _SERVICE, line: 14, col: 9, span: 7, v: "service", comments: []string{"// another comment\n", "// more and more...\n"}},
 		{t: _RPC, line: 14, col: 17, span: 3, v: "rpc"},
 		{t: _MESSAGE, line: 14, col: 21, span: 7, v: "message"},
-		{t: _TYPENAME, line: 15, col: 9, span: 5, v: ".type"},
-		{t: _TYPENAME, line: 16, col: 9, span: 6, v: ".f.q.n"},
+		{t: '.', line: 15, col: 9, span: 1},
+		{t: _NAME, line: 15, col: 10, span: 4, v: "type"},
+		{t: '.', line: 16, col: 9, span: 1},
+		{t: _NAME, line: 16, col: 10, span: 1, v: "f"},
+		{t: '.', line: 16, col: 11, span: 1},
+		{t: _NAME, line: 16, col: 12, span: 1, v: "q"},
+		{t: '.', line: 16, col: 13, span: 1},
+		{t: _NAME, line: 16, col: 14, span: 1, v: "n"},
 		{t: _NAME, line: 17, col: 9, span: 4, v: "name"},
-		{t: _FQNAME, line: 18, col: 9, span: 5, v: "f.q.n"},
+		{t: _NAME, line: 18, col: 9, span: 1, v: "f"},
+		{t: '.', line: 18, col: 10, span: 1},
+		{t: _NAME, line: 18, col: 11, span: 1, v: "q"},
+		{t: '.', line: 18, col: 12, span: 1},
+		{t: _NAME, line: 18, col: 13, span: 1, v: "n"},
 		{t: _FLOAT_LIT, line: 20, col: 9, span: 3, v: 0.01},
 		{t: _FLOAT_LIT, line: 21, col: 9, span: 6, v: 0.01e12},
 		{t: _FLOAT_LIT, line: 22, col: 9, span: 6, v: 0.01e5},
@@ -146,15 +156,15 @@ foo
 		var n node
 		var val interface{}
 		switch tok {
-		case _SYNTAX, _OPTION, _INT32, _SERVICE, _RPC, _MESSAGE, _TYPENAME, _NAME, _FQNAME:
+		case _SYNTAX, _OPTION, _INT32, _SERVICE, _RPC, _MESSAGE, _NAME:
 			n = sym.id
 			val = sym.id.val
 		case _STRING_LIT:
-			n = sym.str
-			val = sym.str.val
+			n = sym.s
+			val = sym.s.val
 		case _INT_LIT:
-			n = sym.ui
-			val = sym.ui.val
+			n = sym.i
+			val = sym.i.val
 		case _FLOAT_LIT:
 			n = sym.f
 			val = sym.f.val

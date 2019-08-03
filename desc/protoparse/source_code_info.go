@@ -80,15 +80,15 @@ func (r *parseResult) generateSourceCodeInfoForOption(sci *sourceCodeInfo, n *op
 	sci.newLoc(n, optPath)
 	var valTag int32
 	switch n.val.(type) {
-	case *identNode:
+	case *compoundIdentNode:
 		valTag = internal.Uninterpreted_identTag
 	case *intLiteralNode:
 		valTag = internal.Uninterpreted_posIntTag
-	case *negativeIntLiteralNode:
+	case *compoundIntNode:
 		valTag = internal.Uninterpreted_negIntTag
-	case *floatLiteralNode:
+	case *compoundFloatNode:
 		valTag = internal.Uninterpreted_doubleTag
-	case *stringLiteralNode:
+	case *compoundStringNode:
 		valTag = internal.Uninterpreted_stringTag
 	case *aggregateLiteralNode:
 		valTag = internal.Uninterpreted_aggregateTag

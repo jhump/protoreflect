@@ -235,47 +235,39 @@ func (n *fileElement) get() node {
 
 type syntaxNode struct {
 	basicCompositeNode
-	syntax *stringLiteralNode
+	syntax *compoundStringNode
 }
 
 type importNode struct {
 	basicCompositeNode
-	name   *stringLiteralNode
+	name   *compoundStringNode
 	public bool
 	weak   bool
 }
 
 type packageNode struct {
 	basicCompositeNode
-	name *identNode
+	name *compoundIdentNode
 }
 
 type identifier string
 
-type identKind int
-
-const (
-	identSimpleName identKind = iota
-	identQualified
-	identTypeName
-)
-
 type identNode struct {
-	basicCompositeNode
-	val  string
-	kind identKind
+	basicNode
+	val string
 }
 
 func (n *identNode) value() interface{} {
 	return identifier(n.val)
 }
 
-func (n *identNode) popLeadingComment() comment {
-	return n.first.(terminalNode).popLeadingComment()
+type compoundIdentNode struct {
+	basicCompositeNode
+	val string
 }
 
-func (n *identNode) pushTrailingComment(c comment) {
-	n.last.(terminalNode).pushTrailingComment(c)
+func (n *compoundIdentNode) value() interface{} {
+	return identifier(n.val)
 }
 
 type compactOptionsNode struct {
@@ -311,7 +303,7 @@ type optionNameNode struct {
 
 type optionNamePartNode struct {
 	basicCompositeNode
-	text        *identNode
+	text        *compoundIdentNode
 	offset      int
 	length      int
 	isExtension bool
@@ -350,17 +342,21 @@ type valueNode interface {
 }
 
 var _ valueNode = (*identNode)(nil)
+var _ valueNode = (*compoundIdentNode)(nil)
 var _ valueNode = (*stringLiteralNode)(nil)
+var _ valueNode = (*compoundStringNode)(nil)
 var _ valueNode = (*intLiteralNode)(nil)
-var _ valueNode = (*negativeIntLiteralNode)(nil)
+var _ valueNode = (*compoundIntNode)(nil)
+var _ valueNode = (*compoundUintNode)(nil)
 var _ valueNode = (*floatLiteralNode)(nil)
+var _ valueNode = (*compoundFloatNode)(nil)
 var _ valueNode = (*boolLiteralNode)(nil)
 var _ valueNode = (*sliceLiteralNode)(nil)
 var _ valueNode = (*aggregateLiteralNode)(nil)
 var _ valueNode = (*noSourceNode)(nil)
 
 type stringLiteralNode struct {
-	basicCompositeNode
+	basicNode
 	val string
 }
 
@@ -368,12 +364,13 @@ func (n *stringLiteralNode) value() interface{} {
 	return n.val
 }
 
-func (n *stringLiteralNode) popLeadingComment() comment {
-	return n.first.(terminalNode).popLeadingComment()
+type compoundStringNode struct {
+	basicCompositeNode
+	val string
 }
 
-func (n *stringLiteralNode) pushTrailingComment(c comment) {
-	n.last.(terminalNode).pushTrailingComment(c)
+func (n *compoundStringNode) value() interface{} {
+	return n.val
 }
 
 type intLiteralNode struct {
@@ -385,17 +382,26 @@ func (n *intLiteralNode) value() interface{} {
 	return n.val
 }
 
-type negativeIntLiteralNode struct {
+type compoundUintNode struct {
+	basicCompositeNode
+	val uint64
+}
+
+func (n *compoundUintNode) value() interface{} {
+	return n.val
+}
+
+type compoundIntNode struct {
 	basicCompositeNode
 	val int64
 }
 
-func (n *negativeIntLiteralNode) value() interface{} {
+func (n *compoundIntNode) value() interface{} {
 	return n.val
 }
 
 type floatLiteralNode struct {
-	basicCompositeNode
+	basicNode
 	val float64
 }
 
@@ -403,12 +409,13 @@ func (n *floatLiteralNode) value() interface{} {
 	return n.val
 }
 
-func (n *floatLiteralNode) popLeadingComment() comment {
-	return n.first.(terminalNode).popLeadingComment()
+type compoundFloatNode struct {
+	basicCompositeNode
+	val float64
 }
 
-func (n *floatLiteralNode) pushTrailingComment(c comment) {
-	n.last.(terminalNode).pushTrailingComment(c)
+func (n *compoundFloatNode) value() interface{} {
+	return n.val
 }
 
 type boolLiteralNode struct {
@@ -446,7 +453,7 @@ type aggregateEntryNode struct {
 
 type aggregateNameNode struct {
 	basicCompositeNode
-	name        *identNode
+	name        *compoundIdentNode
 	isExtension bool
 }
 
@@ -460,8 +467,8 @@ func (a *aggregateNameNode) value() string {
 
 type fieldNode struct {
 	basicCompositeNode
-	label   *labelNode
-	fldType *identNode
+	label   fieldLabel
+	fldType *compoundIdentNode
 	name    *identNode
 	tag     *intLiteralNode
 	options *compactOptionsNode
@@ -477,10 +484,10 @@ func (n *fieldNode) fieldLabel() node {
 	// proto3 fields and fields inside one-ofs will not have a label and we need
 	// this check in order to return a nil node -- otherwise we'd return a
 	// non-nil node that has a nil pointer value in it :/
-	if n.label == nil {
+	if n.label.identNode == nil {
 		return nil
 	}
-	return n.label
+	return n.label.identNode
 }
 
 func (n *fieldNode) fieldName() node {
@@ -506,7 +513,7 @@ func (n *fieldNode) getGroupKeyword() node {
 	return nil
 }
 
-type labelNode struct {
+type fieldLabel struct {
 	*identNode
 	repeated bool
 	required bool
@@ -515,7 +522,7 @@ type labelNode struct {
 type groupNode struct {
 	basicCompositeNode
 	groupKeyword *identNode
-	label        *labelNode
+	label        fieldLabel
 	name         *identNode
 	tag          *intLiteralNode
 	decls        []*messageElement
@@ -528,11 +535,11 @@ type groupNode struct {
 }
 
 func (n *groupNode) fieldLabel() node {
-	if n.label == nil {
+	if n.label.identNode == nil {
 		// return nil interface to indicate absence, not a typed nil
 		return nil
 	}
-	return n.label
+	return n.label.identNode
 }
 
 func (n *groupNode) fieldName() node {
@@ -607,7 +614,7 @@ type mapTypeNode struct {
 	basicCompositeNode
 	mapKeyword *identNode
 	keyType    *identNode
-	valueType  *identNode
+	valueType  *compoundIdentNode
 }
 
 type mapFieldNode struct {
@@ -647,14 +654,17 @@ func (n *mapFieldNode) messageName() node {
 }
 
 func (n *mapFieldNode) keyField() *syntheticMapField {
-	return newSyntheticMapField(n.mapType.keyType, 1)
+	k := n.mapType.keyType
+	t := &compoundIdentNode{val: k.val}
+	t.setRange(k, k)
+	return newSyntheticMapField(t, 1)
 }
 
 func (n *mapFieldNode) valueField() *syntheticMapField {
 	return newSyntheticMapField(n.mapType.valueType, 2)
 }
 
-func newSyntheticMapField(ident *identNode, tagNum uint64) *syntheticMapField {
+func newSyntheticMapField(ident *compoundIdentNode, tagNum uint64) *syntheticMapField {
 	tag := &intLiteralNode{
 		basicNode: basicNode{
 			posRange: posRange{start: *ident.start(), end: *ident.end()},
@@ -665,7 +675,7 @@ func newSyntheticMapField(ident *identNode, tagNum uint64) *syntheticMapField {
 }
 
 type syntheticMapField struct {
-	ident *identNode
+	ident *compoundIdentNode
 	tag   *intLiteralNode
 }
 
@@ -732,7 +742,7 @@ func (n *rangeNode) rangeEnd() node {
 type reservedNode struct {
 	basicCompositeNode
 	ranges []*rangeNode
-	names  []*stringLiteralNode
+	names  []*compoundStringNode
 }
 
 type enumNode struct {
@@ -780,11 +790,7 @@ type enumValueNode struct {
 	basicCompositeNode
 	name    *identNode
 	options *compactOptionsNode
-
-	// only one of these two will be set:
-
-	numberP *intLiteralNode         // positive numeric value
-	numberN *negativeIntLiteralNode // negative numeric value
+	number  *compoundIntNode
 }
 
 func (n *enumValueNode) getName() node {
@@ -792,10 +798,7 @@ func (n *enumValueNode) getName() node {
 }
 
 func (n *enumValueNode) getNumber() node {
-	if n.numberP != nil {
-		return n.numberP
-	}
-	return n.numberN
+	return n.number
 }
 
 type messageNode struct {
@@ -868,7 +871,7 @@ func (n *messageElement) get() node {
 
 type extendNode struct {
 	basicCompositeNode
-	extendee *identNode
+	extendee *compoundIdentNode
 	decls    []*extendElement
 }
 
@@ -964,7 +967,7 @@ func (n *methodNode) getOutputType() node {
 
 type rpcTypeNode struct {
 	basicCompositeNode
-	msgType       *identNode
+	msgType       *compoundIdentNode
 	streamKeyword node
 }
 

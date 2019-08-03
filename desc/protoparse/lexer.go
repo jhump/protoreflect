@@ -196,18 +196,11 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 		}
 
 		if c == '.' {
-			// tokens that start with a dot include type names and decimal literals
+			// decimal literals could start with a dot
 			cn, _, err := l.input.readRune()
 			if err != nil {
 				l.setRune(lval)
 				return int(c)
-			}
-			if cn == '_' || (cn >= 'a' && cn <= 'z') || (cn >= 'A' && cn <= 'Z') {
-				l.adjustPos(cn)
-				token := []rune{c, cn}
-				token = l.readIdentifier(token)
-				l.setIdent(lval, string(token), identTypeName)
-				return _TYPENAME
 			}
 			if cn >= '0' && cn <= '9' {
 				l.adjustPos(cn)
@@ -231,15 +224,11 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			token := []rune{c}
 			token = l.readIdentifier(token)
 			str := string(token)
-			if strings.Contains(str, ".") {
-				l.setIdent(lval, str, identQualified)
-				return _FQNAME
-			}
 			if t, ok := keywords[str]; ok {
-				l.setIdent(lval, str, identSimpleName)
+				l.setIdent(lval, str)
 				return t
 			}
-			l.setIdent(lval, str, identSimpleName)
+			l.setIdent(lval, str)
 			return _NAME
 		}
 
@@ -441,28 +430,22 @@ func (l *protoLex) setPrev(n terminalNode) {
 }
 
 func (l *protoLex) setString(lval *protoSymType, val string) {
-	b := l.newBasicNode()
-	lval.str = &stringLiteralNode{val: val}
-	lval.str.setRange(&b, &b)
-	l.setPrev(lval.str)
+	lval.s = &stringLiteralNode{basicNode: l.newBasicNode(), val: val}
+	l.setPrev(lval.s)
 }
 
-func (l *protoLex) setIdent(lval *protoSymType, val string, kind identKind) {
-	b := l.newBasicNode()
-	lval.id = &identNode{val: val, kind: kind}
-	lval.id.setRange(&b, &b)
+func (l *protoLex) setIdent(lval *protoSymType, val string) {
+	lval.id = &identNode{basicNode: l.newBasicNode(), val: val}
 	l.setPrev(lval.id)
 }
 
 func (l *protoLex) setInt(lval *protoSymType, val uint64) {
-	lval.ui = &intLiteralNode{basicNode: l.newBasicNode(), val: val}
-	l.setPrev(lval.ui)
+	lval.i = &intLiteralNode{basicNode: l.newBasicNode(), val: val}
+	l.setPrev(lval.i)
 }
 
 func (l *protoLex) setFloat(lval *protoSymType, val float64) {
-	b := l.newBasicNode()
-	lval.f = &floatLiteralNode{val: val}
-	lval.f.setRange(&b, &b)
+	lval.f = &floatLiteralNode{basicNode: l.newBasicNode(), val: val}
 	l.setPrev(lval.f)
 }
 
@@ -558,21 +541,7 @@ func (l *protoLex) readIdentifier(sofar []rune) []rune {
 		if err != nil {
 			break
 		}
-		if c == '.' {
-			cn, _, err := l.input.readRune()
-			if err != nil {
-				l.input.unreadRune(c)
-				break
-			}
-			if cn != '_' && (cn < 'a' || cn > 'z') && (cn < 'A' || cn > 'Z') {
-				l.input.unreadRune(cn)
-				l.input.unreadRune(c)
-				break
-			}
-			l.adjustPos(c)
-			token = append(token, c)
-			c = cn
-		} else if c != '_' && (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') {
+		if c != '_' && (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') {
 			l.input.unreadRune(c)
 			break
 		}
