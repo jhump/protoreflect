@@ -44,14 +44,16 @@ import (
 	optNm     []*optionNamePartNode
 	cmpctOpts *compactOptionsNode
 	rngs      []*rangeNode
-	names     []*stringLiteralNode
+	names     []*compoundStringNode
+	cid       *compoundIdentNode
 	sl        []valueNode
 	agg       []*aggregateEntryNode
 	aggName   *aggregateNameNode
 	v         valueNode
-	str       *stringLiteralNode
-	i         *negativeIntLiteralNode
-	ui        *intLiteralNode
+	il        *compoundIntNode
+	str       *compoundStringNode
+	s         *stringLiteralNode
+	i         *intLiteralNode
 	f         *floatLiteralNode
 	id        *identNode
 	b         *basicNode
@@ -68,12 +70,11 @@ import (
 %type <opts>      option compactOption compactOptionDecls rpcOption rpcOptions
 %type <optNm>     optionName optionNameRest optionNameComponent
 %type <cmpctOpts> compactOptions
-%type <v>         constant scalarConstant aggregate
-%type <id>        name ident typeIdent keyType
+%type <v>         constant scalarConstant aggregate uintLit floatLit
+%type <il>        intLit negIntLit
+%type <id>        name keyType identComp
+%type <cid>       ident typeIdent absTypeIdent
 %type <aggName>   aggName
-%type <i>         negIntLit
-%type <ui>        intLit
-%type <f>         floatLit
 %type <sl>        constantList
 %type <agg>       aggFields aggField aggFieldEntry
 %type <fld>       field oneofField
@@ -100,8 +101,8 @@ import (
 %type <rpcType>   rpcType
 
 // same for terminals
-%token <str> _STRING_LIT
-%token <ui>  _INT_LIT
+%token <s> _STRING_LIT
+%token <i>  _INT_LIT
 %token <f>   _FLOAT_LIT
 %token <id>  _NAME _FQNAME _TYPENAME
 %token <id>  _SYNTAX _IMPORT _WEAK _PUBLIC _PACKAGE _OPTION _TRUE _FALSE _INF _NAN _REPEATED _OPTIONAL _REQUIRED
@@ -201,8 +202,21 @@ package : _PACKAGE ident ';' {
 		$$.setRange($1, $3)
 	}
 
-ident : name
-	| _FQNAME
+ident : identComp {
+        $$ = &compoundIdentNode{val: $1.val}
+        $$.setRange($1, $1)
+    }
+	| ident _TYPENAME {
+        $$ = &compoundIdentNode{val: $1.val + $2.val}
+        $$.setRange($1, $2)
+	}
+	| ident '.' identComp {
+        $$ = &compoundIdentNode{val: $1.val + "." + $3.val}
+        $$.setRange($1, $3)
+	}
+
+identComp : name
+    | _FQNAME
 
 option : _OPTION optionName '=' constant ';' {
 		n := &optionNameNode{parts: $2}
@@ -233,7 +247,7 @@ optionNameRest : optionNameComponent
 		$$ = append($1, $2...)
 	}
 
-optionNameComponent : _TYPENAME {
+optionNameComponent : typeIdent {
 		$$ = toNameParts($1, 1 /* exclude leading dot */)
 	}
 	| '.' '(' typeIdent ')' {
@@ -248,26 +262,22 @@ constant : scalarConstant
 scalarConstant : stringLit {
 		$$ = $1
 	}
-	| intLit {
-		$$ = $1
-	}
+	| uintLit
 	| negIntLit {
-		$$ = $1
+	    $$ = $1
 	}
-	| floatLit {
-		$$ = $1
-	}
+	| floatLit
 	| name {
 		if $1.val == "true" {
 			$$ = &boolLiteralNode{identNode: $1, val: true}
 		} else if $1.val == "false" {
 			$$ = &boolLiteralNode{identNode: $1, val: false}
 		} else if $1.val == "inf" {
-			f := &floatLiteralNode{val: math.Inf(1)}
+			f := &compoundFloatNode{val: math.Inf(1)}
 			f.setRange($1, $1)
 			$$ = f
 		} else if $1.val == "nan" {
-			f := &floatLiteralNode{val: math.NaN()}
+			f := &compoundFloatNode{val: math.NaN()}
 			f.setRange($1, $1)
 			$$ = f
 		} else {
@@ -275,40 +285,65 @@ scalarConstant : stringLit {
 		}
 	}
 
-intLit : _INT_LIT
+uintLit : _INT_LIT {
+        i := &compoundUintNode{val: $1.val}
+        i.setRange($1, $1)
+        $$ = i
+    }
 	| '+' _INT_LIT {
-		$$ = $2
+        i := &compoundUintNode{val: $2.val}
+        i.setRange($1, $2)
+        $$ = i
 	}
 
 negIntLit : '-' _INT_LIT {
 		if $2.val > math.MaxInt64 + 1 {
 			lexError(protolex, $2.start(), fmt.Sprintf("numeric constant %d would underflow (allowed range is %d to %d)", $2.val, int64(math.MinInt64), int64(math.MaxInt64)))
 		}
-		$$ = &negativeIntLiteralNode{val: -int64($2.val)}
-		$$.setRange($1, $2)
+		i := &compoundIntNode{val: -int64($2.val)}
+		i.setRange($1, $2)
+		$$ = i
 	}
 
-floatLit : _FLOAT_LIT
+intLit : negIntLit
+    | _INT_LIT {
+        // we don't allow uintLit because this is for enum numeric vals, which don't allow '+'
+        checkUint64InInt32Range(protolex, $1.start(), $1.val)
+		i := &compoundIntNode{val: int64($1.val)}
+		i.setRange($1, $1)
+		$$ = i
+    }
+
+floatLit : _FLOAT_LIT {
+        $$ = $1
+    }
 	| '-' _FLOAT_LIT {
-		$$ = &floatLiteralNode{val: -$2.val}
-		$$.setRange($1, $2)
+		f := &compoundFloatNode{val: -$2.val}
+		f.setRange($1, $2)
+		$$ = f
 	}
 	| '+' _FLOAT_LIT {
-		$$ = &floatLiteralNode{val: $2.val}
-		$$.setRange($1, $2)
+		f := &compoundFloatNode{val: $2.val}
+		f.setRange($1, $2)
+		$$ = f
 	}
 	| '+' _INF {
-		$$ = &floatLiteralNode{val: math.Inf(1)}
-		$$.setRange($1, $2)
+		f := &compoundFloatNode{val: math.Inf(1)}
+		f.setRange($1, $2)
+		$$ = f
 	}
 	| '-' _INF {
-		$$ = &floatLiteralNode{val: math.Inf(-1)}
-		$$.setRange($1, $2)
+		f := &compoundFloatNode{val: math.Inf(-1)}
+		f.setRange($1, $2)
+		$$ = f
 	}
 
-stringLit : _STRING_LIT
+stringLit : _STRING_LIT {
+        $$ = &compoundStringNode{val: $1.val}
+        $$.setRange($1, $1)
+    }
     | stringLit _STRING_LIT {
-        $$ = &stringLiteralNode{val: $1.val + $2.val}
+        $$ = &compoundStringNode{val: $1.val + $2.val}
         $$.setRange($1, $2)
     }
 
@@ -391,10 +426,12 @@ aggFieldEntry : aggName ':' scalarConstant {
 	}
 
 aggName : name {
-		$$ = &aggregateNameNode{name: $1}
+        n := &compoundIdentNode{val: $1.val}
+        n.setRange($1, $1)
+		$$ = &aggregateNameNode{name: n}
 		$$.setRange($1, $1)
 	}
-	| '[' ident ']' {
+	| '[' typeIdent ']' {
 		$$ = &aggregateNameNode{name: $2, isExtension: true}
 		$$.setRange($1, $3)
 	}
@@ -433,35 +470,40 @@ constantList : constant {
 	}
 
 typeIdent : ident
-	| _TYPENAME
-	| '.' ident {
-        $$ = &identNode{val: "." + $2.val}
+    | absTypeIdent
+
+absTypeIdent : '.' ident {
+        $$ = &compoundIdentNode{val: "." + $2.val}
         $$.setRange($1, $2)
 	}
-	| typeIdent _TYPENAME {
-        $$ = &identNode{val: $1.val + $2.val}
+	| _TYPENAME {
+	    $$ = &compoundIdentNode{val: $1.val}
+	    $$.setRange($1, $1)
+    }
+	| absTypeIdent _TYPENAME {
+        $$ = &compoundIdentNode{val: $1.val + $2.val}
         $$.setRange($1, $2)
 	}
-	| typeIdent '.' ident {
-        $$ = &identNode{val: $1.val + "." + $3.val}
+	| absTypeIdent '.' ident {
+        $$ = &compoundIdentNode{val: $1.val + "." + $3.val}
         $$.setRange($1, $3)
 	}
 
 field : _REQUIRED typeIdent name '=' _INT_LIT ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{identNode: $1, required: true}
+		lbl := fieldLabel{identNode: $1, required: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
 		$$.setRange($1, $6)
 	}
 	| _OPTIONAL typeIdent name '=' _INT_LIT ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{identNode: $1}
+		lbl := fieldLabel{identNode: $1}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
 		$$.setRange($1, $6)
 	}
 	| _REPEATED typeIdent name '=' _INT_LIT ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{identNode: $1, repeated: true}
+		lbl := fieldLabel{identNode: $1, repeated: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5}
 		$$.setRange($1, $6)
 	}
@@ -472,19 +514,19 @@ field : _REQUIRED typeIdent name '=' _INT_LIT ';' {
 	}
 	| _REQUIRED typeIdent name '=' _INT_LIT compactOptions ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{identNode: $1, required: true}
+		lbl := fieldLabel{identNode: $1, required: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $6}
 		$$.setRange($1, $7)
 	}
 	| _OPTIONAL typeIdent name '=' _INT_LIT compactOptions ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{identNode: $1}
+		lbl := fieldLabel{identNode: $1}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $6}
 		$$.setRange($1, $7)
 	}
 	| _REPEATED typeIdent name '=' _INT_LIT compactOptions ';' {
 		checkTag(protolex, $5.start(), $5.val)
-		lbl := &labelNode{identNode: $1, repeated: true}
+		lbl := fieldLabel{identNode: $1, repeated: true}
 		$$ = &fieldNode{label: lbl, fldType: $2, name: $3, tag: $5, options: $6}
 		$$.setRange($1, $7)
 	}
@@ -517,7 +559,7 @@ group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageBody '}' {
 		if !unicode.IsUpper(rune($3.val[0])) {
 			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
 		}
-		lbl := &labelNode{identNode: $1, required: true}
+		lbl := fieldLabel{identNode: $1, required: true}
 		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, decls: $7}
 		$$.setRange($1, $8)
 	}
@@ -526,7 +568,7 @@ group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageBody '}' {
 		if !unicode.IsUpper(rune($3.val[0])) {
 			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
 		}
-		lbl := &labelNode{identNode: $1}
+		lbl := fieldLabel{identNode: $1}
 		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, decls: $7}
 		$$.setRange($1, $8)
 	}
@@ -535,7 +577,7 @@ group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageBody '}' {
 		if !unicode.IsUpper(rune($3.val[0])) {
 			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
 		}
-		lbl := &labelNode{identNode: $1, repeated: true}
+		lbl := fieldLabel{identNode: $1, repeated: true}
 		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, decls: $7}
 		$$.setRange($1, $8)
 	}
@@ -678,29 +720,13 @@ enumRanges : enumRanges ',' enumRange {
 	}
 	| enumRange
 
-enumRange : _INT_LIT {
-		checkUint64InInt32Range(protolex, $1.start(), $1.val)
-		r := &rangeNode{stNode: $1, enNode: $1, st: int32($1.val), en: int32($1.val)}
-		r.setRange($1, $1)
-		$$ = []*rangeNode{r}
-	}
-	| negIntLit {
+enumRange : intLit {
 		checkInt64InInt32Range(protolex, $1.start(), $1.val)
 		r := &rangeNode{stNode: $1, enNode: $1, st: int32($1.val), en: int32($1.val)}
 		r.setRange($1, $1)
 		$$ = []*rangeNode{r}
 	}
-	| _INT_LIT _TO _INT_LIT {
-		checkUint64InInt32Range(protolex, $1.start(), $1.val)
-		checkUint64InInt32Range(protolex, $3.start(), $3.val)
-		if $1.val > $3.val {
-			lexError(protolex, $1.start(), fmt.Sprintf("range, %d to %d, is invalid: start must be <= end", $1.val, $3.val))
-		}
-		r := &rangeNode{stNode: $1, enNode: $3, st: int32($1.val), en: int32($3.val)}
-		r.setRange($1, $3)
-		$$ = []*rangeNode{r}
-	}
-	| negIntLit _TO negIntLit {
+	| intLit _TO intLit {
 		checkInt64InInt32Range(protolex, $1.start(), $1.val)
 		checkInt64InInt32Range(protolex, $3.start(), $3.val)
 		if $1.val > $3.val {
@@ -710,20 +736,7 @@ enumRange : _INT_LIT {
 		r.setRange($1, $3)
 		$$ = []*rangeNode{r}
 	}
-	| negIntLit _TO _INT_LIT {
-		checkInt64InInt32Range(protolex, $1.start(), $1.val)
-		checkUint64InInt32Range(protolex, $3.start(), $3.val)
-		r := &rangeNode{stNode: $1, enNode: $3, st: int32($1.val), en: int32($3.val)}
-		r.setRange($1, $3)
-		$$ = []*rangeNode{r}
-	}
-	| _INT_LIT _TO _MAX {
-		checkUint64InInt32Range(protolex, $1.start(), $1.val)
-		r := &rangeNode{stNode: $1, enNode: $3, st: int32($1.val), en: math.MaxInt32}
-		r.setRange($1, $3)
-		$$ = []*rangeNode{r}
-	}
-	| negIntLit _TO _MAX {
+	| intLit _TO _MAX {
 		checkInt64InInt32Range(protolex, $1.start(), $1.val)
 		r := &rangeNode{stNode: $1, enNode: $3, st: int32($1.val), en: math.MaxInt32}
 		r.setRange($1, $3)
@@ -759,7 +772,7 @@ fieldNames : fieldNames ',' stringLit {
 		$$ = append($1, $3)
 	}
 	| stringLit {
-		$$ = []*stringLiteralNode{$1}
+		$$ = []*compoundStringNode{$1}
 	}
 
 enum : _ENUM name '{' enumBody '}' {
@@ -801,22 +814,12 @@ enumItem : option {
 	| error {
 	}
 
-enumField : name '=' _INT_LIT ';' {
-		checkUint64InInt32Range(protolex, $3.start(), $3.val)
-		$$ = &enumValueNode{name: $1, numberP: $3}
-		$$.setRange($1, $4)
-	}
-	|  name '=' _INT_LIT compactOptions ';' {
-		checkUint64InInt32Range(protolex, $3.start(), $3.val)
-		$$ = &enumValueNode{name: $1, numberP: $3, options: $4}
-		$$.setRange($1, $5)
-	}
-	| name '=' negIntLit ';' {
+enumField : name '=' intLit ';' {
 		checkInt64InInt32Range(protolex, $3.start(), $3.val)
 		$$ = &enumValueNode{name: $1, numberN: $3}
 		$$.setRange($1, $4)
 	}
-	|  name '=' negIntLit compactOptions ';' {
+	|  name '=' intLit compactOptions ';' {
 		checkInt64InInt32Range(protolex, $3.start(), $3.val)
 		$$ = &enumValueNode{name: $1, numberN: $3, options: $4}
 		$$.setRange($1, $5)

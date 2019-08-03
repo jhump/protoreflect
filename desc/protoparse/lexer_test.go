@@ -150,11 +150,11 @@ foo
 			n = sym.id
 			val = sym.id.val
 		case _STRING_LIT:
-			n = sym.str
-			val = sym.str.val
+			n = sym.s
+			val = sym.s.val
 		case _INT_LIT:
-			n = sym.ui
-			val = sym.ui.val
+			n = sym.i
+			val = sym.i.val
 		case _FLOAT_LIT:
 			n = sym.f
 			val = sym.f.val

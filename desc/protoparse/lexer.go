@@ -441,28 +441,22 @@ func (l *protoLex) setPrev(n terminalNode) {
 }
 
 func (l *protoLex) setString(lval *protoSymType, val string) {
-	b := l.newBasicNode()
-	lval.str = &stringLiteralNode{val: val}
-	lval.str.setRange(&b, &b)
-	l.setPrev(lval.str)
+	lval.s = &stringLiteralNode{basicNode: l.newBasicNode(), val: val}
+	l.setPrev(lval.s)
 }
 
 func (l *protoLex) setIdent(lval *protoSymType, val string, kind identKind) {
-	b := l.newBasicNode()
-	lval.id = &identNode{val: val, kind: kind}
-	lval.id.setRange(&b, &b)
+	lval.id = &identNode{basicNode: l.newBasicNode(), val: val}
 	l.setPrev(lval.id)
 }
 
 func (l *protoLex) setInt(lval *protoSymType, val uint64) {
-	lval.ui = &intLiteralNode{basicNode: l.newBasicNode(), val: val}
-	l.setPrev(lval.ui)
+	lval.i = &intLiteralNode{basicNode: l.newBasicNode(), val: val}
+	l.setPrev(lval.i)
 }
 
 func (l *protoLex) setFloat(lval *protoSymType, val float64) {
-	b := l.newBasicNode()
-	lval.f = &floatLiteralNode{val: val}
-	lval.f.setRange(&b, &b)
+	lval.f = &floatLiteralNode{basicNode: l.newBasicNode(), val: val}
 	l.setPrev(lval.f)
 }
 

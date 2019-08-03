@@ -771,8 +771,8 @@ func (r *parseResult) addExtensions(ext *extendNode, flds *[]*dpb.FieldDescripto
 	}
 }
 
-func asLabel(lbl *labelNode) *dpb.FieldDescriptorProto_Label {
-	if lbl == nil {
+func asLabel(lbl *fieldLabel) *dpb.FieldDescriptorProto_Label {
+	if lbl.identNode == nil {
 		return nil
 	}
 	switch {
@@ -786,7 +786,7 @@ func asLabel(lbl *labelNode) *dpb.FieldDescriptorProto_Label {
 }
 
 func (r *parseResult) asFieldDescriptor(node *fieldNode) *dpb.FieldDescriptorProto {
-	fd := newFieldDescriptor(node.name.val, node.fldType.val, int32(node.tag.val), asLabel(node.label))
+	fd := newFieldDescriptor(node.name.val, node.fldType.val, int32(node.tag.val), asLabel(&node.label))
 	r.putFieldNode(fd, node)
 	if opts := node.options.Elements(); len(opts) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
@@ -837,7 +837,7 @@ func (r *parseResult) asGroupDescriptors(group *groupNode, isProto3 bool) (*dpb.
 		Name:     proto.String(fieldName),
 		JsonName: proto.String(internal.JsonName(fieldName)),
 		Number:   proto.Int32(int32(group.tag.val)),
-		Label:    asLabel(group.label),
+		Label:    asLabel(&group.label),
 		Type:     dpb.FieldDescriptorProto_TYPE_GROUP.Enum(),
 		TypeName: proto.String(group.name.val),
 	}
@@ -1049,7 +1049,7 @@ func (r *parseResult) asServiceDescriptor(svc *serviceNode) *dpb.ServiceDescript
 	return sd
 }
 
-func toNameParts(ident *identNode, offset int) []*optionNamePartNode {
+func toNameParts(ident *compoundIdentNode, offset int) []*optionNamePartNode {
 	parts := strings.Split(ident.val[offset:], ".")
 	ret := make([]*optionNamePartNode, len(parts))
 	for i, p := range parts {
