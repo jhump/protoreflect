@@ -252,18 +252,9 @@ type packageNode struct {
 
 type identifier string
 
-type identKind int
-
-const (
-	identSimpleName identKind = iota
-	identQualified
-	identTypeName
-)
-
 type identNode struct {
 	basicNode
-	val  string
-	kind identKind
+	val string
 }
 
 func (n *identNode) value() interface{} {
@@ -272,8 +263,7 @@ func (n *identNode) value() interface{} {
 
 type compoundIdentNode struct {
 	basicCompositeNode
-	val  string
-	kind identKind
+	val string
 }
 
 func (n *compoundIdentNode) value() interface{} {

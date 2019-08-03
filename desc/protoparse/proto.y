@@ -72,8 +72,8 @@ import (
 %type <cmpctOpts> compactOptions
 %type <v>         constant scalarConstant aggregate uintLit floatLit
 %type <il>        intLit negIntLit
-%type <id>        name keyType identComp
-%type <cid>       ident typeIdent absTypeIdent
+%type <id>        name keyType
+%type <cid>       ident typeIdent
 %type <aggName>   aggName
 %type <sl>        constantList
 %type <agg>       aggFields aggField aggFieldEntry
@@ -104,7 +104,7 @@ import (
 %token <s> _STRING_LIT
 %token <i>  _INT_LIT
 %token <f>   _FLOAT_LIT
-%token <id>  _NAME _FQNAME _TYPENAME
+%token <id>  _NAME
 %token <id>  _SYNTAX _IMPORT _WEAK _PUBLIC _PACKAGE _OPTION _TRUE _FALSE _INF _NAN _REPEATED _OPTIONAL _REQUIRED
 %token <id>  _DOUBLE _FLOAT _INT32 _INT64 _UINT32 _UINT64 _SINT32 _SINT64 _FIXED32 _FIXED64 _SFIXED32 _SFIXED64
 %token <id>  _BOOL _STRING _BYTES _GROUP _ONEOF _MAP _EXTENSIONS _TO _MAX _RESERVED _ENUM _MESSAGE _EXTEND
@@ -202,21 +202,14 @@ package : _PACKAGE ident ';' {
 		$$.setRange($1, $3)
 	}
 
-ident : identComp {
+ident : name {
         $$ = &compoundIdentNode{val: $1.val}
         $$.setRange($1, $1)
     }
-	| ident _TYPENAME {
-        $$ = &compoundIdentNode{val: $1.val + $2.val}
-        $$.setRange($1, $2)
-	}
-	| ident '.' identComp {
+	| ident '.' name {
         $$ = &compoundIdentNode{val: $1.val + "." + $3.val}
         $$.setRange($1, $3)
 	}
-
-identComp : name
-    | _FQNAME
 
 option : _OPTION optionName '=' constant ';' {
 		n := &optionNameNode{parts: $2}
@@ -470,24 +463,10 @@ constantList : constant {
 	}
 
 typeIdent : ident
-    | absTypeIdent
-
-absTypeIdent : '.' ident {
-        $$ = &compoundIdentNode{val: "." + $2.val}
-        $$.setRange($1, $2)
-	}
-	| _TYPENAME {
-	    $$ = &compoundIdentNode{val: $1.val}
-	    $$.setRange($1, $1)
+    | '.' ident {
+          $$ = &compoundIdentNode{val: "." + $2.val}
+          $$.setRange($1, $2)
     }
-	| absTypeIdent _TYPENAME {
-        $$ = &compoundIdentNode{val: $1.val + $2.val}
-        $$.setRange($1, $2)
-	}
-	| absTypeIdent '.' ident {
-        $$ = &compoundIdentNode{val: $1.val + "." + $3.val}
-        $$.setRange($1, $3)
-	}
 
 field : _REQUIRED typeIdent name '=' _INT_LIT ';' {
 		checkTag(protolex, $5.start(), $5.val)
