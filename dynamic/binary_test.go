@@ -176,6 +176,13 @@ func binaryTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 				bb := make([]byte, 0, mm.XXX_Size())
 				return mm.XXX_Marshal(bb, true)
 			}
+
+			var buf proto.Buffer
+			buf.SetDeterministic(true)
+			if err := buf.Marshal(m); err != nil {
+				return nil, err
+			}
+			return buf.Bytes(), nil
 		}
 		return proto.Marshal(m)
 	}

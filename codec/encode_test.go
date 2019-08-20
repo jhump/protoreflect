@@ -1,11 +1,11 @@
 package codec_test
 
 import (
-	"github.com/jhump/protoreflect/codec"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/jhump/protoreflect/internal/testprotos"
