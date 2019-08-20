@@ -103,7 +103,7 @@ func (cb *Buffer) EncodeDelimitedMessage(pm proto.Message) error {
 func marshalMessage(b []byte, pm proto.Message, deterministic bool) ([]byte, error) {
 	// we try to use the most efficient way to marshal to existing slice
 	nm, ok := pm.(interface {
-		// this interface is implemented by generated messages
+		// this interface is implemented by generated messages before api-v2
 		XXX_Size() int
 		XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
 	})
@@ -141,6 +141,17 @@ func marshalMessage(b []byte, pm proto.Message, deterministic bool) ([]byte, err
 			}
 			return append(b, bytes...), nil
 		}
+
+		var buf proto.Buffer
+		buf.SetDeterministic(true)
+		if err := buf.Marshal(pm); err != nil {
+			return nil, err
+		}
+		bytes := buf.Bytes()
+		if len(b) == 0 {
+			return bytes, nil
+		}
+		return append(b, bytes...), nil
 	}
 
 	mam, ok := pm.(interface {
