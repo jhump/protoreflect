@@ -86,11 +86,17 @@ func TestExtensionRegistry_Defaults(t *testing.T) {
 	testutil.Ok(t, err)
 
 	testutil.Eq(t, 5, len(fds))
-	testutil.Eq(t, file.FindSymbol("testprotos.xtm").AsProto(), fds[0].AsProto())
-	testutil.Eq(t, file.FindSymbol("testprotos.xs").AsProto(), fds[1].AsProto())
-	testutil.Eq(t, file.FindSymbol("testprotos.xi").AsProto(), fds[2].AsProto())
-	testutil.Eq(t, file.FindSymbol("testprotos.xui").AsProto(), fds[3].AsProto())
-	testutil.Eq(t, file.FindSymbol("testprotos.TestMessage.NestedMessage.AnotherNestedMessage.flags").AsProto(), fds[4].AsProto())
+	for i, sym := range []string{
+		"testprotos.xtm",
+		"testprotos.xs",
+		"testprotos.xi",
+		"testprotos.xui",
+		"testprotos.TestMessage.NestedMessage.AnotherNestedMessage.flags",
+	} {
+		got := file.FindSymbol(sym).AsProto()
+		want := fds[i].AsProto()
+		testutil.Ceq(t, want, got, eqpm)
+	}
 
 	checkFindExtension(t, er, fds)
 }
