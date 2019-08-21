@@ -65,7 +65,7 @@ func (cb *Buffer) EncodeFieldValue(fd *desc.FieldDescriptor, val interface{}) er
 		if err != nil {
 			return err
 		}
-		if isPacked(fd) && len(sl) > 1 &&
+		if isPacked(fd) && len(sl) > 0 &&
 			(wt == proto.WireVarint || wt == proto.WireFixed32 || wt == proto.WireFixed64) {
 			// packed repeated field
 			var packedBuffer Buffer
