@@ -436,7 +436,7 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 
 	parsed.add(filename, result)
 
-	if errs.getError() != nil {
+	if errs.err != nil {
 		return // abort
 	}
 
@@ -543,6 +543,13 @@ func (r *parseResult) getMessageReservedRangeNode(rr *dpb.DescriptorProto_Reserv
 	return r.nodes[rr].(rangeDecl)
 }
 
+func (r *parseResult) getEnumNode(e *dpb.EnumDescriptorProto) node {
+	if r.nodes == nil {
+		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+	}
+	return r.nodes[e]
+}
+
 func (r *parseResult) getEnumValueNode(e *dpb.EnumValueDescriptorProto) enumValueDecl {
 	if r.nodes == nil {
 		return noSourceNode{pos: unknownPos(r.fd.GetName())}
@@ -617,12 +624,13 @@ func (r *parseResult) putMethodNode(m *dpb.MethodDescriptorProto, n *methodNode)
 }
 
 func parseProto(filename string, r io.Reader, errs *errorHandler, validate bool) *parseResult {
+	beforeErrs := errs.errsReported
 	lx := newLexer(r, filename, errs)
 	protoParse(lx)
 
 	res := createParseResult(filename, lx.res, errs)
-	if validate {
-		basicValidate(res)
+	if validate && errs.err == nil {
+		basicValidate(res, errs.errsReported > beforeErrs)
 	}
 
 	return res
@@ -1155,18 +1163,18 @@ func writeEscapedBytes(buf *bytes.Buffer, b []byte) {
 	}
 }
 
-func basicValidate(res *parseResult) {
+func basicValidate(res *parseResult, containsErrors bool) {
 	fd := res.fd
 	isProto3 := fd.GetSyntax() == "proto3"
 
 	for _, md := range fd.MessageType {
-		if validateMessage(res, isProto3, "", md) != nil {
+		if validateMessage(res, isProto3, "", md, containsErrors) != nil {
 			return
 		}
 	}
 
 	for _, ed := range fd.EnumType {
-		if validateEnum(res, isProto3, "", ed) != nil {
+		if validateEnum(res, isProto3, "", ed, containsErrors) != nil {
 			return
 		}
 	}
@@ -1178,7 +1186,7 @@ func basicValidate(res *parseResult) {
 	}
 }
 
-func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.DescriptorProto) error {
+func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.DescriptorProto, containsErrors bool) error {
 	nextPrefix := md.GetName() + "."
 
 	for _, fld := range md.Field {
@@ -1192,12 +1200,12 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 		}
 	}
 	for _, ed := range md.EnumType {
-		if err := validateEnum(res, isProto3, nextPrefix, ed); err != nil {
+		if err := validateEnum(res, isProto3, nextPrefix, ed, containsErrors); err != nil {
 			return err
 		}
 	}
 	for _, nmd := range md.NestedType {
-		if err := validateMessage(res, isProto3, nextPrefix, nmd); err != nil {
+		if err := validateMessage(res, isProto3, nextPrefix, nmd, containsErrors); err != nil {
 			return err
 		}
 	}
@@ -1332,8 +1340,19 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	return nil
 }
 
-func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDescriptorProto) error {
+func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDescriptorProto, containsErrors bool) error {
 	scope := fmt.Sprintf("enum %s%s", prefix, ed.GetName())
+
+	if !containsErrors && len(ed.Value) == 0 {
+		// we only check this if file parsing had no errors; otherwise, the file may have
+		// had an enum value, but the parser encountered an error processing it, in which
+		// case the value would be absent from the descriptor. In such a case, this error
+		// would be confusing and incorrect, so we just skip this check.
+		enNode := res.getEnumNode(ed)
+		if err := res.errs.handleError(ErrorWithSourcePos{Pos: enNode.start(), Underlying: fmt.Errorf("%s: enums must define at least one value", scope)}); err != nil {
+			return err
+		}
+	}
 
 	allowAlias := false
 	if index, err := findOption(res, scope, ed.Options.GetUninterpretedOption(), "allow_alias"); err != nil {
@@ -1359,7 +1378,7 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 		}
 	}
 
-	if isProto3 && ed.Value[0].GetNumber() != 0 {
+	if isProto3 && len(ed.Value) > 0 && ed.Value[0].GetNumber() != 0 {
 		evNode := res.getEnumValueNode(ed.Value[0])
 		if err := res.errs.handleError(ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: proto3 requires that first value in enum have numeric value of 0", scope)}); err != nil {
 			return err

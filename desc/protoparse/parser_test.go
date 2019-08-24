@@ -258,7 +258,7 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `enum Foo { }`,
-			errMsg:   `test.proto:1:1: enums must define at least one value`,
+			errMsg:   `test.proto:1:1: enum Foo: enums must define at least one value`,
 		},
 		{
 			contents: `message Foo { oneof Bar { } }`,

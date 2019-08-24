@@ -755,15 +755,6 @@ fieldNames : fieldNames ',' stringLit {
 	}
 
 enum : _ENUM name '{' enumBody '}' {
-		c := 0
-		for _, el := range $4 {
-			if el.value != nil {
-				c++
-			}
-		}
-		if c == 0 {
-			lexError(protolex, $1.start(), "enums must define at least one value")
-		}
 		$$ = &enumNode{name: $2, decls: $4}
 		$$.setRange($1, $5)
 	}
