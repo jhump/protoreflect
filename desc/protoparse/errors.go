@@ -24,7 +24,7 @@ func defaultErrorReporter(err ErrorWithPos) error {
 
 type errorHandler struct {
 	reporter     ErrorReporter
-	errsReported bool
+	errsReported int
 	err          error
 }
 
@@ -42,7 +42,7 @@ func (h *errorHandler) handleError(err error) error {
 		return h.err
 	}
 	if ewp, ok := err.(ErrorWithPos); ok {
-		h.errsReported = true
+		h.errsReported++
 		err = h.reporter(ewp)
 	}
 	h.err = err
@@ -50,7 +50,7 @@ func (h *errorHandler) handleError(err error) error {
 }
 
 func (h *errorHandler) getError() error {
-	if h.errsReported && h.err == nil {
+	if h.errsReported > 0 && h.err == nil {
 		return ErrInvalidSource
 	}
 	return h.err

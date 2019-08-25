@@ -47,6 +47,7 @@ func TestErrorReporting(t *testing.T) {
 					syntax = "proto";
 					package foo
 
+					enum State { A = 0; B = 1; C; D }
 					message Foo {
 						foo = 1;
 					}
@@ -54,8 +55,9 @@ func TestErrorReporting(t *testing.T) {
 			},
 			expectedErrs: []string{
 				"test.proto:2:50: syntax value must be 'proto2' or 'proto3'",
-				"test.proto:5:41: syntax error: unexpected \"message\", expecting ';' or '.'",
-				"test.proto:6:53: syntax error: unexpected '='",
+				"test.proto:5:41: syntax error: unexpected \"enum\", expecting ';' or '.'",
+				"test.proto:5:69: syntax error: unexpected ';', expecting '='",
+				"test.proto:7:53: syntax error: unexpected '='",
 			},
 		},
 		{
@@ -67,6 +69,7 @@ func TestErrorReporting(t *testing.T) {
 					message Foo {
 						string foo = 0;
 					}
+					enum State { C }
 					enum Bar {
 						BAZ = 1;
 						BUZZ = 1;
@@ -75,8 +78,9 @@ func TestErrorReporting(t *testing.T) {
 			},
 			expectedErrs: []string{
 				"test.proto:4:62: tag number 0 must be greater than zero",
-				"test.proto:7:55: enum Bar: proto3 requires that first value in enum have numeric value of 0",
-				"test.proto:8:56: enum Bar: values BAZ and BUZZ both have the same numeric value 1; use allow_alias option if intentional",
+				"test.proto:6:56: syntax error: unexpected '}', expecting '='",
+				"test.proto:8:55: enum Bar: proto3 requires that first value in enum have numeric value of 0",
+				"test.proto:9:56: enum Bar: values BAZ and BUZZ both have the same numeric value 1; use allow_alias option if intentional",
 			},
 		},
 		{
