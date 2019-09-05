@@ -88,6 +88,9 @@ message AnotherTestMessage {
 		// Comment for doors
 		optional string doors = 3;
 	}
+	// Comment for WithOptions
+	optional group WithOptions = 9 [deprecated = true] {
+	}
 	// Comment for atmoo
 	oneof atmoo {
 		// Comment for str

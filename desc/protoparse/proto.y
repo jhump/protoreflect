@@ -560,6 +560,33 @@ group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageBody '}' {
 		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, decls: $7}
 		$$.setRange($1, $8)
 	}
+	| _REQUIRED _GROUP name '=' _INT_LIT compactOptions '{' messageBody '}' {
+		checkTag(protolex, $5.start(), $5.val)
+		if !unicode.IsUpper(rune($3.val[0])) {
+			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
+		}
+		lbl := fieldLabel{identNode: $1, required: true}
+		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, options: $6, decls: $8}
+		$$.setRange($1, $9)
+	}
+	| _OPTIONAL _GROUP name '=' _INT_LIT compactOptions '{' messageBody '}' {
+		checkTag(protolex, $5.start(), $5.val)
+		if !unicode.IsUpper(rune($3.val[0])) {
+			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
+		}
+		lbl := fieldLabel{identNode: $1}
+		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, options: $6, decls: $8}
+		$$.setRange($1, $9)
+	}
+	| _REPEATED _GROUP name '=' _INT_LIT compactOptions '{' messageBody '}' {
+		checkTag(protolex, $5.start(), $5.val)
+		if !unicode.IsUpper(rune($3.val[0])) {
+			lexError(protolex, $3.start(), fmt.Sprintf("group %s should have a name that starts with a capital letter", $3.val))
+		}
+		lbl := fieldLabel{identNode: $1, repeated: true}
+		$$ = &groupNode{groupKeyword: $2, label: lbl, name: $3, tag: $5, options: $6, decls: $8}
+		$$.setRange($1, $9)
+	}
 
 oneof : _ONEOF name '{' oneofBody '}' {
 		c := 0
