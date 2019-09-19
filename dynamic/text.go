@@ -344,7 +344,7 @@ func writeString(b *indentBuffer, s string) error {
 		case '\t':
 			_, err = b.WriteString("\\t")
 		case '"':
-			_, err = b.WriteString("\\")
+			_, err = b.WriteString("\\\"")
 		case '\\':
 			_, err = b.WriteString("\\\\")
 		default:
