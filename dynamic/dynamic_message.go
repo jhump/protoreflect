@@ -1921,6 +1921,9 @@ func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (i
 		}
 		var msgType string
 		if dm, ok := m.(*Message); ok {
+			if dm == nil {
+				return nil, fmt.Errorf("message field `%s` requires value of type `%s`; received:  value `%+v`", fd.GetFullyQualifiedName(), fd.GetMessageType().GetFullyQualifiedName(), m)
+			}
 			msgType = dm.GetMessageDescriptor().GetFullyQualifiedName()
 		} else {
 			msgType = proto.MessageName(m)
