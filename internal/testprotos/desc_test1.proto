@@ -88,15 +88,15 @@ message AnotherTestMessage {
 		// Comment for doors
 		optional string doors = 3;
 	}
-	// Comment for WithOptions
-	optional group WithOptions = 9 [deprecated = true] {
-	}
 	// Comment for atmoo
 	oneof atmoo {
 		// Comment for str
 		string str = 7;
 		// Comment for int
 		int64 int = 8;
+	}
+	// Comment for WithOptions
+	optional group WithOptions = 9 [deprecated = true] {
 	}
 
 	extensions 100 to 200;
