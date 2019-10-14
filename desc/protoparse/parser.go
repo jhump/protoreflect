@@ -848,6 +848,9 @@ func (r *parseResult) asGroupDescriptors(group *groupNode, isProto3 bool) (*dpb.
 		TypeName: proto.String(group.name.val),
 	}
 	r.putFieldNode(fd, group)
+	if opts := group.options.Elements(); len(opts) > 0 {
+		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
+	}
 	md := &dpb.DescriptorProto{Name: proto.String(group.name.val)}
 	r.putMessageNode(md, group)
 	r.addMessageDecls(md, group.decls, isProto3)

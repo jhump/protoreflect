@@ -526,6 +526,7 @@ type groupNode struct {
 	name         *identNode
 	tag          *intLiteralNode
 	decls        []*messageElement
+	options      *compactOptionsNode
 
 	// This field is populated after parsing, to allow lookup of extendee source
 	// locations when field extendees cannot be linked. (Otherwise, this is just

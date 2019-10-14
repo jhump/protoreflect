@@ -877,7 +877,10 @@ func asDynamicIfPossible(msg proto.Message, mf *dynamic.MessageFactory) proto.Me
 func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, path []int32, scope string, indent int) {
 	var groupPath []int32
 	var si *descriptor.SourceCodeInfo_Location
-	if isGroup(fld) {
+
+	group := isGroup(fld)
+
+	if group {
 		// compute path to group message type
 		groupPath = make([]int32, len(path)-2)
 		copy(groupPath, path)
@@ -918,61 +921,59 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFacto
 			p.printElementString(locSi, w, indent, labelString(fld.GetLabel()))
 		}
 
-		if isGroup(fld) {
+		if group {
 			fmt.Fprint(w, "group ")
+		}
 
-			typeSi := sourceInfo.Get(append(path, internal.Field_typeTag))
-			p.printElementString(typeSi, w, indent, p.typeString(fld, scope))
-			fmt.Fprint(w, "= ")
+		typeSi := sourceInfo.Get(append(path, internal.Field_typeTag))
+		p.printElementString(typeSi, w, indent, p.typeString(fld, scope))
 
-			numSi := sourceInfo.Get(append(path, internal.Field_numberTag))
-			p.printElementString(numSi, w, indent, fmt.Sprintf("%d", fld.GetNumber()))
+		if !group {
+			nameSi := sourceInfo.Get(append(path, internal.Field_nameTag))
+			p.printElementString(nameSi, w, indent, fld.GetName())
+		}
 
+		fmt.Fprint(w, "= ")
+		numSi := sourceInfo.Get(append(path, internal.Field_numberTag))
+		p.printElementString(numSi, w, indent, fmt.Sprintf("%d", fld.GetNumber()))
+
+		opts, err := p.extractOptions(fld, fld.GetOptions(), mf)
+		if err != nil {
+			if w.err == nil {
+				w.err = err
+			}
+			return
+		}
+
+		// we use negative values for "extras" keys so they can't collide
+		// with legit option tags
+
+		if !fld.GetFile().IsProto3() && fld.AsFieldDescriptorProto().DefaultValue != nil {
+			defVal := fld.GetDefaultValue()
+			if fld.GetEnumType() != nil {
+				defVal = fld.GetEnumType().FindValueByNumber(defVal.(int32))
+			}
+			opts[-internal.Field_defaultTag] = []option{{name: "default", val: defVal}}
+		}
+
+		jsn := fld.AsFieldDescriptorProto().GetJsonName()
+		if jsn != "" && jsn != internal.JsonName(fld.GetName()) {
+			opts[-internal.Field_jsonNameTag] = []option{{name: "json_name", val: jsn}}
+		}
+
+		elements := elementAddrs{dsc: fld, opts: opts}
+		elements.addrs = optionsAsElementAddrs(internal.Field_optionsTag, 0, opts)
+		p.sort(elements, sourceInfo, path)
+		p.printOptionElementsShort(elements, w, sourceInfo, path, indent)
+
+		if group {
 			fmt.Fprintln(w, "{")
 			p.printMessageBody(fld.GetMessageType(), mf, w, sourceInfo, groupPath, indent+1)
 
 			p.indent(w, indent)
 			fmt.Fprintln(w, "}")
+
 		} else {
-			typeSi := sourceInfo.Get(append(path, internal.Field_typeTag))
-			p.printElementString(typeSi, w, indent, p.typeString(fld, scope))
-
-			nameSi := sourceInfo.Get(append(path, internal.Field_nameTag))
-			p.printElementString(nameSi, w, indent, fld.GetName())
-			fmt.Fprint(w, "= ")
-
-			numSi := sourceInfo.Get(append(path, internal.Field_numberTag))
-			p.printElementString(numSi, w, indent, fmt.Sprintf("%d", fld.GetNumber()))
-
-			opts, err := p.extractOptions(fld, fld.GetOptions(), mf)
-			if err != nil {
-				if w.err == nil {
-					w.err = err
-				}
-				return
-			}
-
-			// we use negative values for "extras" keys so they can't collide
-			// with legit option tags
-
-			if !fld.GetFile().IsProto3() && fld.AsFieldDescriptorProto().DefaultValue != nil {
-				defVal := fld.GetDefaultValue()
-				if fld.GetEnumType() != nil {
-					defVal = fld.GetEnumType().FindValueByNumber(defVal.(int32))
-				}
-				opts[-internal.Field_defaultTag] = []option{{name: "default", val: defVal}}
-			}
-
-			jsn := fld.AsFieldDescriptorProto().GetJsonName()
-			if jsn != "" && jsn != internal.JsonName(fld.GetName()) {
-				opts[-internal.Field_jsonNameTag] = []option{{name: "json_name", val: jsn}}
-			}
-
-			elements := elementAddrs{dsc: fld, opts: opts}
-			elements.addrs = optionsAsElementAddrs(internal.Field_optionsTag, 0, opts)
-			p.sort(elements, sourceInfo, path)
-			p.printOptionElementsShort(elements, w, sourceInfo, path, indent)
-
 			fmt.Fprint(w, ";")
 		}
 	})
@@ -1463,7 +1464,7 @@ func (p *Printer) printOptionElementsShort(addrs elementAddrs, w *writer, source
 				fmt.Fprint(w, " ") // trailing space
 			})
 	}
-	fmt.Fprint(w, "]")
+	fmt.Fprint(w, "] ")
 }
 
 func (p *Printer) printOptions(opts []option, w *writer, indent int, siFetch func(i int32) *descriptor.SourceCodeInfo_Location, fn func(w *writer, indent int, opt option)) {

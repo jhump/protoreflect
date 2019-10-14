@@ -107,7 +107,7 @@ func TestMessageRegistry_LookupTypes(t *testing.T) {
 		testutil.Eq(t, exp, mr.ComputeURL(ed))
 	}
 	// sanity check
-	testutil.Eq(t, 10, msgCount)
+	testutil.Eq(t, 11, msgCount)
 	testutil.Eq(t, 2, enumCount)
 }
 

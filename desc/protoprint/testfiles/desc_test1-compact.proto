@@ -88,6 +88,9 @@ message AnotherTestMessage {
     // Comment for int
     int64 int = 8;
   }
+  // Comment for WithOptions
+  optional group WithOptions = 9 [deprecated = true] {
+  }
   extensions 100 to 200;
 }
 // Comment for AnotherTestMessage extensions (2)
