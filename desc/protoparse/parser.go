@@ -114,7 +114,7 @@ type Parser struct {
 	//
 	// In order to get descriptors from compiled Go protos, use the
 	// `desc.LoadFileDescriptor` method.
-	DependencyDescriptors map[string]*dpb.FileDescriptorProto
+	DependencyDescriptors map[string]*desc.FileDescriptor
 
 	// Used to create a reader for a given filename, when loading proto source
 	// file contents. If unset, os.Open is used. If ImportPaths is also empty
@@ -399,7 +399,7 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	return revisedProtos
 }
 
-func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, recursive, validate bool, parsed *parseResults, importDesc map[string]*dpb.FileDescriptorProto) {
+func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, recursive, validate bool, parsed *parseResults, importDesc map[string]*desc.FileDescriptor) {
 	for _, name := range filenames {
 		parseProtoFile(acc, name, nil, errs, recursive, validate, parsed, importDesc)
 		if errs.err != nil {
@@ -408,7 +408,7 @@ func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, r
 	}
 }
 
-func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, recursive, validate bool, parsed *parseResults, importDesc map[string]*dpb.FileDescriptorProto) {
+func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, recursive, validate bool, parsed *parseResults, importDesc map[string]*desc.FileDescriptor) {
 	if parsed.has(filename) {
 		return
 	}
@@ -427,7 +427,7 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 	} else if d, ok := importDesc[filename]; ok {
 		// This is a user-provided descriptor, which is acting similarly to a
 		// well-known import.
-		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
+		result = &parseResult{fd: proto.Clone(d.AsFileDescriptorProto()).(*dpb.FileDescriptorProto)}
 	} else if d, ok := standardImports[filename]; ok {
 		// it's a well-known import
 		// (we clone it to make sure we're not sharing state with other
