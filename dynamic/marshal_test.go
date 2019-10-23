@@ -1,6 +1,8 @@
 package dynamic
 
 import (
+	"fmt"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"math"
 	"reflect"
 	"testing"
@@ -185,10 +187,93 @@ var mapValueFieldsInfNanMsg = &testprotos.MapValFields{
 	T: map[string]float64{"a": math.Inf(1), "b": math.Inf(-1), "c": math.NaN()},
 }
 
+var mapValueFieldsNilMsg = &testprotos.TestRequest{
+	Others: map[string]*testprotos.TestMessage{"a": nil, "b": nil},
+}
+
+var mapValueFieldsNilUnknownMsg proto.Message
+var mdForUnknownMsg *desc.MessageDescriptor
+
+func init() {
+	// NB: can't use desc/builder package because that would cause dependency cycle :(
+	fdp := &descriptor.FileDescriptorProto{
+		Name:    proto.String("foo.proto"),
+		Syntax:  proto.String("proto3"),
+		Package: proto.String("example"),
+		MessageType: []*descriptor.DescriptorProto{
+			{
+				Name: proto.String("Message"),
+				Field: []*descriptor.FieldDescriptorProto{
+					{
+						Name:     proto.String("vals"),
+						Type:     descriptor.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+						Number:   proto.Int32(1),
+						Label:    descriptor.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+						TypeName: proto.String(".example.Message.ValsEntry"),
+					},
+				},
+				NestedType: []*descriptor.DescriptorProto{
+					{
+						Name: proto.String("ValsEntry"),
+						Options: &descriptor.MessageOptions{
+							MapEntry: proto.Bool(true),
+						},
+						Field: []*descriptor.FieldDescriptorProto{
+							{
+								Name:   proto.String("key"),
+								Number: proto.Int32(1),
+								Type:   descriptor.FieldDescriptorProto_TYPE_STRING.Enum(),
+								Label:  descriptor.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+							},
+							{
+								Name:     proto.String("value"),
+								Number:   proto.Int32(2),
+								Type:     descriptor.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+								Label:    descriptor.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+								TypeName: proto.String(".example.Message"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	fd, err := desc.CreateFileDescriptor(fdp)
+	if err != nil {
+		panic(err)
+	}
+	mdForUnknownMsg = fd.GetMessageTypes()[0]
+	mapValueFieldsNilUnknownMsg = &unknownMsg{
+		Vals: map[string]*unknownMsg{"a": nil, "b": nil},
+	}
+}
+
+// This message looks and acts like a proto but is NOT in the registry, so proto.MessageType
+// returns nil, which forces us to fallback to a nil *dynamic.Message when representing a
+// nil map value in a dynamic message, allowing tests to check that strange edge case.
+type unknownMsg struct {
+	Vals map[string]*unknownMsg `protobuf:"bytes,1,rep,name=vals,proto3" json:"vals,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+}
+
+func (m *unknownMsg) XXX_MessageName() string {
+	return "example.Message"
+}
+func (m *unknownMsg) Reset() {
+	m.Vals = nil
+}
+func (m *unknownMsg) String() string {
+	return fmt.Sprintf("%#v", m.Vals)
+}
+func (m *unknownMsg) ProtoMessage() {
+}
+func (m *unknownMsg) GetMessageDescriptor() *desc.MessageDescriptor {
+	return mdForUnknownMsg
+}
+
 func doTranslationParty(t *testing.T, msg proto.Message,
 	marshalPm func(proto.Message) ([]byte, error), unmarshalPm func([]byte, proto.Message) error,
 	marshalDm func(*Message) ([]byte, error), unmarshalDm func(*Message, []byte) error,
-	includesNaN, compareBytes bool) {
+	includesNaN, compareBytes, outputIsString bool) {
 
 	md, err := desc.LoadMessageDescriptorForMessage(msg)
 	testutil.Ok(t, err)
@@ -197,7 +282,7 @@ func doTranslationParty(t *testing.T, msg proto.Message,
 	b, err := marshalPm(msg)
 	testutil.Ok(t, err)
 	err = unmarshalDm(dm, b)
-	testutil.Ok(t, err)
+	testutil.Ok(t, err, "failed to unmarshal from: %s", b)
 
 	// both techniques to marshal do the same thing
 	b2a, err := marshalPm(dm)
@@ -209,14 +294,18 @@ func doTranslationParty(t *testing.T, msg proto.Message,
 	// round trip back to proto.Message
 	msg2 := reflect.New(reflect.TypeOf(msg).Elem()).Interface().(proto.Message)
 	err = unmarshalPm(b2a, msg2)
-	testutil.Ok(t, err)
+	testutil.Ok(t, err, "failed to unmarshal from: %s", b2a)
 
 	if !includesNaN {
 		// NaN fields are never equal so this would always be false
 		testutil.Ceq(t, msg, msg2, eqpm)
 	}
 	if compareBytes {
-		testutil.Eq(t, b, b2a)
+		if outputIsString {
+			testutil.Eq(t, string(b), string(b2a))
+		} else {
+			testutil.Eq(t, b, b2a)
+		}
 	}
 
 	// and back again
@@ -224,7 +313,7 @@ func doTranslationParty(t *testing.T, msg proto.Message,
 	testutil.Ok(t, err)
 	dm2 := NewMessage(md)
 	err = unmarshalDm(dm2, b3)
-	testutil.Ok(t, err)
+	testutil.Ok(t, err, "failed to unmarshal from: %s", b3)
 
 	if !includesNaN {
 		testutil.Ceq(t, dm, dm2, eqdm)
@@ -234,10 +323,10 @@ func doTranslationParty(t *testing.T, msg proto.Message,
 	// both techniques to unmarshal are equivalent
 	dm3 := NewMessage(md)
 	err = unmarshalPm(b2a, dm3)
-	testutil.Ok(t, err)
+	testutil.Ok(t, err, "failed to unmarshal from: %s", b2a)
 	dm4 := NewMessage(md)
 	err = unmarshalDm(dm4, b2a)
-	testutil.Ok(t, err)
+	testutil.Ok(t, err, "failed to unmarshal from: %s", b2a)
 
 	if !includesNaN {
 		testutil.Ceq(t, dm, dm3, eqdm)

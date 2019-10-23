@@ -193,9 +193,11 @@ func marshalKnownFieldMapEntryText(b *indentBuffer, fd *desc.FieldDescriptor, kf
 	if err != nil {
 		return err
 	}
-	err = marshalKnownFieldText(b, vfd, mv)
-	if err != nil {
-		return err
+	if !isNil(mv) {
+		err = marshalKnownFieldText(b, vfd, mv)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = b.end()

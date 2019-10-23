@@ -31,8 +31,11 @@ func (cb *Buffer) EncodeFieldValue(fd *desc.FieldDescriptor, val interface{}) er
 				if err := entryBuffer.encodeFieldElement(keyType, k); err != nil {
 					return err
 				}
-				if err := entryBuffer.encodeFieldElement(valType, v); err != nil {
-					return err
+				rv := reflect.ValueOf(v)
+				if rv.Kind() != reflect.Ptr || !rv.IsNil() {
+					if err := entryBuffer.encodeFieldElement(valType, v); err != nil {
+						return err
+					}
 				}
 				if err := cb.EncodeTagAndWireType(fd.GetNumber(), proto.WireBytes); err != nil {
 					return err
@@ -47,8 +50,11 @@ func (cb *Buffer) EncodeFieldValue(fd *desc.FieldDescriptor, val interface{}) er
 				if err := entryBuffer.encodeFieldElement(keyType, k); err != nil {
 					return err
 				}
-				if err := entryBuffer.encodeFieldElement(valType, v); err != nil {
-					return err
+				rv := reflect.ValueOf(v)
+				if rv.Kind() != reflect.Ptr || !rv.IsNil() {
+					if err := entryBuffer.encodeFieldElement(valType, v); err != nil {
+						return err
+					}
 				}
 				if err := cb.EncodeTagAndWireType(fd.GetNumber(), proto.WireBytes); err != nil {
 					return err

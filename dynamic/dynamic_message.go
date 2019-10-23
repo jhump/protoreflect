@@ -527,14 +527,8 @@ func (m *Message) doGetField(fd *desc.FieldDescriptor, nilIfAbsent bool) (interf
 				}
 				// GetDefaultValue only returns nil for message types
 				md := fd.GetMessageType()
-				if md.IsProto3() {
-					// try to return a proper nil pointer
-					msgType := proto.MessageType(md.GetFullyQualifiedName())
-					if msgType != nil && msgType.Implements(typeOfProtoMessage) {
-						return reflect.Zero(msgType).Interface().(proto.Message), nil
-					}
-					// fallback to nil dynamic message pointer
-					return (*Message)(nil), nil
+				if m.md.IsProto3() {
+					return nilMessage(md), nil
 				} else {
 					// for proto2, return default instance of message
 					return m.mf.NewMessage(md), nil
@@ -559,6 +553,16 @@ func (m *Message) doGetField(fd *desc.FieldDescriptor, nilIfAbsent bool) (interf
 		return res, nil
 	}
 	return res, nil
+}
+
+func nilMessage(md *desc.MessageDescriptor) interface{} {
+	// try to return a proper nil pointer
+	msgType := proto.MessageType(md.GetFullyQualifiedName())
+	if msgType != nil && msgType.Implements(typeOfProtoMessage) {
+		return reflect.Zero(msgType).Interface().(proto.Message)
+	}
+	// fallback to nil dynamic message pointer
+	return (*Message)(nil)
 }
 
 // HasField returns true if this message has a value for the given field. If the
@@ -980,7 +984,7 @@ func (m *Message) getMapField(fd *desc.FieldDescriptor, key interface{}) (interf
 		return nil, FieldIsNotMapError
 	}
 	kfd := fd.GetMessageType().GetFields()[0]
-	ki, err := validElementFieldValue(kfd, key)
+	ki, err := validElementFieldValue(kfd, key, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1185,12 +1189,12 @@ func (m *Message) putMapField(fd *desc.FieldDescriptor, key interface{}, val int
 		return FieldIsNotMapError
 	}
 	kfd := fd.GetMessageType().GetFields()[0]
-	ki, err := validElementFieldValue(kfd, key)
+	ki, err := validElementFieldValue(kfd, key, false)
 	if err != nil {
 		return err
 	}
 	vfd := fd.GetMessageType().GetFields()[1]
-	vi, err := validElementFieldValue(vfd, val)
+	vi, err := validElementFieldValue(vfd, val, true)
 	if err != nil {
 		return err
 	}
@@ -1279,7 +1283,7 @@ func (m *Message) removeMapField(fd *desc.FieldDescriptor, key interface{}) erro
 		return FieldIsNotMapError
 	}
 	kfd := fd.GetMessageType().GetFields()[0]
-	ki, err := validElementFieldValue(kfd, key)
+	ki, err := validElementFieldValue(kfd, key, false)
 	if err != nil {
 		return err
 	}
@@ -1580,7 +1584,7 @@ func (m *Message) addRepeatedField(fd *desc.FieldDescriptor, val interface{}) er
 	if !fd.IsRepeated() {
 		return FieldIsNotRepeatedError
 	}
-	val, err := validElementFieldValue(fd, val)
+	val, err := validElementFieldValue(fd, val, false)
 	if err != nil {
 		return err
 	}
@@ -1709,7 +1713,7 @@ func (m *Message) setRepeatedField(fd *desc.FieldDescriptor, index int, val inte
 	if fd.IsMap() || !fd.IsRepeated() {
 		return FieldIsNotRepeatedError
 	}
-	val, err := validElementFieldValue(fd, val)
+	val, err := validElementFieldValue(fd, val, false)
 	if err != nil {
 		return err
 	}
@@ -1813,7 +1817,7 @@ func validFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interfac
 			// value should be a slice of entry messages that we need convert into a map[interface{}]interface{}
 			m := map[interface{}]interface{}{}
 			for i := 0; i < val.Len(); i++ {
-				e, err := validElementFieldValue(fd, val.Index(i).Interface())
+				e, err := validElementFieldValue(fd, val.Index(i).Interface(), false)
 				if err != nil {
 					return nil, err
 				}
@@ -1843,7 +1847,7 @@ func validFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interfac
 				// unwrap it
 				ev = reflect.ValueOf(ev.Interface())
 			}
-			e, err := validElementFieldValueForRv(fd, ev)
+			e, err := validElementFieldValueForRv(fd, ev, false)
 			if err != nil {
 				return nil, err
 			}
@@ -1853,7 +1857,7 @@ func validFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interfac
 		return s, nil
 	}
 
-	return validElementFieldValueForRv(fd, val)
+	return validElementFieldValueForRv(fd, val, false)
 }
 
 func asDynamicMessage(m proto.Message, md *desc.MessageDescriptor, mf *MessageFactory) (*Message, error) {
@@ -1867,11 +1871,11 @@ func asDynamicMessage(m proto.Message, md *desc.MessageDescriptor, mf *MessageFa
 	return dm, nil
 }
 
-func validElementFieldValue(fd *desc.FieldDescriptor, val interface{}) (interface{}, error) {
-	return validElementFieldValueForRv(fd, reflect.ValueOf(val))
+func validElementFieldValue(fd *desc.FieldDescriptor, val interface{}, allowNilMessage bool) (interface{}, error) {
+	return validElementFieldValueForRv(fd, reflect.ValueOf(val), allowNilMessage)
 }
 
-func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interface{}, error) {
+func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value, allowNilMessage bool) (interface{}, error) {
 	t := fd.GetType()
 	if !val.IsValid() {
 		return nil, typeError(fd, nil)
@@ -1921,6 +1925,11 @@ func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (i
 		}
 		var msgType string
 		if dm, ok := m.(*Message); ok {
+			if allowNilMessage && dm == nil {
+				// if dm == nil, we'll panic below, so early out if that is allowed
+				// (only allowed for map values, to indicate an entry w/ no value)
+				return m, nil
+			}
 			msgType = dm.GetMessageDescriptor().GetFullyQualifiedName()
 		} else {
 			msgType = proto.MessageName(m)
