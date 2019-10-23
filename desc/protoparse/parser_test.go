@@ -2,6 +2,7 @@ package protoparse
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -492,17 +493,14 @@ func TestParseFilesWithDependencies(t *testing.T) {
 	// Establish that we *can* parse the source file with a parser that
 	// registers the dependency.
 	t.Run("DependencyIncluded", func(t *testing.T) {
-		// Load the compiled descriptor.
-		dep, err := desc.LoadFileDescriptor("desc_test_wellknowntypes.proto")
-		if err != nil {
-			t.Fatalf("Unable to load compiled descriptor.")
-		}
-
 		// Create a dependency-aware parser.
 		parser := Parser{
 			Accessor: FileContentsFromMap(contents),
-			DependencyDescriptors: map[string]*desc.FileDescriptor{
-				"desc_test_wellknowntypes.proto": dep,
+			LookupImport: func(imp string) (*desc.FileDescriptor, error) {
+				if imp == "desc_test_wellknowntypes.proto" {
+					return desc.LoadFileDescriptor(imp)
+				}
+				return nil, errors.New("unexpected filename")
 			},
 		}
 		if _, err := parser.ParseFiles("test.proto"); err != nil {
@@ -519,6 +517,23 @@ func TestParseFilesWithDependencies(t *testing.T) {
 		}
 		if _, err := parser.ParseFiles("test.proto"); err == nil {
 			t.Errorf("Expected parse to fail due to lack of an import.")
+		}
+	})
+
+	// Establish that the accessor has precedence over LookupImport.
+	t.Run("AccessorWins", func(t *testing.T) {
+		// Create a dependency-aware parser that should never be called.
+		parser := Parser{
+			Accessor: FileContentsFromMap(map[string]string{
+				"test.proto": `syntax = "proto3";`,
+			}),
+			LookupImport: func(imp string) (*desc.FileDescriptor, error) {
+				t.Errorf("LookupImport was called on a filename available to the Accessor.")
+				return nil, errors.New("unimportant")
+			},
+		}
+		if _, err := parser.ParseFiles("test.proto"); err != nil {
+			t.Error(err)
 		}
 	})
 }
