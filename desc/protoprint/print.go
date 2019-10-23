@@ -2070,7 +2070,6 @@ func (a elementSrcOrder) Less(i, j int) bool {
 		// i will be unknown and j will be known
 		swapped := false
 		if si != nil {
-			si, sj = sj, si
 			ti, tj = tj, ti
 			swapped = true
 		}
