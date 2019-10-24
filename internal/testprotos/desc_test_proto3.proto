@@ -19,6 +19,7 @@ message TestRequest {
 	TestMessage baz = 3;
 	TestMessage.NestedMessage.AnotherNestedMessage snafu = 4;
 	map<string, bool> flags = 5;
+	map<string, TestMessage> others = 6;
 }
 
 message TestResponse {

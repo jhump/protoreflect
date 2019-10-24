@@ -1,6 +1,7 @@
 package dynamic
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
@@ -105,9 +106,29 @@ func TestEquals(t *testing.T) {
 func checkEquals(t *testing.T, a, b *Message) {
 	testutil.Ceq(t, a, b, eqdm)
 	testutil.Ceq(t, a, b, eqm)
+	testutil.Ceq(t, b, a, eqdm)
+	testutil.Ceq(t, b, a, eqm)
+
+	// and then compare generated message type to dynamic message
+	msgType := proto.MessageType(a.GetMessageDescriptor().GetFullyQualifiedName())
+	msg := reflect.New(msgType.Elem()).Interface().(proto.Message)
+	err := a.ConvertTo(msg)
+	testutil.Ok(t, err)
+	testutil.Ceq(t, a, msg, eqm)
+	testutil.Ceq(t, msg, a, eqm)
 }
 
 func checkNotEquals(t *testing.T, a, b *Message) {
 	testutil.Cneq(t, a, b, eqdm)
 	testutil.Cneq(t, a, b, eqm)
+	testutil.Cneq(t, b, a, eqdm)
+	testutil.Cneq(t, b, a, eqm)
+
+	// and then compare generated message type to dynamic message
+	msgType := proto.MessageType(a.GetMessageDescriptor().GetFullyQualifiedName())
+	msg := reflect.New(msgType.Elem()).Interface().(proto.Message)
+	err := a.ConvertTo(msg)
+	testutil.Ok(t, err)
+	testutil.Cneq(t, b, msg, eqm)
+	testutil.Cneq(t, msg, b, eqm)
 }

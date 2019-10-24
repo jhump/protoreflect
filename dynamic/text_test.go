@@ -30,6 +30,8 @@ func TestTextMapKeyFields(t *testing.T) {
 func TestTextMapValueFields(t *testing.T) {
 	textTranslationParty(t, mapValueFieldsMsg, false)
 	textTranslationParty(t, mapValueFieldsInfNanMsg, true)
+	textTranslationParty(t, mapValueFieldsNilMsg, false)
+	textTranslationParty(t, mapValueFieldsNilUnknownMsg, false)
 }
 
 func TestTextUnknownFields(t *testing.T) {
@@ -171,5 +173,5 @@ func textTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 		// we don't compare bytes because we can't really make the proto and dynamic
 		// marshal methods work the same due to API differences in how to enable
 		// indentation/pretty-printing
-		false)
+		false, true)
 }

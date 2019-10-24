@@ -49,6 +49,8 @@ func TestBinaryMapValueFields(t *testing.T) {
 
 	binaryTranslationParty(t, mapValueFieldsMsg, false)
 	binaryTranslationParty(t, mapValueFieldsInfNanMsg, true)
+	binaryTranslationParty(t, mapValueFieldsNilMsg, false)
+	binaryTranslationParty(t, mapValueFieldsNilUnknownMsg, false)
 }
 
 func TestBinaryExtensionFields(t *testing.T) {
@@ -188,7 +190,7 @@ func binaryTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 	}
 
 	for _, marshalFn := range marshalMethods {
-		doTranslationParty(t, msg, protoMarshal, proto.Unmarshal, marshalFn, (*Message).Unmarshal, includesNaN, true)
+		doTranslationParty(t, msg, protoMarshal, proto.Unmarshal, marshalFn, (*Message).Unmarshal, includesNaN, true, false)
 	}
 }
 

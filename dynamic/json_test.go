@@ -43,6 +43,8 @@ func TestJSONMapKeyFields(t *testing.T) {
 func TestJSONMapValueFields(t *testing.T) {
 	jsonTranslationParty(t, mapValueFieldsMsg, false)
 	jsonTranslationParty(t, mapValueFieldsInfNanMsg, true)
+	jsonTranslationParty(t, mapValueFieldsNilMsg, false)
+	jsonTranslationParty(t, mapValueFieldsNilUnknownMsg, false)
 }
 
 func TestJSONExtensionFields(t *testing.T) {
@@ -510,5 +512,5 @@ func jsonTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 		func(b []byte, pm proto.Message) error {
 			return jsonpb.Unmarshal(bytes.NewReader(b), pm)
 		},
-		(*Message).MarshalJSON, (*Message).UnmarshalJSON, includesNaN, true)
+		(*Message).MarshalJSON, (*Message).UnmarshalJSON, includesNaN, true, true)
 }

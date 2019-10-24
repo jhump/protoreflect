@@ -47,7 +47,7 @@ func validFieldValueForMapField(fd *desc.FieldDescriptor, val reflect.Value) (in
 			// unwrap it
 			k = reflect.ValueOf(k.Interface())
 		}
-		kk, err := validFieldValueForRv(keyField, k)
+		kk, err := validElementFieldValueForRv(keyField, k, false)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +56,7 @@ func validFieldValueForMapField(fd *desc.FieldDescriptor, val reflect.Value) (in
 			// unwrap it
 			v = reflect.ValueOf(v.Interface())
 		}
-		vv, err := validFieldValueForRv(valField, v)
+		vv, err := validElementFieldValueForRv(valField, v, true)
 		if err != nil {
 			return nil, err
 		}
