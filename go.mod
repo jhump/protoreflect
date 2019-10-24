@@ -7,5 +7,3 @@ require (
 	google.golang.org/genproto v0.0.0-20170818010345-ee236bd376b0
 	google.golang.org/grpc v1.8.0
 )
-
-go 1.13
