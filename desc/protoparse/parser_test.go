@@ -2,6 +2,7 @@ package protoparse
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
+	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
@@ -472,4 +474,66 @@ func TestParseFilesWithImportsNoImportPath(t *testing.T) {
 
 	testutil.Ok(t, err)
 	testutil.Eq(t, len(relFilePaths), len(protos))
+}
+
+func TestParseFilesWithDependencies(t *testing.T) {
+	// Create some file contents that import a non-well-known proto.
+	// (One of the protos in internal/testprotos is fine.)
+	contents := map[string]string{
+		"test.proto": `
+			syntax = "proto3";
+			import "desc_test_wellknowntypes.proto";
+
+			message TestImportedType {
+				testprotos.TestWellKnownTypes imported_field = 1;
+			}
+		`,
+	}
+
+	// Establish that we *can* parse the source file with a parser that
+	// registers the dependency.
+	t.Run("DependencyIncluded", func(t *testing.T) {
+		// Create a dependency-aware parser.
+		parser := Parser{
+			Accessor: FileContentsFromMap(contents),
+			LookupImport: func(imp string) (*desc.FileDescriptor, error) {
+				if imp == "desc_test_wellknowntypes.proto" {
+					return desc.LoadFileDescriptor(imp)
+				}
+				return nil, errors.New("unexpected filename")
+			},
+		}
+		if _, err := parser.ParseFiles("test.proto"); err != nil {
+			t.Errorf("Could not parse with a non-well-known import: %v", err)
+		}
+	})
+
+	// Establish that we *can not* parse the source file with a parser that
+	// did not register the dependency.
+	t.Run("DependencyExcluded", func(t *testing.T) {
+		// Create a dependency-aware parser.
+		parser := Parser{
+			Accessor: FileContentsFromMap(contents),
+		}
+		if _, err := parser.ParseFiles("test.proto"); err == nil {
+			t.Errorf("Expected parse to fail due to lack of an import.")
+		}
+	})
+
+	// Establish that the accessor has precedence over LookupImport.
+	t.Run("AccessorWins", func(t *testing.T) {
+		// Create a dependency-aware parser that should never be called.
+		parser := Parser{
+			Accessor: FileContentsFromMap(map[string]string{
+				"test.proto": `syntax = "proto3";`,
+			}),
+			LookupImport: func(imp string) (*desc.FileDescriptor, error) {
+				t.Errorf("LookupImport was called on a filename available to the Accessor.")
+				return nil, errors.New("unimportant")
+			},
+		}
+		if _, err := parser.ParseFiles("test.proto"); err != nil {
+			t.Error(err)
+		}
+	})
 }
