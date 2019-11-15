@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"runtime"
 	"sync"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
@@ -271,6 +272,17 @@ func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest, e
 			if d, ok := cr.filesByName[fd.GetName()]; ok {
 				cr.cacheMu.Unlock()
 				return d, nil
+			}
+		} else {
+			ss := strings.Split(fd.GetName(), "/")
+			if len(ss) > 1 {
+				protoFileName := ss[len(ss)-1]
+				for i, depName := range firstFd.Dependency {
+					if depName == protoFileName {
+						firstFd.Dependency[i] = fd.GetName()
+						break
+					}
+				}
 			}
 		}
 		// store in cache of raw descriptor protos, but don't overwrite existing protos
