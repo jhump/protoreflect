@@ -537,3 +537,25 @@ func TestParseFilesWithDependencies(t *testing.T) {
 		}
 	})
 }
+
+func TestParseCommentsBeforeDot(t *testing.T) {
+	accessor := FileContentsFromMap(map[string]string{
+		"test.proto": `
+syntax = "proto3";
+message Foo {
+  // leading comments
+  .Foo foo = 1;
+}
+`,
+	})
+
+	p := Parser{
+		Accessor:              accessor,
+		IncludeSourceCodeInfo: true,
+	}
+	fds, err := p.ParseFiles("test.proto")
+	testutil.Ok(t, err)
+
+	comment := fds[0].GetMessageTypes()[0].GetFields()[0].GetSourceInfo().GetLeadingComments()
+	testutil.Eq(t, " leading comments\n", comment)
+}
