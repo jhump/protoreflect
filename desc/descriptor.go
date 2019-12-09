@@ -521,6 +521,14 @@ type FieldDescriptor struct {
 	sourceInfoPath []int32
 	def            memoizedDefault
 	isMap          bool
+	line           int
+}
+func (fd *FieldDescriptor) SetLine(line int) {
+	fd.line = line
+}
+
+func (fd *FieldDescriptor) GetLine() int {
+	return fd.line
 }
 
 func createFieldDescriptor(fd *FileDescriptor, parent Descriptor, enclosing string, fld *dpb.FieldDescriptorProto) (*FieldDescriptor, string) {
@@ -1372,6 +1380,15 @@ type MethodDescriptor struct {
 	outType        *MessageDescriptor
 	fqn            string
 	sourceInfoPath []int32
+	line           int
+}
+
+func (md *MethodDescriptor) SetLine(line int) {
+	md.line = line
+}
+
+func (md *MethodDescriptor) GetLine() int {
+	return md.line
 }
 
 func createMethodDescriptor(fd *FileDescriptor, parent *ServiceDescriptor, enclosing string, md *dpb.MethodDescriptorProto) (*MethodDescriptor, string) {

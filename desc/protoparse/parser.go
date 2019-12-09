@@ -223,9 +223,39 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	fds := make([]*desc.FileDescriptor, len(filenames))
 	for i, name := range filenames {
 		fd := linkedProtos[name]
+		p.relateLineWithResult(fd, protos)
 		fds[i] = fd
 	}
 	return fds, nil
+}
+
+//Set line && filename with parse result
+func (p Parser) relateLineWithResult(fd *desc.FileDescriptor, protos map[string]*parseResult) {
+	pResult := protos[fd.GetName()]
+	//set line, file name for service
+	for _, sd := range fd.GetServices() {
+		for _, md := range sd.GetMethods() {
+			md.SetLine(pResult.getMethodNode(md.AsMethodDescriptorProto()).start().Line)
+			inType := md.GetInputType()
+			for _, fieldDesc := range inType.GetFields() {
+				fieldDesc.SetLine(pResult.getFieldNode(fieldDesc.AsFieldDescriptorProto()).start().Line)
+			}
+			outType := md.GetOutputType()
+			for _, fieldDesc := range outType.GetFields() {
+				fieldDesc.SetLine(pResult.getFieldNode(fieldDesc.AsFieldDescriptorProto()).start().Line)
+			}
+		}
+	}
+	//set line filename for message fields
+	for _, msgDesc := range fd.GetMessageTypes() {
+		for _, fieldDesc := range msgDesc.GetFields() {
+			fieldDesc.SetLine(pResult.getFieldNode(fieldDesc.AsFieldDescriptorProto()).start().Line)
+		}
+	}
+	//分析依赖文件
+	for _, depFd := range fd.GetDependencies() {
+		p.relateLineWithResult(depFd, protos)
+	}
 }
 
 // ParseFilesButDoNotLink parses the named files into descriptor protos. The
