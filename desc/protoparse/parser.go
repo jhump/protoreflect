@@ -252,7 +252,7 @@ func (p Parser) relateLineWithResult(fd *desc.FileDescriptor, protos map[string]
 			fieldDesc.SetLine(pResult.getFieldNode(fieldDesc.AsFieldDescriptorProto()).start().Line)
 		}
 	}
-	//分析依赖文件
+	//deal with the deps fd recursive
 	for _, depFd := range fd.GetDependencies() {
 		p.relateLineWithResult(depFd, protos)
 	}
