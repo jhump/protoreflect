@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
@@ -891,10 +892,29 @@ func (fd *FieldDescriptor) String() string {
 // GetJSONName returns the name of the field as referenced in the message's JSON
 // format.
 func (fd *FieldDescriptor) GetJSONName() string {
-	if jsonName := fd.proto.GetJsonName(); jsonName != "" {
-		return jsonName
+	if jsonName := fd.proto.JsonName; jsonName != nil {
+		// if json name is present, use its value
+		return *jsonName
 	}
-	return fd.proto.GetName()
+	// otherwise, compute the proper JSON name from the field name
+	return jsonCamelCase(fd.proto.GetName())
+}
+
+func jsonCamelCase(s string) string {
+	var buf bytes.Buffer
+	prevWasUnderscore := false
+	for _, r := range s {
+		if r == '_' {
+			prevWasUnderscore = true
+			continue
+		}
+		if prevWasUnderscore {
+			r = unicode.ToUpper(r)
+			prevWasUnderscore = false
+		}
+		buf.WriteRune(r)
+	}
+	return buf.String()
 }
 
 // GetFullyQualifiedJSONName returns the JSON format name (same as GetJSONName),

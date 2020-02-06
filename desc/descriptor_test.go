@@ -1201,3 +1201,22 @@ func TestToFileDescriptorSet(t *testing.T) {
 		testutil.Eq(t, expectedFile.AsFileDescriptorProto(), f)
 	}
 }
+
+func TestJsonCamelCase(t *testing.T) {
+	testCases := map[string]string{
+		// NB: these example keys were all run through protoc and the
+		// values below are the json_name values computed by protoc
+		// (to make sure we correctly mirror protoc behavior)
+		"abc":       "abc",
+		"__def":     "Def",
+		"a_b_":      "aB",
+		"d_e":       "dE",
+		"abc_def":   "abcDef",
+		"c_d_e":     "cDE",
+		"_a_b_c_d":  "ABCD",
+		"a_b_c_d_e": "aBCDE",
+	}
+	for k, v := range testCases {
+		testutil.Eq(t, v, jsonCamelCase(k))
+	}
+}
