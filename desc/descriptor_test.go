@@ -1204,8 +1204,15 @@ func TestToFileDescriptorSet(t *testing.T) {
 
 func TestJsonCamelCase(t *testing.T) {
 	testCases := map[string]string{
-		// NB: these example keys were all run through protoc and the
-		// values below are the json_name values computed by protoc
+		// NB: these simple test cases come from protoc's descriptor_unittest.cc:
+		"field_name1":  "fieldName1",
+		"fieldName2":   "fieldName2",
+		"FieldName3":   "FieldName3",
+		"_field_name4": "FieldName4",
+		"FIELD_NAME5":  "FIELDNAME5",
+
+		// NB: these are more interesting examples; all keys were all run through
+		// protoc and the values below are the json_name values computed by protoc
 		// (to make sure we correctly mirror protoc behavior)
 		"abc":       "abc",
 		"__def":     "Def",
@@ -1215,6 +1222,11 @@ func TestJsonCamelCase(t *testing.T) {
 		"c_d_e":     "cDE",
 		"_a_b_c_d":  "ABCD",
 		"a_b_c_d_e": "aBCDE",
+		"abc1":      "abc1",
+		"__2def":    "2def",
+		"a_b_3":     "aB3",
+		"d_e4_":     "dE4",
+		"abc4_5def": "abc45def",
 	}
 	for k, v := range testCases {
 		testutil.Eq(t, v, jsonCamelCase(k))
