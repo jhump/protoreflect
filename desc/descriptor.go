@@ -901,6 +901,9 @@ func (fd *FieldDescriptor) GetJSONName() string {
 }
 
 func jsonCamelCase(s string) string {
+	// This mirrors the implementation in protoc/C++ runtime and in the Java runtime:
+	//   https://github.com/protocolbuffers/protobuf/blob/a104dffcb6b1958a424f5fa6f9e6bdc0ab9b6f9e/src/google/protobuf/descriptor.cc#L276
+	//   https://github.com/protocolbuffers/protobuf/blob/a1c886834425abb64a966231dd2c9dd84fb289b3/java/core/src/main/java/com/google/protobuf/Descriptors.java#L1286
 	var buf bytes.Buffer
 	prevWasUnderscore := false
 	for _, r := range s {
