@@ -100,6 +100,6 @@ wkt:
 	go build -o $(PROTOC_TMP)/gen-file-descriptor-proto-go ./internal/cmd/gen-file-descriptor-proto-go
 	cd $(PROTOC_TMP); curl -sSL https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION_FOR_WKT)/protoc-$(PROTOC_VERSION_FOR_WKT)-linux-x86_64.zip -o protoc.zip
 	cd $(PROTOC_TMP); unzip protoc.zip
-	cd $(PROTOC_TMP)/include; ../gen-file-descriptor-proto-go > ../wkt.go
-	mv $(PROTOC_TMP)/wkt.go internal/wkt.go
+	cd $(PROTOC_TMP)/include; ../gen-file-descriptor-proto-go > ../wkt.gen.go
+	mv $(PROTOC_TMP)/wkt.gen.go internal/wkt.gen.go
 	rm -rf $(PROTOC_TMP)
