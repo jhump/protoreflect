@@ -1,3 +1,9 @@
+# Used to generate FileDescriptorProtos for Well-Known Types.
+#
+# protoc is *not* actually invoked, this is just used to download the zip file
+# that contains both protoc and the Well-Known Types.
+PROTOC_VERSION_FOR_WKT := 3.11.4
+
 # TODO: run golint, errcheck
 .PHONY: default
 default: deps checkgofmt vet predeclared staticcheck ineffassign test
@@ -71,7 +77,7 @@ test:
 	go test -cover -race ./...
 
 .PHONY: generate
-generate:
+generate: wkt
 	@go get golang.org/x/tools/cmd/goyacc
 	go generate ./...
 
@@ -86,3 +92,14 @@ testcover:
 		fi \
 	done
 
+.PHONY: wkt
+wkt:
+	@if ! command -v curl >/dev/null 2>/dev/null; then echo "error: curl must be installed"  >&2; exit 1; fi
+	@if ! command -v unzip >/dev/null 2>/dev/null; then echo "error: unzip must be installed"  >&2; exit 1; fi
+	$(eval PROTOC_TMP := $(shell mktemp -d))
+	go build -o $(PROTOC_TMP)/gen-file-descriptor-proto-go ./internal/cmd/gen-file-descriptor-proto-go
+	cd $(PROTOC_TMP); curl -sSL https://github.com/protocolbuffers/protobuf/releases/download/v$(PROTOC_VERSION_FOR_WKT)/protoc-$(PROTOC_VERSION_FOR_WKT)-linux-x86_64.zip -o protoc.zip
+	cd $(PROTOC_TMP); unzip protoc.zip
+	cd $(PROTOC_TMP)/include; ../gen-file-descriptor-proto-go > ../wkt.go
+	mv $(PROTOC_TMP)/wkt.go internal/wkt.go
+	rm -rf $(PROTOC_TMP)

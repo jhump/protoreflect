@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"github.com/jhump/protoreflect/internal"
 )
 
 var (
@@ -37,7 +38,7 @@ func RegisterImportPath(registerPath, importPath string) {
 	if len(importPath) == 0 {
 		panic("import path cannot be empty")
 	}
-	desc := proto.FileDescriptor(registerPath)
+	desc := internal.ProtoFileDescriptor(registerPath)
 	if len(desc) == 0 {
 		panic(fmt.Sprintf("path %q is not a registered proto file", registerPath))
 	}

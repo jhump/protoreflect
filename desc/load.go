@@ -40,7 +40,7 @@ func loadFileDescriptorLocked(file string, r *ImportResolver) (*FileDescriptor, 
 	if f != nil {
 		return f, nil
 	}
-	fd, err := internal.LoadFileDescriptor(file)
+	fd, err := internal.LoadFileDescriptor(file, false)
 	if err != nil {
 		return nil, err
 	}

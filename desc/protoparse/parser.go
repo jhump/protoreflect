@@ -201,7 +201,7 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	protos := map[string]*parseResult{}
 	results := &parseResults{resultsByFilename: protos}
 	errs := newErrorHandler(p.ErrorReporter)
-	parseProtoFiles(accessor, filenames, errs, true, true, results, p.LookupImport)
+	parseProtoFiles(accessor, filenames, errs, true, true, results, p.LookupImport, p.IncludeSourceCodeInfo)
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
@@ -216,7 +216,9 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	if p.IncludeSourceCodeInfo {
 		for name, fd := range linkedProtos {
 			pr := protos[name]
-			fd.AsFileDescriptorProto().SourceCodeInfo = pr.generateSourceCodeInfo()
+			if fileDescriptorProto := fd.AsFileDescriptorProto(); fileDescriptorProto.SourceCodeInfo == nil {
+				fileDescriptorProto.SourceCodeInfo = pr.generateSourceCodeInfo()
+			}
 			internal.RecomputeSourceInfo(fd)
 		}
 	}
@@ -269,7 +271,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 
 	protos := map[string]*parseResult{}
 	errs := newErrorHandler(p.ErrorReporter)
-	parseProtoFiles(accessor, filenames, errs, false, p.ValidateUnlinkedFiles, &parseResults{resultsByFilename: protos}, p.LookupImport)
+	parseProtoFiles(accessor, filenames, errs, false, p.ValidateUnlinkedFiles, &parseResults{resultsByFilename: protos}, p.LookupImport, p.IncludeSourceCodeInfo)
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
@@ -401,16 +403,16 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	return revisedProtos
 }
 
-func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, recursive, validate bool, parsed *parseResults, lookupImport func(string) (*desc.FileDescriptor, error)) {
+func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, recursive, validate bool, parsed *parseResults, lookupImport func(string) (*desc.FileDescriptor, error), includeSourceCodeInfo bool) {
 	for _, name := range filenames {
-		parseProtoFile(acc, name, nil, errs, recursive, validate, parsed, lookupImport)
+		parseProtoFile(acc, name, nil, errs, recursive, validate, parsed, lookupImport, includeSourceCodeInfo)
 		if errs.err != nil {
 			return
 		}
 	}
 }
 
-func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, recursive, validate bool, parsed *parseResults, lookupImport func(string) (*desc.FileDescriptor, error)) {
+func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, recursive, validate bool, parsed *parseResults, lookupImport func(string) (*desc.FileDescriptor, error), includeSourceCodeInfo bool) {
 	if parsed.has(filename) {
 		return
 	}
@@ -440,7 +442,11 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 		// (we clone it to make sure we're not sharing state with other
 		//  parsers, which could result in unsafe races if multiple
 		//  parsers are trying to access it concurrently)
-		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
+		clonedFileDescriptorProto := proto.Clone(d).(*dpb.FileDescriptorProto)
+		if !includeSourceCodeInfo {
+			clonedFileDescriptorProto.SourceCodeInfo = nil
+		}
+		result = &parseResult{fd: clonedFileDescriptorProto}
 	} else {
 		if !strings.Contains(err.Error(), filename) {
 			// an error message that doesn't indicate the file is awful!
@@ -470,7 +476,7 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 		if !ok {
 			// no AST for this file? use imports in descriptor
 			for _, dep := range fd.Dependency {
-				parseProtoFile(acc, dep, decl.start(), errs, true, validate, parsed, lookupImport)
+				parseProtoFile(acc, dep, decl.start(), errs, true, validate, parsed, lookupImport, includeSourceCodeInfo)
 				if errs.getError() != nil {
 					return // abort
 				}
@@ -479,7 +485,7 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 		}
 		// we have an AST; use it so we can report import location in errors
 		for _, dep := range fnode.imports {
-			parseProtoFile(acc, dep.name.val, dep.name.start(), errs, true, validate, parsed, lookupImport)
+			parseProtoFile(acc, dep.name.val, dep.name.start(), errs, true, validate, parsed, lookupImport, includeSourceCodeInfo)
 			if errs.getError() != nil {
 				return // abort
 			}

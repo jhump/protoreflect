@@ -64,19 +64,33 @@ func (e ErrNoSuchFile) Error() string {
 	return fmt.Sprintf("no such file: %q", string(e))
 }
 
+// ProtoFileDescriptor returns the compressed FileDescriptorProto for a .proto file.
+//
+// This first checks the map in wkt.go for anf FileDescriptorProtos, and then if none
+// are found, this defers to proto.FileDescriptor.
+//
+// This should be used instead of proto.FileDescriptor.
+func ProtoFileDescriptor(file string) []byte {
+	data, ok := protoFilePathToGzippedFileDescriptorProto[file]
+	if ok {
+		return data
+	}
+	return proto.FileDescriptor(file)
+}
+
 // LoadFileDescriptor loads a registered descriptor and decodes it. If the given
 // name cannot be loaded but is a known standard name, an alias will be tried,
 // so the standard files can be loaded even if linked against older "known bad"
 // versions of packages.
-func LoadFileDescriptor(file string) (*dpb.FileDescriptorProto, error) {
-	fdb := proto.FileDescriptor(file)
+func LoadFileDescriptor(file string, includeSourceCodeInfoIfPresent bool) (*dpb.FileDescriptorProto, error) {
+	fdb := ProtoFileDescriptor(file)
 	aliased := false
 	if fdb == nil {
 		var ok bool
 		alias, ok := StdFileAliases[file]
 		if ok {
 			aliased = true
-			if fdb = proto.FileDescriptor(alias); fdb == nil {
+			if fdb = ProtoFileDescriptor(alias); fdb == nil {
 				return nil, ErrNoSuchFile(file)
 			}
 		} else {
@@ -93,6 +107,9 @@ func LoadFileDescriptor(file string) (*dpb.FileDescriptorProto, error) {
 		// the file descriptor will have the alias used to load it, but
 		// we need it to have the specified name in order to link it
 		fd.Name = proto.String(file)
+	}
+	if !includeSourceCodeInfoIfPresent {
+		fd.SourceCodeInfo = nil
 	}
 
 	return fd, nil
