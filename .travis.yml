@@ -3,8 +3,7 @@ sudo: false
 
 matrix:
   include:
-    - go: "1.9"
-    - go: "1.10"
+    # TODO(jh): update the version used to vet to Go 1.13
     - go: "1.11"
       env:
       - GO111MODULE=off
@@ -15,8 +14,17 @@ matrix:
       env: GO111MODULE=off
     - go: "1.12"
       env: GO111MODULE=on
+    - go: "1.13"
+      env:
+      - GO111MODULE=on
+      - GOPROXY=direct
+    - go: "1.14"
+      env:
+      - GO111MODULE=on
+      - GOPROXY=direct
     - go: tip
       env:
+      - GO111MODULE=on
       - GOPROXY=direct
 
 # accomodate forks
