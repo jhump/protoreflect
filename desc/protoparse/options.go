@@ -991,7 +991,7 @@ func interpretOptions(res *parseResult, element descriptorish, opts proto.Messag
 		// If we're lenient, then we don't want to clobber the passed in message
 		// and leave it partially populated. So we convert into a copy first
 		optsClone := proto.Clone(opts)
-		if err := dm.ConvertTo(optsClone); err != nil {
+		if err := dm.ConvertToDeterministic(optsClone); err != nil {
 			// TODO: do this in a more granular way, so we can convert individual
 			// fields and leave bad ones uninterpreted instead of skipping all of
 			// the work we've done so far.
@@ -1005,7 +1005,7 @@ func interpretOptions(res *parseResult, element descriptorish, opts proto.Messag
 	} else {
 		// not lenient: try to convert into the passed in message
 		// and fail if not successful
-		if err := dm.ConvertTo(opts); err != nil {
+		if err := dm.ConvertToDeterministic(opts); err != nil {
 			node := res.nodes[element.AsProto()]
 			return nil, ErrorWithSourcePos{Pos: node.start(), Underlying: err}
 		}

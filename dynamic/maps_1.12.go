@@ -80,7 +80,7 @@ func canConvertMap(src reflect.Value, target reflect.Type) bool {
 	return true
 }
 
-func mergeMapVal(src, target reflect.Value, targetType reflect.Type) error {
+func mergeMapVal(src, target reflect.Value, targetType reflect.Type, deterministic bool) error {
 	tkt := targetType.Key()
 	tvt := targetType.Elem()
 	iter := src.MapRange()
@@ -96,7 +96,7 @@ func mergeMapVal(src, target reflect.Value, targetType reflect.Type) error {
 			nk = k.Addr()
 		} else {
 			nk = reflect.New(tkt).Elem()
-			if err := mergeVal(k, nk); err != nil {
+			if err := mergeVal(k, nk, deterministic); err != nil {
 				return err
 			}
 		}
@@ -106,7 +106,7 @@ func mergeMapVal(src, target reflect.Value, targetType reflect.Type) error {
 			nv = v.Addr()
 		} else {
 			nv = reflect.New(tvt).Elem()
-			if err := mergeVal(v, nv); err != nil {
+			if err := mergeVal(v, nv, deterministic); err != nil {
 				return err
 			}
 		}
