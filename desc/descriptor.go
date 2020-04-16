@@ -192,7 +192,19 @@ func (fd *FileDescriptor) FindSymbol(symbol string) Descriptor {
 	if symbol[0] == '.' {
 		symbol = symbol[1:]
 	}
-	return fd.symbols[symbol]
+	if ret := fd.symbols[symbol]; ret != nil {
+		return ret
+	}
+
+	// allow accessing symbols through public imports, too
+	for _, dep := range fd.GetPublicDependencies() {
+		if ret := dep.FindSymbol(symbol); ret != nil {
+			return ret
+		}
+	}
+
+	// not found
+	return nil
 }
 
 // FindMessage finds the message with the given fully-qualified name. If no
