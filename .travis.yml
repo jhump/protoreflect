@@ -4,21 +4,21 @@ sudo: false
 matrix:
   include:
     # TODO(jh): update the version used to vet to Go 1.13
-    - go: "1.11"
-      env:
-      - GO111MODULE=off
-      - VET=1
-    - go: "1.11"
-      env: GO111MODULE=on
-    - go: "1.12"
+    - go: "1.11.x"
       env: GO111MODULE=off
-    - go: "1.12"
+    - go: "1.11.x"
+      env:
+      - GO111MODULE=on
+      - VET=1
+    - go: "1.12.x"
+      env: GO111MODULE=off
+    - go: "1.12.x"
       env: GO111MODULE=on
-    - go: "1.13"
+    - go: "1.13.x"
       env:
       - GO111MODULE=on
       - GOPROXY=direct
-    - go: "1.14"
+    - go: "1.14.x"
       env:
       - GO111MODULE=on
       - GOPROXY=direct

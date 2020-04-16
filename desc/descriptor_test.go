@@ -1006,7 +1006,7 @@ func TestLoadFileDescriptorForWellKnownProtos(t *testing.T) {
 		testutil.Eq(t, file, fd.GetName())
 		for _, typ := range types {
 			d := fd.FindSymbol(typ)
-			testutil.Require(t, d != nil)
+			testutil.Require(t, d != nil, "file %q does not have type %s", file, typ)
 			d2 := fd.FindSymbol("." + typ)
 			testutil.Eq(t, d, d2)
 		}
@@ -1022,7 +1022,7 @@ func TestLoadFileDescriptorForWellKnownProtos(t *testing.T) {
 		testutil.Eq(t, file, fd.GetName())
 		for _, typ := range types {
 			d := fd.FindSymbol(typ)
-			testutil.Require(t, d != nil)
+			testutil.Require(t, d != nil, "file %q does not have type %s", file, typ)
 			d2 := fd.FindSymbol("." + typ)
 			testutil.Eq(t, d, d2)
 		}

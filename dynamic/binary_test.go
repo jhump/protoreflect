@@ -170,15 +170,6 @@ func binaryTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 
 	protoMarshal := func(m proto.Message) ([]byte, error) {
 		if defaultDeterminism {
-			mm, ok := m.(interface {
-				XXX_Size() int
-				XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
-			})
-			if ok {
-				bb := make([]byte, 0, mm.XXX_Size())
-				return mm.XXX_Marshal(bb, true)
-			}
-
 			var buf proto.Buffer
 			buf.SetDeterministic(true)
 			if err := buf.Marshal(m); err != nil {
