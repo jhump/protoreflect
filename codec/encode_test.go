@@ -140,8 +140,8 @@ func TestEncodeFieldValue_Group(t *testing.T) {
 
 	rrFd := atmMd.FindFieldByNumber(6) // tag 6 is the group
 
-	// A generated message will be encoded using its XXX_Size and XXX_Marshal
-	// methods
+	// A generated message will be encoded using proto.Marshal function
+	// or the proto.Buffer type (for deterministic output)
 	pm := &testprotos.AnotherTestMessage_RockNRoll{
 		Beatles: proto.String("Sgt. Pepper's Lonely Hearts Club Band"),
 		Stones:  proto.String("Exile on Main St."),
@@ -224,10 +224,12 @@ func (m *TestMessage) ProtoMessage() {
 }
 
 func (m *TestMessage) MarshalDeterministic() ([]byte, error) {
-	t := (*testprotos.Test)(m)
-	sz := t.XXX_Size()
-	b := make([]byte, 0, sz)
-	return t.XXX_Marshal(b, true)
+	var buf proto.Buffer
+	buf.SetDeterministic(true)
+	if err := buf.Marshal(m); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 type TestGroup testprotos.AnotherTestMessage_RockNRoll
@@ -244,10 +246,12 @@ func (m *TestGroup) ProtoMessage() {
 }
 
 func (m *TestGroup) MarshalDeterministic() ([]byte, error) {
-	t := (*testprotos.AnotherTestMessage_RockNRoll)(m)
-	sz := t.XXX_Size()
-	b := make([]byte, 0, sz)
-	return t.XXX_Marshal(b, true)
+	var buf proto.Buffer
+	buf.SetDeterministic(true)
+	if err := buf.Marshal(m); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func init() {

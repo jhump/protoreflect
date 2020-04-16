@@ -1,6 +1,8 @@
 package codec
 
-import "github.com/golang/protobuf/proto"
+import (
+	"github.com/golang/protobuf/proto"
+)
 
 // EncodeVarint writes a varint-encoded integer to the Buffer.
 // This is the format for the
@@ -101,22 +103,7 @@ func (cb *Buffer) EncodeDelimitedMessage(pm proto.Message) error {
 }
 
 func marshalMessage(b []byte, pm proto.Message, deterministic bool) ([]byte, error) {
-	// we try to use the most efficient way to marshal to existing slice
-	nm, ok := pm.(interface {
-		// this interface is implemented by generated messages before api-v2
-		XXX_Size() int
-		XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
-	})
-	if ok {
-		sz := nm.XXX_Size()
-		if cap(b) < len(b)+sz {
-			// re-allocate to fit
-			bytes := make([]byte, len(b), len(b)+sz)
-			copy(bytes, b)
-			b = bytes
-		}
-		return nm.XXX_Marshal(b, deterministic)
-	}
+	// We try to use the most efficient way to marshal to existing slice.
 
 	if deterministic {
 		// see if the message has custom deterministic methods, preferring an
