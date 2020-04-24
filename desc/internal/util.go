@@ -1,13 +1,18 @@
 package internal
 
 import (
+	"math"
 	"unicode"
 	"unicode/utf8"
 )
 
 const (
-	// MaxTag is the maximum allowed tag number for a field.
-	MaxTag = 536870911 // 2^29 - 1
+	// MaxNormalTag is the maximum allowed tag number for a field in a normal message.
+	MaxNormalTag = 536870911 // 2^29 - 1
+
+	// MaxTag is the maximum allowed tag number. Only messages with messageset wire
+	// encoding can have tags this high. Normal messages use MaxNormalTag as the limit.
+	MaxTag = math.MaxInt32 - 1
 
 	// SpecialReservedStart is the first tag in a range that is reserved and not
 	// allowed for use in message definitions.

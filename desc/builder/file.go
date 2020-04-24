@@ -668,7 +668,7 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescrip
 	extensions := make([]*dpb.FieldDescriptorProto, 0, len(fb.extensions))
 	for _, exb := range fb.extensions {
 		path := append(path, internal.File_extensionsTag, int32(len(extensions)))
-		if exd, err := exb.buildProto(path, &sourceInfo); err != nil {
+		if exd, err := exb.buildProto(path, &sourceInfo, false); err != nil {
 			return nil, err
 		} else {
 			extensions = append(extensions, exd)

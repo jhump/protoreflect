@@ -702,7 +702,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 	for _, b := range mb.fieldsAndOneOfs {
 		if flb, ok := b.(*FieldBuilder); ok {
 			fldpath := append(path, internal.Message_fieldsTag, int32(len(fields)))
-			fld, err := flb.buildProto(fldpath, sourceInfo)
+			fld, err := flb.buildProto(fldpath, sourceInfo, mb.Options.GetMessageSetWireFormat())
 			if err != nil {
 				return nil, err
 			}
@@ -729,7 +729,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 			oneOfs = append(oneOfs, ood)
 			for _, flb := range oob.choices {
 				path := append(path, internal.Message_fieldsTag, int32(len(fields)))
-				fld, err := flb.buildProto(path, sourceInfo)
+				fld, err := flb.buildProto(path, sourceInfo, mb.Options.GetMessageSetWireFormat())
 				if err != nil {
 					return nil, err
 				}
@@ -775,7 +775,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 	nestedExtensions := make([]*dpb.FieldDescriptorProto, 0, len(mb.nestedExtensions))
 	for _, exb := range mb.nestedExtensions {
 		path := append(path, internal.Message_extensionsTag, int32(len(nestedExtensions)))
-		if exd, err := exb.buildProto(path, sourceInfo); err != nil {
+		if exd, err := exb.buildProto(path, sourceInfo, false); err != nil {
 			return nil, err
 		} else {
 			nestedExtensions = append(nestedExtensions, exd)

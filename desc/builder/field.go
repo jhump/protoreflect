@@ -483,7 +483,7 @@ func (flb *FieldBuilder) GetExtendeeTypeName() string {
 	}
 }
 
-func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.FieldDescriptorProto, error) {
+func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo, isMessageSet bool) (*dpb.FieldDescriptorProto, error) {
 	addCommentsTo(sourceInfo, path, &flb.comments)
 
 	var lbl *dpb.FieldDescriptorProto_Label
@@ -506,6 +506,11 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 	var def *string
 	if flb.Default != "" {
 		def = proto.String(flb.Default)
+	}
+
+	// normal (non-messageset) messages have lower tag limit, so enforce that here
+	if !isMessageSet && flb.number > internal.MaxNormalTag {
+		return nil, fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), internal.MaxNormalTag)
 	}
 
 	return &dpb.FieldDescriptorProto{
