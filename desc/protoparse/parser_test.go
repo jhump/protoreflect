@@ -161,7 +161,7 @@ func parseFileForTest(filename string) (*parseResult, error) {
 	defer func() {
 		_ = f.Close()
 	}()
-	errs := newErrorHandler(nil)
+	errs := newErrorHandler(nil, nil)
 	res := parseProto(filename, f, errs, true)
 	return res, errs.getError()
 }

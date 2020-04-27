@@ -154,6 +154,9 @@ type Parser struct {
 	// The reporter is not invoked for system or I/O errors, only for syntax and
 	// link errors.
 	ErrorReporter ErrorReporter
+
+	// A custom reporter of warnings. If not specified, warning messages are ignored.
+	WarningReporter WarningReporter
 }
 
 // ParseFiles parses the named files into descriptors. The returned slice has
@@ -200,7 +203,7 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 
 	protos := map[string]*parseResult{}
 	results := &parseResults{resultsByFilename: protos}
-	errs := newErrorHandler(p.ErrorReporter)
+	errs := newErrorHandler(p.ErrorReporter, p.WarningReporter)
 	parseProtoFiles(accessor, filenames, errs, true, true, results, p.LookupImport)
 	if err := errs.getError(); err != nil {
 		return nil, err
@@ -268,7 +271,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 	}
 
 	protos := map[string]*parseResult{}
-	errs := newErrorHandler(p.ErrorReporter)
+	errs := newErrorHandler(p.ErrorReporter, p.WarningReporter)
 	parseProtoFiles(accessor, filenames, errs, false, p.ValidateUnlinkedFiles, &parseResults{resultsByFilename: protos}, p.LookupImport)
 	if err := errs.getError(); err != nil {
 		return nil, err
@@ -285,7 +288,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 			// parsing options will be best effort
 			pr.lenient = true
 			// we don't want the real error reporter see any errors
-			pr.errs.reporter = func(err ErrorWithPos) error {
+			pr.errs.errReporter = func(err ErrorWithPos) error {
 				return err
 			}
 			_ = interpretFileOptions(pr, poorFileDescriptorish{FileDescriptorProto: fd})

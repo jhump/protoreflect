@@ -1,6 +1,7 @@
 package protoparse
 
 import (
+	"io"
 	"strings"
 	"testing"
 
@@ -222,4 +223,8 @@ func TestLexerErrors(t *testing.T) {
 		testutil.Require(t, sym.err != nil)
 		testutil.Require(t, strings.Contains(sym.err.Error(), tc.errMsg), "case %d: expected message to contain %q but does not: %q", i, tc.errMsg, sym.err.Error())
 	}
+}
+
+func newTestLexer(in io.Reader) *protoLex {
+	return newLexer(in, "test.proto", newErrorHandler(nil, nil))
 }

@@ -17,23 +17,31 @@ var ErrInvalidSource = errors.New("parse failed: invalid proto source")
 // report as many syntax and/or link errors as it can find.
 type ErrorReporter func(err ErrorWithPos) error
 
+// WarningReporter is responsible for reporting the given warning. This is used
+// for indicating non-error messages to the calling program for things that do
+// not cause the parse to fail but are considered bad practice.
+type WarningReporter func(pos SourcePos, message string)
+
 func defaultErrorReporter(err ErrorWithPos) error {
 	// abort parsing after first error encountered
 	return err
 }
 
 type errorHandler struct {
-	reporter     ErrorReporter
+	errReporter  ErrorReporter
 	errsReported int
 	err          error
+
+	warnReporter WarningReporter
 }
 
-func newErrorHandler(reporter ErrorReporter) *errorHandler {
-	if reporter == nil {
-		reporter = defaultErrorReporter
+func newErrorHandler(errRep ErrorReporter, warnRep WarningReporter) *errorHandler {
+	if errRep == nil {
+		errRep = defaultErrorReporter
 	}
 	return &errorHandler{
-		reporter: reporter,
+		errReporter:  errRep,
+		warnReporter: warnRep,
 	}
 }
 
@@ -42,7 +50,7 @@ func (h *errorHandler) handleErrorWithPos(pos *SourcePos, format string, args ..
 		return h.err
 	}
 	h.errsReported++
-	err := h.reporter(errorWithPos(pos, format, args...))
+	err := h.errReporter(errorWithPos(pos, format, args...))
 	h.err = err
 	return err
 }
@@ -53,10 +61,16 @@ func (h *errorHandler) handleError(err error) error {
 	}
 	if ewp, ok := err.(ErrorWithPos); ok {
 		h.errsReported++
-		err = h.reporter(ewp)
+		err = h.errReporter(ewp)
 	}
 	h.err = err
 	return err
+}
+
+func (h *errorHandler) warn(pos *SourcePos, format string, args ...interface{}) {
+	if h.warnReporter != nil {
+		h.warnReporter(*pos, fmt.Sprintf(format, args...))
+	}
 }
 
 func (h *errorHandler) getError() error {
@@ -95,10 +109,7 @@ type ErrorWithSourcePos struct {
 // Error implements the error interface
 func (e ErrorWithSourcePos) Error() string {
 	sourcePos := e.GetPosition()
-	if sourcePos.Line <= 0 || sourcePos.Col <= 0 {
-		return fmt.Sprintf("%s: %v", sourcePos.Filename, e.Underlying)
-	}
-	return fmt.Sprintf("%s:%d:%d: %v", sourcePos.Filename, sourcePos.Line, sourcePos.Col, e.Underlying)
+	return fmt.Sprintf("%s: %v", sourcePos, e.Underlying)
 }
 
 // GetPosition implements the ErrorWithPos interface, supplying a location in

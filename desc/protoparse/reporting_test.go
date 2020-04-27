@@ -2,6 +2,7 @@ package protoparse
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -218,5 +219,54 @@ func TestErrorReporting(t *testing.T) {
 			testutil.Eq(t, ErrInvalidSource, err, "case #%d: parse should have failed with invalid source error", i+1)
 			testutil.Eq(t, len(tc.expectedErrs), count, "case #%d: parse should have called reporter %d times", i+1, len(tc.expectedErrs))
 		}
+	}
+}
+
+func TestWarningReporting(t *testing.T) {
+	type msg struct {
+		pos  SourcePos
+		text string
+	}
+	var msgs []msg
+	rep := func(pos SourcePos, message string) {
+		msgs = append(msgs, msg{
+			pos: pos, text: message,
+		})
+	}
+
+	testCases := []struct {
+		source          string
+		expectedNotices []string
+	}{
+		{
+			source: `syntax = "proto2"; message Foo {}`,
+		},
+		{
+			source: `syntax = "proto3"; message Foo {}`,
+		},
+		{
+			source: `message Foo {}`,
+			expectedNotices: []string{
+				"test.proto:1:1: No syntax specified. Defaulting to proto2 syntax.",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		accessor := FileContentsFromMap(map[string]string{
+			"test.proto": testCase.source,
+		})
+		p := Parser{
+			Accessor:        accessor,
+			WarningReporter: rep,
+		}
+		msgs = nil
+		_, err := p.ParseFiles("test.proto")
+		testutil.Ok(t, err)
+
+		actualNotices := make([]string, len(msgs))
+		for j, msg := range msgs {
+			actualNotices[j] = fmt.Sprintf("%s: %s", msg.pos, msg.text)
+		}
+		testutil.Eq(t, testCase.expectedNotices, actualNotices)
 	}
 }

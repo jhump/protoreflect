@@ -60,10 +60,6 @@ type protoLex struct {
 	comments   []comment
 }
 
-func newTestLexer(in io.Reader) *protoLex {
-	return newLexer(in, "test.proto", newErrorHandler(nil))
-}
-
 func newLexer(in io.Reader, filename string, errs *errorHandler) *protoLex {
 	return &protoLex{
 		input:    &runeReader{rr: bufio.NewReader(in)},
