@@ -668,7 +668,7 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescrip
 	extensions := make([]*dpb.FieldDescriptorProto, 0, len(fb.extensions))
 	for _, exb := range fb.extensions {
 		path := append(path, internal.File_extensionsTag, int32(len(extensions)))
-		if exd, err := exb.buildProto(path, &sourceInfo); err != nil {
+		if exd, err := exb.buildProto(path, &sourceInfo, isExtendeeMessageSet(exb)); err != nil {
 			return nil, err
 		} else {
 			extensions = append(extensions, exd)
@@ -697,6 +697,13 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescrip
 		Service:        services,
 		SourceCodeInfo: &sourceInfo,
 	}, nil
+}
+
+func isExtendeeMessageSet(flb *FieldBuilder) bool {
+	if flb.localExtendee != nil {
+		return flb.localExtendee.Options.GetMessageSetWireFormat()
+	}
+	return flb.foreignExtendee.GetMessageOptions().GetMessageSetWireFormat()
 }
 
 // Build constructs a file descriptor based on the contents of this file

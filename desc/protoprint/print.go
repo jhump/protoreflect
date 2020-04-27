@@ -716,6 +716,7 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 	}
 
 	skip := map[interface{}]bool{}
+	maxTag := internal.GetMaxTag(md.GetMessageOptions().GetMessageSetWireFormat())
 
 	elements := elementAddrs{dsc: md, opts: opts}
 	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.Message_optionsTag, -1, opts)...)
@@ -817,7 +818,7 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 				addrs = append(addrs, elnext)
 				skip[extr] = true
 			}
-			p.printExtensionRanges(md, ranges, addrs, mf, w, sourceInfo, path, indent)
+			p.printExtensionRanges(md, ranges, maxTag, addrs, mf, w, sourceInfo, path, indent)
 		case reservedRange:
 			// collapse reserved ranges into a single "reserved" block
 			ranges := []reservedRange{d}
@@ -832,7 +833,7 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 				addrs = append(addrs, elnext)
 				skip[rr] = true
 			}
-			p.printReservedRanges(ranges, false, addrs, w, sourceInfo, path, indent)
+			p.printReservedRanges(ranges, maxTag, addrs, w, sourceInfo, path, indent)
 		case string: // reserved name
 			// collapse reserved names into a single "reserved" block
 			names := []string{d}
@@ -1098,7 +1099,7 @@ func (p *Printer) printExtensions(exts *extensionDecl, allExts extensions, paren
 	}
 }
 
-func (p *Printer) printExtensionRanges(parent *desc.MessageDescriptor, ranges []*descriptor.DescriptorProto_ExtensionRange, addrs []elementAddr, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
+func (p *Printer) printExtensionRanges(parent *desc.MessageDescriptor, ranges []*descriptor.DescriptorProto_ExtensionRange, maxTag int32, addrs []elementAddr, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
 	p.indent(w, indent)
 	fmt.Fprint(w, "extensions ")
 
@@ -1118,7 +1119,7 @@ func (p *Printer) printExtensionRanges(parent *desc.MessageDescriptor, ranges []
 		p.printElement(true, si, w, inline(indent), func(w *writer) {
 			if extr.GetStart() == extr.GetEnd()-1 {
 				fmt.Fprintf(w, "%d ", extr.GetStart())
-			} else if extr.GetEnd()-1 == internal.MaxTag {
+			} else if extr.GetEnd()-1 == maxTag {
 				fmt.Fprintf(w, "%d to max ", extr.GetStart())
 			} else {
 				fmt.Fprintf(w, "%d to %d ", extr.GetStart(), extr.GetEnd()-1)
@@ -1131,7 +1132,7 @@ func (p *Printer) printExtensionRanges(parent *desc.MessageDescriptor, ranges []
 	fmt.Fprintln(w, ";")
 }
 
-func (p *Printer) printReservedRanges(ranges []reservedRange, isEnum bool, addrs []elementAddr, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
+func (p *Printer) printReservedRanges(ranges []reservedRange, maxVal int32, addrs []elementAddr, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
 	p.indent(w, indent)
 	fmt.Fprint(w, "reserved ")
 
@@ -1147,8 +1148,7 @@ func (p *Printer) printReservedRanges(ranges []reservedRange, isEnum bool, addrs
 		p.printElement(false, si, w, inline(indent), func(w *writer) {
 			if rr.start == rr.end {
 				fmt.Fprintf(w, "%d ", rr.start)
-			} else if (rr.end == internal.MaxTag && !isEnum) ||
-				(rr.end == math.MaxInt32 && isEnum) {
+			} else if rr.end == maxVal {
 				fmt.Fprintf(w, "%d to max ", rr.start)
 			} else {
 				fmt.Fprintf(w, "%d to %d ", rr.start, rr.end)
@@ -1248,7 +1248,7 @@ func (p *Printer) printEnum(ed *desc.EnumDescriptor, mf *dynamic.MessageFactory,
 					addrs = append(addrs, elnext)
 					skip[rr] = true
 				}
-				p.printReservedRanges(ranges, true, addrs, w, sourceInfo, path, indent)
+				p.printReservedRanges(ranges, math.MaxInt32, addrs, w, sourceInfo, path, indent)
 			case string: // reserved name
 				// collapse reserved names into a single "reserved" block
 				names := []string{d}

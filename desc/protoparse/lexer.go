@@ -39,7 +39,7 @@ func (rr *runeReader) unreadRune(r rune) {
 
 func lexError(l protoLexer, pos *SourcePos, err string) {
 	pl := l.(*protoLex)
-	_ = pl.errs.handleError(ErrorWithSourcePos{Underlying: errors.New(err), Pos: pos})
+	_ = pl.errs.handleErrorWithPos(pos, err)
 }
 
 type protoLex struct {
@@ -284,6 +284,15 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			// integer! (decimal or octal)
 			ui, err := strconv.ParseUint(numstr, 0, 64)
 			if err != nil {
+				if numErr, ok := err.(*strconv.NumError); ok && numErr.Err == strconv.ErrRange {
+					// if it's too big to be an int, parse it as a float
+					var f float64
+					f, err = strconv.ParseFloat(numstr, 64)
+					if err == nil {
+						l.setFloat(lval, f)
+						return _FLOAT_LIT
+					}
+				}
 				l.setError(lval, err)
 				return _ERROR
 			}

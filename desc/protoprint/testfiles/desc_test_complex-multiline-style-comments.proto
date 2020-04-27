@@ -105,7 +105,7 @@ message Another {
 
 	option (eee) = V1;
 
-	option (a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765 > m:<key:"bar" value:200 > m:<key:"foo" value:100 > > fff:OK  };
+	option (a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765 > m:<key:"bar" value:200 > m:<key:"foo" value:100 > [foo.bar.Test.Nested._NestedNested._garblez]:"whoah!" > fff:OK  };
 
 	optional Test test = 1;
 

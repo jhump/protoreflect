@@ -37,6 +37,16 @@ func newErrorHandler(reporter ErrorReporter) *errorHandler {
 	}
 }
 
+func (h *errorHandler) handleErrorWithPos(pos *SourcePos, format string, args ...interface{}) error {
+	if h.err != nil {
+		return h.err
+	}
+	h.errsReported++
+	err := h.reporter(errorWithPos(pos, format, args...))
+	h.err = err
+	return err
+}
+
 func (h *errorHandler) handleError(err error) error {
 	if h.err != nil {
 		return h.err
@@ -101,3 +111,7 @@ func (e ErrorWithSourcePos) Unwrap() error {
 }
 
 var _ ErrorWithPos = ErrorWithSourcePos{}
+
+func errorWithPos(pos *SourcePos, format string, args ...interface{}) ErrorWithPos {
+	return ErrorWithSourcePos{Pos: pos, Underlying: fmt.Errorf(format, args...)}
+}

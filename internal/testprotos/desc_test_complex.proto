@@ -93,6 +93,7 @@ message Another {
     option (a).test.s.id = 98765;
     option (a).test.array = 1;
     option (a).test.array = 2;
+    option (a).test.(.foo.bar.Test.Nested._NestedNested._garblez) = "whoah!";
 
     optional Test test = 1;
     optional Test.Nested._NestedNested.EEE fff = 2 [default = V1];

@@ -65,7 +65,7 @@ message Another {
   option (rept) = { foo:"def" array:3 array:2 array:1 s:<name:"bar" id:321 > r:<name:"g" > r:<name:"s" >  };
   option (rept) = { foo:"def"  };
   option (eee) = V1;
-  option (a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765 > m:<key:"bar" value:200 > m:<key:"foo" value:100 > > fff:OK  };
+  option (a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765 > m:<key:"bar" value:200 > m:<key:"foo" value:100 > [foo.bar.Test.Nested._NestedNested._garblez]:"whoah!" > fff:OK  };
   optional Test test = 1;
   optional Test.Nested._NestedNested.EEE fff = 2 [default = V1];
 }
