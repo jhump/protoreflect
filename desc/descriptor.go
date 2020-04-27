@@ -994,6 +994,23 @@ func (fd *FieldDescriptor) IsRepeated() bool {
 	return fd.proto.GetLabel() == dpb.FieldDescriptorProto_LABEL_REPEATED
 }
 
+// IsProto3Optional returns true if this field has an explicit "optional" label
+// and is in a "proto3" syntax file. Such fields will be nested in synthetic
+// oneofs that contain only the single field.
+func (fd *FieldDescriptor) IsProto3Optional() bool {
+	return internal.GetProto3Optional(fd.proto)
+}
+
+// HasPresence returns true if this field can distinguish when a value is
+// present or not. Scalar fields in "proto3" syntax files, for example, return
+// false since absent values are indistinguishable from zero values.
+func (fd *FieldDescriptor) HasPresence() bool {
+	if !fd.file.isProto3 {
+		return true
+	}
+	return fd.msgType != nil || fd.IsProto3Optional()
+}
+
 // IsMap returns true if this is a map field. If so, it will have the "repeated"
 // label its type will be a message that represents a map entry. The map entry
 // message will have exactly two fields: tag #1 is the key and tag #2 is the value.
@@ -1615,6 +1632,10 @@ func (od *OneOfDescriptor) String() string {
 // these fields may be set for a given message.
 func (od *OneOfDescriptor) GetChoices() []*FieldDescriptor {
 	return od.choices
+}
+
+func (od *OneOfDescriptor) IsSynthetic() bool {
+	return len(od.choices) == 1 && od.choices[0].IsProto3Optional()
 }
 
 // scope represents a lexical scope in a proto file in which messages and enums

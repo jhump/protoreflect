@@ -138,7 +138,7 @@ func (r *parseResult) addExtensions(ext *extendNode, flds *[]*dpb.FieldDescripto
 			count++
 			decl.field.extendee = ext
 			// use higher limit since we don't know yet whether extendee is messageset wire format
-			fd := r.asFieldDescriptor(decl.field, internal.MaxTag)
+			fd := r.asFieldDescriptor(decl.field, internal.MaxTag, isProto3)
 			fd.Extendee = proto.String(extendee)
 			*flds = append(*flds, fd)
 		} else if decl.group != nil {
@@ -170,7 +170,7 @@ func asLabel(lbl *fieldLabel) *dpb.FieldDescriptorProto_Label {
 	}
 }
 
-func (r *parseResult) asFieldDescriptor(node *fieldNode, maxTag int32) *dpb.FieldDescriptorProto {
+func (r *parseResult) asFieldDescriptor(node *fieldNode, maxTag int32, isProto3 bool) *dpb.FieldDescriptorProto {
 	tag := node.tag.val
 	if err := checkTag(node.tag.start(), tag, maxTag); err != nil {
 		_ = r.errs.handleError(err)
@@ -179,6 +179,9 @@ func (r *parseResult) asFieldDescriptor(node *fieldNode, maxTag int32) *dpb.Fiel
 	r.putFieldNode(fd, node)
 	if opts := node.options.Elements(); len(opts) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
+	}
+	if isProto3 && fd.Label != nil && fd.GetLabel() == dpb.FieldDescriptorProto_LABEL_OPTIONAL {
+		internal.SetProto3Optional(fd)
 	}
 	return fd
 }
@@ -400,7 +403,8 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messag
 		} else if decl.extensionRange != nil {
 			msgd.ExtensionRange = append(msgd.ExtensionRange, r.asExtensionRanges(decl.extensionRange, maxTag)...)
 		} else if decl.field != nil {
-			msgd.Field = append(msgd.Field, r.asFieldDescriptor(decl.field, maxTag))
+			fd := r.asFieldDescriptor(decl.field, maxTag, isProto3)
+			msgd.Field = append(msgd.Field, fd)
 		} else if decl.mapField != nil {
 			fd, md := r.asMapDescriptors(decl.mapField, isProto3, maxTag)
 			msgd.Field = append(msgd.Field, fd)
@@ -422,7 +426,7 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messag
 					}
 					ood.Options.UninterpretedOption = append(ood.Options.UninterpretedOption, r.asUninterpretedOption(oodecl.option))
 				} else if oodecl.field != nil {
-					fd := r.asFieldDescriptor(oodecl.field, maxTag)
+					fd := r.asFieldDescriptor(oodecl.field, maxTag, isProto3)
 					fd.OneofIndex = proto.Int32(int32(oodIndex))
 					msgd.Field = append(msgd.Field, fd)
 					ooFields++
@@ -451,6 +455,58 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messag
 			for _, rng := range decl.reserved.ranges {
 				msgd.ReservedRange = append(msgd.ReservedRange, r.asMessageReservedRange(rng, maxTag))
 			}
+		}
+	}
+
+	// process any proto3_optional fields
+	if !isProto3 {
+		return
+	}
+	var allNames map[string]struct{}
+	for _, fd := range msgd.Field {
+		if internal.GetProto3Optional(fd) {
+			// lazy init the set of all names
+			if allNames == nil {
+				allNames = map[string]struct{}{}
+				for _, fd := range msgd.Field {
+					allNames[fd.GetName()] = struct{}{}
+				}
+				for _, fd := range msgd.Extension {
+					allNames[fd.GetName()] = struct{}{}
+				}
+				for _, ed := range msgd.EnumType {
+					allNames[ed.GetName()] = struct{}{}
+					for _, evd := range ed.Value {
+						allNames[evd.GetName()] = struct{}{}
+					}
+				}
+				for _, fd := range msgd.NestedType {
+					allNames[fd.GetName()] = struct{}{}
+				}
+				for _, n := range msgd.ReservedName {
+					allNames[n] = struct{}{}
+				}
+			}
+
+			// Compute a name for the synthetic oneof. This uses the same
+			// algorithm as used in protoc:
+			//  https://github.com/protocolbuffers/protobuf/blob/74ad62759e0a9b5a21094f3fb9bb4ebfaa0d1ab8/src/google/protobuf/compiler/parser.cc#L785-L803
+			ooName := fd.GetName()
+			if !strings.HasPrefix(ooName, "_") {
+				ooName = "_" + ooName
+			}
+			for {
+				_, ok := allNames[ooName]
+				if ok {
+					// found a unique name
+					allNames[ooName] = struct{}{}
+					break
+				}
+				ooName = "X" + ooName
+			}
+
+			fd.OneofIndex = proto.Int32(int32(len(msgd.OneofDecl)))
+			msgd.OneofDecl = append(msgd.OneofDecl, &dpb.OneofDescriptorProto{Name: proto.String(ooName)})
 		}
 	}
 }

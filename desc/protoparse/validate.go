@@ -291,8 +291,8 @@ func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.Fiel
 			if err := res.errs.handleErrorWithPos(n.groupKeyword.start(), "%s: groups are not allowed in proto3", scope); err != nil {
 				return err
 			}
-		} else if fld.Label != nil && fld.GetLabel() != dpb.FieldDescriptorProto_LABEL_REPEATED {
-			if err := res.errs.handleErrorWithPos(node.fieldLabel().start(), "%s: field has label %v, but proto3 must omit labels other than 'repeated'", scope, fld.GetLabel()); err != nil {
+		} else if fld.Label != nil && fld.GetLabel() == dpb.FieldDescriptorProto_LABEL_REQUIRED {
+			if err := res.errs.handleErrorWithPos(node.fieldLabel().start(), "%s: label %v is not allowed in proto3", scope, fld.GetLabel()); err != nil {
 				return err
 			}
 		}
@@ -306,7 +306,7 @@ func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.Fiel
 		}
 	} else {
 		if fld.Label == nil && fld.OneofIndex == nil {
-			if err := res.errs.handleErrorWithPos(node.fieldName().start(), "%s: field has no label, but proto2 must indicate 'optional' or 'required'", scope); err != nil {
+			if err := res.errs.handleErrorWithPos(node.fieldName().start(), "%s: field has no label; proto2 requires explicit 'optional' label", scope); err != nil {
 				return err
 			}
 		}
