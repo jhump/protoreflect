@@ -508,9 +508,9 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 		def = proto.String(flb.Default)
 	}
 
-	// normal (non-messageset) messages have lower tag limit, so enforce that here
-	if !isMessageSet && flb.number > internal.MaxNormalTag {
-		return nil, fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), internal.MaxNormalTag)
+	maxTag := internal.GetMaxTag(isMessageSet)
+	if flb.number > maxTag {
+		return nil, fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), maxTag)
 	}
 
 	return &dpb.FieldDescriptorProto{

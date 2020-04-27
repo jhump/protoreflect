@@ -9,7 +9,7 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
-func basicValidate(res *parseResult, containsErrors bool) {
+func validateBasic(res *parseResult, containsErrors bool) {
 	fd := res.fd
 	isProto3 := fd.GetSyntax() == "proto3"
 

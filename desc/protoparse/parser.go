@@ -656,7 +656,7 @@ func parseProto(filename string, r io.Reader, errs *errorHandler, validate bool)
 
 	res := createParseResult(filename, lx.res, errs)
 	if validate && errs.err == nil {
-		basicValidate(res, errs.errsReported > beforeErrs)
+		validateBasic(res, errs.errsReported > beforeErrs)
 	}
 
 	return res
@@ -731,11 +731,11 @@ func checkExtensionTagsInMessage(md *desc.MessageDescriptor, res *parseResult) e
 }
 
 func checkExtensionTag(fld *desc.FieldDescriptor, res *parseResult) error {
-	// NB: This is kind of gross that we don't enforce this in basicValidate(). But it would
+	// NB: This is kind of gross that we don't enforce this in validateBasic(). But it would
 	// require doing some minimal linking there (to identify the extendee and locate its
 	// descriptor). To keep the code simpler, we just wait until things are fully linked.
 
-	// In basicValidate() we just made sure these were within bounds for any message. But
+	// In validateBasic() we just made sure these were within bounds for any message. But
 	// now that things are linked, we can check if the extendee is messageset wire format
 	// and, if not, enforce tighter limit.
 	if !fld.GetOwner().GetMessageOptions().GetMessageSetWireFormat() && fld.GetNumber() > internal.MaxNormalTag {

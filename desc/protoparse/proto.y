@@ -615,17 +615,17 @@ tagRanges : tagRanges ',' tagRange {
 	| tagRange
 
 tagRange : _INT_LIT {
-		r := &rangeNode{stNode: $1}
+		r := &rangeNode{startNode: $1}
 		r.setRange($1, $1)
 		$$ = []*rangeNode{r}
 	}
 	| _INT_LIT _TO _INT_LIT {
-		r := &rangeNode{stNode: $1, enNode: $3}
+		r := &rangeNode{startNode: $1, endNode: $3}
 		r.setRange($1, $3)
 		$$ = []*rangeNode{r}
 	}
 	| _INT_LIT _TO _MAX {
-		r := &rangeNode{stNode: $1, enNode: $3, enMax: true}
+		r := &rangeNode{startNode: $1, endNode: $3, endMax: true}
 		r.setRange($1, $3)
 		$$ = []*rangeNode{r}
 	}
@@ -636,17 +636,17 @@ enumRanges : enumRanges ',' enumRange {
 	| enumRange
 
 enumRange : intLit {
-		r := &rangeNode{stNode: $1}
+		r := &rangeNode{startNode: $1}
 		r.setRange($1, $1)
 		$$ = []*rangeNode{r}
 	}
 	| intLit _TO intLit {
-		r := &rangeNode{stNode: $1, enNode: $3}
+		r := &rangeNode{startNode: $1, endNode: $3}
 		r.setRange($1, $3)
 		$$ = []*rangeNode{r}
 	}
 	| intLit _TO _MAX {
-		r := &rangeNode{stNode: $1, enNode: $3, enMax: true}
+		r := &rangeNode{startNode: $1, endNode: $3, endMax: true}
 		r.setRange($1, $3)
 		$$ = []*rangeNode{r}
 	}

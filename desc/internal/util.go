@@ -10,9 +10,13 @@ const (
 	// MaxNormalTag is the maximum allowed tag number for a field in a normal message.
 	MaxNormalTag = 536870911 // 2^29 - 1
 
-	// MaxTag is the maximum allowed tag number. Only messages with messageset wire
-	// encoding can have tags this high. Normal messages use MaxNormalTag as the limit.
-	MaxTag = math.MaxInt32 - 1
+	// MaxMessageSetTag is the maximum allowed tag number of a field in a message that
+	// uses the message set wire format.
+	MaxMessageSetTag = math.MaxInt32 - 1
+
+	// MaxTag is the maximum allowed tag number. (It is the same as MaxMessageSetTag
+	// since that is the absolute highest allowed.)
+	MaxTag = MaxMessageSetTag
 
 	// SpecialReservedStart is the first tag in a range that is reserved and not
 	// allowed for use in message definitions.
@@ -272,4 +276,13 @@ func CreatePrefixList(pkg string) []string {
 	prefixes[0] = pkg
 
 	return prefixes
+}
+
+// GetMaxTag returns the max tag number allowed, based on whether a message uses
+// message set wire format or not.
+func GetMaxTag(isMessageSet bool) int32 {
+	if isMessageSet {
+		return MaxMessageSetTag
+	}
+	return MaxNormalTag
 }

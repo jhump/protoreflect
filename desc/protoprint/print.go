@@ -716,10 +716,7 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 	}
 
 	skip := map[interface{}]bool{}
-	maxTag := int32(internal.MaxNormalTag)
-	if md.GetMessageOptions().GetMessageSetWireFormat() {
-		maxTag = internal.MaxTag
-	}
+	maxTag := internal.GetMaxTag(md.GetMessageOptions().GetMessageSetWireFormat())
 
 	elements := elementAddrs{dsc: md, opts: opts}
 	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.Message_optionsTag, -1, opts)...)

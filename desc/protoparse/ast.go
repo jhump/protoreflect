@@ -760,31 +760,31 @@ type extensionRangeNode struct {
 
 type rangeNode struct {
 	basicCompositeNode
-	stNode, enNode node
-	enMax          bool
+	startNode, endNode node
+	endMax             bool
 }
 
 func (n *rangeNode) rangeStart() node {
-	return n.stNode
+	return n.startNode
 }
 
 func (n *rangeNode) rangeEnd() node {
-	if n.enNode == nil {
-		return n.stNode
+	if n.endNode == nil {
+		return n.startNode
 	}
-	return n.enNode
+	return n.endNode
 }
 
 func (n *rangeNode) startValue() interface{} {
-	return n.stNode.(intLiteral).value()
+	return n.startNode.(intLiteral).value()
 }
 
 func (n *rangeNode) startValueAsInt32(min, max int32) (int32, bool) {
-	return n.stNode.(intLiteral).asInt32(min, max)
+	return n.startNode.(intLiteral).asInt32(min, max)
 }
 
 func (n *rangeNode) endValue() interface{} {
-	l, ok := n.enNode.(intLiteral)
+	l, ok := n.endNode.(intLiteral)
 	if !ok {
 		return nil
 	}
@@ -792,13 +792,13 @@ func (n *rangeNode) endValue() interface{} {
 }
 
 func (n *rangeNode) endValueAsInt32(min, max int32) (int32, bool) {
-	if n.enMax {
+	if n.endMax {
 		return max, true
 	}
-	if n.enNode == nil {
+	if n.endNode == nil {
 		return n.startValueAsInt32(min, max)
 	}
-	return n.enNode.(intLiteral).asInt32(min, max)
+	return n.endNode.(intLiteral).asInt32(min, max)
 }
 
 type reservedNode struct {

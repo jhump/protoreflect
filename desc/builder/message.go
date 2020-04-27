@@ -775,7 +775,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 	nestedExtensions := make([]*dpb.FieldDescriptorProto, 0, len(mb.nestedExtensions))
 	for _, exb := range mb.nestedExtensions {
 		path := append(path, internal.Message_extensionsTag, int32(len(nestedExtensions)))
-		if exd, err := exb.buildProto(path, sourceInfo, false); err != nil {
+		if exd, err := exb.buildProto(path, sourceInfo, isExtendeeMessageSet(exb)); err != nil {
 			return nil, err
 		} else {
 			nestedExtensions = append(nestedExtensions, exd)

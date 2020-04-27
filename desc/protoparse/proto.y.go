@@ -1885,7 +1885,7 @@ protodefault:
 		protoDollar = protoS[protopt-1 : protopt+1]
 //line proto.y:617
 		{
-			r := &rangeNode{stNode: protoDollar[1].i}
+			r := &rangeNode{startNode: protoDollar[1].i}
 			r.setRange(protoDollar[1].i, protoDollar[1].i)
 			protoVAL.rngs = []*rangeNode{r}
 		}
@@ -1893,7 +1893,7 @@ protodefault:
 		protoDollar = protoS[protopt-3 : protopt+1]
 //line proto.y:622
 		{
-			r := &rangeNode{stNode: protoDollar[1].i, enNode: protoDollar[3].i}
+			r := &rangeNode{startNode: protoDollar[1].i, endNode: protoDollar[3].i}
 			r.setRange(protoDollar[1].i, protoDollar[3].i)
 			protoVAL.rngs = []*rangeNode{r}
 		}
@@ -1901,7 +1901,7 @@ protodefault:
 		protoDollar = protoS[protopt-3 : protopt+1]
 //line proto.y:627
 		{
-			r := &rangeNode{stNode: protoDollar[1].i, enNode: protoDollar[3].id, enMax: true}
+			r := &rangeNode{startNode: protoDollar[1].i, endNode: protoDollar[3].id, endMax: true}
 			r.setRange(protoDollar[1].i, protoDollar[3].id)
 			protoVAL.rngs = []*rangeNode{r}
 		}
@@ -1915,7 +1915,7 @@ protodefault:
 		protoDollar = protoS[protopt-1 : protopt+1]
 //line proto.y:638
 		{
-			r := &rangeNode{stNode: protoDollar[1].il}
+			r := &rangeNode{startNode: protoDollar[1].il}
 			r.setRange(protoDollar[1].il, protoDollar[1].il)
 			protoVAL.rngs = []*rangeNode{r}
 		}
@@ -1923,7 +1923,7 @@ protodefault:
 		protoDollar = protoS[protopt-3 : protopt+1]
 //line proto.y:643
 		{
-			r := &rangeNode{stNode: protoDollar[1].il, enNode: protoDollar[3].il}
+			r := &rangeNode{startNode: protoDollar[1].il, endNode: protoDollar[3].il}
 			r.setRange(protoDollar[1].il, protoDollar[3].il)
 			protoVAL.rngs = []*rangeNode{r}
 		}
@@ -1931,7 +1931,7 @@ protodefault:
 		protoDollar = protoS[protopt-3 : protopt+1]
 //line proto.y:648
 		{
-			r := &rangeNode{stNode: protoDollar[1].il, enNode: protoDollar[3].id, enMax: true}
+			r := &rangeNode{startNode: protoDollar[1].il, endNode: protoDollar[3].id, endMax: true}
 			r.setRange(protoDollar[1].il, protoDollar[3].id)
 			protoVAL.rngs = []*rangeNode{r}
 		}
