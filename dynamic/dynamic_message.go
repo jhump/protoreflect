@@ -2194,13 +2194,9 @@ func (m *Message) mergeInto(pm proto.Message, deterministic bool) error {
 
 	// track tags for which the dynamic message has data but the given
 	// message doesn't know about it
-	u := target.FieldByName("XXX_unrecognized")
-	var unknownTags map[int32]struct{}
-	if u.IsValid() && u.Type() == typeOfBytes {
-		unknownTags = map[int32]struct{}{}
-		for tag := range m.values {
-			unknownTags[tag] = struct{}{}
-		}
+	unknownTags := map[int32]struct{}{}
+	for tag := range m.values {
+		unknownTags[tag] = struct{}{}
 	}
 
 	// check that we can successfully do the merge
@@ -2305,7 +2301,6 @@ func (m *Message) mergeInto(pm proto.Message, deterministic bool) error {
 
 	// if we have fields that the given message doesn't know about, add to its unknown fields
 	if len(unknownTags) > 0 {
-		ub := u.Interface().([]byte)
 		var b codec.Buffer
 		b.SetDeterministic(deterministic)
 		if deterministic {
@@ -2332,8 +2327,22 @@ func (m *Message) mergeInto(pm proto.Message, deterministic bool) error {
 				}
 			}
 		}
-		ub = append(ub, b.Bytes()...)
-		u.Set(reflect.ValueOf(ub))
+
+		u := target.FieldByName("XXX_unrecognized")
+		if u.IsValid() && u.Type() == typeOfBytes {
+			// Just store the bytes in the unrecognized field
+			ub := u.Interface().([]byte)
+			ub = append(ub, b.Bytes()...)
+			u.Set(reflect.ValueOf(ub))
+		} else {
+			// This message does not have an XXX_unrecognized in which to store
+			// this data. It could be an API v2 message, which stores unrecognized
+			// fields differently. So, in case that is what this is, let's try to
+			// unmarshal the data into it
+			if err := proto.UnmarshalMerge(b.Bytes(), pm); err != nil {
+				return err
+			}
+		}
 	}
 
 	// finally, convey unknown fields into the given message by letting it unmarshal them
