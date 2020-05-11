@@ -14,6 +14,7 @@ import (
 
 	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/internal"
 )
 
 // ErrUnknownTagNumber is an error that is returned when an operation refers
@@ -2194,13 +2195,9 @@ func (m *Message) mergeInto(pm proto.Message, deterministic bool) error {
 
 	// track tags for which the dynamic message has data but the given
 	// message doesn't know about it
-	u := target.FieldByName("XXX_unrecognized")
-	var unknownTags map[int32]struct{}
-	if u.IsValid() && u.Type() == typeOfBytes {
-		unknownTags = map[int32]struct{}{}
-		for tag := range m.values {
-			unknownTags[tag] = struct{}{}
-		}
+	unknownTags := map[int32]struct{}{}
+	for tag := range m.values {
+		unknownTags[tag] = struct{}{}
 	}
 
 	// check that we can successfully do the merge
@@ -2305,7 +2302,6 @@ func (m *Message) mergeInto(pm proto.Message, deterministic bool) error {
 
 	// if we have fields that the given message doesn't know about, add to its unknown fields
 	if len(unknownTags) > 0 {
-		ub := u.Interface().([]byte)
 		var b codec.Buffer
 		b.SetDeterministic(deterministic)
 		if deterministic {
@@ -2332,8 +2328,8 @@ func (m *Message) mergeInto(pm proto.Message, deterministic bool) error {
 				}
 			}
 		}
-		ub = append(ub, b.Bytes()...)
-		u.Set(reflect.ValueOf(ub))
+
+		internal.SetUnrecognized(pm, b.Bytes())
 	}
 
 	// finally, convey unknown fields into the given message by letting it unmarshal them
@@ -2562,13 +2558,15 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 
 	// now actually perform the merge
 	for fd, v := range values {
-		mergeField(m, fd, v)
+		if err := mergeField(m, fd, v); err != nil {
+			return err
+		}
 	}
 
-	u := src.FieldByName("XXX_unrecognized")
-	if u.IsValid() && u.Type() == typeOfBytes {
+	data := internal.GetUnrecognized(pm)
+	if len(data) > 0 {
 		// ignore any error returned: pulling in unknown fields is best-effort
-		_ = m.UnmarshalMerge(u.Interface().([]byte))
+		_ = m.UnmarshalMerge(data)
 	}
 
 	// lastly, also extract any unknown extensions the message may have (unknown extensions
