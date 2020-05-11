@@ -9,9 +9,12 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
+	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/internal"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
@@ -336,4 +339,49 @@ message Foo {
 
 	comment := fds[0].GetMessageTypes()[0].GetFields()[0].GetSourceInfo().GetLeadingComments()
 	testutil.Eq(t, " leading comments\n", comment)
+}
+
+func TestParseCustomOptions(t *testing.T) {
+	accessor := FileContentsFromMap(map[string]string{
+		"test.proto": `
+syntax = "proto3";
+import "google/protobuf/descriptor.proto";
+extend google.protobuf.MessageOptions {
+    string foo = 30303;
+    int64 bar = 30304;
+}
+message Foo {
+  option (.foo) = "foo";
+  option (bar) = 123;
+}
+`,
+	})
+
+	p := Parser{
+		Accessor:              accessor,
+		IncludeSourceCodeInfo: true,
+	}
+	fds, err := p.ParseFiles("test.proto")
+	testutil.Ok(t, err)
+
+	md := fds[0].GetMessageTypes()[0]
+	opts := md.GetMessageOptions()
+	data := internal.GetUnrecognized(opts)
+	buf := codec.NewBuffer(data)
+
+	tag, wt, err := buf.DecodeTagAndWireType()
+	testutil.Ok(t, err)
+	testutil.Eq(t, int32(30303), tag)
+	testutil.Eq(t, int8(proto.WireBytes), wt)
+	fieldData, err := buf.DecodeRawBytes(false)
+	testutil.Ok(t, err)
+	testutil.Eq(t, "foo", string(fieldData))
+
+	tag, wt, err = buf.DecodeTagAndWireType()
+	testutil.Ok(t, err)
+	testutil.Eq(t, int32(30304), tag)
+	testutil.Eq(t, int8(proto.WireVarint), wt)
+	fieldVal, err := buf.DecodeVarint()
+	testutil.Ok(t, err)
+	testutil.Eq(t, uint64(123), fieldVal)
 }
