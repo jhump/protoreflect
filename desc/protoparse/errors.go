@@ -92,15 +92,26 @@ type ErrorWithSourcePos struct {
 
 // Error implements the error interface
 func (e ErrorWithSourcePos) Error() string {
-	if e.Pos.Line <= 0 || e.Pos.Col <= 0 {
-		return fmt.Sprintf("%s: %v", e.Pos.Filename, e.Underlying)
+	filename := "<input>"
+	line := 0
+	col := 0
+	if e.Pos != nil {
+		filename = e.Pos.Filename
+		line = e.Pos.Line
+		col = e.Pos.Col
 	}
-	return fmt.Sprintf("%s:%d:%d: %v", e.Pos.Filename, e.Pos.Line, e.Pos.Col, e.Underlying)
+	if line <= 0 || col <= 0 {
+		return fmt.Sprintf("%s: %v", filename, e.Underlying)
+	}
+	return fmt.Sprintf("%s:%d:%d: %v", filename, line, col, e.Underlying)
 }
 
 // GetPosition implements the ErrorWithPos interface, supplying a location in
 // proto source that caused the error.
 func (e ErrorWithSourcePos) GetPosition() SourcePos {
+	if e.Pos == nil {
+		return SourcePos{}
+	}
 	return *e.Pos
 }
 
