@@ -408,14 +408,14 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 
 func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, recursive, validate bool, parsed *parseResults, lookupImport func(string) (*desc.FileDescriptor, error)) {
 	for _, name := range filenames {
-		parseProtoFile(acc, name, nil, errs, recursive, validate, parsed, lookupImport)
+		parseProtoFile(acc, name, &SourcePos{Filename: name}, errs, recursive, validate, parsed, lookupImport)
 		if errs.err != nil {
 			return
 		}
 	}
 }
 
-func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, recursive, validate bool, parsed *parseResults, lookupImport func(string) (*desc.FileDescriptor, error)) {
+func parseProtoFile(acc FileAccessor, filename string, loc *SourcePos, errs *errorHandler, recursive, validate bool, parsed *parseResults, lookupImport func(string) (*desc.FileDescriptor, error)) {
 	if parsed.has(filename) {
 		return
 	}
@@ -447,13 +447,9 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 		//  parsers are trying to access it concurrently)
 		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
 	} else {
-		if !strings.Contains(err.Error(), filename) {
-			// an error message that doesn't indicate the file is awful!
-			err = fmt.Errorf("%s: %v", filename, err)
-		}
 		// associate the error with the import line
 		err = ErrorWithSourcePos{
-			Pos:        importLoc,
+			Pos:        loc,
 			Underlying: err,
 		}
 		_ = errs.handleError(err)
