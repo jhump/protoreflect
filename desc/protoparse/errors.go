@@ -92,25 +92,21 @@ type ErrorWithSourcePos struct {
 
 // Error implements the error interface
 func (e ErrorWithSourcePos) Error() string {
-	filename := "<input>"
-	line := 0
-	col := 0
-	if e.Pos != nil {
-		filename = e.Pos.Filename
-		line = e.Pos.Line
-		col = e.Pos.Col
+	sourcePos := e.GetPosition()
+	if sourcePos.Line <= 0 || sourcePos.Col <= 0 {
+		return fmt.Sprintf("%s: %v", sourcePos.Filename, e.Underlying)
 	}
-	if line <= 0 || col <= 0 {
-		return fmt.Sprintf("%s: %v", filename, e.Underlying)
-	}
-	return fmt.Sprintf("%s:%d:%d: %v", filename, line, col, e.Underlying)
+	return fmt.Sprintf("%s:%d:%d: %v", sourcePos.Filename, sourcePos.Line, sourcePos.Col, e.Underlying)
 }
 
 // GetPosition implements the ErrorWithPos interface, supplying a location in
 // proto source that caused the error.
+//
+// If there is no underlying SourcePos, a new SourcePost with "<input>" as the
+// filename will be returned.
 func (e ErrorWithSourcePos) GetPosition() SourcePos {
 	if e.Pos == nil {
-		return SourcePos{}
+		return SourcePos{Filename: "<input>"}
 	}
 	return *e.Pos
 }
