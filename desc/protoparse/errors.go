@@ -85,6 +85,8 @@ type ErrorWithPos interface {
 // should instead look for instances of the ErrorWithPos interface, which
 // will find other kinds of errors. This type is only exported for backwards
 // compatibility.
+//
+// SourcePos should always be set and never nil.
 type ErrorWithSourcePos struct {
 	Underlying error
 	Pos        *SourcePos
@@ -101,9 +103,6 @@ func (e ErrorWithSourcePos) Error() string {
 
 // GetPosition implements the ErrorWithPos interface, supplying a location in
 // proto source that caused the error.
-//
-// If there is no underlying SourcePos, a new SourcePost with "<input>" as the
-// filename will be returned.
 func (e ErrorWithSourcePos) GetPosition() SourcePos {
 	if e.Pos == nil {
 		return SourcePos{Filename: "<input>"}
