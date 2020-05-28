@@ -450,7 +450,10 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 		if !strings.Contains(err.Error(), filename) {
 			// an error message that doesn't indicate the file is awful!
 			// this cannot be %w as this is not compatible with go <= 1.13
-			err = fmt.Errorf("%s: %v", filename, err)
+			err = errorWithFilename{
+				underlying: err,
+				filename:   filename,
+			}
 		}
 		// The top-level loop in parseProtoFiles calls this with nil for the top-level files
 		// importLoc is only for imports, otherwise we do not want to return a ErrorWithSourcePos
