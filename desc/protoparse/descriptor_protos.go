@@ -32,7 +32,7 @@ func (r *parseResult) createFileDescriptor(filename string, file *fileNode) {
 			fd.Syntax = proto.String(file.syntax.syntax.val)
 		}
 	} else {
-		r.errs.warn(file.start(), WarnNoSyntax)
+		r.errs.warn(file.start(), ErrNoSyntax)
 	}
 
 	for _, decl := range file.decls {

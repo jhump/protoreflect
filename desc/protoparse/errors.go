@@ -11,10 +11,10 @@ import (
 // always returns nil.
 var ErrInvalidSource = errors.New("parse failed: invalid proto source")
 
-// WarnNoSyntax is a sentinel error that may be passed to a warning reporter.
+// ErrNoSyntax is a sentinel error that may be passed to a warning reporter.
 // The error the reporter receives will be wrapped with source position that
 // indicates the file that had no syntax statement.
-var WarnNoSyntax = errors.New("no syntax specified; defaulting to proto2 syntax")
+var ErrNoSyntax = errors.New("no syntax specified; defaulting to proto2 syntax")
 
 // ErrorReporter is responsible for reporting the given error. If the reporter
 // returns a non-nil error, parsing/linking will abort with that error. If the
