@@ -139,7 +139,7 @@ func TestErrorReporting(t *testing.T) {
 				"test1.proto:5:62: syntax error: unexpected '-', expecting int literal",
 				"test1.proto:8:62: syntax error: unexpected ';', expecting \"returns\"",
 				"test2.proto:7:49: syntax error: unexpected identifier, expecting \"option\" or \"rpc\" or ';' or '}'",
-				"test2.proto:4:49: field Baz.foo: field has label LABEL_REQUIRED, but proto3 must omit labels other than 'repeated'",
+				"test2.proto:4:49: field Baz.foo: label 'required' is not allowed in proto3",
 			},
 		},
 		{

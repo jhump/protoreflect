@@ -102,19 +102,19 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `syntax = "proto2"; message Foo { string s = 1; }`,
-			errMsg:   `test.proto:1:41: field Foo.s: field has no label, but proto2 must indicate 'optional' or 'required'`,
+			errMsg:   `test.proto:1:41: field Foo.s: field has no label; proto2 requires explicit 'optional' label`,
 		},
 		{
 			contents: `message Foo { string s = 1; }`, // syntax defaults to proto2
-			errMsg:   `test.proto:1:22: field Foo.s: field has no label, but proto2 must indicate 'optional' or 'required'`,
+			errMsg:   `test.proto:1:22: field Foo.s: field has no label; proto2 requires explicit 'optional' label`,
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { optional string s = 1; }`,
-			errMsg:   `test.proto:1:34: field Foo.s: field has label LABEL_OPTIONAL, but proto3 must omit labels other than 'repeated'`,
+			succeeds: true, // proto3_optional
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { required string s = 1; }`,
-			errMsg:   `test.proto:1:34: field Foo.s: field has label LABEL_REQUIRED, but proto3 must omit labels other than 'repeated'`,
+			errMsg:   `test.proto:1:34: field Foo.s: label 'required' is not allowed in proto3`,
 		},
 		{
 			contents: `message Foo { extensions 1 to max; } extend Foo { required string sss = 100; }`,

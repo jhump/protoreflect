@@ -333,7 +333,7 @@ func GetProto3Optional(fd *dpb.FieldDescriptorProto) bool {
 }
 
 func SetProto3Optional(fd *dpb.FieldDescriptorProto) {
-	rv := reflect.ValueOf(fd)
+	rv := reflect.ValueOf(fd).Elem()
 	fld := rv.FieldByName("Proto3Optional")
 	if fld.IsValid() {
 		fld.Set(reflect.ValueOf(proto.Bool(true)))

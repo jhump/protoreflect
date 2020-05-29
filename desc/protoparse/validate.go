@@ -292,7 +292,7 @@ func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.Fiel
 				return err
 			}
 		} else if fld.Label != nil && fld.GetLabel() == dpb.FieldDescriptorProto_LABEL_REQUIRED {
-			if err := res.errs.handleErrorWithPos(node.fieldLabel().start(), "%s: label %v is not allowed in proto3", scope, fld.GetLabel()); err != nil {
+			if err := res.errs.handleErrorWithPos(node.fieldLabel().start(), "%s: label 'required' is not allowed in proto3", scope); err != nil {
 				return err
 			}
 		}

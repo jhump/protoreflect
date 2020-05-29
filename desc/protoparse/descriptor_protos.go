@@ -497,7 +497,7 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messag
 			}
 			for {
 				_, ok := allNames[ooName]
-				if ok {
+				if !ok {
 					// found a unique name
 					allNames[ooName] = struct{}{}
 					break
