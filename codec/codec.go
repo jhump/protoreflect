@@ -19,7 +19,6 @@ var ErrBadWireType = codec.ErrBadWireType
 // this package, but we can't use a type alias because we also need to add
 // methods to it, to broaden the exposed API.
 
-
 // Buffer is a reader and a writer that wraps a slice of bytes and also
 // provides API for decoding and encoding the protobuf binary format.
 //

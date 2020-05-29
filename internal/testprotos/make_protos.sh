@@ -4,7 +4,7 @@ set -e
 
 cd $(dirname $0)
 
-PROTOC_VERSION="3.9.0"
+PROTOC_VERSION="3.12.0"
 PROTOC_OS="$(uname -s)"
 PROTOC_ARCH="$(uname -m)"
 case "${PROTOC_OS}" in
@@ -39,4 +39,9 @@ ${PROTOC} --descriptor_set_out=./desc_test_complex.protoset -I. desc_test_comple
 ${PROTOC} --descriptor_set_out=./desc_test_complex_source_info.protoset --include_source_info --include_imports -I. desc_test_complex.proto
 ${PROTOC} --descriptor_set_out=./descriptor.protoset --include_source_info --include_imports -I./protoc/include/ google/protobuf/descriptor.proto
 ${PROTOC} --descriptor_set_out=./duration.protoset -I./protoc/include/ google/protobuf/duration.proto
+
+# We are currently pinning an earlier version of Go protobuf runtime, and thus of protoc-gen-go.
+# So it doesn't support proto3 optional fields yet. So we only create a descriptor for these, just
+# for testing proto3 optional support in the desc and desc/protoparse packages.
+#{PROTOC} --descriptor_set_out=./proto3_optional/desc_test_proto3_optional.protoset --include_source_info --include_imports -I. proto3_optional/desc_test_proto3_optional.proto
 
