@@ -12,6 +12,29 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
+var varintTypes = map[descriptor.FieldDescriptorProto_Type]bool{}
+var fixed32Types = map[descriptor.FieldDescriptorProto_Type]bool{}
+var fixed64Types = map[descriptor.FieldDescriptorProto_Type]bool{}
+
+func init() {
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_BOOL] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_INT32] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_INT64] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_UINT32] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_UINT64] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_SINT32] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_SINT64] = true
+	varintTypes[descriptor.FieldDescriptorProto_TYPE_ENUM] = true
+
+	fixed32Types[descriptor.FieldDescriptorProto_TYPE_FIXED32] = true
+	fixed32Types[descriptor.FieldDescriptorProto_TYPE_SFIXED32] = true
+	fixed32Types[descriptor.FieldDescriptorProto_TYPE_FLOAT] = true
+
+	fixed64Types[descriptor.FieldDescriptorProto_TYPE_FIXED64] = true
+	fixed64Types[descriptor.FieldDescriptorProto_TYPE_SFIXED64] = true
+	fixed64Types[descriptor.FieldDescriptorProto_TYPE_DOUBLE] = true
+}
+
 // ErrWireTypeEndGroup is returned from DecodeFieldValue if the tag and wire-type
 // it reads indicates an end-group marker.
 var ErrWireTypeEndGroup = errors.New("unexpected wire type: end group")
@@ -41,6 +64,18 @@ type UnknownField struct {
 	Encoding int8
 	Contents []byte
 	Value    uint64
+}
+
+// DecodeZigZag32 decodes a signed 32-bit integer from the given
+// zig-zag encoded value.
+func DecodeZigZag32(v uint64) int32 {
+	return int32((uint32(v) >> 1) ^ uint32((int32(v&1)<<31)>>31))
+}
+
+// DecodeZigZag64 decodes a signed 64-bit integer from the given
+// zig-zag encoded value.
+func DecodeZigZag64(v uint64) int64 {
+	return int64((v >> 1) ^ uint64((int64(v&1)<<63)>>63))
 }
 
 // DecodeFieldValue will read a field value from the buffer and return its
