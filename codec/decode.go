@@ -308,8 +308,58 @@ func (cb *Buffer) SkipGroup() error {
 	return nil
 }
 
+// SkipField attempts to skip the value of a field with the given wire
+// type. When consuming a protobuf-encoded stream, it can be called immediately
+// after DecodeTagAndWireType to discard the subsequent data for the field.
+func (cb *Buffer) SkipField(wireType int8) error {
+	switch wireType {
+	case proto.WireFixed32:
+		if err := cb.Skip(4); err != nil {
+			return err
+		}
+	case proto.WireFixed64:
+		if err := cb.Skip(8); err != nil {
+			return err
+		}
+	case proto.WireVarint:
+		// skip varint by finding last byte (has high bit unset)
+		i := cb.index
+		limit := i + 10 // varint cannot be >10 bytes
+		for {
+			if i >= limit {
+				return ErrOverflow
+			}
+			if i >= len(cb.buf) {
+				return io.ErrUnexpectedEOF
+			}
+			if cb.buf[i]&0x80 == 0 {
+				break
+			}
+			i++
+		}
+		// TODO: This would only overflow if buffer length was MaxInt and we
+		// read the last byte. This is not a real/feasible concern on 64-bit
+		// systems. Something to worry about for 32-bit systems? Do we care?
+		cb.index = i + 1
+	case proto.WireBytes:
+		l, err := cb.DecodeVarint()
+		if err != nil {
+			return err
+		}
+		if err := cb.Skip(int(l)); err != nil {
+			return err
+		}
+	case proto.WireStartGroup:
+		if err := cb.SkipGroup(); err != nil {
+			return err
+		}
+	default:
+		return ErrBadWireType
+	}
+	return nil
+}
+
 func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
-	bs := cb.buf
 	start := cb.index
 	defer func() {
 		cb.index = start
@@ -321,52 +371,12 @@ func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
 		if err != nil {
 			return 0, 0, err
 		}
-		// skip past the field's data
-		switch wireType {
-		case proto.WireFixed32:
-			if err := cb.Skip(4); err != nil {
-				return 0, 0, err
-			}
-		case proto.WireFixed64:
-			if err := cb.Skip(8); err != nil {
-				return 0, 0, err
-			}
-		case proto.WireVarint:
-			// skip varint by finding last byte (has high bit unset)
-			i := cb.index
-			limit := i + 10 // varint cannot be >10 bytes
-			for {
-				if i >= limit {
-					return 0, 0, ErrOverflow
-				}
-				if i >= len(bs) {
-					return 0, 0, io.ErrUnexpectedEOF
-				}
-				if bs[i]&0x80 == 0 {
-					break
-				}
-				i++
-			}
-			// TODO: This would only overflow if buffer length was MaxInt and we
-			// read the last byte. This is not a real/feasible concern on 64-bit
-			// systems. Something to worry about for 32-bit systems? Do we care?
-			cb.index = i + 1
-		case proto.WireBytes:
-			l, err := cb.DecodeVarint()
-			if err != nil {
-				return 0, 0, err
-			}
-			if err := cb.Skip(int(l)); err != nil {
-				return 0, 0, err
-			}
-		case proto.WireStartGroup:
-			if err := cb.SkipGroup(); err != nil {
-				return 0, 0, err
-			}
-		case proto.WireEndGroup:
+		if wireType == proto.WireEndGroup {
 			return cb.index, fieldStart, nil
-		default:
-			return 0, 0, ErrBadWireType
+		}
+		// skip past the field's data
+		if err := cb.SkipField(wireType); err != nil {
+			return 0, 0, err
 		}
 	}
 }

@@ -326,22 +326,7 @@ func GetProto3Optional(fd *dpb.FieldDescriptorProto) bool {
 			v, _ := buf.DecodeVarint()
 			return v != 0
 		}
-		switch wt {
-		case proto.WireStartGroup:
-			err = buf.SkipGroup()
-		case proto.WireVarint:
-			_, err = buf.DecodeVarint()
-		case proto.WireFixed32:
-			err = buf.Skip(4)
-		case proto.WireFixed64:
-			err = buf.Skip(8)
-		case proto.WireBytes:
-			l, err := buf.DecodeVarint()
-			if err == nil {
-				err = buf.Skip(int(l))
-			}
-		}
-		if err != nil {
+		if err := buf.SkipField(wt); err != nil {
 			return false
 		}
 	}
