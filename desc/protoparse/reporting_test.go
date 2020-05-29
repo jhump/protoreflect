@@ -228,9 +228,9 @@ func TestWarningReporting(t *testing.T) {
 		text string
 	}
 	var msgs []msg
-	rep := func(pos SourcePos, message string) {
+	rep := func(warn ErrorWithPos) {
 		msgs = append(msgs, msg{
-			pos: pos, text: message,
+			pos: warn.GetPosition(), text: warn.Unwrap().Error(),
 		})
 	}
 
@@ -247,7 +247,7 @@ func TestWarningReporting(t *testing.T) {
 		{
 			source: `message Foo {}`,
 			expectedNotices: []string{
-				"test.proto:1:1: No syntax specified. Defaulting to proto2 syntax.",
+				"test.proto:1:1: no syntax specified; defaulting to proto2 syntax",
 			},
 		},
 	}

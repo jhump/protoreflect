@@ -11,6 +11,11 @@ import (
 // always returns nil.
 var ErrInvalidSource = errors.New("parse failed: invalid proto source")
 
+// WarnNoSyntax is a sentinel error that may be passed to a warning reporter.
+// The error the reporter receives will be wrapped with source position that
+// indicates the file that had no syntax statement.
+var WarnNoSyntax = errors.New("no syntax specified; defaulting to proto2 syntax")
+
 // ErrorReporter is responsible for reporting the given error. If the reporter
 // returns a non-nil error, parsing/linking will abort with that error. If the
 // reporter returns nil, parsing will continue, allowing the parser to try to
@@ -19,8 +24,9 @@ type ErrorReporter func(err ErrorWithPos) error
 
 // WarningReporter is responsible for reporting the given warning. This is used
 // for indicating non-error messages to the calling program for things that do
-// not cause the parse to fail but are considered bad practice.
-type WarningReporter func(pos SourcePos, message string)
+// not cause the parse to fail but are considered bad practice. Though they are
+// just warnings, the details are supplied to the reporter via an error type.
+type WarningReporter func(ErrorWithPos)
 
 func defaultErrorReporter(err ErrorWithPos) error {
 	// abort parsing after first error encountered
@@ -67,9 +73,9 @@ func (h *errorHandler) handleError(err error) error {
 	return err
 }
 
-func (h *errorHandler) warn(pos *SourcePos, format string, args ...interface{}) {
+func (h *errorHandler) warn(pos *SourcePos, err error) {
 	if h.warnReporter != nil {
-		h.warnReporter(*pos, fmt.Sprintf(format, args...))
+		h.warnReporter(ErrorWithSourcePos{Pos: pos, Underlying: err})
 	}
 }
 
