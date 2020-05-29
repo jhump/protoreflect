@@ -121,3 +121,16 @@ var _ ErrorWithPos = ErrorWithSourcePos{}
 func errorWithPos(pos *SourcePos, format string, args ...interface{}) ErrorWithPos {
 	return ErrorWithSourcePos{Pos: pos, Underlying: fmt.Errorf(format, args...)}
 }
+
+type errorWithFilename struct {
+	underlying error
+	filename   string
+}
+
+func (e errorWithFilename) Error() string {
+	return fmt.Sprintf("%s: %v", e.filename, e.underlying)
+}
+
+func (e errorWithFilename) Unwrap() error {
+	return e.underlying
+}
