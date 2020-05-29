@@ -11,11 +11,22 @@ import (
 // always returns nil.
 var ErrInvalidSource = errors.New("parse failed: invalid proto source")
 
+// ErrNoSyntax is a sentinel error that may be passed to a warning reporter.
+// The error the reporter receives will be wrapped with source position that
+// indicates the file that had no syntax statement.
+var ErrNoSyntax = errors.New("no syntax specified; defaulting to proto2 syntax")
+
 // ErrorReporter is responsible for reporting the given error. If the reporter
 // returns a non-nil error, parsing/linking will abort with that error. If the
 // reporter returns nil, parsing will continue, allowing the parser to try to
 // report as many syntax and/or link errors as it can find.
 type ErrorReporter func(err ErrorWithPos) error
+
+// WarningReporter is responsible for reporting the given warning. This is used
+// for indicating non-error messages to the calling program for things that do
+// not cause the parse to fail but are considered bad practice. Though they are
+// just warnings, the details are supplied to the reporter via an error type.
+type WarningReporter func(ErrorWithPos)
 
 func defaultErrorReporter(err ErrorWithPos) error {
 	// abort parsing after first error encountered
@@ -23,17 +34,20 @@ func defaultErrorReporter(err ErrorWithPos) error {
 }
 
 type errorHandler struct {
-	reporter     ErrorReporter
+	errReporter  ErrorReporter
 	errsReported int
 	err          error
+
+	warnReporter WarningReporter
 }
 
-func newErrorHandler(reporter ErrorReporter) *errorHandler {
-	if reporter == nil {
-		reporter = defaultErrorReporter
+func newErrorHandler(errRep ErrorReporter, warnRep WarningReporter) *errorHandler {
+	if errRep == nil {
+		errRep = defaultErrorReporter
 	}
 	return &errorHandler{
-		reporter: reporter,
+		errReporter:  errRep,
+		warnReporter: warnRep,
 	}
 }
 
@@ -42,7 +56,7 @@ func (h *errorHandler) handleErrorWithPos(pos *SourcePos, format string, args ..
 		return h.err
 	}
 	h.errsReported++
-	err := h.reporter(errorWithPos(pos, format, args...))
+	err := h.errReporter(errorWithPos(pos, format, args...))
 	h.err = err
 	return err
 }
@@ -53,10 +67,16 @@ func (h *errorHandler) handleError(err error) error {
 	}
 	if ewp, ok := err.(ErrorWithPos); ok {
 		h.errsReported++
-		err = h.reporter(ewp)
+		err = h.errReporter(ewp)
 	}
 	h.err = err
 	return err
+}
+
+func (h *errorHandler) warn(pos *SourcePos, err error) {
+	if h.warnReporter != nil {
+		h.warnReporter(ErrorWithSourcePos{Pos: pos, Underlying: err})
+	}
 }
 
 func (h *errorHandler) getError() error {
@@ -95,10 +115,7 @@ type ErrorWithSourcePos struct {
 // Error implements the error interface
 func (e ErrorWithSourcePos) Error() string {
 	sourcePos := e.GetPosition()
-	if sourcePos.Line <= 0 || sourcePos.Col <= 0 {
-		return fmt.Sprintf("%s: %v", sourcePos.Filename, e.Underlying)
-	}
-	return fmt.Sprintf("%s:%d:%d: %v", sourcePos.Filename, sourcePos.Line, sourcePos.Col, e.Underlying)
+	return fmt.Sprintf("%s: %v", sourcePos, e.Underlying)
 }
 
 // GetPosition implements the ErrorWithPos interface, supplying a location in
