@@ -43,5 +43,5 @@ ${PROTOC} --descriptor_set_out=./duration.protoset -I./protoc/include/ google/pr
 # We are currently pinning an earlier version of Go protobuf runtime, and thus of protoc-gen-go.
 # So it doesn't support proto3 optional fields yet. So we only create a descriptor for these, just
 # for testing proto3 optional support in the desc and desc/protoparse packages.
-#{PROTOC} --descriptor_set_out=./proto3_optional/desc_test_proto3_optional.protoset --include_source_info --include_imports -I. proto3_optional/desc_test_proto3_optional.proto
+${PROTOC} --descriptor_set_out=./proto3_optional/desc_test_proto3_optional.protoset --include_source_info --include_imports -I. proto3_optional/desc_test_proto3_optional.proto
 
