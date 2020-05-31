@@ -113,6 +113,10 @@ func TestBasicValidation(t *testing.T) {
 			succeeds: true, // proto3_optional
 		},
 		{
+			contents: `syntax = "proto3"; import "google/protobuf/descriptor.proto"; extend google.protobuf.MessageOptions { optional string s = 50000; }`,
+			errMsg:   `test.proto:1:103: field s: label 'optional' is not allowed on extensions in proto3`,
+		},
+		{
 			contents: `syntax = "proto3"; message Foo { required string s = 1; }`,
 			errMsg:   `test.proto:1:34: field Foo.s: label 'required' is not allowed in proto3`,
 		},

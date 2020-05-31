@@ -295,6 +295,10 @@ func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.Fiel
 			if err := res.errs.handleErrorWithPos(node.fieldLabel().start(), "%s: label 'required' is not allowed in proto3", scope); err != nil {
 				return err
 			}
+		} else if fld.Extendee != nil && fld.Label != nil && fld.GetLabel() == dpb.FieldDescriptorProto_LABEL_OPTIONAL {
+			if err := res.errs.handleErrorWithPos(node.fieldLabel().start(), "%s: label 'optional' is not allowed on extensions in proto3", scope); err != nil {
+				return err
+			}
 		}
 		if index, err := findOption(res, scope, fld.Options.GetUninterpretedOption(), "default"); err != nil {
 			return err
