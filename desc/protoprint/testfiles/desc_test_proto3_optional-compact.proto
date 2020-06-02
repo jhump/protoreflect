@@ -1,0 +1,6 @@
+syntax = "proto3";
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+message MessageWithOptionalFields {
+  optional string foo = 1;
+  optional int64 bar = 2;
+}

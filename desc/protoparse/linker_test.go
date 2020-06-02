@@ -40,6 +40,24 @@ func TestMultiFileLink(t *testing.T) {
 	}
 }
 
+func TestProto3Optional(t *testing.T) {
+	fds, err := Parser{ImportPaths: []string{"../../internal/testprotos"}}.ParseFiles("proto3_optional/desc_test_proto3_optional.proto")
+	testutil.Ok(t, err)
+
+	data, err := ioutil.ReadFile("../../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset")
+	testutil.Ok(t, err)
+	var fdset dpb.FileDescriptorSet
+	err = proto.Unmarshal(data, &fdset)
+	testutil.Ok(t, err)
+
+	exp, err := desc.CreateFileDescriptorFromSet(&fdset)
+	testutil.Ok(t, err)
+	// not comparing source code info
+	exp.AsFileDescriptorProto().SourceCodeInfo = nil
+
+	checkFiles(t, fds[0], exp, map[string]struct{}{})
+}
+
 func checkFiles(t *testing.T, act, exp *desc.FileDescriptor, checked map[string]struct{}) {
 	if _, ok := checked[act.GetName()]; ok {
 		// already checked

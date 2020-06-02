@@ -45,6 +45,7 @@ func TestPrinter(t *testing.T) {
 		"../../internal/testprotos/desc_test_complex_source_info.protoset",
 		"../../internal/testprotos/descriptor.protoset",
 		"../../internal/testprotos/desc_test1.protoset",
+		"../../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset",
 	}
 	fds := make([]*desc.FileDescriptor, len(files)+1)
 	for i, file := range files {

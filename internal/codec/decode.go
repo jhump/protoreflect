@@ -7,7 +7,6 @@ import (
 	"math"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 // ErrOverflow is returned when an integer is too large to be represented.
@@ -16,29 +15,6 @@ var ErrOverflow = errors.New("proto: integer overflow")
 // ErrBadWireType is returned when decoding a wire-type from a buffer that
 // is not valid.
 var ErrBadWireType = errors.New("proto: bad wiretype")
-
-var varintTypes = map[descriptor.FieldDescriptorProto_Type]bool{}
-var fixed32Types = map[descriptor.FieldDescriptorProto_Type]bool{}
-var fixed64Types = map[descriptor.FieldDescriptorProto_Type]bool{}
-
-func init() {
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_BOOL] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_INT32] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_INT64] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_UINT32] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_UINT64] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_SINT32] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_SINT64] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_ENUM] = true
-
-	fixed32Types[descriptor.FieldDescriptorProto_TYPE_FIXED32] = true
-	fixed32Types[descriptor.FieldDescriptorProto_TYPE_SFIXED32] = true
-	fixed32Types[descriptor.FieldDescriptorProto_TYPE_FLOAT] = true
-
-	fixed64Types[descriptor.FieldDescriptorProto_TYPE_FIXED64] = true
-	fixed64Types[descriptor.FieldDescriptorProto_TYPE_SFIXED64] = true
-	fixed64Types[descriptor.FieldDescriptorProto_TYPE_DOUBLE] = true
-}
 
 func (cb *Buffer) decodeVarintSlow() (x uint64, err error) {
 	i := cb.index
@@ -227,18 +203,6 @@ func (cb *Buffer) DecodeFixed32() (x uint64, err error) {
 	return
 }
 
-// DecodeZigZag32 decodes a signed 32-bit integer from the given
-// zig-zag encoded value.
-func DecodeZigZag32(v uint64) int32 {
-	return int32((uint32(v) >> 1) ^ uint32((int32(v&1)<<31)>>31))
-}
-
-// DecodeZigZag64 decodes a signed 64-bit integer from the given
-// zig-zag encoded value.
-func DecodeZigZag64(v uint64) int64 {
-	return int64((v >> 1) ^ uint64((int64(v&1)<<63)>>63))
-}
-
 // DecodeRawBytes reads a count-delimited byte buffer from the Buffer.
 // This is the format used for the bytes protocol buffer
 // type and for embedded messages.
@@ -308,8 +272,58 @@ func (cb *Buffer) SkipGroup() error {
 	return nil
 }
 
+// SkipField attempts to skip the value of a field with the given wire
+// type. When consuming a protobuf-encoded stream, it can be called immediately
+// after DecodeTagAndWireType to discard the subsequent data for the field.
+func (cb *Buffer) SkipField(wireType int8) error {
+	switch wireType {
+	case proto.WireFixed32:
+		if err := cb.Skip(4); err != nil {
+			return err
+		}
+	case proto.WireFixed64:
+		if err := cb.Skip(8); err != nil {
+			return err
+		}
+	case proto.WireVarint:
+		// skip varint by finding last byte (has high bit unset)
+		i := cb.index
+		limit := i + 10 // varint cannot be >10 bytes
+		for {
+			if i >= limit {
+				return ErrOverflow
+			}
+			if i >= len(cb.buf) {
+				return io.ErrUnexpectedEOF
+			}
+			if cb.buf[i]&0x80 == 0 {
+				break
+			}
+			i++
+		}
+		// TODO: This would only overflow if buffer length was MaxInt and we
+		// read the last byte. This is not a real/feasible concern on 64-bit
+		// systems. Something to worry about for 32-bit systems? Do we care?
+		cb.index = i + 1
+	case proto.WireBytes:
+		l, err := cb.DecodeVarint()
+		if err != nil {
+			return err
+		}
+		if err := cb.Skip(int(l)); err != nil {
+			return err
+		}
+	case proto.WireStartGroup:
+		if err := cb.SkipGroup(); err != nil {
+			return err
+		}
+	default:
+		return ErrBadWireType
+	}
+	return nil
+}
+
 func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
-	bs := cb.buf
 	start := cb.index
 	defer func() {
 		cb.index = start
@@ -321,52 +335,12 @@ func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
 		if err != nil {
 			return 0, 0, err
 		}
-		// skip past the field's data
-		switch wireType {
-		case proto.WireFixed32:
-			if err := cb.Skip(4); err != nil {
-				return 0, 0, err
-			}
-		case proto.WireFixed64:
-			if err := cb.Skip(8); err != nil {
-				return 0, 0, err
-			}
-		case proto.WireVarint:
-			// skip varint by finding last byte (has high bit unset)
-			i := cb.index
-			limit := i + 10 // varint cannot be >10 bytes
-			for {
-				if i >= limit {
-					return 0, 0, ErrOverflow
-				}
-				if i >= len(bs) {
-					return 0, 0, io.ErrUnexpectedEOF
-				}
-				if bs[i]&0x80 == 0 {
-					break
-				}
-				i++
-			}
-			// TODO: This would only overflow if buffer length was MaxInt and we
-			// read the last byte. This is not a real/feasible concern on 64-bit
-			// systems. Something to worry about for 32-bit systems? Do we care?
-			cb.index = i + 1
-		case proto.WireBytes:
-			l, err := cb.DecodeVarint()
-			if err != nil {
-				return 0, 0, err
-			}
-			if err := cb.Skip(int(l)); err != nil {
-				return 0, 0, err
-			}
-		case proto.WireStartGroup:
-			if err := cb.SkipGroup(); err != nil {
-				return 0, 0, err
-			}
-		case proto.WireEndGroup:
+		if wireType == proto.WireEndGroup {
 			return cb.index, fieldStart, nil
-		default:
-			return 0, 0, ErrBadWireType
+		}
+		// skip past the field's data
+		if err := cb.SkipField(wireType); err != nil {
+			return 0, 0, err
 		}
 	}
 }

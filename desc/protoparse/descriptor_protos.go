@@ -138,7 +138,7 @@ func (r *parseResult) addExtensions(ext *extendNode, flds *[]*dpb.FieldDescripto
 			count++
 			decl.field.extendee = ext
 			// use higher limit since we don't know yet whether extendee is messageset wire format
-			fd := r.asFieldDescriptor(decl.field, internal.MaxTag)
+			fd := r.asFieldDescriptor(decl.field, internal.MaxTag, isProto3)
 			fd.Extendee = proto.String(extendee)
 			*flds = append(*flds, fd)
 		} else if decl.group != nil {
@@ -170,7 +170,7 @@ func asLabel(lbl *fieldLabel) *dpb.FieldDescriptorProto_Label {
 	}
 }
 
-func (r *parseResult) asFieldDescriptor(node *fieldNode, maxTag int32) *dpb.FieldDescriptorProto {
+func (r *parseResult) asFieldDescriptor(node *fieldNode, maxTag int32, isProto3 bool) *dpb.FieldDescriptorProto {
 	tag := node.tag.val
 	if err := checkTag(node.tag.start(), tag, maxTag); err != nil {
 		_ = r.errs.handleError(err)
@@ -179,6 +179,9 @@ func (r *parseResult) asFieldDescriptor(node *fieldNode, maxTag int32) *dpb.Fiel
 	r.putFieldNode(fd, node)
 	if opts := node.options.Elements(); len(opts) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
+	}
+	if isProto3 && fd.Label != nil && fd.GetLabel() == dpb.FieldDescriptorProto_LABEL_OPTIONAL {
+		internal.SetProto3Optional(fd)
 	}
 	return fd
 }
@@ -400,7 +403,8 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messag
 		} else if decl.extensionRange != nil {
 			msgd.ExtensionRange = append(msgd.ExtensionRange, r.asExtensionRanges(decl.extensionRange, maxTag)...)
 		} else if decl.field != nil {
-			msgd.Field = append(msgd.Field, r.asFieldDescriptor(decl.field, maxTag))
+			fd := r.asFieldDescriptor(decl.field, maxTag, isProto3)
+			msgd.Field = append(msgd.Field, fd)
 		} else if decl.mapField != nil {
 			fd, md := r.asMapDescriptors(decl.mapField, isProto3, maxTag)
 			msgd.Field = append(msgd.Field, fd)
@@ -422,7 +426,7 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messag
 					}
 					ood.Options.UninterpretedOption = append(ood.Options.UninterpretedOption, r.asUninterpretedOption(oodecl.option))
 				} else if oodecl.field != nil {
-					fd := r.asFieldDescriptor(oodecl.field, maxTag)
+					fd := r.asFieldDescriptor(oodecl.field, maxTag, isProto3)
 					fd.OneofIndex = proto.Int32(int32(oodIndex))
 					msgd.Field = append(msgd.Field, fd)
 					ooFields++
@@ -452,6 +456,11 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messag
 				msgd.ReservedRange = append(msgd.ReservedRange, r.asMessageReservedRange(rng, maxTag))
 			}
 		}
+	}
+
+	// process any proto3_optional fields
+	if isProto3 {
+		internal.ProcessProto3OptionalFields(msgd)
 	}
 }
 

@@ -40,6 +40,12 @@ func (cb *Buffer) SetDeterministic(deterministic bool) {
 	cb.deterministic = deterministic
 }
 
+// IsDeterministic returns whether or not this buffer is configured to encode
+// messages deterministically.
+func (cb *Buffer) IsDeterministic() bool {
+	return cb.deterministic
+}
+
 // Reset resets this buffer back to empty. Any subsequent writes/encodes
 // to the buffer will allocate a new backing slice of bytes.
 func (cb *Buffer) Reset() {
@@ -66,9 +72,9 @@ func (cb *Buffer) EOF() bool {
 }
 
 // Skip attempts to skip the given number of bytes in the input. If
-// the input has fewer bytes than the given count, false is returned
-// and the buffer is unchanged. Otherwise, the given number of bytes
-// are skipped and true is returned.
+// the input has fewer bytes than the given count, io.ErrUnexpectedEOF
+// is returned and the buffer is unchanged. Otherwise, the given number
+// of bytes are skipped and nil is returned.
 func (cb *Buffer) Skip(count int) error {
 	if count < 0 {
 		return fmt.Errorf("proto: bad byte length %d", count)

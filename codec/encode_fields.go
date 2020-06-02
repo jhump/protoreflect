@@ -12,6 +12,20 @@ import (
 	"github.com/jhump/protoreflect/desc"
 )
 
+// EncodeZigZag64 does zig-zag encoding to convert the given
+// signed 64-bit integer into a form that can be expressed
+// efficiently as a varint, even for negative values.
+func EncodeZigZag64(v int64) uint64 {
+	return (uint64(v) << 1) ^ uint64(v>>63)
+}
+
+// EncodeZigZag32 does zig-zag encoding to convert the given
+// signed 32-bit integer into a form that can be expressed
+// efficiently as a varint, even for negative values.
+func EncodeZigZag32(v int32) uint64 {
+	return uint64((uint32(v) << 1) ^ uint32((v >> 31)))
+}
+
 func (cb *Buffer) EncodeFieldValue(fd *desc.FieldDescriptor, val interface{}) error {
 	if fd.IsMap() {
 		mp := val.(map[interface{}]interface{})
@@ -19,7 +33,7 @@ func (cb *Buffer) EncodeFieldValue(fd *desc.FieldDescriptor, val interface{}) er
 		keyType := entryType.FindFieldByNumber(1)
 		valType := entryType.FindFieldByNumber(2)
 		var entryBuffer Buffer
-		if cb.deterministic {
+		if cb.IsDeterministic() {
 			keys := make([]interface{}, 0, len(mp))
 			for k := range mp {
 				keys = append(keys, k)

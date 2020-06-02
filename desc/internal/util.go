@@ -126,6 +126,9 @@ const (
 	// Field_jsonNameTag is the tag number of the JSON name element in a field
 	// descriptor proto.
 	Field_jsonNameTag = 10
+	// Field_proto3OptionalTag is the tag number of the proto3_optional element
+	// in a descriptor proto.
+	Field_proto3OptionalTag = 17
 	// OneOf_nameTag is the tag number of the name element in a one-of
 	// descriptor proto.
 	OneOf_nameTag = 1

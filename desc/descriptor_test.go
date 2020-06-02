@@ -1232,3 +1232,16 @@ func TestJsonCamelCase(t *testing.T) {
 		testutil.Eq(t, v, jsonCamelCase(k))
 	}
 }
+
+func TestProto3Optional(t *testing.T) {
+	fd, err := loadProtoset("../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset")
+	testutil.Ok(t, err)
+	md := fd.FindSymbol("MessageWithOptionalFields").(*MessageDescriptor)
+	testutil.Eq(t, 2, len(md.GetOneOfs()))
+	testutil.Eq(t, 2, len(md.GetFields()))
+	for i, fld := range md.GetFields() {
+		testutil.Require(t, fld.IsProto3Optional())
+		testutil.Eq(t, fld.GetOneOf(), md.GetOneOfs()[i])
+		testutil.Require(t, md.GetOneOfs()[i].IsSynthetic())
+	}
+}

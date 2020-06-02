@@ -787,7 +787,7 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 				}
 			} else {
 				ood := d.GetOneOf()
-				if ood == nil {
+				if ood == nil || ood.IsSynthetic() {
 					p.printField(d, mf, w, sourceInfo, childPath, scope, indent)
 				} else {
 					// print the one-of, including all of its fields
@@ -981,7 +981,9 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFacto
 }
 
 func shouldEmitLabel(fld *desc.FieldDescriptor) bool {
-	return !fld.IsMap() && fld.GetOneOf() == nil && (fld.GetLabel() != descriptor.FieldDescriptorProto_LABEL_OPTIONAL || !fld.GetFile().IsProto3())
+	return fld.IsProto3Optional() ||
+		(!fld.IsMap() && fld.GetOneOf() == nil &&
+			(fld.GetLabel() != descriptor.FieldDescriptorProto_LABEL_OPTIONAL || !fld.GetFile().IsProto3()))
 }
 
 func labelString(lbl descriptor.FieldDescriptorProto_Label) string {
