@@ -83,6 +83,9 @@ func fromMessage(md *desc.MessageDescriptor,
 
 	oneOfs := make([]*OneOfBuilder, len(md.GetOneOfs()))
 	for i, ood := range md.GetOneOfs() {
+		if ood.IsSynthetic() {
+			continue
+		}
 		if oob, err := fromOneOf(ood); err != nil {
 			return nil, err
 		} else {
@@ -91,7 +94,7 @@ func fromMessage(md *desc.MessageDescriptor,
 	}
 
 	for _, fld := range md.GetFields() {
-		if fld.GetOneOf() != nil {
+		if fld.GetOneOf() != nil && !fld.GetOneOf().IsSynthetic() {
 			// add one-ofs in the order of their first constituent field
 			oob := oneOfs[fld.AsFieldDescriptorProto().GetOneofIndex()]
 			if oob != nil {
@@ -697,8 +700,26 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 			oneOfCount++
 		}
 	}
+
 	fields := make([]*dpb.FieldDescriptorProto, 0, len(mb.fieldsAndOneOfs)-oneOfCount)
 	oneOfs := make([]*dpb.OneofDescriptorProto, 0, oneOfCount)
+
+	addField := func(flb *FieldBuilder, fld *dpb.FieldDescriptorProto) error {
+		fields = append(fields, fld)
+		if flb.number == 0 {
+			needTagsAssigned = append(needTagsAssigned, fld)
+		}
+		if flb.msgType != nil {
+			nmpath := append(path, internal.Message_nestedMessagesTag, int32(len(nestedMessages)))
+			if entry, err := flb.msgType.buildProto(nmpath, sourceInfo); err != nil {
+				return err
+			} else {
+				nestedMessages = append(nestedMessages, entry)
+			}
+		}
+		return nil
+	}
+
 	for _, b := range mb.fieldsAndOneOfs {
 		if flb, ok := b.(*FieldBuilder); ok {
 			fldpath := append(path, internal.Message_fieldsTag, int32(len(fields)))
@@ -706,17 +727,8 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 			if err != nil {
 				return nil, err
 			}
-			fields = append(fields, fld)
-			if flb.number == 0 {
-				needTagsAssigned = append(needTagsAssigned, fld)
-			}
-			if flb.msgType != nil {
-				nmpath := append(path, internal.Message_nestedMessagesTag, int32(len(nestedMessages)))
-				if entry, err := flb.msgType.buildProto(nmpath, sourceInfo); err != nil {
-					return nil, err
-				} else {
-					nestedMessages = append(nestedMessages, entry)
-				}
+			if err := addField(flb, fld); err != nil {
+				return nil, err
 			}
 		} else {
 			oopath := append(path, internal.Message_oneOfsTag, int32(len(oneOfs)))
@@ -734,9 +746,8 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 					return nil, err
 				}
 				fld.OneofIndex = proto.Int32(int32(oobIndex))
-				fields = append(fields, fld)
-				if flb.number == 0 {
-					needTagsAssigned = append(needTagsAssigned, fld)
+				if err := addField(flb, fld); err != nil {
+					return nil, err
 				}
 			}
 		}
@@ -792,7 +803,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 		}
 	}
 
-	return &dpb.DescriptorProto{
+	md := &dpb.DescriptorProto{
 		Name:           proto.String(mb.name),
 		Options:        mb.Options,
 		Field:          fields,
@@ -803,7 +814,13 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 		ExtensionRange: mb.ExtensionRanges,
 		ReservedName:   mb.ReservedNames,
 		ReservedRange:  mb.ReservedRanges,
-	}, nil
+	}
+
+	if mb.GetFile().IsProto3 {
+		internal.ProcessProto3OptionalFields(md)
+	}
+
+	return md, nil
 }
 
 // Build constructs a message descriptor based on the contents of this message

@@ -1008,7 +1008,7 @@ func (fd *FieldDescriptor) HasPresence() bool {
 	if !fd.file.isProto3 {
 		return true
 	}
-	return fd.msgType != nil || fd.IsProto3Optional()
+	return fd.msgType != nil || fd.oneOf != nil
 }
 
 // IsMap returns true if this is a map field. If so, it will have the "repeated"

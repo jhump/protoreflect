@@ -32,10 +32,11 @@ type FieldBuilder struct {
 	msgType   *MessageBuilder
 	fieldType *FieldType
 
-	Options  *dpb.FieldOptions
-	Label    dpb.FieldDescriptorProto_Label
-	Default  string
-	JsonName string
+	Options        *dpb.FieldOptions
+	Label          dpb.FieldDescriptorProto_Label
+	Proto3Optional bool
+	Default        string
+	JsonName       string
 
 	foreignExtendee *desc.MessageDescriptor
 	localExtendee   *MessageBuilder
@@ -186,6 +187,7 @@ func fromField(fld *desc.FieldDescriptor) (*FieldBuilder, error) {
 	flb := NewField(fld.GetName(), ft)
 	flb.Options = fld.GetFieldOptions()
 	flb.Label = fld.GetLabel()
+	flb.Proto3Optional = fld.IsProto3Optional()
 	flb.Default = fld.AsFieldDescriptorProto().GetDefaultValue()
 	flb.JsonName = fld.GetJSONName()
 	setComments(&flb.comments, fld.GetSourceInfo())
@@ -393,6 +395,13 @@ func (flb *FieldBuilder) SetLabel(lbl dpb.FieldDescriptorProto_Label) *FieldBuil
 	return flb
 }
 
+// SetProto3Optional sets whether this is a proto3 optional field. It returns
+// the field builder, for method chaining.
+func (flb *FieldBuilder) SetProto3Optional(p3o bool) *FieldBuilder {
+	flb.Proto3Optional = p3o
+	return flb
+}
+
 // SetRepeated sets the label for this field to repeated. It returns the field
 // builder, for method chaining.
 func (flb *FieldBuilder) SetRepeated() *FieldBuilder {
@@ -486,8 +495,24 @@ func (flb *FieldBuilder) GetExtendeeTypeName() string {
 func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo, isMessageSet bool) (*dpb.FieldDescriptorProto, error) {
 	addCommentsTo(sourceInfo, path, &flb.comments)
 
+	isProto3 := flb.GetFile().IsProto3
+	if flb.Proto3Optional {
+		if !isProto3 {
+			return nil, fmt.Errorf("field %s is not in a proto3 syntax file but is marked as a proto3 optional field", GetFullyQualifiedName(flb))
+		}
+		if flb.IsExtension() {
+			return nil, fmt.Errorf("field %s: extensions cannot be proto3 optional fields", GetFullyQualifiedName(flb))
+		}
+		if _, ok := flb.GetParent().(*OneOfBuilder); ok {
+			return nil, fmt.Errorf("field %s: proto3 optional fields cannot belong to a oneof", GetFullyQualifiedName(flb))
+		}
+	}
+
 	var lbl *dpb.FieldDescriptorProto_Label
 	if int32(flb.Label) != 0 {
+		if isProto3 && flb.Label == dpb.FieldDescriptorProto_LABEL_REQUIRED {
+			return nil, fmt.Errorf("field %s: proto3 does not allow required fields", GetFullyQualifiedName(flb))
+		}
 		lbl = flb.Label.Enum()
 	}
 	var typeName *string
@@ -513,7 +538,7 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 		return nil, fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), maxTag)
 	}
 
-	return &dpb.FieldDescriptorProto{
+	fd := &dpb.FieldDescriptorProto{
 		Name:         proto.String(flb.name),
 		Number:       proto.Int32(flb.number),
 		Options:      flb.Options,
@@ -523,7 +548,11 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 		JsonName:     proto.String(jsName),
 		DefaultValue: def,
 		Extendee:     extendee,
-	}, nil
+	}
+	if flb.Proto3Optional {
+		internal.SetProto3Optional(fd)
+	}
+	return fd, nil
 }
 
 // Build constructs a field descriptor based on the contents of this field
@@ -578,7 +607,12 @@ func NewOneOf(name string) *OneOfBuilder {
 // This means that one-of builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original one-of's
 // package name.
+//
+// This function returns an error if the given descriptor is synthetic.
 func FromOneOf(ood *desc.OneOfDescriptor) (*OneOfBuilder, error) {
+	if ood.IsSynthetic() {
+		return nil, fmt.Errorf("one-of %s is synthetic", ood.GetFullyQualifiedName())
+	}
 	if fb, err := FromFile(ood.GetFile()); err != nil {
 		return nil, err
 	} else if oob, ok := fb.findFullyQualifiedElement(ood.GetFullyQualifiedName()).(*OneOfBuilder); ok {
@@ -744,8 +778,8 @@ func (oob *OneOfBuilder) TryAddChoice(flb *FieldBuilder) error {
 	if flb.IsExtension() {
 		return fmt.Errorf("field %s is an extension, not a regular field", flb.GetName())
 	}
-	if flb.msgType != nil {
-		return fmt.Errorf("cannot add a group or map field %q to one-of %s", flb.name, GetFullyQualifiedName(oob))
+	if flb.msgType != nil && flb.fieldType.fieldType != dpb.FieldDescriptorProto_TYPE_GROUP {
+		return fmt.Errorf("cannot add a map field %q to one-of %s", flb.name, GetFullyQualifiedName(oob))
 	}
 	if flb.IsRepeated() || flb.IsRequired() {
 		return fmt.Errorf("fields in a one-of must be optional, %s is %v", flb.name, flb.Label)

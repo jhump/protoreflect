@@ -313,6 +313,26 @@ func TestCreatingMapField(t *testing.T) {
 	testutil.Eq(t, nmd, md.FindFieldByName("fooBarBaz").GetMessageType())
 }
 
+func TestProto3Optional(t *testing.T) {
+	mb := NewMessage("Foo")
+	flb := NewField("bar", FieldTypeBool()).SetProto3Optional(true)
+	mb.AddField(flb)
+
+	_, err := flb.Build()
+	testutil.Nok(t, err) // file does not have proto3 syntax
+
+	fb := NewFile("foo.proto").SetProto3(true)
+	fb.AddMessage(mb)
+
+	fld, err := flb.Build()
+	testutil.Ok(t, err)
+
+	testutil.Require(t, fld.IsProto3Optional())
+	testutil.Require(t, fld.GetOneOf() != nil)
+	testutil.Require(t, fld.GetOneOf().IsSynthetic())
+	testutil.Eq(t, "_bar", fld.GetOneOf().GetName())
+}
+
 func TestBuildersFromDescriptors(t *testing.T) {
 	for _, s := range []string{"desc_test1.proto", "desc_test2.proto", "desc_test_defaults.proto", "desc_test_options.proto", "desc_test_proto3.proto", "desc_test_wellknowntypes.proto", "nopkg/desc_test_nopkg.proto", "nopkg/desc_test_nopkg_new.proto", "pkg/desc_test_pkg.proto"} {
 		fd, err := desc.LoadFileDescriptor(s)
@@ -636,9 +656,9 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	testutil.Eq(t, msg1.GetField("bar"), fld2)
 
 	// add fails due to name collisions
-	fld1 = NewField("foo", FieldTypeInt32())
-	err := oo1.TryAddChoice(fld1)
-	checkFailedAdd(t, err, oo1, fld1, "already contains field")
+	fld1dup := NewField("foo", FieldTypeInt32())
+	err := oo1.TryAddChoice(fld1dup)
+	checkFailedAdd(t, err, oo1, fld1dup, "already contains field")
 	fld2 = NewField("bar", FieldTypeInt32())
 	err = msg1.TryAddField(fld2)
 	checkFailedAdd(t, err, msg1, fld2, "already contains element")
@@ -653,7 +673,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	checkChildren(t, msg1, oo1, oo2, msg2)
 	testutil.Eq(t, msg1.GetNestedMessage("baz"), msg2)
 
-	// can't add extension, group, or map fields to one-of
+	// can't add extension or map fields to one-of
 	ext1 := NewExtension("abc", 123, FieldTypeInt32(), msg1)
 	err = oo1.TryAddChoice(ext1)
 	checkFailedAdd(t, err, oo1, ext1, "is an extension, not a regular field")
@@ -661,11 +681,12 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	checkFailedAdd(t, err, msg1, ext1, "is an extension, not a regular field")
 	mapField := NewMapField("abc", FieldTypeInt32(), FieldTypeString())
 	err = oo1.TryAddChoice(mapField)
-	checkFailedAdd(t, err, oo1, mapField, "cannot add a group or map field")
+	checkFailedAdd(t, err, oo1, mapField, "cannot add a map field")
+	// can add group field though
 	groupMsg := NewMessage("Group")
 	groupField := NewGroupField(groupMsg)
-	err = oo1.TryAddChoice(groupField)
-	checkFailedAdd(t, err, oo1, groupField, "cannot add a group or map field")
+	oo1.AddChoice(groupField)
+	checkChildren(t, oo1, fld1, groupField)
 	// adding map and group to msg succeeds
 	msg1.AddField(groupField)
 	msg1.AddField(mapField)
