@@ -73,6 +73,12 @@ func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
 		}
 	}
 
+	// When Parser calls linkFiles, it does not check errs again, and it expects that linkFiles
+	// will return all errors it should process. If the ErrorReporter handles all errors itself
+	// and always returns nil, we should get ErrInvalidSource here, and need to propagate this
+	if err := l.errs.getError(); err != nil {
+		return nil, err
+	}
 	return linked, nil
 }
 
