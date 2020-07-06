@@ -118,11 +118,11 @@ type Parser struct {
 	// desc.LoadFileDescriptor.
 	LookupImport func(string) (*desc.FileDescriptor, error)
 
-	// LookupImportV2 has the same functionality as LookupImport, however it returns
+	// LookupImportProto has the same functionality as LookupImport, however it returns
 	// a FileDescriptorProto instead of a FileDescriptor.
 	//
-	// It is an error to set both LookupImport and LookupImportV2.
-	LookupImportV2 func(string) (*dpb.FileDescriptorProto, error)
+	// It is an error to set both LookupImport and LookupImportProto.
+	LookupImportProto func(string) (*dpb.FileDescriptorProto, error)
 
 	// Used to create a reader for a given filename, when loading proto source
 	// file contents. If unset, os.Open is used. If ImportPaths is also empty
@@ -316,11 +316,11 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 }
 
 func (p Parser) getLookupImport() (func(string) (*dpb.FileDescriptorProto, error), error) {
-	if p.LookupImport != nil && p.LookupImportV2 != nil {
-		return nil, ErrLookupImportAndV2Set
+	if p.LookupImport != nil && p.LookupImportProto != nil {
+		return nil, ErrLookupImportAndProtoSet
 	}
-	if p.LookupImportV2 != nil {
-		return p.LookupImportV2, nil
+	if p.LookupImportProto != nil {
+		return p.LookupImportProto, nil
 	}
 	if p.LookupImport != nil {
 		return func(path string) (*dpb.FileDescriptorProto, error) {

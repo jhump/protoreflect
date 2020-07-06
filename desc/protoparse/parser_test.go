@@ -288,11 +288,11 @@ func TestParseFilesWithDependencies(t *testing.T) {
 			t.Errorf("Could not parse with a non-well-known import: %v", err)
 		}
 	})
-	t.Run("DependencyIncludedV2", func(t *testing.T) {
+	t.Run("DependencyIncludedProto", func(t *testing.T) {
 		// Create a dependency-aware parser.
 		parser := Parser{
 			Accessor: FileContentsFromMap(contents),
-			LookupImportV2: func(imp string) (*dpb.FileDescriptorProto, error) {
+			LookupImportProto: func(imp string) (*dpb.FileDescriptorProto, error) {
 				if imp == "desc_test_wellknowntypes.proto" {
 					fileDescriptor, err := desc.LoadFileDescriptor(imp)
 					if err != nil {
