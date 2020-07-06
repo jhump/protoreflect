@@ -118,6 +118,12 @@ type Parser struct {
 	// desc.LoadFileDescriptor.
 	LookupImport func(string) (*desc.FileDescriptor, error)
 
+	// LookupImportProto has the same functionality as LookupImport, however it returns
+	// a FileDescriptorProto instead of a FileDescriptor.
+	//
+	// It is an error to set both LookupImport and LookupImportProto.
+	LookupImportProto func(string) (*dpb.FileDescriptorProto, error)
+
 	// Used to create a reader for a given filename, when loading proto source
 	// file contents. If unset, os.Open is used. If ImportPaths is also empty
 	// then relative paths are will be relative to the process's current working
@@ -200,11 +206,15 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 			return nil, ret
 		}
 	}
+	lookupImport, err := p.getLookupImport()
+	if err != nil {
+		return nil, err
+	}
 
 	protos := map[string]*parseResult{}
 	results := &parseResults{resultsByFilename: protos}
 	errs := newErrorHandler(p.ErrorReporter, p.WarningReporter)
-	parseProtoFiles(accessor, filenames, errs, true, true, results, p.LookupImport)
+	parseProtoFiles(accessor, filenames, errs, true, true, results, lookupImport)
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
@@ -269,10 +279,14 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 			return os.Open(name)
 		}
 	}
+	lookupImport, err := p.getLookupImport()
+	if err != nil {
+		return nil, err
+	}
 
 	protos := map[string]*parseResult{}
 	errs := newErrorHandler(p.ErrorReporter, p.WarningReporter)
-	parseProtoFiles(accessor, filenames, errs, false, p.ValidateUnlinkedFiles, &parseResults{resultsByFilename: protos}, p.LookupImport)
+	parseProtoFiles(accessor, filenames, errs, false, p.ValidateUnlinkedFiles, &parseResults{resultsByFilename: protos}, lookupImport)
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
@@ -299,6 +313,25 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 		fds[i] = fd
 	}
 	return fds, nil
+}
+
+func (p Parser) getLookupImport() (func(string) (*dpb.FileDescriptorProto, error), error) {
+	if p.LookupImport != nil && p.LookupImportProto != nil {
+		return nil, ErrLookupImportAndProtoSet
+	}
+	if p.LookupImportProto != nil {
+		return p.LookupImportProto, nil
+	}
+	if p.LookupImport != nil {
+		return func(path string) (*dpb.FileDescriptorProto, error) {
+			value, err := p.LookupImport(path)
+			if value != nil {
+				return value.AsFileDescriptorProto(), err
+			}
+			return nil, err
+		}, nil
+	}
+	return nil, nil
 }
 
 func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
@@ -409,7 +442,7 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	return revisedProtos
 }
 
-func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, recursive, validate bool, parsed *parseResults, lookupImport func(string) (*desc.FileDescriptor, error)) {
+func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, recursive, validate bool, parsed *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error)) {
 	for _, name := range filenames {
 		parseProtoFile(acc, name, nil, errs, recursive, validate, parsed, lookupImport)
 		if errs.err != nil {
@@ -418,12 +451,12 @@ func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, r
 	}
 }
 
-func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, recursive, validate bool, parsed *parseResults, lookupImport func(string) (*desc.FileDescriptor, error)) {
+func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, recursive, validate bool, parsed *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error)) {
 	if parsed.has(filename) {
 		return
 	}
 	if lookupImport == nil {
-		lookupImport = func(string) (*desc.FileDescriptor, error) {
+		lookupImport = func(string) (*dpb.FileDescriptorProto, error) {
 			return nil, errors.New("no import lookup function")
 		}
 	}
@@ -442,7 +475,7 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 	} else if d, lookupErr := lookupImport(filename); lookupErr == nil {
 		// This is a user-provided descriptor, which is acting similarly to a
 		// well-known import.
-		result = &parseResult{fd: proto.Clone(d.AsFileDescriptorProto()).(*dpb.FileDescriptorProto)}
+		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
 	} else if d, ok := standardImports[filename]; ok {
 		// it's a well-known import
 		// (we clone it to make sure we're not sharing state with other
