@@ -16,6 +16,9 @@ var ErrInvalidSource = errors.New("parse failed: invalid proto source")
 // indicates the file that had no syntax statement.
 var ErrNoSyntax = errors.New("no syntax specified; defaulting to proto2 syntax")
 
+// ErrLookupImportAndV2Set is the error returned if both LookupImport and LookupImportV2 are set.
+var ErrLookupImportAndV2Set = errors.New("both LookupImport and LookupImportV2 set")
+
 // ErrorReporter is responsible for reporting the given error. If the reporter
 // returns a non-nil error, parsing/linking will abort with that error. If the
 // reporter returns nil, parsing will continue, allowing the parser to try to
