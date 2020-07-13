@@ -717,6 +717,8 @@ func createParseResult(filename string, file *fileNode, errs *errorHandler) *par
 		// nil AST means there was an error that prevented any parsing
 		// or the file was empty; synthesize empty non-nil AST
 		file = &fileNode{}
+	}
+	if file.first == nil {
 		n := noSourceNode{pos: unknownPos(filename)}
 		file.setRange(&n, &n)
 	}

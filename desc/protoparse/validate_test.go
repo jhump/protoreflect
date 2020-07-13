@@ -244,6 +244,30 @@ func TestBasicValidation(t *testing.T) {
 			contents: `message Foo { oneof foo { group bar = 1 { } } }`,
 			errMsg:   `test.proto:1:33: group bar should have a name that starts with a capital letter`,
 		},
+		{
+			contents: ``,
+			succeeds: true,
+		},
+		{
+			contents: `0`,
+			errMsg:   `test.proto:1:1: syntax error: unexpected int literal`,
+		},
+		{
+			contents: `foobar`,
+			errMsg:   `test.proto:1:1: syntax error: unexpected identifier`,
+		},
+		{
+			contents: `Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.`,
+			errMsg:   `test.proto:1:1: syntax error: unexpected identifier`,
+		},
+		{
+			contents: `"abc"`,
+			errMsg:   `test.proto:1:1: syntax error: unexpected string literal`,
+		},
+		{
+			contents: `0.0.0.0.0`,
+			errMsg:   `test.proto:1:1: syntax error: unexpected float literal`,
+		},
 	}
 
 	for i, tc := range testCases {
