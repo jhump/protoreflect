@@ -2627,11 +2627,14 @@ func (m *Message) validateRecursive(prefix string) error {
 			var dm *Message
 			if d, ok := pm.(*Message); ok {
 				dm = d
-			} else {
+			} else if pm != nil {
 				dm = m.mf.NewDynamicMessage(md)
 				if err := dm.ConvertFrom(pm); err != nil {
 					return nil
 				}
+			}
+			if dm == nil {
+				return nil
 			}
 			if err := dm.validateRecursive(chprefix); err != nil {
 				return err
