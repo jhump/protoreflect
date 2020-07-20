@@ -55,10 +55,14 @@ message MessageWithReservations {
   reserved 5 to 10, 12 to 15, 18, 1000 to max;
   reserved "A", "B", "C";
 }
+message MessageWithMap {
+  map<string, Simple> vals = 1;
+}
 extend google.protobuf.MessageOptions {
   repeated Test rept = 20002;
   optional Test.Nested._NestedNested.EEE eee = 20010;
   optional Another a = 20020;
+  optional MessageWithMap map_vals = 20030;
 }
 message Another {
   option (rept) = { foo:"abc" array:1 array:2 array:3 s:<name:"foo" id:123 > r:<name:"f" > r:<name:"s" > r:<id:456 >  };
@@ -66,6 +70,7 @@ message Another {
   option (rept) = { foo:"def"  };
   option (eee) = V1;
   option (a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765 > m:<key:"bar" value:200 > m:<key:"foo" value:100 > [foo.bar.Test.Nested._NestedNested._garblez]:"whoah!" > fff:OK  };
+  option (map_vals) = { vals:<key:"" value:<> > vals:<key:"bar" value:<name:"baz" > > vals:<key:"foo" value:<> >  }; // no key, no value
   optional Test test = 1;
   optional Test.Nested._NestedNested.EEE fff = 2 [default = V1];
 }

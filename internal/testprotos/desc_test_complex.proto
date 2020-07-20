@@ -75,10 +75,15 @@ message MessageWithReservations {
 	reserved "A", "B", "C";
 }
 
+message MessageWithMap {
+	map<string, Simple> vals = 1;
+}
+
 extend google.protobuf.MessageOptions {
 	repeated Test rept = 20002;
 	optional Test.Nested._NestedNested.EEE eee = 20010;
 	optional Another a = 20020;
+	optional MessageWithMap map_vals = 20030;
 }
 
 message Another {
@@ -94,6 +99,10 @@ message Another {
     option (a).test.array = 1;
     option (a).test.array = 2;
     option (a).test.(.foo.bar.Test.Nested._NestedNested._garblez) = "whoah!";
+
+	option (map_vals).vals = {}; // no key, no value
+	option (map_vals).vals = {key: "foo"}; // no value
+	option (map_vals).vals = {key: "bar", value: {name: "baz"}};
 
     optional Test test = 1;
     optional Test.Nested._NestedNested.EEE fff = 2 [default = V1];

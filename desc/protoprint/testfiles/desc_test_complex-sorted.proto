@@ -11,6 +11,8 @@ message Another {
 
    option (eee) = V1;
 
+   option (map_vals) = { vals:<key:"" value:<> > vals:<key:"bar" value:<name:"baz" > > vals:<key:"foo" value:<> >  }; // no key, no value
+
    option (rept) = { foo:"abc" array:1 array:2 array:3 s:<name:"foo" id:123 > r:<name:"f" > r:<name:"s" > r:<id:456 >  };
    option (rept) = { foo:"def" array:3 array:2 array:1 s:<name:"bar" id:321 > r:<name:"g" > r:<name:"s" >  };
    option (rept) = { foo:"def"  };
@@ -100,6 +102,10 @@ message KeywordCollisions {
    optional int32 false = 34;
 
    optional int32 default = 35;
+}
+
+message MessageWithMap {
+   map<string, Simple> vals = 1;
 }
 
 message MessageWithReservations {
@@ -342,6 +348,8 @@ extend google.protobuf.MessageOptions {
    optional Test.Nested._NestedNested.EEE eee = 20010;
 
    optional Another a = 20020;
+
+   optional MessageWithMap map_vals = 20030;
 }
 
 extend google.protobuf.MethodOptions {
