@@ -60,9 +60,19 @@ type protoLex struct {
 	comments   []comment
 }
 
+var utf8Bom = []byte{0xEF, 0xBB, 0xBF}
+
 func newLexer(in io.Reader, filename string, errs *errorHandler) *protoLex {
+	br := bufio.NewReader(in)
+
+	// if file has UTF8 byte order marker preface, consume it
+	marker, err := br.Peek(3)
+	if err == nil && bytes.Equal(marker, utf8Bom) {
+		_, _ = br.Discard(3)
+	}
+
 	return &protoLex{
-		input:    &runeReader{rr: bufio.NewReader(in)},
+		input:    &runeReader{rr: br},
 		filename: filename,
 		errs:     errs,
 	}
