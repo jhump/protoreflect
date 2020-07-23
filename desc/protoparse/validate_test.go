@@ -17,6 +17,11 @@ func TestBasicValidation(t *testing.T) {
 			succeeds: true,
 		},
 		{
+			// with byte order marker
+			contents: string([]byte{0xEF, 0xBB, 0xBF}) + `message Foo { optional double bar = 1 [default = -18446744073709551615]; }`,
+			succeeds: true,
+		},
+		{
 			contents: `message Foo { optional double bar = 1 [default = 18446744073709551616]; }`,
 			succeeds: true,
 		},
