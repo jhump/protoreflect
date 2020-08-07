@@ -123,7 +123,7 @@ func TestBinaryUnknownFields(t *testing.T) {
 	err = proto.Unmarshal(buf.Bytes(), &msg)
 	testutil.Ok(t, err)
 	// make sure unrecognized fields parsed correctly
-	testutil.Eq(t, buf.Bytes()[baseLen:], msg.XXX_unrecognized)
+	testutil.Eq(t, buf.Bytes()[baseLen:], []byte(msg.ProtoReflect().GetUnknown()))
 
 	// make sure dynamic message's round trip generates same bytes
 	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.TestMessage)(nil))
