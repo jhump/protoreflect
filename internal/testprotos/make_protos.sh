@@ -31,6 +31,7 @@ outdir="../../../../.."
 ${PROTOC} "--go_out=plugins=grpc:$outdir" -I. *.proto
 ${PROTOC} "--go_out=plugins=grpc:$outdir" -I. nopkg/*.proto
 ${PROTOC} "--go_out=plugins=grpc:$outdir" -I. pkg/*.proto
+${PROTOC} "--go_out=plugins=grpc:$outdir" -I. grpc/*.proto
 
 # And make descriptor set (with source info) for several files
 ${PROTOC} --descriptor_set_out=./desc_test1.protoset --include_source_info --include_imports -I. desc_test1.proto
