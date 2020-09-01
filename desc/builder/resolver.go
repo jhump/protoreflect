@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 )
@@ -125,8 +125,15 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 	}
 
 	depSlice := make([]*desc.FileDescriptor, 0, len(deps.descs))
+	depMap := make(map[string]*desc.FileDescriptor, len(deps.descs))
 	for dep := range deps.descs {
-		depSlice = append(depSlice, dep)
+		isDuplicate, err := isDuplicateDependency(dep, depMap)
+		if err != nil {
+			return nil, err
+		}
+		if !isDuplicate {
+			depSlice = append(depSlice, dep)
+		}
 	}
 
 	fp, err := fb.buildProto(depSlice)
@@ -146,6 +153,31 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 	}
 
 	return desc.CreateFileDescriptor(fp, depSlice...)
+}
+
+// isDuplicateDependency checks for duplicate descriptors
+func isDuplicateDependency(dep *desc.FileDescriptor, depMap map[string]*desc.FileDescriptor) (bool, error) {
+	if _, exists := depMap[dep.GetName()]; !exists {
+		depMap[dep.GetName()] = dep
+		return false, nil
+	}
+	prevFDP := depMap[dep.GetName()].AsFileDescriptorProto()
+	depFDP := dep.AsFileDescriptorProto()
+
+	// temporarily reset Source Code Fields as builders does not have SourceCodeInfo
+	defer setSourceCodeInfo(prevFDP, nil)()
+	defer setSourceCodeInfo(depFDP, nil)()
+
+	if !proto.Equal(prevFDP, depFDP) {
+		return true, fmt.Errorf("multiple versions of descriptors found with same file name: %s", dep.GetName())
+	}
+	return true, nil
+}
+
+func setSourceCodeInfo(fdp *descriptor.FileDescriptorProto, info *descriptor.SourceCodeInfo) (reset func()) {
+	prevSourceCodeInfo := fdp.SourceCodeInfo
+	fdp.SourceCodeInfo = info
+	return func() { fdp.SourceCodeInfo = prevSourceCodeInfo }
 }
 
 func addFileNames(fd *desc.FileDescriptor, files map[string]struct{}) {
