@@ -125,12 +125,15 @@ func TestComplexDescriptorsFromScratch(t *testing.T) {
 	testutil.Ok(t, err)
 	mdTimestamp, err := desc.LoadMessageDescriptorForMessage((*timestamp.Timestamp)(nil))
 	testutil.Ok(t, err)
+	mbAny, err := FromMessage(mdAny)
+	testutil.Ok(t, err)
 
 	msgA := NewMessage("FooA").
 		AddField(NewField("id", FieldTypeUInt64())).
 		AddField(NewField("when", FieldTypeImportedMessage(mdTimestamp))).
 		AddField(NewField("extras", FieldTypeImportedMessage(mdAny)).
 			SetRepeated()).
+		AddField(NewField("builder", FieldTypeMessage(mbAny))).
 		SetExtensionRanges([]*dpb.DescriptorProto_ExtensionRange{{Start: proto.Int32(100), End: proto.Int32(201)}})
 	msgA2 := NewMessage("Nnn").
 		AddField(NewField("uid1", FieldTypeFixed64())).
@@ -203,21 +206,25 @@ func TestComplexDescriptorsFromScratch(t *testing.T) {
 
 	// check contents of files
 	testutil.Require(t, depA.FindMessage("foo.bar.FooA") != nil)
-	testutil.Eq(t, 3, len(depA.FindMessage("foo.bar.FooA").GetFields()))
+	testutil.Eq(t, 4, len(depA.FindMessage("foo.bar.FooA").GetFields()))
 	testutil.Require(t, depA.FindMessage("foo.bar.Nnn") != nil)
 	testutil.Eq(t, 2, len(depA.FindMessage("foo.bar.Nnn").GetFields()))
+	testutil.Eq(t, 2, len(depA.GetDependencies()))
 
 	testutil.Require(t, depB.FindMessage("foo.bar.FooB") != nil)
 	testutil.Eq(t, 2, len(depB.FindMessage("foo.bar.FooB").GetFields()))
+	testutil.Eq(t, 1, len(depB.GetDependencies()))
 
 	testutil.Require(t, depC.FindMessage("foo.baz.BarBaz") != nil)
 	testutil.Eq(t, 3, len(depC.FindMessage("foo.baz.BarBaz").GetFields()))
 	testutil.Require(t, depC.FindEnum("foo.baz.Vals") != nil)
 	testutil.Eq(t, 4, len(depC.FindEnum("foo.baz.Vals").GetValues()))
+	testutil.Eq(t, 2, len(depC.GetDependencies()))
 
 	testutil.Require(t, depD.FindEnum("foo.biz.Ppp") != nil)
 	testutil.Eq(t, 4, len(depD.FindEnum("foo.biz.Ppp").GetValues()))
 	testutil.Require(t, depD.FindExtensionByName("foo.biz.ppp") != nil)
+	testutil.Eq(t, 1, len(depD.GetDependencies()))
 
 	testutil.Require(t, fd.FindMessage("foo.bar.Ppp") != nil)
 	testutil.Eq(t, 2, len(fd.FindMessage("foo.bar.Ppp").GetFields()))
