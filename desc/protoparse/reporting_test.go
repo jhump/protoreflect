@@ -338,6 +338,14 @@ func TestWarningReporting(t *testing.T) {
 				"test.proto": `syntax = "proto3"; import "google/protobuf/descriptor.proto"; message Foo { option deprecated = true; }`,
 			},
 		},
+		{
+			// makes sure we can use a given descriptor.proto to override non-custom options
+			name: "implicitly used descriptor.proto import with new option",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto3"; import "google/protobuf/descriptor.proto"; message Foo { option foobar = 123; }`,
+				"google/protobuf/descriptor.proto": `syntax = "proto2"; package google.protobuf; message MessageOptions { optional fixed32 foobar = 99; }`,
+			},
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
