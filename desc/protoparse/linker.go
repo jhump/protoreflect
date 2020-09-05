@@ -81,28 +81,6 @@ func (l *linker) linkFiles() error {
 		return err
 	}
 
-	// Now we're done linking, so we can check to see if any imports were unused
-	for _, r := range l.files {
-		usedImports := l.usedImports[r.fd]
-		node := r.nodes[r.fd]
-		fileNode, _ := node.(*fileNode)
-		for _, dep := range r.fd.Dependency {
-			if _, ok := usedImports[dep]; !ok {
-				var pos *SourcePos
-				if fileNode != nil {
-					for _, imp := range fileNode.imports {
-						if imp.name.val == dep {
-							pos = imp.start()
-						}
-					}
-				}
-				if pos == nil {
-					pos = unknownPos(r.fd.GetName())
-				}
-				r.errs.warn(pos, errUnusedImport(dep))
-			}
-		}
-	}
 	return nil
 }
 
@@ -794,4 +772,38 @@ func (l *linker) checkMessageSetsExtension(fld *descriptorpb.FieldDescriptorProt
 		return errorWithPos(pos, "tag number %d is higher than max allowed tag number (%d)", fld.GetNumber(), internal.MaxNormalTag)
 	}
 	return nil
+}
+
+func (l *linker) checkForUnusedImports(filename string) {
+	r := l.files[filename]
+	usedImports := l.usedImports[r.fd]
+	node := r.nodes[r.fd]
+	fileNode, _ := node.(*fileNode)
+	for i, dep := range r.fd.Dependency {
+		if _, ok := usedImports[dep]; !ok {
+			isPublic := false
+			// it's fine if it's a public import
+			for _, j := range r.fd.PublicDependency {
+				if i == int(j) {
+					isPublic = true
+					break
+				}
+			}
+			if isPublic {
+				break
+			}
+			var pos *SourcePos
+			if fileNode != nil {
+				for _, imp := range fileNode.imports {
+					if imp.name.val == dep {
+						pos = imp.start()
+					}
+				}
+			}
+			if pos == nil {
+				pos = unknownPos(r.fd.GetName())
+			}
+			r.errs.warn(pos, errUnusedImport(dep))
+		}
+	}
 }

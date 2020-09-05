@@ -167,7 +167,7 @@ type ErrorUnusedImport interface {
 type errUnusedImport string
 
 func (e errUnusedImport) Error() string {
-	return fmt.Sprintf("import %q not used", e)
+	return fmt.Sprintf("import %q not used", string(e))
 }
 
 func (e errUnusedImport) UnusedImport() string {

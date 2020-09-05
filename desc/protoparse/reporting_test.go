@@ -235,38 +235,126 @@ func TestWarningReporting(t *testing.T) {
 	}
 
 	testCases := []struct {
-		source          string
+		name            string
+		sources         map[string]string
 		expectedNotices []string
 	}{
 		{
-			source: `syntax = "proto2"; message Foo {}`,
+			name: "syntax proto2",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto2"; message Foo {}`,
+			},
 		},
 		{
-			source: `syntax = "proto3"; message Foo {}`,
+			name: "syntax proto3",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto3"; message Foo {}`,
+			},
 		},
 		{
-			source: `message Foo {}`,
+			name: "no syntax",
+			sources: map[string]string{
+				"test.proto": `message Foo {}`,
+			},
 			expectedNotices: []string{
 				"test.proto:1:1: no syntax specified; defaulting to proto2 syntax",
 			},
 		},
+		{
+			name: "used import",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto3"; import "foo.proto"; message Foo { Bar bar = 1; }`,
+				"foo.proto":  `syntax = "proto3"; message Bar { string name = 1; }`,
+			},
+		},
+		{
+			name: "used public import",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto3"; import "foo.proto"; message Foo { Bar bar = 1; }`,
+				// we're only asking to compile test.proto, so we won't report unused import for baz.proto
+				"foo.proto":  `syntax = "proto3"; import public "bar.proto"; import "baz.proto";`,
+				"bar.proto":  `syntax = "proto3"; message Bar { string name = 1; }`,
+				"baz.proto":  `syntax = "proto3"; message Baz { }`,
+			},
+		},
+		{
+			name: "used nested public import",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto3"; import "foo.proto"; message Foo { Bar bar = 1; }`,
+				"foo.proto":  `syntax = "proto3"; import public "baz.proto";`,
+				"baz.proto":  `syntax = "proto3"; import public "bar.proto";`,
+				"bar.proto":  `syntax = "proto3"; message Bar { string name = 1; }`,
+			},
+		},
+		{
+			name: "unused import",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto3"; import "foo.proto"; message Foo { string name = 1; }`,
+				"foo.proto":  `syntax = "proto3"; message Bar { string name = 1; }`,
+			},
+			expectedNotices: []string{
+				`test.proto:1:20: import "foo.proto" not used`,
+			},
+		},
+		{
+			name: "multiple unused imports",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto3"; import "foo.proto"; import "bar.proto"; import "baz.proto"; message Test { Bar bar = 1; }`,
+				"foo.proto":  `syntax = "proto3"; message Foo {};`,
+				"bar.proto":  `syntax = "proto3"; message Bar {};`,
+				"baz.proto":  `syntax = "proto3"; message Baz {};`,
+			},
+			expectedNotices: []string{
+				`test.proto:1:20: import "foo.proto" not used`,
+				`test.proto:1:60: import "baz.proto" not used`,
+			},
+		},
+		{
+			name: "unused public import is not reported",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto3"; import public "foo.proto"; message Foo { }`,
+				"foo.proto":  `syntax = "proto3"; message Bar { string name = 1; }`,
+			},
+		},
+		{
+			name: "unused descriptor.proto import",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto3"; import "google/protobuf/descriptor.proto"; message Foo { }`,
+			},
+			expectedNotices: []string{
+				`test.proto:1:20: import "google/protobuf/descriptor.proto" not used`,
+			},
+		},
+		{
+			name: "explicitly used descriptor.proto import",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto3"; import "google/protobuf/descriptor.proto"; extend google.protobuf.MessageOptions { string foobar = 33333; }`,
+			},
+		},
+		{
+			// having options implicitly uses decriptor.proto
+			name: "implicitly used descriptor.proto import",
+			sources: map[string]string{
+				"test.proto": `syntax = "proto3"; import "google/protobuf/descriptor.proto"; message Foo { option deprecated = true; }`,
+			},
+		},
 	}
 	for _, testCase := range testCases {
-		accessor := FileContentsFromMap(map[string]string{
-			"test.proto": testCase.source,
-		})
-		p := Parser{
-			Accessor:        accessor,
-			WarningReporter: rep,
-		}
-		msgs = nil
-		_, err := p.ParseFiles("test.proto")
-		testutil.Ok(t, err)
+		t.Run(testCase.name, func(t *testing.T) {
+			accessor := FileContentsFromMap(testCase.sources)
+			p := Parser{
+				Accessor:        accessor,
+				WarningReporter: rep,
+			}
+			msgs = nil
+			_, err := p.ParseFiles("test.proto")
+			testutil.Ok(t, err)
 
-		actualNotices := make([]string, len(msgs))
-		for j, msg := range msgs {
-			actualNotices[j] = fmt.Sprintf("%s: %s", msg.pos, msg.text)
-		}
-		testutil.Eq(t, testCase.expectedNotices, actualNotices)
+			actualNotices := make([]string, len(msgs))
+			for j, msg := range msgs {
+				actualNotices[j] = fmt.Sprintf("%s: %s", msg.pos, msg.text)
+			}
+			testutil.Eq(t, testCase.expectedNotices, actualNotices)
+		})
 	}
 }
