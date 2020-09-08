@@ -46,7 +46,7 @@ func (n *MessageNode) MessageName() Node {
 }
 
 // MessageBody represents the body of a message. It is used by both
-// MessageNodesa and GroupNodes.
+// MessageNodes and GroupNodes.
 type MessageBody struct {
 	OpenBrace       *RuneNode
 	Options         []*OptionNode

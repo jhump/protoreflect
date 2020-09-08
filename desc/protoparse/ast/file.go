@@ -121,7 +121,7 @@ var _ FileElement = (*EmptyDeclNode)(nil)
 //
 //  syntax = "proto2";
 //
-// Files that have syntax node are assumed to use proto2 syntax.
+// Files that don't have a syntax node are assumed to use proto2 syntax.
 type SyntaxNode struct {
 	compositeNode
 	Keyword   *KeywordNode
@@ -163,7 +163,7 @@ type ImportNode struct {
 }
 
 // NewImportNode creates a new *ImportNode. The public and weak arguments are optional
-// and only or the other (or neither) may be specified, not both. When public is
+// and only one or the other (or neither) may be specified, not both. When public is
 // non-nil, it indicates the "public" keyword in the import statement and means this is
 // a public import. When weak is non-nil, it indicates the "weak" keyword in the import
 // statement means this is a weak import. When both are nil, this is a normal import.

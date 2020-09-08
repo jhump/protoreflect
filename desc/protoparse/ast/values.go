@@ -8,7 +8,7 @@ import (
 // ValueNode is an AST node that represents a literal value.
 //
 // It also includes references (e.g. IdentifierValueNode), which can be
-// used as value in some contexts, such as describing the default value
+// used as values in some contexts, such as describing the default value
 // for a field, which can refer to an enum value.
 type ValueNode interface {
 	Node

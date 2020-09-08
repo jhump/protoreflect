@@ -61,11 +61,11 @@ type Visitor struct {
 	VisitSyntaxNode func(*SyntaxNode) (bool, *Visitor)
 	// VisitPackageNode is invoked when visiting a *PackageNode in the AST.
 	VisitPackageNode func(*PackageNode) (bool, *Visitor)
-	// VisitImportNode is invoked when visiting a *ImportNode in the AST.
+	// VisitImportNode is invoked when visiting an *ImportNode in the AST.
 	VisitImportNode func(*ImportNode) (bool, *Visitor)
-	// VisitOptionNode is invoked when visiting a *OptionNode in the AST.
+	// VisitOptionNode is invoked when visiting an *OptionNode in the AST.
 	VisitOptionNode func(*OptionNode) (bool, *Visitor)
-	// VisitOptionNameNode is invoked when visiting a *OptionNameNode in the AST.
+	// VisitOptionNameNode is invoked when visiting an *OptionNameNode in the AST.
 	VisitOptionNameNode func(*OptionNameNode) (bool, *Visitor)
 	// VisitFieldReferenceNode is invoked when visiting a *FieldReferenceNode in the AST.
 	VisitFieldReferenceNode func(*FieldReferenceNode) (bool, *Visitor)
@@ -73,9 +73,9 @@ type Visitor struct {
 	VisitCompactOptionsNode func(*CompactOptionsNode) (bool, *Visitor)
 	// VisitMessageNode is invoked when visiting a *MessageNode in the AST.
 	VisitMessageNode func(*MessageNode) (bool, *Visitor)
-	// VisitExtendNode is invoked when visiting a *ExtendNode in the AST.
+	// VisitExtendNode is invoked when visiting an *ExtendNode in the AST.
 	VisitExtendNode func(*ExtendNode) (bool, *Visitor)
-	// VisitExtensionRangeNode is invoked when visiting a *ExtensionRangeNode in the AST.
+	// VisitExtensionRangeNode is invoked when visiting an *ExtensionRangeNode in the AST.
 	VisitExtensionRangeNode func(*ExtensionRangeNode) (bool, *Visitor)
 	// VisitReservedNode is invoked when visiting a *ReservedNode in the AST.
 	VisitReservedNode func(*ReservedNode) (bool, *Visitor)
@@ -91,17 +91,17 @@ type Visitor struct {
 	VisitMapTypeNode func(*MapTypeNode) (bool, *Visitor)
 	// VisitOneOfNode is invoked when visiting a *OneOfNode in the AST.
 	VisitOneOfNode func(*OneOfNode) (bool, *Visitor)
-	// VisitEnumNode is invoked when visiting a *EnumNode in the AST.
+	// VisitEnumNode is invoked when visiting an *EnumNode in the AST.
 	VisitEnumNode func(*EnumNode) (bool, *Visitor)
-	// VisitEnumValueNode is invoked when visiting a *EnumValueNode in the AST.
+	// VisitEnumValueNode is invoked when visiting an *EnumValueNode in the AST.
 	VisitEnumValueNode func(*EnumValueNode) (bool, *Visitor)
 	// VisitServiceNode is invoked when visiting a *ServiceNode in the AST.
 	VisitServiceNode func(*ServiceNode) (bool, *Visitor)
-	// VisitRPCNode is invoked when visiting a *RPCNode in the AST.
+	// VisitRPCNode is invoked when visiting an *RPCNode in the AST.
 	VisitRPCNode func(*RPCNode) (bool, *Visitor)
-	// VisitRPCTypeNode is invoked when visiting a *RPCTypeNode in the AST.
+	// VisitRPCTypeNode is invoked when visiting an *RPCTypeNode in the AST.
 	VisitRPCTypeNode func(*RPCTypeNode) (bool, *Visitor)
-	// VisitIdentNode is invoked when visiting a *IdentNode in the AST.
+	// VisitIdentNode is invoked when visiting an *IdentNode in the AST.
 	VisitIdentNode func(*IdentNode) (bool, *Visitor)
 	// VisitCompoundIdentNode is invoked when visiting a *CompoundIdentNode in the AST.
 	VisitCompoundIdentNode func(*CompoundIdentNode) (bool, *Visitor)
@@ -125,7 +125,7 @@ type Visitor struct {
 	VisitBoolLiteralNode func(*BoolLiteralNode) (bool, *Visitor)
 	// VisitSliceLiteralNode is invoked when visiting a *SliceLiteralNode in the AST.
 	VisitSliceLiteralNode func(*SliceLiteralNode) (bool, *Visitor)
-	// VisitAggregateLiteralNode is invoked when visiting a *AggregateLiteralNode in the AST.
+	// VisitAggregateLiteralNode is invoked when visiting an *AggregateLiteralNode in the AST.
 	VisitAggregateLiteralNode func(*AggregateLiteralNode) (bool, *Visitor)
 	// VisitKeywordNode is invoked when visiting a *KeywordNode in the AST.
 	VisitKeywordNode func(*KeywordNode) (bool, *Visitor)
@@ -143,17 +143,17 @@ type Visitor struct {
 	// VisitMessageDeclNode is invoked when visiting a MessageDeclNode in the AST.
 	// This function is used when no concrete type function is provided.
 	VisitMessageDeclNode func(MessageDeclNode) (bool, *Visitor)
-	// VisitOptionDeclNode is invoked when visiting a OptionDeclNode in the AST.
+	// VisitOptionDeclNode is invoked when visiting an OptionDeclNode in the AST.
 	// This function is used when no concrete type function is provided.
 	VisitOptionDeclNode func(OptionDeclNode) (bool, *Visitor)
 
-	// VisitIdentValueNode is invoked when visiting a IdentValueNode in the AST.
+	// VisitIdentValueNode is invoked when visiting an IdentValueNode in the AST.
 	// This function is used when no concrete type function is provided.
 	VisitIdentValueNode func(IdentValueNode) (bool, *Visitor)
 	// VisitStringValueNode is invoked when visiting a StringValueNode in the AST.
 	// This function is used when no concrete type function is provided.
 	VisitStringValueNode func(StringValueNode) (bool, *Visitor)
-	// VisitIntValueNode is invoked when visiting a IntValueNode in the AST.
+	// VisitIntValueNode is invoked when visiting an IntValueNode in the AST.
 	// This function is used when no concrete type function is provided. If
 	// both this and VisitFloatValueNode are provided, and a node implements
 	// both (such as *UintLiteralNode), this function will be invoked and
