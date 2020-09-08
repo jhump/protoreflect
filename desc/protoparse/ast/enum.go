@@ -3,8 +3,8 @@ package ast
 import "fmt"
 
 type EnumNode struct {
-	basicCompositeNode
-	Keyword    *IdentNode
+	compositeNode
+	Keyword    *KeywordNode
 	Name       *IdentNode
 	OpenBrace  *RuneNode
 	Options    []*OptionNode
@@ -18,7 +18,7 @@ type EnumNode struct {
 func (*EnumNode) fileElement() {}
 func (*EnumNode) msgElement()  {}
 
-func NewEnumNode(keyword *IdentNode, name *IdentNode, open *RuneNode, decls []EnumElement, close *RuneNode) *EnumNode {
+func NewEnumNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []EnumElement, close *RuneNode) *EnumNode {
 	children := make([]Node, 0, 4+len(decls))
 	children = append(children, keyword, name, open)
 	for _, decl := range decls {
@@ -45,7 +45,7 @@ func NewEnumNode(keyword *IdentNode, name *IdentNode, open *RuneNode, decls []En
 	}
 
 	return &EnumNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Keyword:    keyword,
@@ -59,6 +59,8 @@ func NewEnumNode(keyword *IdentNode, name *IdentNode, open *RuneNode, decls []En
 	}
 }
 
+// EnumElement is an interface implemented by all AST nodes that can
+// appear in the body of an enum declaration.
 type EnumElement interface {
 	Node
 	enumElement()
@@ -70,7 +72,7 @@ var _ EnumElement = (*ReservedNode)(nil)
 var _ EnumElement = (*EmptyDeclNode)(nil)
 
 type EnumValueNode struct {
-	basicCompositeNode
+	compositeNode
 	Name      *IdentNode
 	Equals    *RuneNode
 	Number    IntValueNode
@@ -85,7 +87,7 @@ func NewEnumValueNode(name *IdentNode, equals *RuneNode, number IntValueNode,opt
 		name, equals, number, opts, semicolon,
 	}
 	return &EnumValueNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Name:      name,

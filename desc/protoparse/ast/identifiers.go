@@ -2,6 +2,9 @@ package ast
 
 import "strings"
 
+// Identifier is a possibly-qualified name. This is used to distinguish
+// ValueNode values that are references/identifiers vs. those that are
+// string literals.
 type Identifier string
 
 type IdentValueNode interface {
@@ -13,13 +16,13 @@ var _ IdentValueNode = (*IdentNode)(nil)
 var _ IdentValueNode = (*CompoundIdentNode)(nil)
 
 type IdentNode struct {
-	basicNode
+	terminalNode
 	Val string
 }
 
 func NewIdentNode(val string, info TokenInfo) *IdentNode {
 	return &IdentNode{
-		basicNode: basicNode{
+		terminalNode: terminalNode{
 			posRange: info.PosRange,
 			leading:  info.LeadingComments,
 			trailing: info.TrailingComments,
@@ -36,8 +39,12 @@ func (n *IdentNode) AsIdentifier() Identifier {
 	return Identifier(n.Val)
 }
 
+func (n *IdentNode) AsKeyword() *KeywordNode {
+	return (*KeywordNode)(n)
+}
+
 type CompoundIdentNode struct {
-	basicCompositeNode
+	compositeNode
 	Components []*IdentNode
 	Dots       []*RuneNode
 	Val        string
@@ -47,16 +54,16 @@ func NewCompoundIdentNode(components []*IdentNode, dots []*RuneNode) *CompoundId
 	children := make([]Node, 0, len(components)*2 - 1)
 	var b strings.Builder
 	for i, comp := range components {
-		children = append(children, comp)
-		b.WriteString(comp.Val)
 		if i > 0 {
 			dot := dots[i-1]
 			children = append(children, dot)
 			b.WriteRune(dot.Rune)
 		}
+		children = append(children, comp)
+		b.WriteString(comp.Val)
 	}
 	return &CompoundIdentNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Components: components,
@@ -71,4 +78,17 @@ func (n *CompoundIdentNode) Value() interface{} {
 
 func (n *CompoundIdentNode) AsIdentifier() Identifier {
 	return Identifier(n.Val)
+}
+
+type KeywordNode IdentNode
+
+func NewKeywordNode(val string, info TokenInfo) *KeywordNode {
+	return &KeywordNode{
+		terminalNode: terminalNode{
+			posRange: info.PosRange,
+			leading:  info.LeadingComments,
+			trailing: info.TrailingComments,
+		},
+		Val: val,
+	}
 }

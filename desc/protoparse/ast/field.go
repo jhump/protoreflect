@@ -18,9 +18,9 @@ var _ FieldDeclNode = (*MapFieldNode)(nil)
 var _ FieldDeclNode = (*SyntheticMapField)(nil)
 
 type FieldNode struct {
-	basicCompositeNode
+	compositeNode
 	Label     FieldLabel
-	FldType   *CompoundIdentNode
+	FldType   IdentValueNode
 	Name      *IdentNode
 	Equals    *RuneNode
 	Tag       *UintLiteralNode
@@ -34,7 +34,7 @@ func (*FieldNode) msgElement()    {}
 func (*FieldNode) oneOfElement()  {}
 func (*FieldNode) extendElement() {}
 
-func NewFieldNode(label *IdentNode, fieldType *CompoundIdentNode, name *IdentNode, equals *RuneNode, tag *UintLiteralNode, opts *CompactOptionsNode, semicolon *RuneNode) *FieldNode {
+func NewFieldNode(label *KeywordNode, fieldType IdentValueNode, name *IdentNode, equals *RuneNode, tag *UintLiteralNode, opts *CompactOptionsNode, semicolon *RuneNode) *FieldNode {
 	numChildren := 5
 	if label != nil {
 		numChildren++
@@ -53,7 +53,7 @@ func NewFieldNode(label *IdentNode, fieldType *CompoundIdentNode, name *IdentNod
 	children = append(children, semicolon)
 
 	return &FieldNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Label:     newFieldLabel(label),
@@ -70,10 +70,10 @@ func (n *FieldNode) FieldLabel() Node {
 	// proto3 fields and fields inside one-ofs will not have a label and we need
 	// this check in order to return a nil node -- otherwise we'd return a
 	// non-nil node that has a nil pointer value in it :/
-	if n.Label.IdentNode == nil {
+	if n.Label.KeywordNode == nil {
 		return nil
 	}
-	return n.Label.IdentNode
+	return n.Label.KeywordNode
 }
 
 func (n *FieldNode) FieldName() Node {
@@ -100,32 +100,32 @@ func (n *FieldNode) GetGroupKeyword() Node {
 }
 
 type FieldLabel struct {
-	*IdentNode
+	*KeywordNode
 	Repeated bool
 	Required bool
 }
 
-func newFieldLabel(lbl *IdentNode) FieldLabel {
+func newFieldLabel(lbl *KeywordNode) FieldLabel {
 	repeated, required := false, false
 	if lbl != nil {
 		repeated = lbl.Val == "repeated"
 		required = lbl.Val == "required"
 	}
 	return FieldLabel{
-		IdentNode: lbl,
-		Repeated:  repeated,
-		Required:  required,
+		KeywordNode: lbl,
+		Repeated:    repeated,
+		Required:    required,
 	}
 }
 
 func (f *FieldLabel) IsPresent() bool {
-	return f.IdentNode != nil
+	return f.KeywordNode != nil
 }
 
 type GroupNode struct {
-	basicCompositeNode
+	compositeNode
 	Label   FieldLabel
-	Keyword *IdentNode
+	Keyword *KeywordNode
 	Name    *IdentNode
 	Equals  *RuneNode
 	Tag     *UintLiteralNode
@@ -144,7 +144,7 @@ func (*GroupNode) msgElement()    {}
 func (*GroupNode) oneOfElement()  {}
 func (*GroupNode) extendElement() {}
 
-func NewGroupNode(label *IdentNode, keyword *IdentNode, name *IdentNode, equals *RuneNode, tag *UintLiteralNode, opts *CompactOptionsNode, open *RuneNode, decls []MessageElement, close *RuneNode) *GroupNode {
+func NewGroupNode(label *KeywordNode, keyword *KeywordNode, name *IdentNode, equals *RuneNode, tag *UintLiteralNode, opts *CompactOptionsNode, open *RuneNode, decls []MessageElement, close *RuneNode) *GroupNode {
 	numChildren := 7 + len(decls)
 	if opts != nil {
 		numChildren++
@@ -161,7 +161,7 @@ func NewGroupNode(label *IdentNode, keyword *IdentNode, name *IdentNode, equals 
 	children = append(children, close)
 
 	ret := &GroupNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Label:     newFieldLabel(label),
@@ -176,11 +176,11 @@ func NewGroupNode(label *IdentNode, keyword *IdentNode, name *IdentNode, equals 
 }
 
 func (n *GroupNode) FieldLabel() Node {
-	if n.Label.IdentNode == nil {
+	if n.Label.KeywordNode == nil {
 		// return nil interface to indicate absence, not a typed nil
 		return nil
 	}
-	return n.Label.IdentNode
+	return n.Label.KeywordNode
 }
 
 func (n *GroupNode) FieldName() Node {
@@ -211,8 +211,8 @@ func (n *GroupNode) MessageName() Node {
 }
 
 type OneOfNode struct {
-	basicCompositeNode
-	Keyword    *IdentNode
+	compositeNode
+	Keyword    *KeywordNode
 	Name       *IdentNode
 	OpenBrace  *RuneNode
 	Options    []*OptionNode
@@ -225,7 +225,7 @@ type OneOfNode struct {
 
 func (*OneOfNode) msgElement() {}
 
-func NewOneOfNode(keyword *IdentNode, name *IdentNode, open *RuneNode, decls []OneOfElement, close *RuneNode) *OneOfNode {
+func NewOneOfNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []OneOfElement, close *RuneNode) *OneOfNode {
 	children := make([]Node, 4 + len(decls))
 	children = append(children, keyword, name, open)
 	for _, decl := range decls {
@@ -252,7 +252,7 @@ func NewOneOfNode(keyword *IdentNode, name *IdentNode, open *RuneNode, decls []O
 	}
 
 	return &OneOfNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Keyword:    keyword,
@@ -266,6 +266,8 @@ func NewOneOfNode(keyword *IdentNode, name *IdentNode, open *RuneNode, decls []O
 	}
 }
 
+// OneOfElement is an interface implemented by all AST nodes that can
+// appear in the body of a oneof declaration.
 type OneOfElement interface {
 	Node
 	oneOfElement()
@@ -277,19 +279,19 @@ var _ OneOfElement = (*GroupNode)(nil)
 var _ OneOfElement = (*EmptyDeclNode)(nil)
 
 type MapTypeNode struct {
-	basicCompositeNode
-	Keyword    *IdentNode
+	compositeNode
+	Keyword    *KeywordNode
 	OpenAngle  *RuneNode
 	KeyType    *IdentNode
 	Comma      *RuneNode
-	ValueType  *CompoundIdentNode
+	ValueType  IdentValueNode
 	CloseAngle *RuneNode
 }
 
-func NewMapTypeNode(keyword *IdentNode, open *RuneNode, keyType *IdentNode, comma *RuneNode, valType *CompoundIdentNode, close *RuneNode) *MapTypeNode {
+func NewMapTypeNode(keyword *KeywordNode, open *RuneNode, keyType *IdentNode, comma *RuneNode, valType IdentValueNode, close *RuneNode) *MapTypeNode {
 	children := []Node{keyword, open, keyType, comma, valType, close}
 	return &MapTypeNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Keyword:    keyword,
@@ -302,7 +304,7 @@ func NewMapTypeNode(keyword *IdentNode, open *RuneNode, keyType *IdentNode, comm
 }
 
 type MapFieldNode struct {
-	basicCompositeNode
+	compositeNode
 	MapType   *MapTypeNode
 	Name      *IdentNode
 	Equals    *RuneNode
@@ -326,7 +328,7 @@ func NewMapFieldNode(mapType *MapTypeNode, name *IdentNode, equals *RuneNode, ta
 	children = append(children, semicolon)
 
 	return &MapFieldNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		MapType:   mapType,
@@ -368,18 +370,16 @@ func (n *MapFieldNode) MessageName() Node {
 
 func (n *MapFieldNode) KeyField() *SyntheticMapField {
 	k := n.MapType.KeyType
-	t := &CompoundIdentNode{Val: k.Val}
-	t.children = []Node{k}
-	return NewSyntheticMapField(t, 1)
+	return NewSyntheticMapField(k, 1)
 }
 
 func (n *MapFieldNode) ValueField() *SyntheticMapField {
 	return NewSyntheticMapField(n.MapType.ValueType, 2)
 }
 
-func NewSyntheticMapField(ident *CompoundIdentNode, tagNum uint64) *SyntheticMapField {
+func NewSyntheticMapField(ident IdentValueNode, tagNum uint64) *SyntheticMapField {
 	tag := &UintLiteralNode{
-		basicNode: basicNode{
+		terminalNode: terminalNode{
 			posRange: PosRange{Start: *ident.Start(), End: *ident.End()},
 		},
 		Val: tagNum,
@@ -388,7 +388,7 @@ func NewSyntheticMapField(ident *CompoundIdentNode, tagNum uint64) *SyntheticMap
 }
 
 type SyntheticMapField struct {
-	Ident *CompoundIdentNode
+	Ident IdentValueNode
 	Tag   *UintLiteralNode
 }
 

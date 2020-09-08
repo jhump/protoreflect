@@ -19,4 +19,9 @@
 // optional arguments, which means the arguments can be nil. If nil
 // values are provided for other (non-optional) arguments, the resulting
 // node may be invalid and cause panics later in the program.
+//
+// This package defines numerous interfaces. However, user code should
+// not attempt to implement any of them. Most consumers of an AST will
+// not work correctly if they encounter concrete implementations other
+// than the ones defined in this package.
 package ast

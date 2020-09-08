@@ -12,8 +12,8 @@ var _ MessageDeclNode = (*GroupNode)(nil)
 var _ MessageDeclNode = (*MapFieldNode)(nil)
 
 type MessageNode struct {
-	basicCompositeNode
-	Keyword *IdentNode
+	compositeNode
+	Keyword *KeywordNode
 	Name    *IdentNode
 
 	MessageBody
@@ -22,7 +22,7 @@ type MessageNode struct {
 func (*MessageNode) fileElement() {}
 func (*MessageNode) msgElement()  {}
 
-func NewMessageNode(keyword *IdentNode, name *IdentNode, open *RuneNode, decls []MessageElement, close *RuneNode) *MessageNode {
+func NewMessageNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []MessageElement, close *RuneNode) *MessageNode {
 	children := make([]Node, 4 + len(decls))
 	children = append(children, keyword, name, open)
 	for _, decl := range decls {
@@ -31,7 +31,7 @@ func NewMessageNode(keyword *IdentNode, name *IdentNode, open *RuneNode, decls [
 	children = append(children, close)
 
 	ret := &MessageNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Keyword: keyword,
@@ -45,6 +45,8 @@ func (n *MessageNode) MessageName() Node {
 	return n.Name
 }
 
+// MessageBody represents the body of a message. It is used by both
+// MessageNodesa and GroupNodes.
 type MessageBody struct {
 	OpenBrace       *RuneNode
 	Options         []*OptionNode
@@ -95,6 +97,8 @@ func populateMessageBody(m *MessageBody, open *RuneNode, decls []MessageElement,
 	m.CloseBrace = close
 }
 
+// MessageElement is an interface implemented by all AST nodes that can
+// appear in a message body.
 type MessageElement interface {
 	Node
 	msgElement()
@@ -113,9 +117,9 @@ var _ MessageElement = (*ReservedNode)(nil)
 var _ MessageElement = (*EmptyDeclNode)(nil)
 
 type ExtendNode struct {
-	basicCompositeNode
-	Keyword    *IdentNode
-	Extendee   *CompoundIdentNode
+	compositeNode
+	Keyword    *KeywordNode
+	Extendee   IdentValueNode
 	OpenBrace  *RuneNode
 	Fields     []*FieldNode
 	Groups     []*GroupNode
@@ -127,7 +131,7 @@ type ExtendNode struct {
 func (*ExtendNode) fileElement() {}
 func (*ExtendNode) msgElement()  {}
 
-func NewExtendNode(keyword *IdentNode, extendee *CompoundIdentNode, open *RuneNode, decls []ExtendElement, close *RuneNode) *ExtendNode {
+func NewExtendNode(keyword *KeywordNode, extendee IdentValueNode, open *RuneNode, decls []ExtendElement, close *RuneNode) *ExtendNode {
 	children := make([]Node, 4 + len(decls))
 	children = append(children, keyword, extendee, open)
 	for _, decl := range decls {
@@ -136,7 +140,7 @@ func NewExtendNode(keyword *IdentNode, extendee *CompoundIdentNode, open *RuneNo
 	children = append(children, close)
 
 	ret := &ExtendNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Keyword:    keyword,
@@ -162,6 +166,8 @@ func NewExtendNode(keyword *IdentNode, extendee *CompoundIdentNode, open *RuneNo
 	return ret
 }
 
+// ExtendElement is an interface implemented by all AST nodes that can
+// appear in the body of an extends declaration.
 type ExtendElement interface {
 	Node
 	extendElement()

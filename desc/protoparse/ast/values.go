@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+// ValueNode is an AST node that represents a literal value.
+//
+// It also includes references (e.g. IdentifierValueNode), which can be
+// used as value in some contexts, such as describing the default value
+// for a field, which can refer to an enum value.
 type ValueNode interface {
 	Node
 	Value() interface{}
@@ -13,13 +18,13 @@ type ValueNode interface {
 var _ ValueNode = (*IdentNode)(nil)
 var _ ValueNode = (*CompoundIdentNode)(nil)
 var _ ValueNode = (*StringLiteralNode)(nil)
-var _ ValueNode = (*CompoundStringNode)(nil)
+var _ ValueNode = (*CompoundStringListeralNode)(nil)
 var _ ValueNode = (*UintLiteralNode)(nil)
-var _ ValueNode = (*CompoundUintNode)(nil)
-var _ ValueNode = (*NegativeIntNode)(nil)
+var _ ValueNode = (*PositiveUintLiteralNode)(nil)
+var _ ValueNode = (*NegativeIntLiteralNode)(nil)
 var _ ValueNode = (*FloatLiteralNode)(nil)
 var _ ValueNode = (*SpecialFloatLiteralNode)(nil)
-var _ ValueNode = (*CompoundFloatNode)(nil)
+var _ ValueNode = (*SignedFloatLiteralNode)(nil)
 var _ ValueNode = (*BoolLiteralNode)(nil)
 var _ ValueNode = (*SliceLiteralNode)(nil)
 var _ ValueNode = (*AggregateLiteralNode)(nil)
@@ -30,16 +35,16 @@ type StringValueNode interface {
 }
 
 var _ StringValueNode = (*StringLiteralNode)(nil)
-var _ StringValueNode = (*CompoundStringNode)(nil)
+var _ StringValueNode = (*CompoundStringListeralNode)(nil)
 
 type StringLiteralNode struct {
-	basicNode
+	terminalNode
 	Val string
 }
 
 func NewStringLiteralNode(val string, info TokenInfo) *StringLiteralNode {
 	return &StringLiteralNode{
-		basicNode: basicNode{
+		terminalNode: terminalNode{
 			posRange: info.PosRange,
 			leading:  info.LeadingComments,
 			trailing: info.TrailingComments,
@@ -56,31 +61,31 @@ func (n *StringLiteralNode) AsString() string {
 	return n.Val
 }
 
-type CompoundStringNode struct {
-	basicCompositeNode
+type CompoundStringListeralNode struct {
+	compositeNode
 	Val string
 }
 
-func NewCompoundStringNode(components ...*StringLiteralNode) *CompoundStringNode {
+func NewCompoundLiteralStringNode(components ...*StringLiteralNode) *CompoundStringListeralNode {
 	children := make([]Node, len(components))
 	var b strings.Builder
 	for i, comp := range components {
 		children[i] = comp
 		b.WriteString(comp.Val)
 	}
-	return &CompoundStringNode{
-		basicCompositeNode: basicCompositeNode{
+	return &CompoundStringListeralNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Val: b.String(),
 	}
 }
 
-func (n *CompoundStringNode) Value() interface{} {
+func (n *CompoundStringListeralNode) Value() interface{} {
 	return n.AsString()
 }
 
-func (n *CompoundStringNode) AsString() string {
+func (n *CompoundStringListeralNode) AsString() string {
 	return n.Val
 }
 
@@ -102,17 +107,17 @@ func AsInt32(n IntValueNode, min, max int32) (int32, bool) {
 }
 
 var _ IntValueNode = (*UintLiteralNode)(nil)
-var _ IntValueNode = (*CompoundUintNode)(nil)
-var _ IntValueNode = (*NegativeIntNode)(nil)
+var _ IntValueNode = (*PositiveUintLiteralNode)(nil)
+var _ IntValueNode = (*NegativeIntLiteralNode)(nil)
 
 type UintLiteralNode struct {
-	basicNode
+	terminalNode
 	Val uint64
 }
 
 func NewUintLiteralNode(val uint64, info TokenInfo) *UintLiteralNode {
 	return &UintLiteralNode{
-		basicNode: basicNode{
+		terminalNode: terminalNode{
 			posRange: info.PosRange,
 			leading:  info.LeadingComments,
 			trailing: info.TrailingComments,
@@ -140,68 +145,68 @@ func (n *UintLiteralNode) AsFloat() float64 {
 	return float64(n.Val)
 }
 
-type CompoundUintNode struct {
-	basicCompositeNode
-	Sign *RuneNode
+type PositiveUintLiteralNode struct {
+	compositeNode
+	Plus *RuneNode
 	Uint *UintLiteralNode
 	Val  uint64
 }
 
-func NewCompoundUintNode(sign *RuneNode, i *UintLiteralNode) *CompoundUintNode {
+func NewPositiveUintLiteralNode(sign *RuneNode, i *UintLiteralNode) *PositiveUintLiteralNode {
 	children := []Node{sign, i}
-	return &CompoundUintNode{
-		basicCompositeNode: basicCompositeNode{
+	return &PositiveUintLiteralNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
-		Sign: sign,
+		Plus: sign,
 		Uint: i,
 		Val:  i.Val,
 	}
 }
 
-func (n *CompoundUintNode) Value() interface{} {
+func (n *PositiveUintLiteralNode) Value() interface{} {
 	return n.Val
 }
 
-func (n *CompoundUintNode) AsInt64() (int64, bool) {
+func (n *PositiveUintLiteralNode) AsInt64() (int64, bool) {
 	if n.Val > math.MaxInt64 {
 		return 0, false
 	}
 	return int64(n.Val), true
 }
 
-func (n *CompoundUintNode) AsUint64() (uint64, bool) {
+func (n *PositiveUintLiteralNode) AsUint64() (uint64, bool) {
 	return n.Val, true
 }
 
-type NegativeIntNode struct {
-	basicCompositeNode
-	Sign *RuneNode
-	Uint *UintLiteralNode
-	Val  int64
+type NegativeIntLiteralNode struct {
+	compositeNode
+	Minus *RuneNode
+	Uint  *UintLiteralNode
+	Val   int64
 }
 
-func NewNegativeIntNode(sign *RuneNode, i *UintLiteralNode) *NegativeIntNode {
+func NewNegativeIntLiteralNode(sign *RuneNode, i *UintLiteralNode) *NegativeIntLiteralNode {
 	children := []Node{sign, i}
-	return &NegativeIntNode{
-		basicCompositeNode: basicCompositeNode{
+	return &NegativeIntLiteralNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
-		Sign: sign,
-		Uint: i,
-		Val:  -int64(i.Val),
+		Minus: sign,
+		Uint:  i,
+		Val:   -int64(i.Val),
 	}
 }
 
-func (n *NegativeIntNode) Value() interface{} {
+func (n *NegativeIntLiteralNode) Value() interface{} {
 	return n.Val
 }
 
-func (n *NegativeIntNode) AsInt64() (int64, bool) {
+func (n *NegativeIntLiteralNode) AsInt64() (int64, bool) {
 	return n.Val, true
 }
 
-func (n *NegativeIntNode) AsUint64() (uint64, bool) {
+func (n *NegativeIntLiteralNode) AsUint64() (uint64, bool) {
 	if n.Val < 0 {
 		return 0, false
 	}
@@ -218,13 +223,13 @@ var _ FloatValueNode = (*SpecialFloatLiteralNode)(nil)
 var _ FloatValueNode = (*UintLiteralNode)(nil)
 
 type FloatLiteralNode struct {
-	basicNode
+	terminalNode
 	Val float64
 }
 
 func NewFloatLiteralNode(val float64, info TokenInfo) *FloatLiteralNode {
 	return &FloatLiteralNode{
-		basicNode: basicNode{
+		terminalNode: terminalNode{
 			posRange: info.PosRange,
 			leading:  info.LeadingComments,
 			trailing: info.TrailingComments,
@@ -242,11 +247,11 @@ func (n *FloatLiteralNode) AsFloat() float64 {
 }
 
 type SpecialFloatLiteralNode struct {
-	*IdentNode
+	*KeywordNode
 	Val float64
 }
 
-func NewSpecialFloatLiteralNode(name *IdentNode) *SpecialFloatLiteralNode {
+func NewSpecialFloatLiteralNode(name *KeywordNode) *SpecialFloatLiteralNode {
 	var f float64
 	if name.Val == "inf" {
 		f = math.Inf(1)
@@ -254,8 +259,8 @@ func NewSpecialFloatLiteralNode(name *IdentNode) *SpecialFloatLiteralNode {
 		f = math.NaN()
 	}
 	return &SpecialFloatLiteralNode{
-		IdentNode: name,
-		Val:       f,
+		KeywordNode: name,
+		Val:         f,
 	}
 }
 
@@ -267,21 +272,21 @@ func (n *SpecialFloatLiteralNode) AsFloat() float64 {
 	return n.Val
 }
 
-type CompoundFloatNode struct {
-	basicCompositeNode
+type SignedFloatLiteralNode struct {
+	compositeNode
 	Sign  *RuneNode
 	Float FloatValueNode
 	Val   float64
 }
 
-func NewCompoundFloatNode(sign *RuneNode, f *FloatLiteralNode) *CompoundFloatNode {
+func NewSignedFloatLiteralNode(sign *RuneNode, f *FloatLiteralNode) *SignedFloatLiteralNode {
 	children := []Node{sign, f}
 	val := f.Val
 	if sign.Rune == '-' {
 		val = -f.Val
 	}
-	return &CompoundFloatNode{
-		basicCompositeNode: basicCompositeNode{
+	return &SignedFloatLiteralNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Sign:  sign,
@@ -290,19 +295,19 @@ func NewCompoundFloatNode(sign *RuneNode, f *FloatLiteralNode) *CompoundFloatNod
 	}
 }
 
-func (n *CompoundFloatNode) Value() interface{} {
+func (n *SignedFloatLiteralNode) Value() interface{} {
 	return n.Val
 }
 
 type BoolLiteralNode struct {
-	*IdentNode
+	*KeywordNode
 	Val bool
 }
 
-func NewBoolLiteralNode(name *IdentNode) *BoolLiteralNode {
+func NewBoolLiteralNode(name *KeywordNode) *BoolLiteralNode {
 	return &BoolLiteralNode{
-		IdentNode: name,
-		Val:       name.Val == "true",
+		KeywordNode: name,
+		Val:         name.Val == "true",
 	}
 }
 
@@ -311,7 +316,7 @@ func (n *BoolLiteralNode) Value() interface{} {
 }
 
 type SliceLiteralNode struct {
-	basicCompositeNode
+	compositeNode
 	OpenBracket  *RuneNode
 	Elements     []ValueNode
 	Commas       []*RuneNode
@@ -322,15 +327,15 @@ func NewSliceLiteralNode(open *RuneNode, vals []ValueNode, commas []*RuneNode, c
 	children := make([]Node, len(vals)*2 + 1)
 	children = append(children, open)
 	for i, val := range vals {
-		children = append(children, val)
 		if i > 0 {
 			children = append(children, commas[i-1])
 		}
+		children = append(children, val)
 	}
 	children = append(children, close)
 
 	return &SliceLiteralNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		OpenBracket:  open,
@@ -345,7 +350,7 @@ func (n *SliceLiteralNode) Value() interface{} {
 }
 
 type AggregateLiteralNode struct {
-	basicCompositeNode
+	compositeNode
 	Open     *RuneNode
 	Elements []*AggregateEntryNode
 	Close    *RuneNode
@@ -360,7 +365,7 @@ func NewAggregateLiteralNode(open *RuneNode, vals []*AggregateEntryNode, close *
 	children = append(children, close)
 
 	return &AggregateLiteralNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Open:     open,
@@ -374,7 +379,7 @@ func (n *AggregateLiteralNode) Value() interface{} {
 }
 
 type AggregateEntryNode struct {
-	basicCompositeNode
+	compositeNode
 	Name *FieldReferenceNode
 	Sep  *RuneNode
 	Val  ValueNode
@@ -400,7 +405,7 @@ func NewAggregateEntryNode(name *FieldReferenceNode, sep *RuneNode, val ValueNod
 	}
 
 	return &AggregateEntryNode{
-		basicCompositeNode: basicCompositeNode{
+		compositeNode: compositeNode{
 			children: children,
 		},
 		Name: name,

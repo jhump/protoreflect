@@ -10,8 +10,8 @@ var _ OptionDeclNode = (*OptionNode)(nil)
 var _ OptionDeclNode = (*CompactOptionNode)(nil)
 
 type OptionNode struct {
-	basicCompositeNode
-	Keyword   *IdentNode
+	compositeNode
+	Keyword   *KeywordNode
 	OptionBody
 	Semicolon *RuneNode
 }
@@ -22,6 +22,22 @@ func (e *OptionNode) oneOfElement()   {}
 func (e *OptionNode) enumElement()    {}
 func (e *OptionNode) serviceElement() {}
 func (e *OptionNode) methodElement()  {}
+
+func NewOptionNode(keyword *KeywordNode, name *OptionNameNode, equals *RuneNode, val ValueNode, semicolon *RuneNode) *OptionNode {
+	children := []Node{keyword, name, equals, val, semicolon}
+	return &OptionNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		Keyword: keyword,
+		OptionBody: OptionBody{
+			Name: name,
+			Equals: equals,
+			Val: val,
+		},
+		Semicolon: semicolon,
+	}
+}
 
 type OptionBody struct {
 	Name      *OptionNameNode
@@ -38,16 +54,50 @@ func (n *OptionBody) GetValue() ValueNode {
 }
 
 type OptionNameNode struct {
-	basicCompositeNode
+	compositeNode
 	Parts []*FieldReferenceNode
 	Dots  []*RuneNode
 }
 
+func NewOptionNameNode(parts []*FieldReferenceNode, dots []*RuneNode) *OptionNameNode {
+	children := make([]Node, len(parts)*2-1)
+	for i, part := range parts {
+		if i > 0 {
+			children = append(children, dots[i-1])
+		}
+		children = append(children, part)
+	}
+	return &OptionNameNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		Parts: parts,
+		Dots: dots,
+	}
+}
+
 type FieldReferenceNode struct {
-	basicCompositeNode
+	compositeNode
 	Open  *RuneNode
-	Name  *CompoundIdentNode
+	Name  IdentValueNode
 	Close *RuneNode
+}
+
+func NewFieldReferenceNode(open *RuneNode, name IdentValueNode, close *RuneNode) *FieldReferenceNode {
+	var children []Node
+	if open != nil {
+		children = []Node{open, name, close}
+	} else {
+		children = []Node{name}
+	}
+	return &FieldReferenceNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		Open:  open,
+		Name:  name,
+		Close: close,
+	}
 }
 
 func (a *FieldReferenceNode) IsExtension() bool {
@@ -56,28 +106,57 @@ func (a *FieldReferenceNode) IsExtension() bool {
 
 func (a *FieldReferenceNode) Value() string {
 	if a.Open != nil {
-		return string(a.Open.Rune) + a.Name.Val + string(a.Close.Rune)
+		return string(a.Open.Rune) + string(a.Name.AsIdentifier()) + string(a.Close.Rune)
 	} else {
-		return a.Name.Val
+		return string(a.Name.AsIdentifier())
 	}
 }
 
 type CompactOptionsNode struct {
-	basicCompositeNode
+	compositeNode
 	OpenBracket  *RuneNode
 	Options      []*CompactOptionNode
 	Commas       []*RuneNode
 	CloseBracket *RuneNode
 }
 
-func (n *CompactOptionsNode) Elements() []*CompactOptionNode {
-	if n == nil {
-		return nil
+func NewCompactOptionsNode(open *RuneNode, opts []*CompactOptionNode, commas []*RuneNode, close *RuneNode) *CompactOptionsNode {
+	children := make([]Node, len(opts)*2+1)
+	children = append(children, open)
+	for i, opt := range opts {
+		if i > 0 {
+			children = append(children, commas[i-1])
+		}
+		children = append(children, opt)
 	}
-	return n.Options
+	children = append(children, close)
+
+	return &CompactOptionsNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		OpenBracket:  open,
+		Options:      opts,
+		Commas:       commas,
+		CloseBracket: close,
+	}
 }
 
 type CompactOptionNode struct {
-	basicCompositeNode
+	compositeNode
 	OptionBody
+}
+
+func NewCompactOptionNode(name *OptionNameNode, equals *RuneNode, val ValueNode) *CompactOptionNode {
+	children := []Node{name, equals, val}
+	return &CompactOptionNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		OptionBody: OptionBody{
+			Name: name,
+			Equals: equals,
+			Val: val,
+		},
+	}
 }

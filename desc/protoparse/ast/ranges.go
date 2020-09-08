@@ -1,8 +1,8 @@
 package ast
 
 type ExtensionRangeNode struct {
-	basicCompositeNode
-	Keyword   *IdentNode
+	compositeNode
+	Keyword   *KeywordNode
 	Ranges    []*RangeNode
 	Commas    []*RuneNode
 	Options   *CompactOptionsNode
@@ -12,11 +12,11 @@ type ExtensionRangeNode struct {
 func (e *ExtensionRangeNode) msgElement() {}
 
 type RangeNode struct {
-	basicCompositeNode
+	compositeNode
 	StartNode IntValueNode
 	To        *IdentNode
 	EndNode   IntValueNode
-	Max       bool
+	Max       *KeywordNode
 }
 
 func (n *RangeNode) RangeStart() Node {
@@ -47,7 +47,7 @@ func (n *RangeNode) EndValue() interface{} {
 }
 
 func (n *RangeNode) EndValueAsInt32(min, max int32) (int32, bool) {
-	if n.Max {
+	if n.Max != nil {
 		return max, true
 	}
 	if n.EndNode == nil {
@@ -57,10 +57,10 @@ func (n *RangeNode) EndValueAsInt32(min, max int32) (int32, bool) {
 }
 
 type ReservedNode struct {
-	basicCompositeNode
-	Keyword   *IdentNode
+	compositeNode
+	Keyword   *KeywordNode
 	Ranges    []*RangeNode
-	Names     []*CompoundStringNode
+	Names     []StringValueNode
 	Commas    []*RuneNode
 	Semicolon *RuneNode
 }

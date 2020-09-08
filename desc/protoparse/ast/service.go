@@ -1,19 +1,60 @@
 package ast
 
+import "fmt"
+
 type ServiceNode struct {
-	basicCompositeNode
-	Keyword    *IdentNode
+	compositeNode
+	Keyword    *KeywordNode
 	Name       *IdentNode
 	OpenBrace  *RuneNode
 	Options    []*OptionNode
 	RPCs       []*RPCNode
 	CloseBrace *RuneNode
 
-	AllDecls []*ServiceElement
+	AllDecls []ServiceElement
 }
 
 func (*ServiceNode) fileElement() {}
 
+func NewServiceNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []ServiceElement, close *RuneNode) *ServiceNode {
+	children := make([]Node, 4+len(decls))
+	children = append(children, keyword, name, open)
+	for _, decl := range decls {
+		children = append(children, decl)
+	}
+	children = append(children, close)
+
+	var opts []*OptionNode
+	var rpcs []*RPCNode
+	for _, decl := range decls {
+		switch decl := decl.(type) {
+		case *OptionNode:
+			opts = append(opts, decl)
+		case *RPCNode:
+			rpcs = append(rpcs, decl)
+		case *EmptyDeclNode:
+			// no-op
+		default:
+			panic(fmt.Sprintf("invalid ServiceElement type: %T", decl))
+		}
+	}
+
+	return &ServiceNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		Keyword:    keyword,
+		Name:       name,
+		OpenBrace:  open,
+		Options:    opts,
+		RPCs:       rpcs,
+		CloseBrace: close,
+		AllDecls:   decls,
+	}
+}
+
+// ServiceElement is an interface implemented by all AST nodes that can
+// appear in the body of a service declaration.
 type ServiceElement interface {
 	Node
 	serviceElement()
@@ -24,11 +65,11 @@ var _ ServiceElement = (*RPCNode)(nil)
 var _ ServiceElement = (*EmptyDeclNode)(nil)
 
 type RPCNode struct {
-	basicCompositeNode
-	Keyword    *IdentNode
+	compositeNode
+	Keyword    *KeywordNode
 	Name       *IdentNode
 	Input      *RPCTypeNode
-	Returns    *IdentNode
+	Returns    *KeywordNode
 	Output     *RPCTypeNode
 	Semicolon  *RuneNode
 	OpenBrace  *RuneNode
@@ -40,14 +81,67 @@ type RPCNode struct {
 
 func (n *RPCNode) serviceElement() {}
 
+func NewRPCNode(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, returns *KeywordNode, output *RPCTypeNode, semicolon, open *RuneNode, decls []RPCElement, close *RuneNode) *RPCNode {
+	if semicolon != nil {
+		if open != nil || len(decls) > 0 || close != nil {
+			panic("cannot specify both semicolon and RPC body nodes")
+		}
+	}
+	numChildren := 6 + len(decls)
+	if semicolon == nil {
+		numChildren++
+	}
+	children := make([]Node, 0, numChildren)
+	children = append(children, keyword, name, input, returns, output)
+	if semicolon != nil {
+		children = append(children, semicolon)
+	} else {
+		children = append(children, open)
+		for _, decl := range decls {
+			children = append(children, decl)
+		}
+		children = append(children, close)
+	}
+
+	var opts []*OptionNode
+	for _, decl := range decls {
+		switch decl := decl.(type) {
+		case *OptionNode:
+			opts = append(opts, decl)
+		case *EmptyDeclNode:
+			// no-op
+		default:
+			panic(fmt.Sprintf("invalid RPCElement type: %T", decl))
+		}
+	}
+
+	return &RPCNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		Keyword:    keyword,
+		Name:       name,
+		Input:      input,
+		Returns:    returns,
+		Output:     output,
+		Semicolon:  semicolon,
+		OpenBrace:  open,
+		Options:    opts,
+		CloseBrace: close,
+		AllDecls:   decls,
+	}
+}
+
 func (n *RPCNode) GetInputType() Node {
-	return n.Input.MsgType
+	return n.Input.MessageType
 }
 
 func (n *RPCNode) GetOutputType() Node {
-	return n.Output.MsgType
+	return n.Output.MessageType
 }
 
+// RPCElement is an interface implemented by all AST nodes that can
+// appear in the body of an rpc declaration (aka method).
 type RPCElement interface {
 	Node
 	methodElement()
@@ -57,9 +151,28 @@ var _ RPCElement = (*OptionNode)(nil)
 var _ RPCElement = (*EmptyDeclNode)(nil)
 
 type RPCTypeNode struct {
-	basicCompositeNode
-	OpenParen     *RuneNode
-	StreamKeyword *RuneNode
-	MsgType       *CompoundIdentNode
-	CloseParen    *RuneNode
+	compositeNode
+	OpenParen   *RuneNode
+	Stream      *KeywordNode
+	MessageType IdentValueNode
+	CloseParen  *RuneNode
+}
+
+func NewRPCTypeNode(open *RuneNode, stream *KeywordNode, msgType IdentValueNode, close *RuneNode) *RPCTypeNode {
+	var children []Node
+	if stream != nil {
+		children = []Node{open, stream, msgType, close}
+	} else {
+		children = []Node{open, msgType, close}
+	}
+
+	return &RPCTypeNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		OpenParen:   open,
+		Stream:      stream,
+		MessageType: msgType,
+		CloseParen:  close,
+	}
 }
