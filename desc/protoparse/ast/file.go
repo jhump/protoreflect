@@ -166,7 +166,7 @@ type ImportNode struct {
 // and only one or the other (or neither) may be specified, not both. When public is
 // non-nil, it indicates the "public" keyword in the import statement and means this is
 // a public import. When weak is non-nil, it indicates the "weak" keyword in the import
-// statement means this is a weak import. When both are nil, this is a normal import.
+// statement and means this is a weak import. When both are nil, this is a normal import.
 // The other arguments must be non-nil:
 //  - keyword: The token corresponding to the "import" keyword.
 //  - public: The token corresponding to the optional "public" keyword.
