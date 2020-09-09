@@ -28,6 +28,10 @@ func NewIdentNode(val string, info TokenInfo) *IdentNode {
 	}
 }
 
+func (n *IdentNode) RawText() string {
+	return n.Val
+}
+
 func (n *IdentNode) Value() interface{} {
 	return n.AsIdentifier()
 }
@@ -84,4 +88,8 @@ func NewKeywordNode(val string, info TokenInfo) *KeywordNode {
 		terminalNode: info.asTerminalNode(),
 		Val:          val,
 	}
+}
+
+func (n *KeywordNode) RawText() string {
+	return string(n.Val)
 }

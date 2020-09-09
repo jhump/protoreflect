@@ -50,16 +50,21 @@ type StringLiteralNode struct {
 	terminalNode
 	// Val is the actual string value that the literal indicates.
 	Val string
-	// RawText is the text as it appeared in the source file, including
+	// the text as it appeared in the source file, including
 	// quotation marks and interior escape sequences.
-	RawText string
+	rawText string
 }
 
-func NewStringLiteralNode(val string, info TokenInfo) *StringLiteralNode {
+func NewStringLiteralNode(val, rawText string, info TokenInfo) *StringLiteralNode {
 	return &StringLiteralNode{
 		terminalNode: info.asTerminalNode(),
 		Val:          val,
+		rawText:      rawText,
 	}
+}
+
+func (n *StringLiteralNode) RawText() string {
+	return n.rawText
 }
 
 func (n *StringLiteralNode) Value() interface{} {
@@ -126,15 +131,20 @@ type UintLiteralNode struct {
 	terminalNode
 	// Val is the numeric value indicated by the literal
 	Val uint64
-	// RawText is the actual token text as it appeared in the source file.
-	RawText string
+	// rawText is the actual token text as it appeared in the source file.
+	rawText string
 }
 
-func NewUintLiteralNode(val uint64, info TokenInfo) *UintLiteralNode {
+func NewUintLiteralNode(val uint64, rawText string, info TokenInfo) *UintLiteralNode {
 	return &UintLiteralNode{
 		terminalNode: info.asTerminalNode(),
 		Val:          val,
+		rawText:      rawText,
 	}
+}
+
+func (n *UintLiteralNode) RawText() string {
+	return n.rawText
 }
 
 func (n *UintLiteralNode) Value() interface{} {
@@ -240,16 +250,21 @@ type FloatLiteralNode struct {
 	terminalNode
 	// Val is the numeric value indicated by the literal
 	Val float64
-	// RawText is the actual token text as it appeared in the source file,
+	// rawText is the actual token text as it appeared in the source file,
 	// which could be in scientific notation.
-	RawText string
+	rawText string
 }
 
-func NewFloatLiteralNode(val float64, info TokenInfo) *FloatLiteralNode {
+func NewFloatLiteralNode(val float64, rawText string, info TokenInfo) *FloatLiteralNode {
 	return &FloatLiteralNode{
 		terminalNode: info.asTerminalNode(),
 		Val:          val,
+		rawText:      rawText,
 	}
+}
+
+func (n *FloatLiteralNode) RawText() string {
+	return n.rawText
 }
 
 func (n *FloatLiteralNode) Value() interface{} {

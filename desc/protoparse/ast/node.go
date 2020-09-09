@@ -22,12 +22,14 @@ type TerminalNode interface {
 	// token and returns it. If the node has no leading comments then
 	// this method will panic.
 	PopLeadingComment() Comment
-	// PushTrailingComment appends the given comment to the tokens
+	// PushTrailingComment appends the given comment to the token's
 	// trailing comments.
 	PushTrailingComment(Comment)
 	// LeadingWhitespace returns any whitespace between the prior comment
 	// (last leading comment), if any, or prior lexed token and this token.
 	LeadingWhitespace() string
+	// RawText returns the raw text of the token as read from the source.
+	RawText() string
 }
 
 var _ TerminalNode = (*StringLiteralNode)(nil)
@@ -44,14 +46,16 @@ var _ TerminalNode = (*RuneNode)(nil)
 type TokenInfo struct {
 	// The location of the token in the source file.
 	PosRange
+	// The raw text of the token.
+	RawText string
 	// Any comments encountered preceding this token.
 	LeadingComments []Comment
 	// Any leading whitespace immediately preceding this token.
 	LeadingWhitespace string
 	// Any trailing comments following this token. This is usually
 	// empty as tokens are created by the lexer immediately and
-	// trailing comments are accounted for after and added via the
-	// node's PushTrailingComment method.
+	// trailing comments are accounted for afterwards, added using
+	// the node's PushTrailingComment method.
 	TrailingComments []Comment
 }
 
@@ -157,6 +161,10 @@ func NewRuneNode(r rune, info TokenInfo) *RuneNode {
 		terminalNode: info.asTerminalNode(),
 		Rune:         r,
 	}
+}
+
+func (n *RuneNode) RawText() string {
+	return string(n.Rune)
 }
 
 // EmptyDeclNode represents an empty declaration in protobuf source.
