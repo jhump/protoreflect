@@ -81,27 +81,29 @@ type RPCNode struct {
 
 func (n *RPCNode) serviceElement() {}
 
-func NewRPCNode(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, returns *KeywordNode, output *RPCTypeNode, semicolon, open *RuneNode, decls []RPCElement, close *RuneNode) *RPCNode {
-	if semicolon != nil {
-		if open != nil || len(decls) > 0 || close != nil {
-			panic("cannot specify both semicolon and RPC body nodes")
-		}
+func NewRPCNode(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, returns *KeywordNode, output *RPCTypeNode, semicolon *RuneNode) *RPCNode {
+	children := []Node{keyword, name, input, returns, output, semicolon}
+	return &RPCNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		Keyword:   keyword,
+		Name:      name,
+		Input:     input,
+		Returns:   returns,
+		Output:    output,
+		Semicolon: semicolon,
 	}
-	numChildren := 6 + len(decls)
-	if semicolon == nil {
-		numChildren++
+}
+
+func NewRPCNodeWithBody(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, returns *KeywordNode, output *RPCTypeNode, open *RuneNode, decls []RPCElement, close *RuneNode) *RPCNode {
+	children := make([]Node, 0, 7+len(decls))
+	children = append(children, keyword, name, input, returns, output, open)
+	children = append(children, open)
+	for _, decl := range decls {
+		children = append(children, decl)
 	}
-	children := make([]Node, 0, numChildren)
-	children = append(children, keyword, name, input, returns, output)
-	if semicolon != nil {
-		children = append(children, semicolon)
-	} else {
-		children = append(children, open)
-		for _, decl := range decls {
-			children = append(children, decl)
-		}
-		children = append(children, close)
-	}
+	children = append(children, close)
 
 	var opts []*OptionNode
 	for _, decl := range decls {
@@ -124,7 +126,6 @@ func NewRPCNode(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, retur
 		Input:      input,
 		Returns:    returns,
 		Output:     output,
-		Semicolon:  semicolon,
 		OpenBrace:  open,
 		Options:    opts,
 		CloseBrace: close,

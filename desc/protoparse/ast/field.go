@@ -2,6 +2,12 @@ package ast
 
 import "fmt"
 
+// FieldDeclNode is a node in the AST that defines a field. This includes
+// normal message fields as well as extensions. There are multiple types
+// of AST nodes that declare fields:
+//  - *FieldNode
+//  - *GroupNode
+//  - *MapFieldNode
 type FieldDeclNode interface {
 	Node
 	FieldLabel() Node
@@ -164,12 +170,12 @@ func NewGroupNode(label *KeywordNode, keyword *KeywordNode, name *IdentNode, equ
 		compositeNode: compositeNode{
 			children: children,
 		},
-		Label:     newFieldLabel(label),
-		Keyword:   keyword,
-		Name:      name,
-		Equals:    equals,
-		Tag:       tag,
-		Options:   opts,
+		Label:   newFieldLabel(label),
+		Keyword: keyword,
+		Name:    name,
+		Equals:  equals,
+		Tag:     tag,
+		Options: opts,
 	}
 	populateMessageBody(&ret.MessageBody, open, decls, close)
 	return ret
@@ -226,7 +232,7 @@ type OneOfNode struct {
 func (*OneOfNode) msgElement() {}
 
 func NewOneOfNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []OneOfElement, close *RuneNode) *OneOfNode {
-	children := make([]Node, 4 + len(decls))
+	children := make([]Node, 4+len(decls))
 	children = append(children, keyword, name, open)
 	for _, decl := range decls {
 		children = append(children, decl)
@@ -369,14 +375,24 @@ func (n *MapFieldNode) MessageName() Node {
 }
 
 func (n *MapFieldNode) KeyField() *SyntheticMapField {
-	k := n.MapType.KeyType
-	return NewSyntheticMapField(k, 1)
+	return NewSyntheticMapField(n.MapType.KeyType, 1)
 }
 
 func (n *MapFieldNode) ValueField() *SyntheticMapField {
 	return NewSyntheticMapField(n.MapType.ValueType, 2)
 }
 
+// SyntheticMapField is not an actual node in the AST but a synthetic node
+// that implements FieldDeclNode. These are used to represent the implicit
+// field declarations of the "key" and "value" fields in a map entry.
+type SyntheticMapField struct {
+	Ident IdentValueNode
+	Tag   *UintLiteralNode
+}
+
+// NewSyntheticMapField creates a new *SyntheticMapField for the given
+// identifier (either a key or value type in a map declaration) and tag
+// number (1 for key, 2 for value).
 func NewSyntheticMapField(ident IdentValueNode, tagNum uint64) *SyntheticMapField {
 	tag := &UintLiteralNode{
 		terminalNode: terminalNode{
@@ -385,11 +401,6 @@ func NewSyntheticMapField(ident IdentValueNode, tagNum uint64) *SyntheticMapFiel
 		Val: tagNum,
 	}
 	return &SyntheticMapField{Ident: ident, Tag: tag}
-}
-
-type SyntheticMapField struct {
-	Ident IdentValueNode
-	Tag   *UintLiteralNode
 }
 
 func (n *SyntheticMapField) Start() *SourcePos {

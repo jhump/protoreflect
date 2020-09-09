@@ -107,8 +107,8 @@ type Visitor struct {
 	VisitCompoundIdentNode func(*CompoundIdentNode) (bool, *Visitor)
 	// VisitStringLiteralNode is invoked when visiting a *StringLiteralNode in the AST.
 	VisitStringLiteralNode func(*StringLiteralNode) (bool, *Visitor)
-	// VisitCompoundStringLiteralNode is invoked when visiting a *CompoundStringListeralNode in the AST.
-	VisitCompoundStringLiteralNode func(*CompoundStringListeralNode) (bool, *Visitor)
+	// VisitCompoundStringLiteralNode is invoked when visiting a *CompoundStringLiteralNode in the AST.
+	VisitCompoundStringLiteralNode func(*CompoundStringLiteralNode) (bool, *Visitor)
 	// VisitUintLiteralNode is invoked when visiting a *UintLiteralNode in the AST.
 	VisitUintLiteralNode func(*UintLiteralNode) (bool, *Visitor)
 	// VisitPositiveUintLiteralNode is invoked when visiting a *PositiveUintLiteralNode in the AST.
@@ -123,10 +123,12 @@ type Visitor struct {
 	VisitSignedFloatLiteralNode func(*SignedFloatLiteralNode) (bool, *Visitor)
 	// VisitBoolLiteralNode is invoked when visiting a *BoolLiteralNode in the AST.
 	VisitBoolLiteralNode func(*BoolLiteralNode) (bool, *Visitor)
-	// VisitSliceLiteralNode is invoked when visiting a *SliceLiteralNode in the AST.
-	VisitSliceLiteralNode func(*SliceLiteralNode) (bool, *Visitor)
-	// VisitAggregateLiteralNode is invoked when visiting an *AggregateLiteralNode in the AST.
-	VisitAggregateLiteralNode func(*AggregateLiteralNode) (bool, *Visitor)
+	// VisitArrayLiteralNode is invoked when visiting an *ArrayLiteralNode in the AST.
+	VisitArrayLiteralNode func(*ArrayLiteralNode) (bool, *Visitor)
+	// VisitMessageLiteralNode is invoked when visiting a *MessageLiteralNode in the AST.
+	VisitMessageLiteralNode func(*MessageLiteralNode) (bool, *Visitor)
+	// VisitMessageFieldNode is invoked when visiting a *MessageFieldNode in the AST.
+	VisitMessageFieldNode func(*MessageFieldNode) (bool, *Visitor)
 	// VisitKeywordNode is invoked when visiting a *KeywordNode in the AST.
 	VisitKeywordNode func(*KeywordNode) (bool, *Visitor)
 	// VisitRuneNode is invoked when visiting a *RuneNode in the AST.
@@ -175,7 +177,7 @@ type Visitor struct {
 	// This function is used when no concrete type function is provided
 	// no more specific interface type function is provided.
 	VisitCompositeNode func(CompositeNode) (bool, *Visitor)
-	// VisitNode is invoked when visiting a Node in the AST. Tbis
+	// VisitNode is invoked when visiting a Node in the AST. This
 	// function is only used when no other more specific function is
 	// provided.
 	VisitNode func(Node) (bool, *Visitor)
@@ -317,7 +319,7 @@ func (v *Visitor) Visit(n Node) (bool, VisitFunc) {
 			matched = true
 			ok, next = v.VisitStringLiteralNode(n)
 		}
-	case *CompoundStringListeralNode:
+	case *CompoundStringLiteralNode:
 		if v.VisitCompoundStringLiteralNode != nil {
 			matched = true
 			ok, next = v.VisitCompoundStringLiteralNode(n)
@@ -357,15 +359,20 @@ func (v *Visitor) Visit(n Node) (bool, VisitFunc) {
 			matched = true
 			ok, next = v.VisitBoolLiteralNode(n)
 		}
-	case *SliceLiteralNode:
-		if v.VisitSliceLiteralNode != nil {
+	case *ArrayLiteralNode:
+		if v.VisitArrayLiteralNode != nil {
 			matched = true
-			ok, next = v.VisitSliceLiteralNode(n)
+			ok, next = v.VisitArrayLiteralNode(n)
 		}
-	case *AggregateLiteralNode:
-		if v.VisitAggregateLiteralNode != nil {
+	case *MessageLiteralNode:
+		if v.VisitMessageLiteralNode != nil {
 			matched = true
-			ok, next = v.VisitAggregateLiteralNode(n)
+			ok, next = v.VisitMessageLiteralNode(n)
+		}
+	case *MessageFieldNode:
+		if v.VisitMessageFieldNode != nil {
+			matched = true
+			ok, next = v.VisitMessageFieldNode(n)
 		}
 	case *KeywordNode:
 		if v.VisitKeywordNode != nil {

@@ -1,5 +1,11 @@
 package ast
 
+// OptionDeclNode is a node in the AST that defines an option. This
+// includes both syntaxes for options:
+//  - *OptionNode (normal syntax found in files, messages, enums,
+//    services, and methods)
+//  - *CompactOptionNode (abbreviated syntax found in fields,
+//    enum values, extension ranges)
 type OptionDeclNode interface {
 	Node
 	GetName() Node
@@ -11,7 +17,7 @@ var _ OptionDeclNode = (*CompactOptionNode)(nil)
 
 type OptionNode struct {
 	compositeNode
-	Keyword   *KeywordNode
+	Keyword *KeywordNode
 	OptionBody
 	Semicolon *RuneNode
 }
@@ -31,18 +37,18 @@ func NewOptionNode(keyword *KeywordNode, name *OptionNameNode, equals *RuneNode,
 		},
 		Keyword: keyword,
 		OptionBody: OptionBody{
-			Name: name,
+			Name:   name,
 			Equals: equals,
-			Val: val,
+			Val:    val,
 		},
 		Semicolon: semicolon,
 	}
 }
 
 type OptionBody struct {
-	Name      *OptionNameNode
-	Equals    *RuneNode
-	Val       ValueNode
+	Name   *OptionNameNode
+	Equals *RuneNode
+	Val    ValueNode
 }
 
 func (n *OptionBody) GetName() Node {
@@ -72,7 +78,7 @@ func NewOptionNameNode(parts []*FieldReferenceNode, dots []*RuneNode) *OptionNam
 			children: children,
 		},
 		Parts: parts,
-		Dots: dots,
+		Dots:  dots,
 	}
 }
 
@@ -154,9 +160,9 @@ func NewCompactOptionNode(name *OptionNameNode, equals *RuneNode, val ValueNode)
 			children: children,
 		},
 		OptionBody: OptionBody{
-			Name: name,
+			Name:   name,
 			Equals: equals,
-			Val: val,
+			Val:    val,
 		},
 	}
 }

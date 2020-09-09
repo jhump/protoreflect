@@ -2,10 +2,11 @@ package ast
 
 import "fmt"
 
-// FileNode is the root of the AST hierarchy.
+// FileNode is the root of the AST hierarchy. It represents an entire
+// protobuf source file.
 type FileNode struct {
 	compositeNode
-	Syntax   *SyntaxNode // nil if file has no syntax declaration
+	Syntax *SyntaxNode // nil if file has no syntax declaration
 
 	// Any package declarations in the file. Note that a valid file
 	// will have only zero or one such declaration.
@@ -19,10 +20,12 @@ type FileNode struct {
 
 	// All of the above elements in their original order as encountered
 	// in the source file.
-	AllDecls    []FileElement
-
-	// This provides access to all comments in the entire file.
-	AllComments []Comment
+	AllDecls []FileElement
+	// Any comments that follow the last token in the file.
+	FinalComments []Comment
+	// Any whitespace at the end of the file (after the last token or
+	// last comment in the file).
+	FinalWhitespace string
 }
 
 // NewFileElement creates a new *FileNode. The syntax parameter is optional. If it
@@ -88,15 +91,6 @@ func NewFileElement(syntax *SyntaxNode, decls []FileElement) *FileNode {
 		AllDecls: decls,
 	}
 
-	Walk(ret, func(n Node) (bool, VisitFunc) {
-		if _, ok := n.(TerminalNode); ok {
-			ret.AllComments = append(ret.AllComments, n.LeadingComments()...)
-			ret.AllComments = append(ret.AllComments, n.TrailingComments()...)
-			return false, nil
-		}
-		return true, nil
-	})
-
 	return ret
 }
 
@@ -153,9 +147,9 @@ func NewSyntaxNode(keyword *KeywordNode, equals *RuneNode, syntax StringValueNod
 //  import "google/protobuf/empty.proto";
 type ImportNode struct {
 	compositeNode
-	Keyword   *KeywordNode
+	Keyword *KeywordNode
 	// Optional; if present indicates this is a public import
-	Public    *KeywordNode
+	Public *KeywordNode
 	// Optional; if present indicates this is a weak import
 	Weak      *KeywordNode
 	Name      StringValueNode

@@ -7,6 +7,7 @@ import "strings"
 // string literals.
 type Identifier string
 
+// IdentValueNode is an AST node that represents an identifier.
 type IdentValueNode interface {
 	ValueNode
 	AsIdentifier() Identifier
@@ -22,12 +23,8 @@ type IdentNode struct {
 
 func NewIdentNode(val string, info TokenInfo) *IdentNode {
 	return &IdentNode{
-		terminalNode: terminalNode{
-			posRange: info.PosRange,
-			leading:  info.LeadingComments,
-			trailing: info.TrailingComments,
-		},
-		Val: val,
+		terminalNode: info.asTerminalNode(),
+		Val:          val,
 	}
 }
 
@@ -51,7 +48,7 @@ type CompoundIdentNode struct {
 }
 
 func NewCompoundIdentNode(components []*IdentNode, dots []*RuneNode) *CompoundIdentNode {
-	children := make([]Node, 0, len(components)*2 - 1)
+	children := make([]Node, 0, len(components)*2-1)
 	var b strings.Builder
 	for i, comp := range components {
 		if i > 0 {
@@ -84,11 +81,7 @@ type KeywordNode IdentNode
 
 func NewKeywordNode(val string, info TokenInfo) *KeywordNode {
 	return &KeywordNode{
-		terminalNode: terminalNode{
-			posRange: info.PosRange,
-			leading:  info.LeadingComments,
-			trailing: info.TrailingComments,
-		},
-		Val: val,
+		terminalNode: info.asTerminalNode(),
+		Val:          val,
 	}
 }

@@ -2,6 +2,9 @@ package ast
 
 import "fmt"
 
+// EnumNode represents an enum declaration. Example:
+//
+//  enum Foo { BAR = 0; BAZ = 1 }
 type EnumNode struct {
 	compositeNode
 	Keyword    *KeywordNode
@@ -18,6 +21,14 @@ type EnumNode struct {
 func (*EnumNode) fileElement() {}
 func (*EnumNode) msgElement()  {}
 
+// NewEnumNode creates a new *EnumNode. All arguments must be non-nil. While
+// it is technically allowed for decls to be nil or empty, the resulting node
+// will not be a valid enum, which must have at least one value.
+//  - keyword: The token corresponding to the "enum" keyword.
+//  - name: The token corresponding to the enum's name.
+//  - open: The token corresponding to the "{" rune that starts the body.
+//  - decls: All declarations inside the enum body.
+//  - close: The token corresponding to the "}" rune that ends the body.
 func NewEnumNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []EnumElement, close *RuneNode) *EnumNode {
 	children := make([]Node, 0, 4+len(decls))
 	children = append(children, keyword, name, open)
@@ -71,6 +82,9 @@ var _ EnumElement = (*EnumValueNode)(nil)
 var _ EnumElement = (*ReservedNode)(nil)
 var _ EnumElement = (*EmptyDeclNode)(nil)
 
+// EnumNode represents an enum declaration. Example:
+//
+//  UNSET = 0 [deprecated = true];
 type EnumValueNode struct {
 	compositeNode
 	Name      *IdentNode
@@ -82,7 +96,14 @@ type EnumValueNode struct {
 
 func (e *EnumValueNode) enumElement() {}
 
-func NewEnumValueNode(name *IdentNode, equals *RuneNode, number IntValueNode,opts *CompactOptionsNode, semicolon *RuneNode) *EnumValueNode {
+// NewEnumValueNode creates a new *EnumValueNode. All arguments must be non-nil
+// except opts which is only non-nil if the declaration included options.
+//  - name: The token corresponding to the enum value's name.
+//  - equals: The token corresponding to the '=' rune after the name.
+//  - number: The token corresponding to the enum value's number.
+//  - opts: Optional set of enum value options.
+//  - semicolon: The token corresponding to the ":" rune that ends the declaration.
+func NewEnumValueNode(name *IdentNode, equals *RuneNode, number IntValueNode, opts *CompactOptionsNode, semicolon *RuneNode) *EnumValueNode {
 	children := []Node{
 		name, equals, number, opts, semicolon,
 	}

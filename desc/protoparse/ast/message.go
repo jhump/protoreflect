@@ -2,6 +2,11 @@ package ast
 
 import "fmt"
 
+// MessageDeclNode is a node in the AST that defines a message type. This
+// includes normal message fields as well as implicit messages:
+//  - *MessageNode
+//  - *GroupNode (the group is a field and inline message type)
+//  - *MapFieldNode (map fields implicitly define a MapEntry message type)
 type MessageDeclNode interface {
 	Node
 	MessageName() Node
@@ -23,7 +28,7 @@ func (*MessageNode) fileElement() {}
 func (*MessageNode) msgElement()  {}
 
 func NewMessageNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []MessageElement, close *RuneNode) *MessageNode {
-	children := make([]Node, 4 + len(decls))
+	children := make([]Node, 4+len(decls))
 	children = append(children, keyword, name, open)
 	for _, decl := range decls {
 		children = append(children, decl)
@@ -132,7 +137,7 @@ func (*ExtendNode) fileElement() {}
 func (*ExtendNode) msgElement()  {}
 
 func NewExtendNode(keyword *KeywordNode, extendee IdentValueNode, open *RuneNode, decls []ExtendElement, close *RuneNode) *ExtendNode {
-	children := make([]Node, 4 + len(decls))
+	children := make([]Node, 4+len(decls))
 	children = append(children, keyword, extendee, open)
 	for _, decl := range decls {
 		children = append(children, decl)

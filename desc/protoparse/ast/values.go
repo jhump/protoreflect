@@ -12,13 +12,19 @@ import (
 // for a field, which can refer to an enum value.
 type ValueNode interface {
 	Node
+	// Value returns a Go representation of the value. For scalars, this
+	// will be a string, int64, uint64, float64, or bool. This could also
+	// be an Identifier (e.g. IdentValueNodes). It can also be a composite
+	// literal:
+	//   * For array literals, the type returned will be []ValueNode
+	//   * For message literals, the type returned will be []*MessageFieldNode
 	Value() interface{}
 }
 
 var _ ValueNode = (*IdentNode)(nil)
 var _ ValueNode = (*CompoundIdentNode)(nil)
 var _ ValueNode = (*StringLiteralNode)(nil)
-var _ ValueNode = (*CompoundStringListeralNode)(nil)
+var _ ValueNode = (*CompoundStringLiteralNode)(nil)
 var _ ValueNode = (*UintLiteralNode)(nil)
 var _ ValueNode = (*PositiveUintLiteralNode)(nil)
 var _ ValueNode = (*NegativeIntLiteralNode)(nil)
@@ -26,30 +32,33 @@ var _ ValueNode = (*FloatLiteralNode)(nil)
 var _ ValueNode = (*SpecialFloatLiteralNode)(nil)
 var _ ValueNode = (*SignedFloatLiteralNode)(nil)
 var _ ValueNode = (*BoolLiteralNode)(nil)
-var _ ValueNode = (*SliceLiteralNode)(nil)
-var _ ValueNode = (*AggregateLiteralNode)(nil)
+var _ ValueNode = (*ArrayLiteralNode)(nil)
+var _ ValueNode = (*MessageLiteralNode)(nil)
 
+// StringValueNode is an AST node that represents a string literal.
+// Such a node can be a single literal (*StringLiteralNode) or a
+// concatenation of multiple literals (*CompoundStringLiteralNode).
 type StringValueNode interface {
 	ValueNode
 	AsString() string
 }
 
 var _ StringValueNode = (*StringLiteralNode)(nil)
-var _ StringValueNode = (*CompoundStringListeralNode)(nil)
+var _ StringValueNode = (*CompoundStringLiteralNode)(nil)
 
 type StringLiteralNode struct {
 	terminalNode
+	// Val is the actual string value that the literal indicates.
 	Val string
+	// RawText is the text as it appeared in the source file, including
+	// quotation marks and interior escape sequences.
+	RawText string
 }
 
 func NewStringLiteralNode(val string, info TokenInfo) *StringLiteralNode {
 	return &StringLiteralNode{
-		terminalNode: terminalNode{
-			posRange: info.PosRange,
-			leading:  info.LeadingComments,
-			trailing: info.TrailingComments,
-		},
-		Val: val,
+		terminalNode: info.asTerminalNode(),
+		Val:          val,
 	}
 }
 
@@ -61,19 +70,19 @@ func (n *StringLiteralNode) AsString() string {
 	return n.Val
 }
 
-type CompoundStringListeralNode struct {
+type CompoundStringLiteralNode struct {
 	compositeNode
 	Val string
 }
 
-func NewCompoundLiteralStringNode(components ...*StringLiteralNode) *CompoundStringListeralNode {
+func NewCompoundLiteralStringNode(components ...*StringLiteralNode) *CompoundStringLiteralNode {
 	children := make([]Node, len(components))
 	var b strings.Builder
 	for i, comp := range components {
 		children[i] = comp
 		b.WriteString(comp.Val)
 	}
-	return &CompoundStringListeralNode{
+	return &CompoundStringLiteralNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
@@ -81,14 +90,17 @@ func NewCompoundLiteralStringNode(components ...*StringLiteralNode) *CompoundStr
 	}
 }
 
-func (n *CompoundStringListeralNode) Value() interface{} {
+func (n *CompoundStringLiteralNode) Value() interface{} {
 	return n.AsString()
 }
 
-func (n *CompoundStringListeralNode) AsString() string {
+func (n *CompoundStringLiteralNode) AsString() string {
 	return n.Val
 }
 
+// IntValueNode is an AST node that represents an integer literal. If
+// an integer literal is too large for an int64 (or uint64 for
+// positive literals), it is represented instead by a FloatValueNode.
 type IntValueNode interface {
 	ValueNode
 	AsInt64() (int64, bool)
@@ -112,17 +124,16 @@ var _ IntValueNode = (*NegativeIntLiteralNode)(nil)
 
 type UintLiteralNode struct {
 	terminalNode
+	// Val is the numeric value indicated by the literal
 	Val uint64
+	// RawText is the actual token text as it appeared in the source file.
+	RawText string
 }
 
 func NewUintLiteralNode(val uint64, info TokenInfo) *UintLiteralNode {
 	return &UintLiteralNode{
-		terminalNode: terminalNode{
-			posRange: info.PosRange,
-			leading:  info.LeadingComments,
-			trailing: info.TrailingComments,
-		},
-		Val: val,
+		terminalNode: info.asTerminalNode(),
+		Val:          val,
 	}
 }
 
@@ -213,6 +224,9 @@ func (n *NegativeIntLiteralNode) AsUint64() (uint64, bool) {
 	return uint64(n.Val), true
 }
 
+// FloatValueNode is an AST node that represents a numeric literal with
+// a floating point, in scientific notation, or too large to fit in an
+// int64 or uint64.
 type FloatValueNode interface {
 	ValueNode
 	AsFloat() float64
@@ -224,17 +238,17 @@ var _ FloatValueNode = (*UintLiteralNode)(nil)
 
 type FloatLiteralNode struct {
 	terminalNode
+	// Val is the numeric value indicated by the literal
 	Val float64
+	// RawText is the actual token text as it appeared in the source file,
+	// which could be in scientific notation.
+	RawText string
 }
 
 func NewFloatLiteralNode(val float64, info TokenInfo) *FloatLiteralNode {
 	return &FloatLiteralNode{
-		terminalNode: terminalNode{
-			posRange: info.PosRange,
-			leading:  info.LeadingComments,
-			trailing: info.TrailingComments,
-		},
-		Val: val,
+		terminalNode: info.asTerminalNode(),
+		Val:          val,
 	}
 }
 
@@ -279,11 +293,11 @@ type SignedFloatLiteralNode struct {
 	Val   float64
 }
 
-func NewSignedFloatLiteralNode(sign *RuneNode, f *FloatLiteralNode) *SignedFloatLiteralNode {
+func NewSignedFloatLiteralNode(sign *RuneNode, f FloatValueNode) *SignedFloatLiteralNode {
 	children := []Node{sign, f}
-	val := f.Val
+	val := f.AsFloat()
 	if sign.Rune == '-' {
-		val = -f.Val
+		val = -val
 	}
 	return &SignedFloatLiteralNode{
 		compositeNode: compositeNode{
@@ -315,7 +329,7 @@ func (n *BoolLiteralNode) Value() interface{} {
 	return n.Val
 }
 
-type SliceLiteralNode struct {
+type ArrayLiteralNode struct {
 	compositeNode
 	OpenBracket  *RuneNode
 	Elements     []ValueNode
@@ -323,8 +337,8 @@ type SliceLiteralNode struct {
 	CloseBracket *RuneNode
 }
 
-func NewSliceLiteralNode(open *RuneNode, vals []ValueNode, commas []*RuneNode, close *RuneNode) *SliceLiteralNode {
-	children := make([]Node, len(vals)*2 + 1)
+func NewArrayLiteralNode(open *RuneNode, vals []ValueNode, commas []*RuneNode, close *RuneNode) *ArrayLiteralNode {
+	children := make([]Node, len(vals)*2+1)
 	children = append(children, open)
 	for i, val := range vals {
 		if i > 0 {
@@ -334,7 +348,7 @@ func NewSliceLiteralNode(open *RuneNode, vals []ValueNode, commas []*RuneNode, c
 	}
 	children = append(children, close)
 
-	return &SliceLiteralNode{
+	return &ArrayLiteralNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
@@ -345,26 +359,26 @@ func NewSliceLiteralNode(open *RuneNode, vals []ValueNode, commas []*RuneNode, c
 	}
 }
 
-func (n *SliceLiteralNode) Value() interface{} {
+func (n *ArrayLiteralNode) Value() interface{} {
 	return n.Elements
 }
 
-type AggregateLiteralNode struct {
+type MessageLiteralNode struct {
 	compositeNode
 	Open     *RuneNode
-	Elements []*AggregateEntryNode
+	Elements []*MessageFieldNode
 	Close    *RuneNode
 }
 
-func NewAggregateLiteralNode(open *RuneNode, vals []*AggregateEntryNode, close *RuneNode) *AggregateLiteralNode {
-	children := make([]Node, len(vals) + 2)
+func NewMessageLiteralNode(open *RuneNode, vals []*MessageFieldNode, close *RuneNode) *MessageLiteralNode {
+	children := make([]Node, len(vals)+2)
 	children = append(children, open)
 	for _, val := range vals {
 		children = append(children, val)
 	}
 	children = append(children, close)
 
-	return &AggregateLiteralNode{
+	return &MessageLiteralNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
@@ -374,24 +388,24 @@ func NewAggregateLiteralNode(open *RuneNode, vals []*AggregateEntryNode, close *
 	}
 }
 
-func (n *AggregateLiteralNode) Value() interface{} {
+func (n *MessageLiteralNode) Value() interface{} {
 	return n.Elements
 }
 
-type AggregateEntryNode struct {
+type MessageFieldNode struct {
 	compositeNode
-	Name *FieldReferenceNode
-	Sep  *RuneNode
-	Val  ValueNode
-	End  *RuneNode
+	Name  *FieldReferenceNode
+	Sep   *RuneNode
+	Val   ValueNode
+	Final *RuneNode
 }
 
-func NewAggregateEntryNode(name *FieldReferenceNode, sep *RuneNode, val ValueNode, end *RuneNode) *AggregateEntryNode {
+func NewMessageFieldNode(name *FieldReferenceNode, sep *RuneNode, val ValueNode, final *RuneNode) *MessageFieldNode {
 	numChildren := 2
 	if sep != nil {
 		numChildren++
 	}
-	if end != nil {
+	if final != nil {
 		numChildren++
 	}
 	children := make([]Node, 0, numChildren)
@@ -400,17 +414,17 @@ func NewAggregateEntryNode(name *FieldReferenceNode, sep *RuneNode, val ValueNod
 		children = append(children, sep)
 	}
 	children = append(children, val)
-	if end != nil {
-		children = append(children, end)
+	if final != nil {
+		children = append(children, final)
 	}
 
-	return &AggregateEntryNode{
+	return &MessageFieldNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
-		Name: name,
-		Sep:  sep,
-		Val:  val,
-		End:  end,
+		Name:  name,
+		Sep:   sep,
+		Val:   val,
+		Final: final,
 	}
 }

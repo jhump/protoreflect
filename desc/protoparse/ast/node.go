@@ -12,10 +12,22 @@ type Node interface {
 	TrailingComments() []Comment
 }
 
+// TerminalNode represents a leaf in the AST. These represent
+// the tokens/lexemes in the protobuf language. Comments and
+// whitespace are accumulated by the lexer and associated with
+// the following lexed token.
 type TerminalNode interface {
 	Node
+	// PopLeadingComment removes the first leading comment from this
+	// token and returns it. If the node has no leading comments then
+	// this method will panic.
 	PopLeadingComment() Comment
+	// PushTrailingComment appends the given comment to the tokens
+	// trailing comments.
 	PushTrailingComment(Comment)
+	// LeadingWhitespace returns any whitespace between the prior comment
+	// (last leading comment), if any, or prior lexed token and this token.
+	LeadingWhitespace() string
 }
 
 var _ TerminalNode = (*StringLiteralNode)(nil)
@@ -27,21 +39,48 @@ var _ TerminalNode = (*SpecialFloatLiteralNode)(nil)
 var _ TerminalNode = (*KeywordNode)(nil)
 var _ TerminalNode = (*RuneNode)(nil)
 
+// TokenInfo represents state accumulated by the lexer to associated with a
+// token (aka terminal node).
 type TokenInfo struct {
+	// The location of the token in the source file.
 	PosRange
-	LeadingComments  []Comment
+	// Any comments encountered preceding this token.
+	LeadingComments []Comment
+	// Any leading whitespace immediately preceding this token.
+	LeadingWhitespace string
+	// Any trailing comments following this token. This is usually
+	// empty as tokens are created by the lexer immediately and
+	// trailing comments are accounted for after and added via the
+	// node's PushTrailingComment method.
 	TrailingComments []Comment
 }
 
+func (t *TokenInfo) asTerminalNode() terminalNode {
+	return terminalNode{
+		posRange:          t.PosRange,
+		leadingComments:   t.LeadingComments,
+		leadingWhitespace: t.LeadingWhitespace,
+		trailingComments:  t.TrailingComments,
+	}
+}
+
+// CompositeNode represents any non-terminal node in the tree. These
+// are interior or root nodes and have child nodes.
 type CompositeNode interface {
 	Node
+	// All AST nodes that are immediate children of this one.
 	Children() []Node
 }
 
+// terminalNode contains book-keeping shared by all TerminalNode
+// implementations. It is embedded in all such node types in this
+// package. It provides the implementation of the TerminalNode
+// interface.
 type terminalNode struct {
-	posRange PosRange
-	leading  []Comment
-	trailing []Comment
+	posRange          PosRange
+	leadingComments   []Comment
+	leadingWhitespace string
+	trailingComments  []Comment
 }
 
 func (n *terminalNode) Start() *SourcePos {
@@ -53,23 +92,31 @@ func (n *terminalNode) End() *SourcePos {
 }
 
 func (n *terminalNode) LeadingComments() []Comment {
-	return n.leading
+	return n.leadingComments
 }
 
 func (n *terminalNode) TrailingComments() []Comment {
-	return n.trailing
+	return n.trailingComments
 }
 
 func (n *terminalNode) PopLeadingComment() Comment {
-	c := n.leading[0]
-	n.leading = n.leading[1:]
+	c := n.leadingComments[0]
+	n.leadingComments = n.leadingComments[1:]
 	return c
 }
 
 func (n *terminalNode) PushTrailingComment(c Comment) {
-	n.trailing = append(n.trailing, c)
+	n.leadingComments = append(n.leadingComments, c)
 }
 
+func (n *terminalNode) LeadingWhitespace() string {
+	return n.leadingWhitespace
+}
+
+// compositeNode contains book-keeping shared by all CompositeNode
+// implementations. It is embedded in all such node types in this
+// package. It provides the implementation of the CompositeNode
+// interface.
 type compositeNode struct {
 	children []Node
 }
@@ -94,27 +141,34 @@ func (n *compositeNode) TrailingComments() []Comment {
 	return n.children[len(n.children)-1].TrailingComments()
 }
 
+// RuneNode represents a single rune in protobuf source. Runes
+// are typically collected into tokens, but some runes stand on
+// their own, such as punctuation/symbols like commas, semicolons,
+// equals signs, open and close symbols (braces, brackets, angles,
+// and parentheses), and periods/dots.
 type RuneNode struct {
 	terminalNode
 	Rune rune
 }
 
+// NewRuneNode creates a new *RuneNode with the given properties.
 func NewRuneNode(r rune, info TokenInfo) *RuneNode {
 	return &RuneNode{
-		terminalNode: terminalNode{
-			posRange: info.PosRange,
-			leading:  info.LeadingComments,
-			trailing: info.TrailingComments,
-		},
-		Rune: r,
+		terminalNode: info.asTerminalNode(),
+		Rune:         r,
 	}
 }
 
+// EmptyDeclNode represents an empty declaration in protobuf source.
+// These amount to extra semicolons, with no actual content preceding
+// the semicolon.
 type EmptyDeclNode struct {
 	compositeNode
 	Semicolon *RuneNode
 }
 
+// NewEmptyDeclNode creates a new *EmptyDeclNode. The one argument must
+// be non-nil.
 func NewEmptyDeclNode(semicolon *RuneNode) *EmptyDeclNode {
 	return &EmptyDeclNode{
 		compositeNode: compositeNode{
