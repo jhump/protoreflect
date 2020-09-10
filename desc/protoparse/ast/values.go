@@ -334,25 +334,25 @@ type ArrayLiteralNode struct {
 	CloseBracket *RuneNode
 }
 
-func NewArrayLiteralNode(open *RuneNode, vals []ValueNode, commas []*RuneNode, close *RuneNode) *ArrayLiteralNode {
+func NewArrayLiteralNode(openBracket *RuneNode, vals []ValueNode, commas []*RuneNode, closeBracket *RuneNode) *ArrayLiteralNode {
 	children := make([]Node, 0, len(vals)*2+1)
-	children = append(children, open)
+	children = append(children, openBracket)
 	for i, val := range vals {
 		if i > 0 {
 			children = append(children, commas[i-1])
 		}
 		children = append(children, val)
 	}
-	children = append(children, close)
+	children = append(children, closeBracket)
 
 	return &ArrayLiteralNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
-		OpenBracket:  open,
+		OpenBracket:  openBracket,
 		Elements:     vals,
 		Commas:       commas,
-		CloseBracket: close,
+		CloseBracket: closeBracket,
 	}
 }
 
@@ -373,7 +373,7 @@ type MessageLiteralNode struct {
 	Close *RuneNode
 }
 
-func NewMessageLiteralNode(open *RuneNode, vals []*MessageFieldNode, seps []*RuneNode, close *RuneNode) *MessageLiteralNode {
+func NewMessageLiteralNode(openSym *RuneNode, vals []*MessageFieldNode, seps []*RuneNode, closeSym *RuneNode) *MessageLiteralNode {
 	numChildren := len(vals) + 2
 	for _, sep := range seps {
 		if sep != nil {
@@ -381,23 +381,23 @@ func NewMessageLiteralNode(open *RuneNode, vals []*MessageFieldNode, seps []*Run
 		}
 	}
 	children := make([]Node, 0, numChildren)
-	children = append(children, open)
+	children = append(children, openSym)
 	for i, val := range vals {
 		if i > 0 && seps[i-1] != nil {
 			children = append(children, seps[i-1])
 		}
 		children = append(children, val)
 	}
-	children = append(children, close)
+	children = append(children, closeSym)
 
 	return &MessageLiteralNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
-		Open:     open,
+		Open:     openSym,
 		Elements: vals,
 		Seps:     seps,
-		Close:    close,
+		Close:    closeSym,
 	}
 }
 

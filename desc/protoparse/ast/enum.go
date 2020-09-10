@@ -26,16 +26,16 @@ func (*EnumNode) msgElement()  {}
 // will not be a valid enum, which must have at least one value.
 //  - keyword: The token corresponding to the "enum" keyword.
 //  - name: The token corresponding to the enum's name.
-//  - open: The token corresponding to the "{" rune that starts the body.
+//  - openBrace: The token corresponding to the "{" rune that starts the body.
 //  - decls: All declarations inside the enum body.
-//  - close: The token corresponding to the "}" rune that ends the body.
-func NewEnumNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []EnumElement, close *RuneNode) *EnumNode {
+//  - closeBrace: The token corresponding to the "}" rune that ends the body.
+func NewEnumNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []EnumElement, closeBrace *RuneNode) *EnumNode {
 	children := make([]Node, 0, 4+len(decls))
-	children = append(children, keyword, name, open)
+	children = append(children, keyword, name, openBrace)
 	for _, decl := range decls {
 		children = append(children, decl)
 	}
-	children = append(children, close)
+	children = append(children, closeBrace)
 
 	var opts []*OptionNode
 	var vals []*EnumValueNode
@@ -61,11 +61,11 @@ func NewEnumNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []
 		},
 		Keyword:    keyword,
 		Name:       name,
-		OpenBrace:  open,
+		OpenBrace:  openBrace,
 		Options:    opts,
 		Values:     vals,
 		Reserved:   rsvd,
-		CloseBrace: close,
+		CloseBrace: closeBrace,
 		AllDecls:   decls,
 	}
 }

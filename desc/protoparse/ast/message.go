@@ -28,13 +28,13 @@ type MessageNode struct {
 func (*MessageNode) fileElement() {}
 func (*MessageNode) msgElement()  {}
 
-func NewMessageNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []MessageElement, close *RuneNode) *MessageNode {
+func NewMessageNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []MessageElement, closeBrace *RuneNode) *MessageNode {
 	children := make([]Node, 0, 4+len(decls))
-	children = append(children, keyword, name, open)
+	children = append(children, keyword, name, openBrace)
 	for _, decl := range decls {
 		children = append(children, decl)
 	}
-	children = append(children, close)
+	children = append(children, closeBrace)
 
 	ret := &MessageNode{
 		compositeNode: compositeNode{
@@ -43,7 +43,7 @@ func NewMessageNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls
 		Keyword: keyword,
 		Name:    name,
 	}
-	populateMessageBody(&ret.MessageBody, open, decls, close)
+	populateMessageBody(&ret.MessageBody, openBrace, decls, closeBrace)
 	return ret
 }
 
@@ -70,8 +70,8 @@ type MessageBody struct {
 	AllDecls []MessageElement
 }
 
-func populateMessageBody(m *MessageBody, open *RuneNode, decls []MessageElement, close *RuneNode) {
-	m.OpenBrace = open
+func populateMessageBody(m *MessageBody, openBrace *RuneNode, decls []MessageElement, closeBrace *RuneNode) {
+	m.OpenBrace = openBrace
 	m.AllDecls = decls
 	for _, decl := range decls {
 		switch decl := decl.(type) {
@@ -101,7 +101,7 @@ func populateMessageBody(m *MessageBody, open *RuneNode, decls []MessageElement,
 			panic(fmt.Sprintf("invalid MessageElement type: %T", decl))
 		}
 	}
-	m.CloseBrace = close
+	m.CloseBrace = closeBrace
 }
 
 // MessageElement is an interface implemented by all AST nodes that can
@@ -138,13 +138,13 @@ type ExtendNode struct {
 func (*ExtendNode) fileElement() {}
 func (*ExtendNode) msgElement()  {}
 
-func NewExtendNode(keyword *KeywordNode, extendee IdentValueNode, open *RuneNode, decls []ExtendElement, close *RuneNode) *ExtendNode {
+func NewExtendNode(keyword *KeywordNode, extendee IdentValueNode, openBrace *RuneNode, decls []ExtendElement, closeBrace *RuneNode) *ExtendNode {
 	children := make([]Node, 0, 4+len(decls))
-	children = append(children, keyword, extendee, open)
+	children = append(children, keyword, extendee, openBrace)
 	for _, decl := range decls {
 		children = append(children, decl)
 	}
-	children = append(children, close)
+	children = append(children, closeBrace)
 
 	ret := &ExtendNode{
 		compositeNode: compositeNode{
@@ -152,8 +152,8 @@ func NewExtendNode(keyword *KeywordNode, extendee IdentValueNode, open *RuneNode
 		},
 		Keyword:    keyword,
 		Extendee:   extendee,
-		OpenBrace:  open,
-		CloseBrace: close,
+		OpenBrace:  openBrace,
+		CloseBrace: closeBrace,
 		AllDecls:   decls,
 	}
 	for _, decl := range decls {

@@ -97,10 +97,10 @@ type FieldReferenceNode struct {
 	Close *RuneNode
 }
 
-func NewFieldReferenceNode(open *RuneNode, name IdentValueNode, close *RuneNode) *FieldReferenceNode {
+func NewFieldReferenceNode(openSym *RuneNode, name IdentValueNode, closeSym *RuneNode) *FieldReferenceNode {
 	var children []Node
-	if open != nil {
-		children = []Node{open, name, close}
+	if openSym != nil {
+		children = []Node{openSym, name, closeSym}
 	} else {
 		children = []Node{name}
 	}
@@ -108,9 +108,9 @@ func NewFieldReferenceNode(open *RuneNode, name IdentValueNode, close *RuneNode)
 		compositeNode: compositeNode{
 			children: children,
 		},
-		Open:  open,
+		Open:  openSym,
 		Name:  name,
-		Close: close,
+		Close: closeSym,
 	}
 }
 
@@ -138,25 +138,25 @@ type CompactOptionsNode struct {
 	CloseBracket *RuneNode
 }
 
-func NewCompactOptionsNode(open *RuneNode, opts []*OptionNode, commas []*RuneNode, close *RuneNode) *CompactOptionsNode {
+func NewCompactOptionsNode(openBracket *RuneNode, opts []*OptionNode, commas []*RuneNode, closeBracket *RuneNode) *CompactOptionsNode {
 	children := make([]Node, 0, len(opts)*2+1)
-	children = append(children, open)
+	children = append(children, openBracket)
 	for i, opt := range opts {
 		if i > 0 {
 			children = append(children, commas[i-1])
 		}
 		children = append(children, opt)
 	}
-	children = append(children, close)
+	children = append(children, closeBracket)
 
 	return &CompactOptionsNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
-		OpenBracket:  open,
+		OpenBracket:  openBracket,
 		Options:      opts,
 		Commas:       commas,
-		CloseBracket: close,
+		CloseBracket: closeBracket,
 	}
 }
 

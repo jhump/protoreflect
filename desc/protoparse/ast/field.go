@@ -156,7 +156,7 @@ func (*GroupNode) msgElement()    {}
 func (*GroupNode) oneOfElement()  {}
 func (*GroupNode) extendElement() {}
 
-func NewGroupNode(label *KeywordNode, keyword *KeywordNode, name *IdentNode, equals *RuneNode, tag *UintLiteralNode, opts *CompactOptionsNode, open *RuneNode, decls []MessageElement, close *RuneNode) *GroupNode {
+func NewGroupNode(label *KeywordNode, keyword *KeywordNode, name *IdentNode, equals *RuneNode, tag *UintLiteralNode, opts *CompactOptionsNode, openBrace *RuneNode, decls []MessageElement, closeBrace *RuneNode) *GroupNode {
 	numChildren := 6 + len(decls)
 	if label != nil {
 		numChildren++
@@ -172,11 +172,11 @@ func NewGroupNode(label *KeywordNode, keyword *KeywordNode, name *IdentNode, equ
 	if opts != nil {
 		children = append(children, opts)
 	}
-	children = append(children, open)
+	children = append(children, openBrace)
 	for _, decl := range decls {
 		children = append(children, decl)
 	}
-	children = append(children, close)
+	children = append(children, closeBrace)
 
 	ret := &GroupNode{
 		compositeNode: compositeNode{
@@ -189,7 +189,7 @@ func NewGroupNode(label *KeywordNode, keyword *KeywordNode, name *IdentNode, equ
 		Tag:     tag,
 		Options: opts,
 	}
-	populateMessageBody(&ret.MessageBody, open, decls, close)
+	populateMessageBody(&ret.MessageBody, openBrace, decls, closeBrace)
 	return ret
 }
 
@@ -247,13 +247,13 @@ type OneOfNode struct {
 
 func (*OneOfNode) msgElement() {}
 
-func NewOneOfNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []OneOfElement, close *RuneNode) *OneOfNode {
+func NewOneOfNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []OneOfElement, closeBrace *RuneNode) *OneOfNode {
 	children := make([]Node, 0, 4+len(decls))
-	children = append(children, keyword, name, open)
+	children = append(children, keyword, name, openBrace)
 	for _, decl := range decls {
 		children = append(children, decl)
 	}
-	children = append(children, close)
+	children = append(children, closeBrace)
 
 	var opts []*OptionNode
 	var flds []*FieldNode
@@ -279,11 +279,11 @@ func NewOneOfNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls [
 		},
 		Keyword:    keyword,
 		Name:       name,
-		OpenBrace:  open,
+		OpenBrace:  openBrace,
 		Options:    opts,
 		Fields:     flds,
 		Groups:     grps,
-		CloseBrace: close,
+		CloseBrace: closeBrace,
 		AllDecls:   decls,
 	}
 }
@@ -310,18 +310,18 @@ type MapTypeNode struct {
 	CloseAngle *RuneNode
 }
 
-func NewMapTypeNode(keyword *KeywordNode, open *RuneNode, keyType *IdentNode, comma *RuneNode, valType IdentValueNode, close *RuneNode) *MapTypeNode {
-	children := []Node{keyword, open, keyType, comma, valType, close}
+func NewMapTypeNode(keyword *KeywordNode, openAngle *RuneNode, keyType *IdentNode, comma *RuneNode, valType IdentValueNode, closeAngle *RuneNode) *MapTypeNode {
+	children := []Node{keyword, openAngle, keyType, comma, valType, closeAngle}
 	return &MapTypeNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
 		Keyword:    keyword,
-		OpenAngle:  open,
+		OpenAngle:  openAngle,
 		KeyType:    keyType,
 		Comma:      comma,
 		ValueType:  valType,
-		CloseAngle: close,
+		CloseAngle: closeAngle,
 	}
 }
 

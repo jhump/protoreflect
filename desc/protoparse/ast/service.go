@@ -16,13 +16,13 @@ type ServiceNode struct {
 
 func (*ServiceNode) fileElement() {}
 
-func NewServiceNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []ServiceElement, close *RuneNode) *ServiceNode {
+func NewServiceNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []ServiceElement, closeBrace *RuneNode) *ServiceNode {
 	children := make([]Node, 0, 4+len(decls))
-	children = append(children, keyword, name, open)
+	children = append(children, keyword, name, openBrace)
 	for _, decl := range decls {
 		children = append(children, decl)
 	}
-	children = append(children, close)
+	children = append(children, closeBrace)
 
 	var opts []*OptionNode
 	var rpcs []*RPCNode
@@ -45,10 +45,10 @@ func NewServiceNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls
 		},
 		Keyword:    keyword,
 		Name:       name,
-		OpenBrace:  open,
+		OpenBrace:  openBrace,
 		Options:    opts,
 		RPCs:       rpcs,
-		CloseBrace: close,
+		CloseBrace: closeBrace,
 		AllDecls:   decls,
 	}
 }
@@ -105,14 +105,14 @@ func NewRPCNode(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, retur
 	}
 }
 
-func NewRPCNodeWithBody(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, returns *KeywordNode, output *RPCTypeNode, open *RuneNode, decls []RPCElement, close *RuneNode) *RPCNode {
+func NewRPCNodeWithBody(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, returns *KeywordNode, output *RPCTypeNode, openBrace *RuneNode, decls []RPCElement, closeBrace *RuneNode) *RPCNode {
 	children := make([]Node, 0, 7+len(decls))
-	children = append(children, keyword, name, input, returns, output, open)
-	children = append(children, open)
+	children = append(children, keyword, name, input, returns, output, openBrace)
+	children = append(children, openBrace)
 	for _, decl := range decls {
 		children = append(children, decl)
 	}
-	children = append(children, close)
+	children = append(children, closeBrace)
 
 	var opts []*OptionNode
 	for _, decl := range decls {
@@ -135,9 +135,9 @@ func NewRPCNodeWithBody(keyword *KeywordNode, name *IdentNode, input *RPCTypeNod
 		Input:      input,
 		Returns:    returns,
 		Output:     output,
-		OpenBrace:  open,
+		OpenBrace:  openBrace,
 		Options:    opts,
-		CloseBrace: close,
+		CloseBrace: closeBrace,
 		AllDecls:   decls,
 	}
 }
@@ -168,21 +168,21 @@ type RPCTypeNode struct {
 	CloseParen  *RuneNode
 }
 
-func NewRPCTypeNode(open *RuneNode, stream *KeywordNode, msgType IdentValueNode, close *RuneNode) *RPCTypeNode {
+func NewRPCTypeNode(openParen *RuneNode, stream *KeywordNode, msgType IdentValueNode, closeParen *RuneNode) *RPCTypeNode {
 	var children []Node
 	if stream != nil {
-		children = []Node{open, stream, msgType, close}
+		children = []Node{openParen, stream, msgType, closeParen}
 	} else {
-		children = []Node{open, msgType, close}
+		children = []Node{openParen, msgType, closeParen}
 	}
 
 	return &RPCTypeNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
-		OpenParen:   open,
+		OpenParen:   openParen,
 		Stream:      stream,
 		MessageType: msgType,
-		CloseParen:  close,
+		CloseParen:  closeParen,
 	}
 }
