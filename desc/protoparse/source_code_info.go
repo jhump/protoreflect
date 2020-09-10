@@ -228,9 +228,9 @@ func (r *parseResult) generateSourceCodeInfoForEnumValue(sci *sourceCodeInfo, n 
 
 func (r *parseResult) generateSourceCodeInfoForReservedRange(sci *sourceCodeInfo, n *ast.RangeNode, path []int32) {
 	sci.newLoc(n, path)
-	sci.newLoc(n.Start, append(path, internal.ReservedRange_startTag))
-	if n.End != nil {
-		sci.newLoc(n.End, append(path, internal.ReservedRange_endTag))
+	sci.newLoc(n.StartVal, append(path, internal.ReservedRange_startTag))
+	if n.EndVal != nil {
+		sci.newLoc(n.EndVal, append(path, internal.ReservedRange_endTag))
 	}
 }
 
@@ -330,9 +330,9 @@ func (r *parseResult) generateSourceCodeInfoForExtensionRanges(sci *sourceCodeIn
 		path := append(path, *extRangeIndex)
 		*extRangeIndex++
 		sci.newLoc(child, path)
-		sci.newLoc(child.Start, append(path, internal.ExtensionRange_startTag))
-		if child.End != nil {
-			sci.newLoc(child.End, append(path, internal.ExtensionRange_endTag))
+		sci.newLoc(child.StartVal, append(path, internal.ExtensionRange_startTag))
+		if child.EndVal != nil {
+			sci.newLoc(child.EndVal, append(path, internal.ExtensionRange_endTag))
 		}
 		if n.Options != nil {
 			optsPath := append(path, internal.ExtensionRange_optionsTag)

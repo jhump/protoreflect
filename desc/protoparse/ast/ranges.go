@@ -55,13 +55,13 @@ var _ RangeDeclNode = NoSourceNode{}
 
 type RangeNode struct {
 	compositeNode
-	Start IntValueNode
-	To    *IdentNode
-	End   IntValueNode
-	Max   *KeywordNode
+	StartVal IntValueNode
+	To       *KeywordNode
+	EndVal   IntValueNode
+	Max      *KeywordNode
 }
 
-func NewRangeNode(start IntValueNode, to *IdentNode, end IntValueNode, max *KeywordNode) *RangeNode {
+func NewRangeNode(start IntValueNode, to *KeywordNode, end IntValueNode, max *KeywordNode) *RangeNode {
 	numChildren := 1
 	if to != nil {
 		numChildren = 3
@@ -80,47 +80,47 @@ func NewRangeNode(start IntValueNode, to *IdentNode, end IntValueNode, max *Keyw
 		compositeNode: compositeNode{
 			children: children,
 		},
-		Start: start,
-		To:    to,
-		End:   end,
-		Max:   max,
+		StartVal: start,
+		To:       to,
+		EndVal:   end,
+		Max:      max,
 	}
 }
 
 func (n *RangeNode) RangeStart() Node {
-	return n.Start
+	return n.StartVal
 }
 
 func (n *RangeNode) RangeEnd() Node {
-	if n.End == nil {
-		return n.Start
+	if n.EndVal == nil {
+		return n.StartVal
 	}
-	return n.End
+	return n.EndVal
 }
 
 func (n *RangeNode) StartValue() interface{} {
-	return n.Start.Value()
+	return n.StartVal.Value()
 }
 
 func (n *RangeNode) StartValueAsInt32(min, max int32) (int32, bool) {
-	return AsInt32(n.Start, min, max)
+	return AsInt32(n.StartVal, min, max)
 }
 
 func (n *RangeNode) EndValue() interface{} {
-	if n.End == nil {
+	if n.EndVal == nil {
 		return nil
 	}
-	return n.End.Value()
+	return n.EndVal.Value()
 }
 
 func (n *RangeNode) EndValueAsInt32(min, max int32) (int32, bool) {
 	if n.Max != nil {
 		return max, true
 	}
-	if n.End == nil {
+	if n.EndVal == nil {
 		return n.StartValueAsInt32(min, max)
 	}
-	return AsInt32(n.End, min, max)
+	return AsInt32(n.EndVal, min, max)
 }
 
 type ReservedNode struct {

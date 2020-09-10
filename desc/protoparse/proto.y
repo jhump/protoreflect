@@ -4,7 +4,6 @@ package protoparse
 //lint:file-ignore SA4006 generated parser has unused values
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/jhump/protoreflect/desc/protoparse/ast"
@@ -56,11 +55,11 @@ import (
 	rngs      *rangeList
 	names     *nameList
 	cid       *identList
-	tid       *ast.IdentValueNode
+	tid       ast.IdentValueNode
 	sl        *valueList
 	msgField  *ast.MessageFieldNode
 	msgEntry  *messageFieldEntry
-	msg       *messageFieldList
+	msgLit    *messageFieldList
 	v         ast.ValueNode
 	il        ast.IntValueNode
 	str       *stringList
@@ -93,9 +92,9 @@ import (
 %type <cid>       ident
 %type <tid>       typeIdent
 %type <sl>        constantList
-%type <msgField>  aggField
-%type <msgEntry>  aggFieldEntry
-%type <msg>       aggFields
+%type <msgField>  aggFieldEntry
+%type <msgEntry>  aggField
+%type <msgLit>    aggFields
 %type <fld>       field oneofField
 %type <oo>        oneof
 %type <grp>       group oneofGroup
@@ -200,10 +199,10 @@ import : _IMPORT stringLit ';' {
 		$$ = ast.NewImportNode($1.ToKeyword(), nil, nil, $2.toStringValueNode(), $3)
 	}
 	| _IMPORT _WEAK stringLit ';' {
-		$$ = ast.NewImportNode($1.ToKeyword(), nil, $2, $3.toStringValueNode(), $4)
+		$$ = ast.NewImportNode($1.ToKeyword(), nil, $2.ToKeyword(), $3.toStringValueNode(), $4)
 	}
 	| _IMPORT _PUBLIC stringLit ';' {
-		$$ = ast.NewImportNode($1.ToKeyword(), $2, nil, $3.toStringValueNode(), $4)
+		$$ = ast.NewImportNode($1.ToKeyword(), $2.ToKeyword(), nil, $3.toStringValueNode(), $4)
 	}
 
 package : _PACKAGE ident ';' {
@@ -246,9 +245,9 @@ scalarConstant : stringLit {
 	| numLit
 	| name {
 		if $1.Val == "true" || $1.Val == "false" {
-			$$ = ast.NewBoolLiteralNode($1)
+			$$ = ast.NewBoolLiteralNode($1.ToKeyword())
 		} else if $1.Val == "inf" || $1.Val == "nan" {
-			$$ = ast.NewSpecialFloatLiteralNode($1)
+			$$ = ast.NewSpecialFloatLiteralNode($1.ToKeyword())
 		} else {
 			$$ = $1
 		}
@@ -264,11 +263,11 @@ numLit : _FLOAT_LIT {
 		$$ = ast.NewSignedFloatLiteralNode($1, $2)
 	}
 	| '+' _INF {
-	    f := ast.NewSpecialFloatLiteralNode($2)
+	    f := ast.NewSpecialFloatLiteralNode($2.ToKeyword())
 		$$ = ast.NewSignedFloatLiteralNode($1, f)
 	}
 	| '-' _INF {
-	    f := ast.NewSpecialFloatLiteralNode($2)
+	    f := ast.NewSpecialFloatLiteralNode($2.ToKeyword())
 		$$ = ast.NewSignedFloatLiteralNode($1, f)
 	}
 	| _INT_LIT {
@@ -278,7 +277,7 @@ numLit : _FLOAT_LIT {
         $$ = ast.NewPositiveUintLiteralNode($1, $2)
     }
     | '-' _INT_LIT {
-        if $2.val > math.MaxInt64 + 1 {
+        if $2.Val > math.MaxInt64 + 1 {
             // can't represent as int so treat as float literal
             $$ = ast.NewSignedFloatLiteralNode($1, $2)
         } else {
@@ -346,12 +345,12 @@ aggFieldEntry : aggName ':' scalarConstant {
 	}
 	| aggName ':' '<' aggFields '>' {
         fields, delims := $4.toNodes()
-        msg = ast.NewMessageLiteralNode($3, fields, delims, $5)
+        msg := ast.NewMessageLiteralNode($3, fields, delims, $5)
         $$ = ast.NewMessageFieldNode($1, $2, msg)
 	}
 	| aggName '<' aggFields '>' {
         fields, delims := $3.toNodes()
-        msg = ast.NewMessageLiteralNode($2, fields, delims, $4)
+        msg := ast.NewMessageLiteralNode($2, fields, delims, $4)
         $$ = ast.NewMessageFieldNode($1, nil, msg)
 	}
 	| aggName ':' '<' error '>' {
@@ -376,12 +375,12 @@ constantList : constant {
 	}
 	| '<' aggFields '>' {
         fields, delims := $2.toNodes()
-        msg = ast.NewMessageLiteralNode($1, fields, delims, $3)
+        msg := ast.NewMessageLiteralNode($1, fields, delims, $3)
         $$ = &valueList{msg, nil, nil}
 	}
 	| '<' aggFields '>' ',' constantList {
         fields, delims := $2.toNodes()
-        msg = ast.NewMessageLiteralNode($1, fields, delims, $3)
+        msg := ast.NewMessageLiteralNode($1, fields, delims, $3)
         $$ = &valueList{msg, $4, $5}
 	}
 	| '<' error '>' {
@@ -434,7 +433,9 @@ compactOptionDecls : compactOption {
 	}
 
 compactOption: optionName '=' constant {
-        $$ = ast.NewOptionNode(nil, $1, $2, $3, nil)
+        refs, dots := $1.toNodes()
+        optName := ast.NewOptionNameNode(refs, dots)
+        $$ = ast.NewOptionNode(nil, optName, $2, $3, nil)
 	}
 
 group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageDecls '}' {
@@ -464,7 +465,7 @@ ooDecls : ooDecls ooDecl {
 		$$ = append($1, $2)
 	}
 	| ooDecl {
-	    $$ = []OneOfElement{$1}
+	    $$ = []ast.OneOfElement{$1}
 	}
 	| {
 		$$ = nil
@@ -527,11 +528,11 @@ keyType : _INT32
 
 extensions : _EXTENSIONS tagRanges ';' {
         ranges, commas := $2.toNodes()
-        $$ = ast.NewExtensionRangeNode($1, ranges, commas, nil, $3)
+        $$ = ast.NewExtensionRangeNode($1.ToKeyword(), ranges, commas, nil, $3)
 	}
 	| _EXTENSIONS tagRanges compactOptions ';' {
         ranges, commas := $2.toNodes()
-        $$ = ast.NewExtensionRangeNode($1, ranges, commas, $3, $4)
+        $$ = ast.NewExtensionRangeNode($1.ToKeyword(), ranges, commas, $3, $4)
 	}
 
 tagRanges : tagRange {
@@ -545,10 +546,10 @@ tagRange : _INT_LIT {
         $$ = ast.NewRangeNode($1, nil, nil, nil)
 	}
 	| _INT_LIT _TO _INT_LIT {
-        $$ = ast.NewRangeNode($1, $2, $3, nil)
+        $$ = ast.NewRangeNode($1, $2.ToKeyword(), $3, nil)
 	}
 	| _INT_LIT _TO _MAX {
-        $$ = ast.NewRangeNode($1, $2, nil, $3.ToKeyword())
+        $$ = ast.NewRangeNode($1, $2.ToKeyword(), nil, $3.ToKeyword())
 	}
 
 enumRanges : enumRange {
@@ -562,10 +563,10 @@ enumRange : intLit {
         $$ = ast.NewRangeNode($1, nil, nil, nil)
 	}
 	| intLit _TO intLit {
-        $$ = ast.NewRangeNode($1, $2, $3, nil)
+        $$ = ast.NewRangeNode($1, $2.ToKeyword(), $3, nil)
 	}
 	| intLit _TO _MAX {
-        $$ = ast.NewRangeNode($1, $2, nil, $3.ToKeyword())
+        $$ = ast.NewRangeNode($1, $2.ToKeyword(), nil, $3.ToKeyword())
 	}
 
 intLit : _INT_LIT {
@@ -577,19 +578,19 @@ intLit : _INT_LIT {
 
 msgReserved : _RESERVED tagRanges ';' {
         ranges, commas := $2.toNodes()
-        $$ = ast.NewReservedRangesNode($1, ranges, commas, $3)
+        $$ = ast.NewReservedRangesNode($1.ToKeyword(), ranges, commas, $3)
 	}
 	| reservedNames
 
 enumReserved : _RESERVED enumRanges ';' {
         ranges, commas := $2.toNodes()
-        $$ = ast.NewReservedRangesNode($1, ranges, commas, $3)
+        $$ = ast.NewReservedRangesNode($1.ToKeyword(), ranges, commas, $3)
 	}
 	| reservedNames
 
 reservedNames : _RESERVED fieldNames ';' {
         names, commas := $2.toNodes()
-        $$ = ast.NewReservedNamesNode($1, names, commas, $3)
+        $$ = ast.NewReservedNamesNode($1.ToKeyword(), names, commas, $3)
 	}
 
 fieldNames : stringLit {
@@ -756,7 +757,7 @@ rpc : _RPC name rpcType _RETURNS rpcType ';' {
 	}
 
 rpcType : '(' _STREAM typeIdent ')' {
-		$$ = ast.NewRPCTypeNode($1, $2, $3, $4)
+		$$ = ast.NewRPCTypeNode($1, $2.ToKeyword(), $3, $4)
 	}
 	| '(' typeIdent ')' {
 		$$ = ast.NewRPCTypeNode($1, nil, $2, $3)

@@ -498,14 +498,14 @@ func getRangeBounds(res *parseResult, rng *ast.RangeNode, minVal, maxVal int32) 
 	start, ok := rng.StartValueAsInt32(minVal, maxVal)
 	if !ok {
 		checkOrder = false
-		_ = res.errs.handleErrorWithPos(rng.Start.Start(), "range start %d is out of range: should be between %d and %d", rng.StartValue(), minVal, maxVal)
+		_ = res.errs.handleErrorWithPos(rng.StartVal.Start(), "range start %d is out of range: should be between %d and %d", rng.StartValue(), minVal, maxVal)
 	}
 
 	end, ok := rng.EndValueAsInt32(minVal, maxVal)
 	if !ok {
 		checkOrder = false
-		if rng.End != nil {
-			_ = res.errs.handleErrorWithPos(rng.End.Start(), "range end %d is out of range: should be between %d and %d", rng.EndValue(), minVal, maxVal)
+		if rng.EndVal != nil {
+			_ = res.errs.handleErrorWithPos(rng.EndVal.Start(), "range end %d is out of range: should be between %d and %d", rng.EndValue(), minVal, maxVal)
 		}
 	}
 
