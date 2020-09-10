@@ -65,6 +65,7 @@ func (t *TokenInfo) asTerminalNode() terminalNode {
 		leadingComments:   t.LeadingComments,
 		leadingWhitespace: t.LeadingWhitespace,
 		trailingComments:  t.TrailingComments,
+		raw:               t.RawText,
 	}
 }
 

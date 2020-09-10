@@ -157,12 +157,18 @@ func (*GroupNode) oneOfElement()  {}
 func (*GroupNode) extendElement() {}
 
 func NewGroupNode(label *KeywordNode, keyword *KeywordNode, name *IdentNode, equals *RuneNode, tag *UintLiteralNode, opts *CompactOptionsNode, open *RuneNode, decls []MessageElement, close *RuneNode) *GroupNode {
-	numChildren := 7 + len(decls)
+	numChildren := 6 + len(decls)
+	if label != nil {
+		numChildren++
+	}
 	if opts != nil {
 		numChildren++
 	}
 	children := make([]Node, 0, numChildren)
-	children = append(children, label, keyword, name, equals, tag)
+	if label != nil {
+		children = append(children, label)
+	}
+	children = append(children, keyword, name, equals, tag)
 	if opts != nil {
 		children = append(children, opts)
 	}

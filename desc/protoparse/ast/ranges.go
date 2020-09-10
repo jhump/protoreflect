@@ -92,10 +92,13 @@ func (n *RangeNode) RangeStart() Node {
 }
 
 func (n *RangeNode) RangeEnd() Node {
-	if n.EndVal == nil {
-		return n.StartVal
+	if n.Max != nil {
+		return n.Max
 	}
-	return n.EndVal
+	if n.EndVal != nil {
+		return n.EndVal
+	}
+	return n.StartVal
 }
 
 func (n *RangeNode) StartValue() interface{} {

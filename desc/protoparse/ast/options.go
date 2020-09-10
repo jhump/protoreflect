@@ -32,7 +32,21 @@ func (e *OptionNode) serviceElement() {}
 func (e *OptionNode) methodElement()  {}
 
 func NewOptionNode(keyword *KeywordNode, name *OptionNameNode, equals *RuneNode, val ValueNode, semicolon *RuneNode) *OptionNode {
-	children := []Node{keyword, name, equals, val, semicolon}
+	numChildren := 3
+	if keyword != nil {
+		numChildren++
+	}
+	if semicolon != nil {
+		numChildren++
+	}
+	children := make([]Node, 0, numChildren)
+	if keyword != nil {
+		children = append(children, keyword)
+	}
+	children = append(children, name, equals, val)
+	if semicolon != nil {
+		children = append(children, semicolon)
+	}
 	return &OptionNode{
 		compositeNode: compositeNode{
 			children: children,

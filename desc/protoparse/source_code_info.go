@@ -231,6 +231,8 @@ func (r *parseResult) generateSourceCodeInfoForReservedRange(sci *sourceCodeInfo
 	sci.newLoc(n.StartVal, append(path, internal.ReservedRange_startTag))
 	if n.EndVal != nil {
 		sci.newLoc(n.EndVal, append(path, internal.ReservedRange_endTag))
+	} else if n.Max != nil {
+		sci.newLoc(n.Max, append(path, internal.ReservedRange_endTag))
 	}
 }
 

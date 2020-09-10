@@ -156,10 +156,18 @@ file : syntax {
 	}
 
 fileDecls : fileDecls fileDecl {
-		$$ = append($1, $2)
+        if $2 != nil {
+    		$$ = append($1, $2)
+        } else {
+            $$ = $1
+        }
 	}
 	| fileDecl {
-	    $$ = []ast.FileElement{$1}
+	    if $1 != nil {
+	        $$ = []ast.FileElement{$1}
+        } else {
+            $$ = nil
+        }
 	}
 
 fileDecl : import {
@@ -187,8 +195,10 @@ fileDecl : import {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
+	    $$ = nil
 	}
 	| error {
+	    $$ = nil
 	}
 
 syntax : _SYNTAX '=' stringLit ';' {
@@ -298,64 +308,118 @@ aggregate : '{' aggFields '}' {
 	}
 
 aggFields : aggField {
-        $$ = &messageFieldList{$1, nil}
+	    if $1 != nil {
+	        $$ = &messageFieldList{$1, nil}
+        } else {
+            $$ = nil
+        }
     }
 	| aggField aggFields {
-        $$ = &messageFieldList{$1, $2}
+        if $1 != nil {
+            $$ = &messageFieldList{$1, $2}
+        } else {
+            $$ = $2
+        }
 	}
 	| {
 		$$ = nil
 	}
 
 aggField : aggFieldEntry {
-        $$ = &messageFieldEntry{$1, nil}
+        if $1 != nil {
+            $$ = &messageFieldEntry{$1, nil}
+        } else {
+            $$ = nil
+        }
     }
 	| aggFieldEntry ',' {
-		$$ = &messageFieldEntry{$1, $2}
+	    if $1 != nil {
+    		$$ = &messageFieldEntry{$1, $2}
+        } else {
+            $$ = nil
+        }
 	}
 	| aggFieldEntry ';' {
-		$$ = &messageFieldEntry{$1, $2}
+	    if $1 != nil {
+    		$$ = &messageFieldEntry{$1, $2}
+        } else {
+            $$ = nil
+        }
 	}
 	| error ',' {
+	    $$ = nil
 	}
 	| error ';' {
+	    $$ = nil
 	}
 	| error {
+	    $$ = nil
 	}
 
 aggFieldEntry : aggName ':' scalarConstant {
-        $$ = ast.NewMessageFieldNode($1, $2, $3)
+        if $1 != nil {
+            $$ = ast.NewMessageFieldNode($1, $2, $3)
+        } else {
+            $$ = nil
+        }
 	}
 	| aggName ':' '[' ']' {
-	    val := ast.NewArrayLiteralNode($3, nil, nil, $4)
-        $$ = ast.NewMessageFieldNode($1, $2, val)
+	    if $1 != nil {
+            val := ast.NewArrayLiteralNode($3, nil, nil, $4)
+            $$ = ast.NewMessageFieldNode($1, $2, val)
+	    } else {
+	        $$ = nil
+	    }
 	}
 	| aggName ':' '[' constantList ']' {
-	    vals, commas := $4.toNodes()
-	    val := ast.NewArrayLiteralNode($3, vals, commas, $5)
-        $$ = ast.NewMessageFieldNode($1, $2, val)
+	    if $1 != nil {
+            vals, commas := $4.toNodes()
+            val := ast.NewArrayLiteralNode($3, vals, commas, $5)
+            $$ = ast.NewMessageFieldNode($1, $2, val)
+	    } else {
+	        $$ = nil
+	    }
 	}
 	| aggName ':' '[' error ']' {
+	    $$ = nil
 	}
 	| aggName ':' aggregate {
-        $$ = ast.NewMessageFieldNode($1, $2, $3)
+	    if $1 != nil {
+            $$ = ast.NewMessageFieldNode($1, $2, $3)
+	    } else {
+	        $$ = nil
+	    }
 	}
 	| aggName aggregate {
-        $$ = ast.NewMessageFieldNode($1, nil, $2)
+        if $1 != nil {
+            $$ = ast.NewMessageFieldNode($1, nil, $2)
+        } else {
+            $$ = nil
+        }
 	}
 	| aggName ':' '<' aggFields '>' {
-        fields, delims := $4.toNodes()
-        msg := ast.NewMessageLiteralNode($3, fields, delims, $5)
-        $$ = ast.NewMessageFieldNode($1, $2, msg)
+	    if $1 != nil {
+            fields, delims := $4.toNodes()
+            msg := ast.NewMessageLiteralNode($3, fields, delims, $5)
+            $$ = ast.NewMessageFieldNode($1, $2, msg)
+        } else {
+            $$ = nil
+        }
 	}
 	| aggName '<' aggFields '>' {
-        fields, delims := $3.toNodes()
-        msg := ast.NewMessageLiteralNode($2, fields, delims, $4)
-        $$ = ast.NewMessageFieldNode($1, nil, msg)
+	    if $1 != nil {
+            fields, delims := $3.toNodes()
+            msg := ast.NewMessageLiteralNode($2, fields, delims, $4)
+            $$ = ast.NewMessageFieldNode($1, nil, msg)
+        } else {
+            $$ = nil
+        }
 	}
 	| aggName ':' '<' error '>' {
+	    $$ = nil
 	}
 	| aggName '<' error '>' {
+	    $$ = nil
 	}
 
 aggName : name {
@@ -365,6 +429,7 @@ aggName : name {
         $$ = ast.NewFieldReferenceNode($1, $2, $3)
 	}
 	| '[' error ']' {
+	    $$ = nil
 	}
 
 constantList : constant {
@@ -384,8 +449,10 @@ constantList : constant {
         $$ = &valueList{msg, $4, $5}
 	}
 	| '<' error '>' {
+	    $$ = nil
 	}
 	| '<' error '>' ',' constantList {
+	    $$ = $5
 	}
 
 typeIdent : ident {
@@ -462,10 +529,18 @@ oneof : _ONEOF name '{' ooDecls '}' {
 	}
 
 ooDecls : ooDecls ooDecl {
-		$$ = append($1, $2)
+        if $2 != nil {
+    		$$ = append($1, $2)
+        } else {
+            $$ = $1
+        }
 	}
 	| ooDecl {
-	    $$ = []ast.OneOfElement{$1}
+	    if $1 != nil {
+	        $$ = []ast.OneOfElement{$1}
+        } else {
+            $$ = nil
+        }
 	}
 	| {
 		$$ = nil
@@ -484,8 +559,10 @@ ooDecl : option {
 	    $$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
+	    $$ = nil
 	}
 	| error {
+	    $$ = nil
 	}
 
 oneofField : typeIdent name '=' _INT_LIT ';' {
@@ -605,10 +682,18 @@ enum : _ENUM name '{' enumDecls '}' {
 	}
 
 enumDecls : enumDecls enumDecl {
-		$$ = append($1, $2)
+        if $2 != nil {
+    		$$ = append($1, $2)
+        } else {
+            $$ = $1
+        }
 	}
 	| enumDecl {
-	    $$ = []ast.EnumElement{$1}
+	    if $1 != nil {
+    	    $$ = []ast.EnumElement{$1}
+	    } else {
+	        $$ = nil
+	    }
 	}
 	| {
 		$$ = nil
@@ -627,8 +712,10 @@ enumDecl : option {
 	    $$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
+	    $$ = nil
 	}
 	| error {
+	    $$ = nil
 	}
 
 enumValue : name '=' intLit ';' {
@@ -643,10 +730,18 @@ message : _MESSAGE name '{' messageDecls '}' {
 	}
 
 messageDecls : messageDecls messageDecl {
-		$$ = append($1, $2)
+        if $2 != nil {
+    		$$ = append($1, $2)
+        } else {
+            $$ = $1
+        }
 	}
 	| messageDecl {
-	    $$ = []ast.MessageElement{$1}
+	    if $1 != nil {
+	        $$ = []ast.MessageElement{$1}
+        } else {
+            $$ = nil
+        }
 	}
 	| {
 		$$ = nil
@@ -686,8 +781,10 @@ messageDecl : field {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
+	    $$ = nil
 	}
 	| error {
+	    $$ = nil
 	}
 
 extend : _EXTEND typeIdent '{' extendDecls '}' {
@@ -695,10 +792,18 @@ extend : _EXTEND typeIdent '{' extendDecls '}' {
 	}
 
 extendDecls : extendDecls extendDecl {
-		$$ = append($1, $2)
+        if $2 != nil {
+    		$$ = append($1, $2)
+        } else {
+            $$ = $1
+        }
 	}
 	| extendDecl {
-	    $$ = []ast.ExtendElement{$1}
+	    if $1 != nil {
+	        $$ = []ast.ExtendElement{$1}
+        } else {
+            $$ = nil
+        }
 	}
 	| {
 		$$ = nil
@@ -714,8 +819,10 @@ extendDecl : field {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
+	    $$ = nil
 	}
 	| error {
+	    $$ = nil
 	}
 
 service : _SERVICE name '{' serviceDecls '}' {
@@ -723,10 +830,18 @@ service : _SERVICE name '{' serviceDecls '}' {
 	}
 
 serviceDecls : serviceDecls serviceDecl {
-		$$ = append($1, $2)
+        if $2 != nil {
+    		$$ = append($1, $2)
+        } else {
+            $$ = $1
+        }
 	}
 	| serviceDecl {
-	    $$ = []ast.ServiceElement{$1}
+	    if $1 != nil {
+	        $$ = []ast.ServiceElement{$1}
+        } else {
+            $$ = nil
+        }
 	}
 	| {
 		$$ = nil
@@ -745,8 +860,10 @@ serviceDecl : option {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
+	    $$ = nil
 	}
 	| error {
+	    $$ = nil
 	}
 
 rpc : _RPC name rpcType _RETURNS rpcType ';' {
@@ -764,10 +881,18 @@ rpcType : '(' _STREAM typeIdent ')' {
 	}
 
 rpcDecls : rpcDecls rpcDecl {
-		$$ = append($1, $2)
+        if $2 != nil {
+    		$$ = append($1, $2)
+        } else {
+            $$ = $1
+        }
 	}
 	| rpcDecl {
-	    $$ = []ast.RPCElement{$1}
+	    if $1 != nil {
+	        $$ = []ast.RPCElement{$1}
+        } else {
+            $$ = nil
+        }
 	}
 	| {
 		$$ = nil
@@ -780,8 +905,10 @@ rpcDecl : option {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
+	    $$ = nil
 	}
 	| error {
+	    $$ = nil
 	}
 
 name : _NAME

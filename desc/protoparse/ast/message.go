@@ -72,6 +72,7 @@ type MessageBody struct {
 
 func populateMessageBody(m *MessageBody, open *RuneNode, decls []MessageElement, close *RuneNode) {
 	m.OpenBrace = open
+	m.AllDecls = decls
 	for _, decl := range decls {
 		switch decl := decl.(type) {
 		case *OptionNode:

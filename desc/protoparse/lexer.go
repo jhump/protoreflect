@@ -54,9 +54,9 @@ func (rr *runeReader) startMark(initial rune) {
 	rr.marked = []rune{initial}
 }
 
-func (rr *runeReader) endMark() []rune {
-	m := rr.marked
-	rr.marked = nil
+func (rr *runeReader) endMark() string {
+	m := string(rr.marked)
+	rr.marked = rr.marked[:0]
 	return m
 }
 
@@ -400,11 +400,11 @@ func (l *protoLex) posRange() ast.PosRange {
 
 func (l *protoLex) newComment() ast.Comment {
 	ws := string(l.ws)
-	l.ws = nil
+	l.ws = l.ws[:0]
 	return ast.Comment{
 		PosRange:          l.posRange(),
 		LeadingWhitespace: ws,
-		Text:              string(l.input.endMark()),
+		Text:              l.input.endMark(),
 	}
 }
 
@@ -415,7 +415,7 @@ func (l *protoLex) newTokenInfo() ast.TokenInfo {
 		PosRange:          l.posRange(),
 		LeadingComments:   l.comments,
 		LeadingWhitespace: ws,
-		RawText:           string(l.input.endMark()),
+		RawText:           l.input.endMark(),
 	}
 }
 
