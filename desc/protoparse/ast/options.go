@@ -60,7 +60,7 @@ type OptionNameNode struct {
 }
 
 func NewOptionNameNode(parts []*FieldReferenceNode, dots []*RuneNode) *OptionNameNode {
-	children := make([]Node, len(parts)*2-1)
+	children := make([]Node, 0, len(parts)*2-1)
 	for i, part := range parts {
 		if i > 0 {
 			children = append(children, dots[i-1])
@@ -125,7 +125,7 @@ type CompactOptionsNode struct {
 }
 
 func NewCompactOptionsNode(open *RuneNode, opts []*OptionNode, commas []*RuneNode, close *RuneNode) *CompactOptionsNode {
-	children := make([]Node, len(opts)*2+1)
+	children := make([]Node, 0, len(opts)*2+1)
 	children = append(children, open)
 	for i, opt := range opts {
 		if i > 0 {
@@ -144,4 +144,11 @@ func NewCompactOptionsNode(open *RuneNode, opts []*OptionNode, commas []*RuneNod
 		Commas:       commas,
 		CloseBracket: close,
 	}
+}
+
+func (e *CompactOptionsNode) GetElements() []*OptionNode {
+	if e == nil {
+		return nil
+	}
+	return e.Options
 }

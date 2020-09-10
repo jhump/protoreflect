@@ -46,7 +46,7 @@ func NewFileNode(syntax *SyntaxNode, decls []FileElement) *FileNode {
 	if syntax != nil {
 		numChildren++
 	}
-	children := make([]Node, numChildren)
+	children := make([]Node, 0, numChildren)
 	if syntax != nil {
 		children = append(children, syntax)
 	}

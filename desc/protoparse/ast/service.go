@@ -17,7 +17,7 @@ type ServiceNode struct {
 func (*ServiceNode) fileElement() {}
 
 func NewServiceNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []ServiceElement, close *RuneNode) *ServiceNode {
-	children := make([]Node, 4+len(decls))
+	children := make([]Node, 0, 4+len(decls))
 	children = append(children, keyword, name, open)
 	for _, decl := range decls {
 		children = append(children, decl)

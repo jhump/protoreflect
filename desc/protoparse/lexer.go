@@ -76,6 +76,7 @@ type protoLex struct {
 	offset int
 
 	prevSym ast.TerminalNode
+	eof     ast.TerminalNode
 
 	prevLineNo int
 	prevColNo  int
@@ -207,7 +208,8 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			// we're not actually returning a rune, but this will associate
 			// accumulated comments as a trailing comment on last symbol
 			// (if appropriate)
-			l.setRune(lval, 0)
+			l.setIdent(lval, "")
+			l.eof = lval.id
 			return 0
 		} else if err != nil {
 			// we don't call setError because we don't want it wrapped
@@ -397,18 +399,22 @@ func (l *protoLex) posRange() ast.PosRange {
 }
 
 func (l *protoLex) newComment() ast.Comment {
+	ws := string(l.ws)
+	l.ws = nil
 	return ast.Comment{
 		PosRange:          l.posRange(),
-		LeadingWhitespace: string(l.ws),
+		LeadingWhitespace: ws,
 		Text:              string(l.input.endMark()),
 	}
 }
 
 func (l *protoLex) newTokenInfo() ast.TokenInfo {
+	ws := string(l.ws)
+	l.ws = nil
 	return ast.TokenInfo{
 		PosRange:          l.posRange(),
 		LeadingComments:   l.comments,
-		LeadingWhitespace: string(l.ws),
+		LeadingWhitespace: ws,
 		RawText:           string(l.input.endMark()),
 	}
 }

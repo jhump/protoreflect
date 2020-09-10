@@ -699,7 +699,15 @@ func parseProto(filename string, r io.Reader, errs *errorHandler, validate bool)
 	beforeErrs := errs.errsReported
 	lx := newLexer(r, filename, errs)
 	protoParse(lx)
-
+	if lx.res == nil || len(lx.res.Children()) == 0 {
+		// nil AST means there was an error that prevented any parsing
+		// or the file was empty; synthesize empty non-nil AST
+		lx.res = ast.NewEmptyFileNode(filename)
+	}
+	if lx.eof != nil {
+		lx.res.FinalComments = lx.eof.LeadingComments()
+		lx.res.FinalWhitespace = lx.eof.LeadingWhitespace()
+	}
 	res := createParseResult(filename, lx.res, errs)
 	if validate && errs.err == nil {
 		validateBasic(res, errs.errsReported > beforeErrs)
@@ -713,11 +721,6 @@ func createParseResult(filename string, file *ast.FileNode, errs *errorHandler) 
 		errs:               errs,
 		nodes:              map[proto.Message]ast.Node{},
 		interpretedOptions: map[*ast.OptionNode][]int32{},
-	}
-	if file == nil || len(file.Children()) == 0 {
-		// nil AST means there was an error that prevented any parsing
-		// or the file was empty; synthesize empty non-nil AST
-		file = ast.NewEmptyFileNode(filename)
 	}
 	res.createFileDescriptor(filename, file)
 	return res

@@ -242,7 +242,7 @@ type OneOfNode struct {
 func (*OneOfNode) msgElement() {}
 
 func NewOneOfNode(keyword *KeywordNode, name *IdentNode, open *RuneNode, decls []OneOfElement, close *RuneNode) *OneOfNode {
-	children := make([]Node, 4+len(decls))
+	children := make([]Node, 0, 4+len(decls))
 	children = append(children, keyword, name, open)
 	for _, decl := range decls {
 		children = append(children, decl)

@@ -111,7 +111,7 @@ func (n *terminalNode) PopLeadingComment() Comment {
 }
 
 func (n *terminalNode) PushTrailingComment(c Comment) {
-	n.leadingComments = append(n.leadingComments, c)
+	n.trailingComments = append(n.trailingComments, c)
 }
 
 func (n *terminalNode) LeadingWhitespace() string {

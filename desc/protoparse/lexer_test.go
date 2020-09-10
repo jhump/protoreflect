@@ -1,6 +1,7 @@
 package protoparse
 
 import (
+	"github.com/jhump/protoreflect/desc/protoparse/ast"
 	"io"
 	"strings"
 	"testing"
@@ -68,9 +69,15 @@ foo
 
 	// this is an attached leading comment
 	foo
+	// a trailing comment for last element
+
+	// comment attached to no tokens (upcoming token is EOF!)
+	/* another comment followed by some final whitespace*/
+
+	
 	`))
 
-	var prev node
+	var prev ast.Node
 	var sym protoSymType
 	expected := []struct {
 		t          int
@@ -154,49 +161,57 @@ foo
 		if tok == 0 {
 			t.Fatalf("lexer reported EOF but should have returned %v", exp)
 		}
-		var n node
+		var n ast.Node
 		var val interface{}
 		switch tok {
 		case _SYNTAX, _OPTION, _INT32, _SERVICE, _RPC, _MESSAGE, _NAME:
 			n = sym.id
-			val = sym.id.val
+			val = sym.id.Val
 		case _STRING_LIT:
 			n = sym.s
-			val = sym.s.val
+			val = sym.s.Val
 		case _INT_LIT:
 			n = sym.i
-			val = sym.i.val
+			val = sym.i.Val
 		case _FLOAT_LIT:
 			n = sym.f
-			val = sym.f.val
+			val = sym.f.Val
 		default:
 			n = sym.b
 			val = nil
 		}
 		testutil.Eq(t, exp.t, tok, "case %d: wrong token type (case %v)", i, exp.v)
 		testutil.Eq(t, exp.v, val, "case %d: wrong token value", i)
-		testutil.Eq(t, exp.line, n.start().Line, "case %d: wrong line number", i)
-		testutil.Eq(t, exp.col, n.start().Col, "case %d: wrong column number", i)
-		testutil.Eq(t, exp.line, n.end().Line, "case %d: wrong end line number", i)
-		testutil.Eq(t, exp.col+exp.span, n.end().Col, "case %d: wrong end column number", i)
+		testutil.Eq(t, exp.line, n.Start().Line, "case %d: wrong line number", i)
+		testutil.Eq(t, exp.col, n.Start().Col, "case %d: wrong column number", i)
+		testutil.Eq(t, exp.line, n.End().Line, "case %d: wrong end line number", i)
+		testutil.Eq(t, exp.col+exp.span, n.End().Col, "case %d: wrong end column number", i)
 		if exp.trailCount > 0 {
-			testutil.Eq(t, exp.trailCount, len(prev.trailingComments()), "case %d: wrong number of trailing comments", i)
+			testutil.Eq(t, exp.trailCount, len(prev.TrailingComments()), "case %d: wrong number of trailing comments", i)
 		}
-		testutil.Eq(t, len(exp.comments)-exp.trailCount, len(n.leadingComments()), "case %d: wrong number of comments", i)
+		testutil.Eq(t, len(exp.comments)-exp.trailCount, len(n.LeadingComments()), "case %d: wrong number of comments", i)
 		for ci := range exp.comments {
-			var c comment
+			var c ast.Comment
 			if ci < exp.trailCount {
-				c = prev.trailingComments()[ci]
+				c = prev.TrailingComments()[ci]
 			} else {
-				c = n.leadingComments()[ci-exp.trailCount]
+				c = n.LeadingComments()[ci-exp.trailCount]
 			}
-			testutil.Eq(t, exp.comments[ci], c.text, "case %d, comment #%d: unexpected text", i, ci+1)
+			testutil.Eq(t, exp.comments[ci], c.Text, "case %d, comment #%d: unexpected text", i, ci+1)
 		}
 		prev = n
 	}
 	if tok := l.Lex(&sym); tok != 0 {
 		t.Fatalf("lexer reported symbol after what should have been EOF: %d", tok)
 	}
+	// Now we check final state of lexer for unattached comments and final whitespace
+	// One of the final comments get associated as trailing comment for final token
+	testutil.Eq(t, 1, len(prev.TrailingComments()), "last token: wrong number of trailing comments")
+	finalComments := l.eof.LeadingComments()
+	testutil.Eq(t, 2, len(finalComments), "wrong number of final remaining comments")
+	testutil.Eq(t, "// comment attached to no tokens (upcoming token is EOF!)\n", finalComments[0].Text, "incorrect final comment text")
+	testutil.Eq(t, "/* another comment followed by some final whitespace*/", finalComments[1].Text, "incorrect final comment text")
+	testutil.Eq(t, "\n\n\t\n\t", l.eof.LeadingWhitespace(), "incorrect final whitespace")
 }
 
 func TestLexerErrors(t *testing.T) {

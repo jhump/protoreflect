@@ -172,7 +172,7 @@ func (r *parseResult) asFieldDescriptor(node *ast.FieldNode, maxTag int32, isPro
 	}
 	fd := newFieldDescriptor(node.Name.Val, string(node.FldType.AsIdentifier()), int32(tag), asLabel(&node.Label))
 	r.putFieldNode(fd, node)
-	if opts := node.Options.Options; len(opts) > 0 {
+	if opts := node.Options.GetElements(); len(opts) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	if isProto3 && fd.Label != nil && fd.GetLabel() == dpb.FieldDescriptorProto_LABEL_OPTIONAL {
@@ -236,7 +236,7 @@ func (r *parseResult) asGroupDescriptors(group *ast.GroupNode, isProto3 bool, ma
 		TypeName: proto.String(group.Name.Val),
 	}
 	r.putFieldNode(fd, group)
-	if opts := group.Options.Options; len(opts) > 0 {
+	if opts := group.Options.GetElements(); len(opts) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	md := &dpb.DescriptorProto{Name: proto.String(group.Name.Val)}
@@ -260,7 +260,7 @@ func (r *parseResult) asMapDescriptors(mapField *ast.MapFieldNode, isProto3 bool
 	r.putFieldNode(valFd, mapField.ValueField())
 	entryName := internal.InitCap(internal.JsonName(mapField.Name.Val)) + "Entry"
 	fd := newFieldDescriptor(mapField.Name.Val, entryName, int32(tag), dpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
-	if opts := mapField.Options.Options; len(opts) > 0 {
+	if opts := mapField.Options.GetElements(); len(opts) > 0 {
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	r.putFieldNode(fd, mapField)
@@ -274,7 +274,7 @@ func (r *parseResult) asMapDescriptors(mapField *ast.MapFieldNode, isProto3 bool
 }
 
 func (r *parseResult) asExtensionRanges(node *ast.ExtensionRangeNode, maxTag int32) []*dpb.DescriptorProto_ExtensionRange {
-	opts := r.asUninterpretedOptions(node.Options.Options)
+	opts := r.asUninterpretedOptions(node.Options.GetElements())
 	ers := make([]*dpb.DescriptorProto_ExtensionRange, len(node.Ranges))
 	for i, rng := range node.Ranges {
 		start, end := getRangeBounds(r, rng, 0, maxTag)
@@ -298,7 +298,7 @@ func (r *parseResult) asEnumValue(ev *ast.EnumValueNode) *dpb.EnumValueDescripto
 	}
 	evd := &dpb.EnumValueDescriptorProto{Name: proto.String(ev.Name.Val), Number: proto.Int32(num)}
 	r.putEnumValueNode(evd, ev)
-	if opts := ev.Options.Options; len(opts) > 0 {
+	if opts := ev.Options.GetElements(); len(opts) > 0 {
 		evd.Options = &dpb.EnumValueOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	return evd

@@ -220,7 +220,7 @@ func (r *parseResult) generateSourceCodeInfoForEnumValue(sci *sourceCodeInfo, n 
 		optsPath := append(path, internal.EnumVal_optionsTag)
 		sci.newLoc(n.Options, optsPath)
 		var optIndex int32
-		for _, opt := range n.Options.Options {
+		for _, opt := range n.Options.GetElements() {
 			r.generateSourceCodeInfoForOption(sci, opt, true, &optIndex, optsPath)
 		}
 	}
@@ -318,7 +318,7 @@ func (r *parseResult) generateSourceCodeInfoForField(sci *sourceCodeInfo, n ast.
 		optsPath := append(path, internal.Field_optionsTag)
 		sci.newLoc(n.GetOptions(), optsPath)
 		var optIndex int32
-		for _, opt := range n.GetOptions().Options {
+		for _, opt := range n.GetOptions().GetElements() {
 			r.generateSourceCodeInfoForOption(sci, opt, true, &optIndex, optsPath)
 		}
 	}
@@ -338,7 +338,7 @@ func (r *parseResult) generateSourceCodeInfoForExtensionRanges(sci *sourceCodeIn
 			optsPath := append(path, internal.ExtensionRange_optionsTag)
 			sci.newLoc(n.Options, optsPath)
 			var optIndex int32
-			for _, opt := range n.Options.Options {
+			for _, opt := range n.Options.GetElements() {
 				r.generateSourceCodeInfoForOption(sci, opt, true, &optIndex, optsPath)
 			}
 		}

@@ -335,7 +335,7 @@ type ArrayLiteralNode struct {
 }
 
 func NewArrayLiteralNode(open *RuneNode, vals []ValueNode, commas []*RuneNode, close *RuneNode) *ArrayLiteralNode {
-	children := make([]Node, len(vals)*2+1)
+	children := make([]Node, 0, len(vals)*2+1)
 	children = append(children, open)
 	for i, val := range vals {
 		if i > 0 {
@@ -380,7 +380,7 @@ func NewMessageLiteralNode(open *RuneNode, vals []*MessageFieldNode, seps []*Run
 			numChildren++
 		}
 	}
-	children := make([]Node, numChildren)
+	children := make([]Node, 0, numChildren)
 	children = append(children, open)
 	for i, val := range vals {
 		if i > 0 && seps[i-1] != nil {
