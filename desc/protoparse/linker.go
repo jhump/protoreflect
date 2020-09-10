@@ -3,7 +3,6 @@ package protoparse
 import (
 	"bytes"
 	"fmt"
-	"github.com/jhump/protoreflect/desc/protoparse/ast"
 	"sort"
 	"strings"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
+	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
 
 type linker struct {

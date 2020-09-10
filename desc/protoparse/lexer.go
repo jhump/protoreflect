@@ -5,11 +5,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/jhump/protoreflect/desc/protoparse/ast"
 	"io"
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
 
 type runeReader struct {

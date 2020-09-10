@@ -1,11 +1,11 @@
 package protoparse
 
 import (
-	"github.com/jhump/protoreflect/desc/protoparse/ast"
 	"io"
 	"strings"
 	"testing"
 
+	"github.com/jhump/protoreflect/desc/protoparse/ast"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 

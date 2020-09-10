@@ -3,7 +3,6 @@ package protoparse
 import (
 	"bytes"
 	"fmt"
-	"github.com/jhump/protoreflect/desc/protoparse/ast"
 	"math"
 
 	"github.com/golang/protobuf/proto"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
+	"github.com/jhump/protoreflect/desc/protoparse/ast"
 	"github.com/jhump/protoreflect/dynamic"
 )
 

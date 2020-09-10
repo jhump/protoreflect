@@ -2,12 +2,12 @@ package protoparse
 
 import (
 	"fmt"
-	"github.com/jhump/protoreflect/desc/protoparse/ast"
 	"sort"
 
 	"github.com/golang/protobuf/proto"
-
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+
+	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
 
 func validateBasic(res *parseResult, containsErrors bool) {

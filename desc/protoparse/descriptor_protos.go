@@ -2,7 +2,6 @@ package protoparse
 
 import (
 	"bytes"
-	"github.com/jhump/protoreflect/desc/protoparse/ast"
 	"math"
 	"strings"
 	"unicode"
@@ -11,6 +10,7 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 	"github.com/jhump/protoreflect/desc/internal"
+	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
 
 func (r *parseResult) createFileDescriptor(filename string, file *ast.FileNode) {

@@ -1,9 +1,10 @@
 package protoparse
 
 import (
-	"github.com/jhump/protoreflect/internal/testutil"
 	"strings"
 	"testing"
+
+	"github.com/jhump/protoreflect/internal/testutil"
 )
 
 func TestBasicValidation(t *testing.T) {
