@@ -28,10 +28,6 @@ func NewIdentNode(val string, info TokenInfo) *IdentNode {
 	}
 }
 
-func (n *IdentNode) RawText() string {
-	return n.Val
-}
-
 func (n *IdentNode) Value() interface{} {
 	return n.AsIdentifier()
 }
@@ -40,20 +36,29 @@ func (n *IdentNode) AsIdentifier() Identifier {
 	return Identifier(n.Val)
 }
 
-func (n *IdentNode) AsKeyword() *KeywordNode {
+func (n *IdentNode) ToKeyword() *KeywordNode {
 	return (*KeywordNode)(n)
 }
 
 type CompoundIdentNode struct {
 	compositeNode
+	LeadingDot *RuneNode
 	Components []*IdentNode
 	Dots       []*RuneNode
 	Val        string
 }
 
-func NewCompoundIdentNode(components []*IdentNode, dots []*RuneNode) *CompoundIdentNode {
-	children := make([]Node, 0, len(components)*2-1)
+func NewCompoundIdentNode(leadingDot *RuneNode, components []*IdentNode, dots []*RuneNode) *CompoundIdentNode {
+	numChildren := len(components)*2 - 1
+	if leadingDot != nil {
+		numChildren++
+	}
+	children := make([]Node, 0, numChildren)
 	var b strings.Builder
+	if leadingDot != nil {
+		children = append(children, leadingDot)
+		b.WriteRune(leadingDot.Rune)
+	}
 	for i, comp := range components {
 		if i > 0 {
 			dot := dots[i-1]
@@ -67,6 +72,7 @@ func NewCompoundIdentNode(components []*IdentNode, dots []*RuneNode) *CompoundId
 		compositeNode: compositeNode{
 			children: children,
 		},
+		LeadingDot: leadingDot,
 		Components: components,
 		Dots:       dots,
 		Val:        b.String(),
@@ -88,8 +94,4 @@ func NewKeywordNode(val string, info TokenInfo) *KeywordNode {
 		terminalNode: info.asTerminalNode(),
 		Val:          val,
 	}
-}
-
-func (n *KeywordNode) RawText() string {
-	return string(n.Val)
 }

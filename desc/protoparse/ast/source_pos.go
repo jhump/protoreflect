@@ -16,12 +16,6 @@ func (pos SourcePos) String() string {
 	return fmt.Sprintf("%s:%d:%d", pos.Filename, pos.Line, pos.Col)
 }
 
-// UnknownPos is a placeholder position when only the source file
-// name is known.
-func UnknownPos(filename string) *SourcePos {
-	return &SourcePos{Filename: filename}
-}
-
 // PosRange is a range of positions in a source file that indicates
 // the span of some region of source, such as a single token or
 // a sub-tree of the AST.

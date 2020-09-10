@@ -64,6 +64,15 @@ var _ ServiceElement = (*OptionNode)(nil)
 var _ ServiceElement = (*RPCNode)(nil)
 var _ ServiceElement = (*EmptyDeclNode)(nil)
 
+type RPCDeclNode interface {
+	Node
+	GetInputType() Node
+	GetOutputType() Node
+}
+
+var _ RPCDeclNode = (*RPCNode)(nil)
+var _ RPCDeclNode = NoSourceNode{}
+
 type RPCNode struct {
 	compositeNode
 	Keyword    *KeywordNode

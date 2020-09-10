@@ -2,6 +2,14 @@ package ast
 
 import "fmt"
 
+type FileDeclNode interface {
+	Node
+	GetSyntax() Node
+}
+
+var _ FileDeclNode = (*FileNode)(nil)
+var _ FileDeclNode = NoSourceNode{}
+
 // FileNode is the root of the AST hierarchy. It represents an entire
 // protobuf source file.
 type FileNode struct {
@@ -33,7 +41,7 @@ type FileNode struct {
 //
 // This function panics if the concrete type of any element of decls is not
 // from this package.
-func NewFileElement(syntax *SyntaxNode, decls []FileElement) *FileNode {
+func NewFileNode(syntax *SyntaxNode, decls []FileElement) *FileNode {
 	numChildren := len(decls)
 	if syntax != nil {
 		numChildren++
@@ -76,7 +84,7 @@ func NewFileElement(syntax *SyntaxNode, decls []FileElement) *FileNode {
 		}
 	}
 
-	ret := &FileNode{
+	return &FileNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
@@ -90,8 +98,18 @@ func NewFileElement(syntax *SyntaxNode, decls []FileElement) *FileNode {
 		Services: svcs,
 		AllDecls: decls,
 	}
+}
 
-	return ret
+func NewEmptyFileNode(filename string) *FileNode {
+	return &FileNode{
+		compositeNode: compositeNode{
+			children: []Node{NewNoSourceNode(filename)},
+		},
+	}
+}
+
+func (f *FileNode) GetSyntax() Node {
+	return f.Syntax
 }
 
 // FileElement is an interface implemented by all AST nodes that are

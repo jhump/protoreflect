@@ -82,6 +82,15 @@ var _ EnumElement = (*EnumValueNode)(nil)
 var _ EnumElement = (*ReservedNode)(nil)
 var _ EnumElement = (*EmptyDeclNode)(nil)
 
+type EnumValueDeclNode interface {
+	Node
+	GetName() Node
+	GetNumber() Node
+}
+
+var _ EnumValueDeclNode = (*EnumValueNode)(nil)
+var _ EnumValueDeclNode = NoSourceNode{}
+
 // EnumNode represents an enum declaration. Example:
 //
 //  UNSET = 0 [deprecated = true];
@@ -94,7 +103,7 @@ type EnumValueNode struct {
 	Semicolon *RuneNode
 }
 
-func (e *EnumValueNode) enumElement() {}
+func (*EnumValueNode) enumElement() {}
 
 // NewEnumValueNode creates a new *EnumValueNode. All arguments must be non-nil
 // except opts which is only non-nil if the declaration included options.
@@ -117,4 +126,12 @@ func NewEnumValueNode(name *IdentNode, equals *RuneNode, number IntValueNode, op
 		Options:   opts,
 		Semicolon: semicolon,
 	}
+}
+
+func (e *EnumValueNode) GetName() Node {
+	return e.Name
+}
+
+func (e *EnumValueNode) GetNumber() Node {
+	return e.Number
 }

@@ -15,6 +15,7 @@ type MessageDeclNode interface {
 var _ MessageDeclNode = (*MessageNode)(nil)
 var _ MessageDeclNode = (*GroupNode)(nil)
 var _ MessageDeclNode = (*MapFieldNode)(nil)
+var _ MessageDeclNode = NoSourceNode{}
 
 type MessageNode struct {
 	compositeNode

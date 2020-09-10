@@ -17,6 +17,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
+	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
 
 //go:generate goyacc -o proto.y.go -p proto proto.y
@@ -514,11 +515,11 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 	if recursive {
 		fd := result.fd
 		decl := result.getFileNode(fd)
-		fnode, ok := decl.(*fileNode)
+		fnode, ok := decl.(*ast.FileNode)
 		if !ok {
 			// no AST for this file? use imports in descriptor
 			for _, dep := range fd.Dependency {
-				parseProtoFile(acc, dep, decl.start(), errs, true, validate, parsed, lookupImport)
+				parseProtoFile(acc, dep, decl.Start(), errs, true, validate, parsed, lookupImport)
 				if errs.getError() != nil {
 					return // abort
 				}
@@ -526,8 +527,8 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 			return
 		}
 		// we have an AST; use it so we can report import location in errors
-		for _, dep := range fnode.imports {
-			parseProtoFile(acc, dep.name.val, dep.name.start(), errs, true, validate, parsed, lookupImport)
+		for _, dep := range fnode.Imports {
+			parseProtoFile(acc, dep.Name.AsString(), dep.Name.Start(), errs, true, validate, parsed, lookupImport)
 			if errs.getError() != nil {
 				return // abort
 			}
@@ -565,132 +566,132 @@ type parseResult struct {
 
 	// a map of elements in the descriptor to nodes in the AST
 	// (for extracting position information when validating the descriptor)
-	nodes map[proto.Message]node
+	nodes map[proto.Message]ast.Node
 
 	// a map of uninterpreted option AST nodes to their relative path
 	// in the resulting options message
-	interpretedOptions map[*optionNode][]int32
+	interpretedOptions map[*ast.OptionNode][]int32
 }
 
-func (r *parseResult) getFileNode(f *dpb.FileDescriptorProto) fileDecl {
+func (r *parseResult) getFileNode(f *dpb.FileDescriptorProto) ast.FileDeclNode {
 	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(f.GetName())}
+		return ast.NewNoSourceNode(f.GetName())
 	}
-	return r.nodes[f].(fileDecl)
+	return r.nodes[f].(ast.FileDeclNode)
 }
 
-func (r *parseResult) getOptionNode(o *dpb.UninterpretedOption) optionDecl {
+func (r *parseResult) getOptionNode(o *dpb.UninterpretedOption) ast.OptionDeclNode {
 	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+		return ast.NewNoSourceNode(r.fd.GetName())
 	}
-	return r.nodes[o].(optionDecl)
+	return r.nodes[o].(ast.OptionDeclNode)
 }
 
-func (r *parseResult) getOptionNamePartNode(o *dpb.UninterpretedOption_NamePart) node {
+func (r *parseResult) getOptionNamePartNode(o *dpb.UninterpretedOption_NamePart) ast.Node {
 	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+		return ast.NewNoSourceNode(r.fd.GetName())
 	}
 	return r.nodes[o]
 }
 
-func (r *parseResult) getFieldNode(f *dpb.FieldDescriptorProto) fieldDecl {
+func (r *parseResult) getFieldNode(f *dpb.FieldDescriptorProto) ast.FieldDeclNode {
 	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+		return ast.NewNoSourceNode(r.fd.GetName())
 	}
-	return r.nodes[f].(fieldDecl)
+	return r.nodes[f].(ast.FieldDeclNode)
 }
 
-func (r *parseResult) getExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange) rangeDecl {
+func (r *parseResult) getExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange) ast.RangeDeclNode {
 	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+		return ast.NewNoSourceNode(r.fd.GetName())
 	}
-	return r.nodes[e].(rangeDecl)
+	return r.nodes[e].(ast.RangeDeclNode)
 }
 
-func (r *parseResult) getMessageReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange) rangeDecl {
+func (r *parseResult) getMessageReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange) ast.RangeDeclNode {
 	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+		return ast.NewNoSourceNode(r.fd.GetName())
 	}
-	return r.nodes[rr].(rangeDecl)
+	return r.nodes[rr].(ast.RangeDeclNode)
 }
 
-func (r *parseResult) getEnumNode(e *dpb.EnumDescriptorProto) node {
+func (r *parseResult) getEnumNode(e *dpb.EnumDescriptorProto) ast.Node {
 	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+		return ast.NewNoSourceNode(r.fd.GetName())
 	}
 	return r.nodes[e]
 }
 
-func (r *parseResult) getEnumValueNode(e *dpb.EnumValueDescriptorProto) enumValueDecl {
+func (r *parseResult) getEnumValueNode(e *dpb.EnumValueDescriptorProto) ast.EnumValueDeclNode {
 	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+		return ast.NewNoSourceNode(r.fd.GetName())
 	}
-	return r.nodes[e].(enumValueDecl)
+	return r.nodes[e].(ast.EnumValueDeclNode)
 }
 
-func (r *parseResult) getEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumReservedRange) rangeDecl {
+func (r *parseResult) getEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumReservedRange) ast.RangeDeclNode {
 	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+		return ast.NewNoSourceNode(r.fd.GetName())
 	}
-	return r.nodes[rr].(rangeDecl)
+	return r.nodes[rr].(ast.RangeDeclNode)
 }
 
-func (r *parseResult) getMethodNode(m *dpb.MethodDescriptorProto) methodDecl {
+func (r *parseResult) getMethodNode(m *dpb.MethodDescriptorProto) ast.RPCDeclNode {
 	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
+		return ast.NewNoSourceNode(r.fd.GetName())
 	}
-	return r.nodes[m].(methodDecl)
+	return r.nodes[m].(ast.RPCDeclNode)
 }
 
-func (r *parseResult) putFileNode(f *dpb.FileDescriptorProto, n *fileNode) {
+func (r *parseResult) putFileNode(f *dpb.FileDescriptorProto, n *ast.FileNode) {
 	r.nodes[f] = n
 }
 
-func (r *parseResult) putOptionNode(o *dpb.UninterpretedOption, n *optionNode) {
+func (r *parseResult) putOptionNode(o *dpb.UninterpretedOption, n *ast.OptionNode) {
 	r.nodes[o] = n
 }
 
-func (r *parseResult) putOptionNamePartNode(o *dpb.UninterpretedOption_NamePart, n *optionNamePartNode) {
+func (r *parseResult) putOptionNamePartNode(o *dpb.UninterpretedOption_NamePart, n *ast.FieldReferenceNode) {
 	r.nodes[o] = n
 }
 
-func (r *parseResult) putMessageNode(m *dpb.DescriptorProto, n msgDecl) {
+func (r *parseResult) putMessageNode(m *dpb.DescriptorProto, n ast.MessageDeclNode) {
 	r.nodes[m] = n
 }
 
-func (r *parseResult) putFieldNode(f *dpb.FieldDescriptorProto, n fieldDecl) {
+func (r *parseResult) putFieldNode(f *dpb.FieldDescriptorProto, n ast.FieldDeclNode) {
 	r.nodes[f] = n
 }
 
-func (r *parseResult) putOneOfNode(o *dpb.OneofDescriptorProto, n *oneOfNode) {
+func (r *parseResult) putOneOfNode(o *dpb.OneofDescriptorProto, n *ast.OneOfNode) {
 	r.nodes[o] = n
 }
 
-func (r *parseResult) putExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange, n *rangeNode) {
+func (r *parseResult) putExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange, n *ast.RangeNode) {
 	r.nodes[e] = n
 }
 
-func (r *parseResult) putMessageReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange, n *rangeNode) {
+func (r *parseResult) putMessageReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange, n *ast.RangeNode) {
 	r.nodes[rr] = n
 }
 
-func (r *parseResult) putEnumNode(e *dpb.EnumDescriptorProto, n *enumNode) {
+func (r *parseResult) putEnumNode(e *dpb.EnumDescriptorProto, n *ast.EnumNode) {
 	r.nodes[e] = n
 }
 
-func (r *parseResult) putEnumValueNode(e *dpb.EnumValueDescriptorProto, n *enumValueNode) {
+func (r *parseResult) putEnumValueNode(e *dpb.EnumValueDescriptorProto, n *ast.EnumValueNode) {
 	r.nodes[e] = n
 }
 
-func (r *parseResult) putEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumReservedRange, n *rangeNode) {
+func (r *parseResult) putEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumReservedRange, n *ast.RangeNode) {
 	r.nodes[rr] = n
 }
 
-func (r *parseResult) putServiceNode(s *dpb.ServiceDescriptorProto, n *serviceNode) {
+func (r *parseResult) putServiceNode(s *dpb.ServiceDescriptorProto, n *ast.ServiceNode) {
 	r.nodes[s] = n
 }
 
-func (r *parseResult) putMethodNode(m *dpb.MethodDescriptorProto, n *methodNode) {
+func (r *parseResult) putMethodNode(m *dpb.MethodDescriptorProto, n *ast.RPCNode) {
 	r.nodes[m] = n
 }
 
@@ -707,35 +708,19 @@ func parseProto(filename string, r io.Reader, errs *errorHandler, validate bool)
 	return res
 }
 
-func createParseResult(filename string, file *fileNode, errs *errorHandler) *parseResult {
+func createParseResult(filename string, file *ast.FileNode, errs *errorHandler) *parseResult {
 	res := &parseResult{
 		errs:               errs,
-		nodes:              map[proto.Message]node{},
-		interpretedOptions: map[*optionNode][]int32{},
+		nodes:              map[proto.Message]ast.Node{},
+		interpretedOptions: map[*ast.OptionNode][]int32{},
 	}
-	if file == nil {
+	if file == nil || len(file.Children()) == 0 {
 		// nil AST means there was an error that prevented any parsing
 		// or the file was empty; synthesize empty non-nil AST
-		file = &fileNode{}
-	}
-	if file.first == nil {
-		n := noSourceNode{pos: unknownPos(filename)}
-		file.setRange(&n, &n)
+		file = ast.NewEmptyFileNode(filename)
 	}
 	res.createFileDescriptor(filename, file)
 	return res
-}
-
-func toNameParts(ident *compoundIdentNode) []*optionNamePartNode {
-	parts := strings.Split(ident.val, ".")
-	ret := make([]*optionNamePartNode, len(parts))
-	offset := 0
-	for i, p := range parts {
-		ret[i] = &optionNamePartNode{text: ident, offset: offset, length: len(p)}
-		ret[i].setRange(ident, ident)
-		offset += len(p) + 1
-	}
-	return ret
 }
 
 func checkTag(pos *SourcePos, v uint64, maxTag int32) error {
@@ -786,22 +771,22 @@ func checkExtensionTag(fld *desc.FieldDescriptor, res *parseResult) error {
 	// now that things are linked, we can check if the extendee is messageset wire format
 	// and, if not, enforce tighter limit.
 	if !fld.GetOwner().GetMessageOptions().GetMessageSetWireFormat() && fld.GetNumber() > internal.MaxNormalTag {
-		pos := res.nodes[fld.AsFieldDescriptorProto()].(fieldDecl).fieldTag().start()
+		pos := res.getFieldNode(fld.AsFieldDescriptorProto()).FieldTag().Start()
 		return errorWithPos(pos, "tag number %d is higher than max allowed tag number (%d)", fld.GetNumber(), internal.MaxNormalTag)
 	}
 	return nil
 }
 
-func aggToString(agg []*aggregateEntryNode, buf *bytes.Buffer) {
+func aggToString(agg []*ast.MessageFieldNode, buf *bytes.Buffer) {
 	buf.WriteString("{")
 	for _, a := range agg {
 		buf.WriteString(" ")
-		buf.WriteString(a.name.value())
-		if v, ok := a.val.(*aggregateLiteralNode); ok {
-			aggToString(v.elements, buf)
+		buf.WriteString(a.Name.Value())
+		if v, ok := a.Val.(*ast.MessageLiteralNode); ok {
+			aggToString(v.Elements, buf)
 		} else {
 			buf.WriteString(": ")
-			elementToString(a.val.value(), buf)
+			elementToString(a.Val.Value(), buf)
 		}
 	}
 	buf.WriteString(" }")
@@ -809,7 +794,7 @@ func aggToString(agg []*aggregateEntryNode, buf *bytes.Buffer) {
 
 func elementToString(v interface{}, buf *bytes.Buffer) {
 	switch v := v.(type) {
-	case bool, int64, uint64, identifier:
+	case bool, int64, uint64, ast.Identifier:
 		_, _ = fmt.Fprintf(buf, "%v", v)
 	case float64:
 		if math.IsInf(v, 1) {
@@ -825,7 +810,7 @@ func elementToString(v interface{}, buf *bytes.Buffer) {
 		buf.WriteRune('"')
 		writeEscapedBytes(buf, []byte(v))
 		buf.WriteRune('"')
-	case []valueNode:
+	case []ast.ValueNode:
 		buf.WriteString(": [")
 		first := true
 		for _, e := range v {
@@ -834,10 +819,10 @@ func elementToString(v interface{}, buf *bytes.Buffer) {
 			} else {
 				buf.WriteString(", ")
 			}
-			elementToString(e.value(), buf)
+			elementToString(e.Value(), buf)
 		}
 		buf.WriteString("]")
-	case []*aggregateEntryNode:
+	case []*ast.MessageFieldNode:
 		aggToString(v, buf)
 	}
 }

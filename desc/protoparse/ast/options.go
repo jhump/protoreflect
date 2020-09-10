@@ -13,12 +13,14 @@ type OptionDeclNode interface {
 }
 
 var _ OptionDeclNode = (*OptionNode)(nil)
-var _ OptionDeclNode = (*CompactOptionNode)(nil)
+var _ OptionDeclNode = NoSourceNode{}
 
 type OptionNode struct {
 	compositeNode
-	Keyword *KeywordNode
-	OptionBody
+	Keyword   *KeywordNode
+	Name      *OptionNameNode
+	Equals    *RuneNode
+	Val       ValueNode
 	Semicolon *RuneNode
 }
 
@@ -35,27 +37,19 @@ func NewOptionNode(keyword *KeywordNode, name *OptionNameNode, equals *RuneNode,
 		compositeNode: compositeNode{
 			children: children,
 		},
-		Keyword: keyword,
-		OptionBody: OptionBody{
-			Name:   name,
-			Equals: equals,
-			Val:    val,
-		},
+		Keyword:   keyword,
+		Name:      name,
+		Equals:    equals,
+		Val:       val,
 		Semicolon: semicolon,
 	}
 }
 
-type OptionBody struct {
-	Name   *OptionNameNode
-	Equals *RuneNode
-	Val    ValueNode
-}
-
-func (n *OptionBody) GetName() Node {
+func (n *OptionNode) GetName() Node {
 	return n.Name
 }
 
-func (n *OptionBody) GetValue() ValueNode {
+func (n *OptionNode) GetValue() ValueNode {
 	return n.Val
 }
 
@@ -120,13 +114,17 @@ func (a *FieldReferenceNode) Value() string {
 
 type CompactOptionsNode struct {
 	compositeNode
-	OpenBracket  *RuneNode
-	Options      []*CompactOptionNode
+	OpenBracket *RuneNode
+	Options     []*OptionNode
+	// Commas represent the separating ',' characters between options. The
+	// length of this slice must be exactly len(Options)-1, with each item
+	// in Options having a corresponding item in this slice *except the last*
+	// (since a trailing comma is not allowed).
 	Commas       []*RuneNode
 	CloseBracket *RuneNode
 }
 
-func NewCompactOptionsNode(open *RuneNode, opts []*CompactOptionNode, commas []*RuneNode, close *RuneNode) *CompactOptionsNode {
+func NewCompactOptionsNode(open *RuneNode, opts []*OptionNode, commas []*RuneNode, close *RuneNode) *CompactOptionsNode {
 	children := make([]Node, len(opts)*2+1)
 	children = append(children, open)
 	for i, opt := range opts {
@@ -145,24 +143,5 @@ func NewCompactOptionsNode(open *RuneNode, opts []*CompactOptionNode, commas []*
 		Options:      opts,
 		Commas:       commas,
 		CloseBracket: close,
-	}
-}
-
-type CompactOptionNode struct {
-	compositeNode
-	OptionBody
-}
-
-func NewCompactOptionNode(name *OptionNameNode, equals *RuneNode, val ValueNode) *CompactOptionNode {
-	children := []Node{name, equals, val}
-	return &CompactOptionNode{
-		compositeNode: compositeNode{
-			children: children,
-		},
-		OptionBody: OptionBody{
-			Name:   name,
-			Equals: equals,
-			Val:    val,
-		},
 	}
 }

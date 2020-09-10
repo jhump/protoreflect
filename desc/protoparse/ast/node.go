@@ -85,6 +85,7 @@ type terminalNode struct {
 	leadingComments   []Comment
 	leadingWhitespace string
 	trailingComments  []Comment
+	raw               string
 }
 
 func (n *terminalNode) Start() *SourcePos {
@@ -115,6 +116,10 @@ func (n *terminalNode) PushTrailingComment(c Comment) {
 
 func (n *terminalNode) LeadingWhitespace() string {
 	return n.leadingWhitespace
+}
+
+func (n *terminalNode) RawText() string {
+	return n.raw
 }
 
 // compositeNode contains book-keeping shared by all CompositeNode
@@ -161,10 +166,6 @@ func NewRuneNode(r rune, info TokenInfo) *RuneNode {
 		terminalNode: info.asTerminalNode(),
 		Rune:         r,
 	}
-}
-
-func (n *RuneNode) RawText() string {
-	return string(n.Rune)
 }
 
 // EmptyDeclNode represents an empty declaration in protobuf source.

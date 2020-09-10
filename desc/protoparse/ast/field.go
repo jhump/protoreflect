@@ -16,12 +16,14 @@ type FieldDeclNode interface {
 	FieldTag() Node
 	FieldExtendee() Node
 	GetGroupKeyword() Node
+	GetOptions() *CompactOptionsNode
 }
 
 var _ FieldDeclNode = (*FieldNode)(nil)
 var _ FieldDeclNode = (*GroupNode)(nil)
 var _ FieldDeclNode = (*MapFieldNode)(nil)
 var _ FieldDeclNode = (*SyntheticMapField)(nil)
+var _ FieldDeclNode = NoSourceNode{}
 
 type FieldNode struct {
 	compositeNode
@@ -103,6 +105,10 @@ func (n *FieldNode) FieldExtendee() Node {
 
 func (n *FieldNode) GetGroupKeyword() Node {
 	return nil
+}
+
+func (n *FieldNode) GetOptions() *CompactOptionsNode {
+	return n.Options
 }
 
 type FieldLabel struct {
@@ -210,6 +216,10 @@ func (n *GroupNode) FieldExtendee() Node {
 
 func (n *GroupNode) GetGroupKeyword() Node {
 	return n.Keyword
+}
+
+func (n *GroupNode) GetOptions() *CompactOptionsNode {
+	return n.Options
 }
 
 func (n *GroupNode) MessageName() Node {
@@ -370,6 +380,10 @@ func (n *MapFieldNode) GetGroupKeyword() Node {
 	return nil
 }
 
+func (n *MapFieldNode) GetOptions() *CompactOptionsNode {
+	return n.Options
+}
+
 func (n *MapFieldNode) MessageName() Node {
 	return n.Name
 }
@@ -440,5 +454,9 @@ func (n *SyntheticMapField) FieldExtendee() Node {
 }
 
 func (n *SyntheticMapField) GetGroupKeyword() Node {
+	return nil
+}
+
+func (n *SyntheticMapField) GetOptions() *CompactOptionsNode {
 	return nil
 }

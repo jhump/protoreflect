@@ -34,6 +34,7 @@ var _ ValueNode = (*SignedFloatLiteralNode)(nil)
 var _ ValueNode = (*BoolLiteralNode)(nil)
 var _ ValueNode = (*ArrayLiteralNode)(nil)
 var _ ValueNode = (*MessageLiteralNode)(nil)
+var _ ValueNode = NoSourceNode{}
 
 // StringValueNode is an AST node that represents a string literal.
 // Such a node can be a single literal (*StringLiteralNode) or a
@@ -50,21 +51,13 @@ type StringLiteralNode struct {
 	terminalNode
 	// Val is the actual string value that the literal indicates.
 	Val string
-	// the text as it appeared in the source file, including
-	// quotation marks and interior escape sequences.
-	rawText string
 }
 
-func NewStringLiteralNode(val, rawText string, info TokenInfo) *StringLiteralNode {
+func NewStringLiteralNode(val string, info TokenInfo) *StringLiteralNode {
 	return &StringLiteralNode{
 		terminalNode: info.asTerminalNode(),
 		Val:          val,
-		rawText:      rawText,
 	}
-}
-
-func (n *StringLiteralNode) RawText() string {
-	return n.rawText
 }
 
 func (n *StringLiteralNode) Value() interface{} {
@@ -131,20 +124,13 @@ type UintLiteralNode struct {
 	terminalNode
 	// Val is the numeric value indicated by the literal
 	Val uint64
-	// rawText is the actual token text as it appeared in the source file.
-	rawText string
 }
 
-func NewUintLiteralNode(val uint64, rawText string, info TokenInfo) *UintLiteralNode {
+func NewUintLiteralNode(val uint64, info TokenInfo) *UintLiteralNode {
 	return &UintLiteralNode{
 		terminalNode: info.asTerminalNode(),
 		Val:          val,
-		rawText:      rawText,
 	}
-}
-
-func (n *UintLiteralNode) RawText() string {
-	return n.rawText
 }
 
 func (n *UintLiteralNode) Value() interface{} {
@@ -250,21 +236,13 @@ type FloatLiteralNode struct {
 	terminalNode
 	// Val is the numeric value indicated by the literal
 	Val float64
-	// rawText is the actual token text as it appeared in the source file,
-	// which could be in scientific notation.
-	rawText string
 }
 
-func NewFloatLiteralNode(val float64, rawText string, info TokenInfo) *FloatLiteralNode {
+func NewFloatLiteralNode(val float64, info TokenInfo) *FloatLiteralNode {
 	return &FloatLiteralNode{
 		terminalNode: info.asTerminalNode(),
 		Val:          val,
-		rawText:      rawText,
 	}
-}
-
-func (n *FloatLiteralNode) RawText() string {
-	return n.rawText
 }
 
 func (n *FloatLiteralNode) Value() interface{} {
@@ -346,8 +324,12 @@ func (n *BoolLiteralNode) Value() interface{} {
 
 type ArrayLiteralNode struct {
 	compositeNode
-	OpenBracket  *RuneNode
-	Elements     []ValueNode
+	OpenBracket *RuneNode
+	Elements    []ValueNode
+	// Commas represent the separating ',' characters between elements. The
+	// length of this slice must be exactly len(Elements)-1, with each item
+	// in Elements having a corresponding item in this slice *except the last*
+	// (since a trailing comma is not allowed).
 	Commas       []*RuneNode
 	CloseBracket *RuneNode
 }
@@ -382,13 +364,28 @@ type MessageLiteralNode struct {
 	compositeNode
 	Open     *RuneNode
 	Elements []*MessageFieldNode
-	Close    *RuneNode
+	// Separator characters between elements, which can be either ','
+	// or ';' if present. This slice must be exactly len(Elements) in
+	// length, with each item in Elements having one corresponding item
+	// in Seps. Separators in message literals are optional, so a given
+	// item in this slice may be nil to indicate absence of a separator.
+	Seps  []*RuneNode
+	Close *RuneNode
 }
 
-func NewMessageLiteralNode(open *RuneNode, vals []*MessageFieldNode, close *RuneNode) *MessageLiteralNode {
-	children := make([]Node, len(vals)+2)
+func NewMessageLiteralNode(open *RuneNode, vals []*MessageFieldNode, seps []*RuneNode, close *RuneNode) *MessageLiteralNode {
+	numChildren := len(vals) + 2
+	for _, sep := range seps {
+		if sep != nil {
+			numChildren++
+		}
+	}
+	children := make([]Node, numChildren)
 	children = append(children, open)
-	for _, val := range vals {
+	for i, val := range vals {
+		if i > 0 && seps[i-1] != nil {
+			children = append(children, seps[i-1])
+		}
 		children = append(children, val)
 	}
 	children = append(children, close)
@@ -399,6 +396,7 @@ func NewMessageLiteralNode(open *RuneNode, vals []*MessageFieldNode, close *Rune
 		},
 		Open:     open,
 		Elements: vals,
+		Seps:     seps,
 		Close:    close,
 	}
 }
@@ -409,18 +407,17 @@ func (n *MessageLiteralNode) Value() interface{} {
 
 type MessageFieldNode struct {
 	compositeNode
-	Name  *FieldReferenceNode
-	Sep   *RuneNode
-	Val   ValueNode
-	Final *RuneNode
+	Name *FieldReferenceNode
+	// Sep represents the ':' separator between the name and value. If
+	// the value is a message literal (and thus starts with '<' or '{'),
+	// then the separator is optional, and thus may be nil.
+	Sep *RuneNode
+	Val ValueNode
 }
 
-func NewMessageFieldNode(name *FieldReferenceNode, sep *RuneNode, val ValueNode, final *RuneNode) *MessageFieldNode {
+func NewMessageFieldNode(name *FieldReferenceNode, sep *RuneNode, val ValueNode) *MessageFieldNode {
 	numChildren := 2
 	if sep != nil {
-		numChildren++
-	}
-	if final != nil {
 		numChildren++
 	}
 	children := make([]Node, 0, numChildren)
@@ -429,17 +426,13 @@ func NewMessageFieldNode(name *FieldReferenceNode, sep *RuneNode, val ValueNode,
 		children = append(children, sep)
 	}
 	children = append(children, val)
-	if final != nil {
-		children = append(children, final)
-	}
 
 	return &MessageFieldNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
-		Name:  name,
-		Sep:   sep,
-		Val:   val,
-		Final: final,
+		Name: name,
+		Sep:  sep,
+		Val:  val,
 	}
 }
