@@ -145,9 +145,6 @@ type Visitor struct {
 	// VisitMessageDeclNode is invoked when visiting a MessageDeclNode in the AST.
 	// This function is used when no concrete type function is provided.
 	VisitMessageDeclNode func(MessageDeclNode) (bool, *Visitor)
-	// VisitOptionDeclNode is invoked when visiting an OptionDeclNode in the AST.
-	// This function is used when no concrete type function is provided.
-	VisitOptionDeclNode func(OptionDeclNode) (bool, *Visitor)
 
 	// VisitIdentValueNode is invoked when visiting an IdentValueNode in the AST.
 	// This function is used when no concrete type function is provided.
@@ -407,11 +404,6 @@ func (v *Visitor) Visit(n Node) (bool, VisitFunc) {
 			if v.VisitFieldDeclNode != nil {
 				matched = true
 				ok, next = v.VisitFieldDeclNode(n)
-			}
-		case OptionDeclNode:
-			if v.VisitOptionDeclNode != nil {
-				matched = true
-				ok, next = v.VisitOptionDeclNode(n)
 			}
 		case IdentValueNode:
 			if v.VisitIdentValueNode != nil {

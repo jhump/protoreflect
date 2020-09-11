@@ -361,6 +361,10 @@ func (n *SignedFloatLiteralNode) Value() interface{} {
 	return n.Val
 }
 
+func (n *SignedFloatLiteralNode) AsFloat() float64 {
+	return n.Val
+}
+
 // BoolLiteralNode represents a boolean literal.
 type BoolLiteralNode struct {
 	*KeywordNode
