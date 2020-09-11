@@ -335,6 +335,8 @@ func (r *parseResult) generateSourceCodeInfoForExtensionRanges(sci *sourceCodeIn
 		sci.newLoc(child.StartVal, append(path, internal.ExtensionRange_startTag))
 		if child.EndVal != nil {
 			sci.newLoc(child.EndVal, append(path, internal.ExtensionRange_endTag))
+		} else if child.Max != nil {
+			sci.newLoc(child.Max, append(path, internal.ExtensionRange_endTag))
 		}
 		if n.Options != nil {
 			optsPath := append(path, internal.ExtensionRange_optionsTag)
