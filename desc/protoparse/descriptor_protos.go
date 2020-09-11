@@ -323,12 +323,10 @@ func (r *parseResult) asMethodDescriptor(node *ast.RPCNode) *dpb.MethodDescripto
 	// We do the same to match protoc as closely as possible
 	// https://github.com/protocolbuffers/protobuf/blob/0c3f43a6190b77f1f68b7425d1b7e1a8257a8d0c/src/google/protobuf/compiler/parser.cc#L2152
 	if node.OpenBrace != nil {
+		md.Options = &dpb.MethodOptions{}
 		for _, decl := range node.Decls {
 			switch decl := decl.(type) {
 			case *ast.OptionNode:
-				if md.Options == nil {
-					md.Options = &dpb.MethodOptions{}
-				}
 				md.Options.UninterpretedOption = append(md.Options.UninterpretedOption, r.asUninterpretedOption(decl))
 			}
 		}
