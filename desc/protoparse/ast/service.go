@@ -108,7 +108,6 @@ func NewRPCNode(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, retur
 func NewRPCNodeWithBody(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, returns *KeywordNode, output *RPCTypeNode, openBrace *RuneNode, decls []RPCElement, closeBrace *RuneNode) *RPCNode {
 	children := make([]Node, 0, 7+len(decls))
 	children = append(children, keyword, name, input, returns, output, openBrace)
-	children = append(children, openBrace)
 	for _, decl := range decls {
 		children = append(children, decl)
 	}

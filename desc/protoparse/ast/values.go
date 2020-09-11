@@ -383,10 +383,10 @@ func NewMessageLiteralNode(openSym *RuneNode, vals []*MessageFieldNode, seps []*
 	children := make([]Node, 0, numChildren)
 	children = append(children, openSym)
 	for i, val := range vals {
-		if i > 0 && seps[i-1] != nil {
-			children = append(children, seps[i-1])
-		}
 		children = append(children, val)
+		if seps[i] != nil {
+			children = append(children, seps[i])
+		}
 	}
 	children = append(children, closeSym)
 

@@ -278,7 +278,7 @@ func TestBasicValidation(t *testing.T) {
 
 	for i, tc := range testCases {
 		errs := newErrorHandler(nil, nil)
-		_ = parseProto("test.proto", strings.NewReader(tc.contents), errs, true)
+		_ = parseProto("test.proto", strings.NewReader(tc.contents), errs, true, true)
 		err := errs.getError()
 		if tc.succeeds {
 			testutil.Ok(t, err, "case #%d should succeed", i)

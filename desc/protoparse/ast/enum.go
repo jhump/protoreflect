@@ -113,9 +113,16 @@ func (*EnumValueNode) enumElement() {}
 //  - opts: Optional set of enum value options.
 //  - semicolon: The token corresponding to the ":" rune that ends the declaration.
 func NewEnumValueNode(name *IdentNode, equals *RuneNode, number IntValueNode, opts *CompactOptionsNode, semicolon *RuneNode) *EnumValueNode {
-	children := []Node{
-		name, equals, number, opts, semicolon,
+	numChildren := 4
+	if opts != nil {
+		numChildren++
 	}
+	children := make([]Node, 0, numChildren)
+	children = append(children, name, equals, number)
+	if opts != nil {
+		children = append(children, opts)
+	}
+	children = append(children, semicolon)
 	return &EnumValueNode{
 		compositeNode: compositeNode{
 			children: children,
