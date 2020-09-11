@@ -1252,13 +1252,13 @@ protodefault:
 		protoDollar = protoS[protopt-1 : protopt+1]
 //line proto.y:242
 		{
-			protoVAL.ref = ast.NewFieldReferenceNode(nil, protoDollar[1].id, nil)
+			protoVAL.ref = ast.NewFieldReferenceNode(protoDollar[1].id)
 		}
 	case 28:
 		protoDollar = protoS[protopt-3 : protopt+1]
 //line proto.y:245
 		{
-			protoVAL.ref = ast.NewFieldReferenceNode(protoDollar[1].b, protoDollar[2].tid, protoDollar[3].b)
+			protoVAL.ref = ast.NewExtensionFieldReferenceNode(protoDollar[1].b, protoDollar[2].tid, protoDollar[3].b)
 		}
 	case 31:
 		protoDollar = protoS[protopt-1 : protopt+1]
@@ -1525,13 +1525,13 @@ protodefault:
 		protoDollar = protoS[protopt-1 : protopt+1]
 //line proto.y:425
 		{
-			protoVAL.ref = ast.NewFieldReferenceNode(nil, protoDollar[1].id, nil)
+			protoVAL.ref = ast.NewFieldReferenceNode(protoDollar[1].id)
 		}
 	case 65:
 		protoDollar = protoS[protopt-3 : protopt+1]
 //line proto.y:428
 		{
-			protoVAL.ref = ast.NewFieldReferenceNode(protoDollar[1].b, protoDollar[2].tid, protoDollar[3].b)
+			protoVAL.ref = ast.NewExtensionFieldReferenceNode(protoDollar[1].b, protoDollar[2].tid, protoDollar[3].b)
 		}
 	case 66:
 		protoDollar = protoS[protopt-3 : protopt+1]

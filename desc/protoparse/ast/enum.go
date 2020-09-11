@@ -77,6 +77,9 @@ var _ EnumElement = (*EnumValueNode)(nil)
 var _ EnumElement = (*ReservedNode)(nil)
 var _ EnumElement = (*EmptyDeclNode)(nil)
 
+// EnumValueDeclNode is a placeholder interface for AST nodes that represent
+// enum values. This allows NoSourceNode to be used in place of *EnumValueNode
+// for some usages.
 type EnumValueDeclNode interface {
 	Node
 	GetName() Node
@@ -106,7 +109,7 @@ func (*EnumValueNode) enumElement() {}
 //  - equals: The token corresponding to the '=' rune after the name.
 //  - number: The token corresponding to the enum value's number.
 //  - opts: Optional set of enum value options.
-//  - semicolon: The token corresponding to the ":" rune that ends the declaration.
+//  - semicolon: The token corresponding to the ";" rune that ends the declaration.
 func NewEnumValueNode(name *IdentNode, equals *RuneNode, number IntValueNode, opts *CompactOptionsNode, semicolon *RuneNode) *EnumValueNode {
 	if name == nil {
 		panic("name is nil")

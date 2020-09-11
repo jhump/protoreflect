@@ -240,10 +240,10 @@ optionName : optionNameComponent {
 	}
 
 optionNameComponent : name {
-		$$ = ast.NewFieldReferenceNode(nil, $1, nil)
+		$$ = ast.NewFieldReferenceNode($1)
 	}
 	| '(' typeIdent ')' {
-		$$ = ast.NewFieldReferenceNode($1, $2, $3)
+		$$ = ast.NewExtensionFieldReferenceNode($1, $2, $3)
 	}
 
 constant : scalarConstant
@@ -423,10 +423,10 @@ aggFieldEntry : aggName ':' scalarConstant {
 	}
 
 aggName : name {
-        $$ = ast.NewFieldReferenceNode(nil, $1, nil)
+        $$ = ast.NewFieldReferenceNode($1)
 	}
 	| '[' typeIdent ']' {
-        $$ = ast.NewFieldReferenceNode($1, $2, $3)
+        $$ = ast.NewExtensionFieldReferenceNode($1, $2, $3)
 	}
 	| '[' error ']' {
 	    $$ = nil

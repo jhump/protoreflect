@@ -2,6 +2,10 @@ package ast
 
 import "fmt"
 
+// ExtensionRangeNode represents a extension range declaration in an extendable
+// message. Example:
+//
+//  extensions 100 to max;
 type ExtensionRangeNode struct {
 	compositeNode
 	Keyword *KeywordNode
@@ -17,6 +21,14 @@ type ExtensionRangeNode struct {
 
 func (e *ExtensionRangeNode) msgElement() {}
 
+// NewExtensionRangeNode creates a new *ExtensionRangeNode. All args must be
+// non-nil except opts, which may be nil.
+//  - keyword: The token corresponding to the "extends" keyword.
+//  - ranges: One or more range expressions.
+//  - commas: Tokens that represent the "," runes that delimit the range expressions.
+//    The length of commas must be one less than the length of ranges.
+//  - opts: The node corresponding to options that apply to each of the ranges.
+//  - semicolon The token corresponding to the ";" rune that ends the declaration.
 func NewExtensionRangeNode(keyword *KeywordNode, ranges []*RangeNode, commas []*RuneNode, opts *CompactOptionsNode, semicolon *RuneNode) *ExtensionRangeNode {
 	if keyword == nil {
 		panic("keyword is nil")
@@ -64,6 +76,9 @@ func NewExtensionRangeNode(keyword *KeywordNode, ranges []*RangeNode, commas []*
 	}
 }
 
+// RangeDeclNode is a placeholder interface for AST nodes that represent
+// numeric values. This allows NoSourceNode to be used in place of *RangeNode
+// for some usages.
 type RangeDeclNode interface {
 	Node
 	RangeStart() Node
@@ -73,14 +88,25 @@ type RangeDeclNode interface {
 var _ RangeDeclNode = (*RangeNode)(nil)
 var _ RangeDeclNode = NoSourceNode{}
 
+// RangeNode represents a range expression, used in both extension ranges and
+// reserved ranges. Example:
+//
+//  1000 to max
 type RangeNode struct {
 	compositeNode
 	StartVal IntValueNode
-	To       *KeywordNode
-	EndVal   IntValueNode
-	Max      *KeywordNode
+	// if To is non-nil, then exactly one of EndVal or Max must also be non-nil
+	To *KeywordNode
+	// EndVal and Max are mutually exclusive
+	EndVal IntValueNode
+	Max    *KeywordNode
 }
 
+// NewRangeNode creates a new *RangeNode. The start argument must be non-nil.
+// The to argument represents the "to" keyword. If present (i.e. if it is non-nil),
+// then so must be exactly one of end or max. If max is non-nil, it indicates a
+// "100 to max" style range. But if end is non-nil, the end of the range is a
+// literal, such as "100 to 200".
 func NewRangeNode(start IntValueNode, to *KeywordNode, end IntValueNode, max *KeywordNode) *RangeNode {
 	if start == nil {
 		panic("start is nil")
@@ -162,6 +188,11 @@ func (n *RangeNode) EndValueAsInt32(min, max int32) (int32, bool) {
 	return AsInt32(n.EndVal, min, max)
 }
 
+// ReservedNode represents reserved declaration, whic can be used to reserve
+// either names or numbers. Examples:
+//
+//   reserved 1, 10-12, 15;
+//   reserved "foo", "bar", "baz";
 type ReservedNode struct {
 	compositeNode
 	Keyword *KeywordNode
@@ -181,6 +212,13 @@ type ReservedNode struct {
 func (*ReservedNode) msgElement()  {}
 func (*ReservedNode) enumElement() {}
 
+// NewReservedRangesNode creates a new *ReservedNode that represents reserved
+// numeric ranges. All args must be non-nil.
+//  - keyword: The token corresponding to the "reserved" keyword.
+//  - ranges: One or more range expressions.
+//  - commas: Tokens that represent the "," runes that delimit the range expressions.
+//    The length of commas must be one less than the length of ranges.
+//  - semicolon The token corresponding to the ";" rune that ends the declaration.
 func NewReservedRangesNode(keyword *KeywordNode, ranges []*RangeNode, commas []*RuneNode, semicolon *RuneNode) *ReservedNode {
 	if keyword == nil {
 		panic("keyword is nil")
@@ -220,6 +258,13 @@ func NewReservedRangesNode(keyword *KeywordNode, ranges []*RangeNode, commas []*
 	}
 }
 
+// NewReservedNamesNode creates a new *ReservedNode that represents reserved
+// names. All args must be non-nil.
+//  - keyword: The token corresponding to the "reserved" keyword.
+//  - names: One or more names.
+//  - commas: Tokens that represent the "," runes that delimit the names.
+//    The length of commas must be one less than the length of names.
+//  - semicolon The token corresponding to the ";" rune that ends the declaration.
 func NewReservedNamesNode(keyword *KeywordNode, names []StringValueNode, commas []*RuneNode, semicolon *RuneNode) *ReservedNode {
 	if keyword == nil {
 		panic("keyword is nil")

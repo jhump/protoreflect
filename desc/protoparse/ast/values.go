@@ -11,6 +11,9 @@ import (
 // It also includes references (e.g. IdentifierValueNode), which can be
 // used as values in some contexts, such as describing the default value
 // for a field, which can refer to an enum value.
+//
+// This also allows NoSourceNode to be used in place of a real value node
+// for some usages.
 type ValueNode interface {
 	Node
 	// Value returns a Go representation of the value. For scalars, this
@@ -48,12 +51,16 @@ type StringValueNode interface {
 var _ StringValueNode = (*StringLiteralNode)(nil)
 var _ StringValueNode = (*CompoundStringLiteralNode)(nil)
 
+// StringLiteralNode represents a simple string literal. Example:
+//
+//  "proto2"
 type StringLiteralNode struct {
 	terminalNode
 	// Val is the actual string value that the literal indicates.
 	Val string
 }
 
+// NewStringLiteralNode creates a new *StringLiteralNode with the given val.
 func NewStringLiteralNode(val string, info TokenInfo) *StringLiteralNode {
 	return &StringLiteralNode{
 		terminalNode: info.asTerminalNode(),
@@ -69,11 +76,18 @@ func (n *StringLiteralNode) AsString() string {
 	return n.Val
 }
 
+// CompoundStringLiteralNode represents a compound string literal, which is
+// the concatenaton of adjacent string literals. Example:
+//
+//  "this "  "is"   " all one "   "string"
 type CompoundStringLiteralNode struct {
 	compositeNode
 	Val string
 }
 
+// NewCompoundLiteralStringNode creates a new *CompoundStringLiteralNode that
+// consists of the given string components. The components argument may not be
+// empty.
 func NewCompoundLiteralStringNode(components ...*StringLiteralNode) *CompoundStringLiteralNode {
 	if len(components) == 0 {
 		panic("must have at least one component")
@@ -109,6 +123,8 @@ type IntValueNode interface {
 	AsUint64() (uint64, bool)
 }
 
+// AsInt32 range checks the given int value and returns its value is
+// in the range or 0, false if it is outside the range.
 func AsInt32(n IntValueNode, min, max int32) (int32, bool) {
 	i, ok := n.AsInt64()
 	if !ok {
@@ -124,12 +140,14 @@ var _ IntValueNode = (*UintLiteralNode)(nil)
 var _ IntValueNode = (*PositiveUintLiteralNode)(nil)
 var _ IntValueNode = (*NegativeIntLiteralNode)(nil)
 
+// UintLiteralNode represents a simple integer literal with no sign character.
 type UintLiteralNode struct {
 	terminalNode
 	// Val is the numeric value indicated by the literal
 	Val uint64
 }
 
+// NewUintLiteralNode creates a new *UintLiteralNode with the given val.
 func NewUintLiteralNode(val uint64, info TokenInfo) *UintLiteralNode {
 	return &UintLiteralNode{
 		terminalNode: info.asTerminalNode(),
@@ -156,6 +174,7 @@ func (n *UintLiteralNode) AsFloat() float64 {
 	return float64(n.Val)
 }
 
+// PositiveUintLiteralNode represents an integer literal with a positive (+) sign.
 type PositiveUintLiteralNode struct {
 	compositeNode
 	Plus *RuneNode
@@ -163,6 +182,8 @@ type PositiveUintLiteralNode struct {
 	Val  uint64
 }
 
+// NewPositiveUintLiteralNode creates a new *PositiveUintLiteralNode. Both
+// arguments must be non-nil.
 func NewPositiveUintLiteralNode(sign *RuneNode, i *UintLiteralNode) *PositiveUintLiteralNode {
 	if sign == nil {
 		panic("sign is nil")
@@ -196,6 +217,7 @@ func (n *PositiveUintLiteralNode) AsUint64() (uint64, bool) {
 	return n.Val, true
 }
 
+// NegativeIntLiteralNode represents an integer literal with a negative (-) sign.
 type NegativeIntLiteralNode struct {
 	compositeNode
 	Minus *RuneNode
@@ -203,6 +225,8 @@ type NegativeIntLiteralNode struct {
 	Val   int64
 }
 
+// NewNegativeIntLiteralNode creates a new *NegativeIntLiteralNode. Both
+// arguments must be non-nil.
 func NewNegativeIntLiteralNode(sign *RuneNode, i *UintLiteralNode) *NegativeIntLiteralNode {
 	if sign == nil {
 		panic("sign is nil")
@@ -248,12 +272,14 @@ var _ FloatValueNode = (*FloatLiteralNode)(nil)
 var _ FloatValueNode = (*SpecialFloatLiteralNode)(nil)
 var _ FloatValueNode = (*UintLiteralNode)(nil)
 
+// FloatLiteralNode represents a floating point numeric literal.
 type FloatLiteralNode struct {
 	terminalNode
 	// Val is the numeric value indicated by the literal
 	Val float64
 }
 
+// NewFloatLiteralNode creates a new *FloatLiteralNode with the given val.
 func NewFloatLiteralNode(val float64, info TokenInfo) *FloatLiteralNode {
 	return &FloatLiteralNode{
 		terminalNode: info.asTerminalNode(),
@@ -269,11 +295,15 @@ func (n *FloatLiteralNode) AsFloat() float64 {
 	return n.Val
 }
 
+// SpecialFloatLiteralNode represents a special floating point numeric literal
+// for "inf" and "nan" values.
 type SpecialFloatLiteralNode struct {
 	*KeywordNode
 	Val float64
 }
 
+// NewSpecialFloatLiteralNode returns a new *SpecialFloatLiteralNode for the
+// given keyword, which must be "inf" or "nan".
 func NewSpecialFloatLiteralNode(name *KeywordNode) *SpecialFloatLiteralNode {
 	var f float64
 	if name.Val == "inf" {
@@ -295,6 +325,7 @@ func (n *SpecialFloatLiteralNode) AsFloat() float64 {
 	return n.Val
 }
 
+// SignedFloatLiteralNode represents a signed floating point number.
 type SignedFloatLiteralNode struct {
 	compositeNode
 	Sign  *RuneNode
@@ -302,6 +333,8 @@ type SignedFloatLiteralNode struct {
 	Val   float64
 }
 
+// NewSignedFloatLiteralNode creates a new *SignedFloatLiteralNode. Both
+// arguments must be non-nil.
 func NewSignedFloatLiteralNode(sign *RuneNode, f FloatValueNode) *SignedFloatLiteralNode {
 	if sign == nil {
 		panic("sign is nil")
@@ -328,11 +361,14 @@ func (n *SignedFloatLiteralNode) Value() interface{} {
 	return n.Val
 }
 
+// BoolLiteralNode represents a boolean literal.
 type BoolLiteralNode struct {
 	*KeywordNode
 	Val bool
 }
 
+// NewBoolLiteralNode returns a new *BoolLiteralNode for the given keyword,
+// which must be "true" or "false".
 func NewBoolLiteralNode(name *KeywordNode) *BoolLiteralNode {
 	return &BoolLiteralNode{
 		KeywordNode: name,
@@ -344,6 +380,10 @@ func (n *BoolLiteralNode) Value() interface{} {
 	return n.Val
 }
 
+// ArrayLiteralNode represents an array literal, which is only allowed inside of
+// a MessageLiteralNode, to indicate values for a repeated field. Example:
+//
+//  ["foo", "bar", "baz"]
 type ArrayLiteralNode struct {
 	compositeNode
 	OpenBracket *RuneNode
@@ -356,12 +396,20 @@ type ArrayLiteralNode struct {
 	CloseBracket *RuneNode
 }
 
+// NewArrayLiteralNode creates a new *ArrayLiteralNode. The openBracket and
+// closeBracket args must be non-nil and represent the "[" and "]" runes that
+// surround the array values. The given commas arg must have a length that is
+// one less than the length of the vals arg. However, vals may be empty, in
+// which case commas must also be empty.
 func NewArrayLiteralNode(openBracket *RuneNode, vals []ValueNode, commas []*RuneNode, closeBracket *RuneNode) *ArrayLiteralNode {
 	if openBracket == nil {
 		panic("openBracket is nil")
 	}
 	if closeBracket == nil {
 		panic("closeBracket is nil")
+	}
+	if len(vals) == 0 && len(commas) != 0 {
+		panic("vals is empty but commas is not")
 	}
 	if len(vals) > 0 && len(commas) != len(vals)-1 {
 		panic(fmt.Sprintf("%d vals requires %d commas, not %d", len(vals), len(vals)-1, len(commas)))
@@ -397,9 +445,14 @@ func (n *ArrayLiteralNode) Value() interface{} {
 	return n.Elements
 }
 
+// MessageLiteralNode represents a message literal, which is compatible with the
+// protobuf text format and can be used for custom options with message types.
+// Example:
+//
+//   { foo:1 foo:2 foo:3 bar:<name:"abc" id:123> }
 type MessageLiteralNode struct {
 	compositeNode
-	Open     *RuneNode
+	Open     *RuneNode // should be '{' or '<'
 	Elements []*MessageFieldNode
 	// Separator characters between elements, which can be either ','
 	// or ';' if present. This slice must be exactly len(Elements) in
@@ -407,9 +460,16 @@ type MessageLiteralNode struct {
 	// in Seps. Separators in message literals are optional, so a given
 	// item in this slice may be nil to indicate absence of a separator.
 	Seps  []*RuneNode
-	Close *RuneNode
+	Close *RuneNode // should be '}' or '>', depending on Open
 }
 
+// NewMessageLiteralNode creates a new *MessageLiteralNode. The openSym and
+// closeSym runes must not be nil and should be "{" and "}" or "<" and ">".
+//
+// Unlike separators (dots and commas) used for other AST nodes that represent
+// a list of elements, the seps arg must be the SAME length as vals, and it may
+// contain nil values to indicate absence of a separator (in fact, it could be
+// all nils).
 func NewMessageLiteralNode(openSym *RuneNode, vals []*MessageFieldNode, seps []*RuneNode, closeSym *RuneNode) *MessageLiteralNode {
 	if openSym == nil {
 		panic("openSym is nil")
@@ -454,6 +514,10 @@ func (n *MessageLiteralNode) Value() interface{} {
 	return n.Elements
 }
 
+// MessageFieldNode represents a single field (name and value) inside of a
+// message literal. Example:
+//
+//   foo:"bar"
 type MessageFieldNode struct {
 	compositeNode
 	Name *FieldReferenceNode
@@ -464,6 +528,8 @@ type MessageFieldNode struct {
 	Val ValueNode
 }
 
+// NewMessageFieldNode creates a new *MessageFieldNode. All args except sep
+// must be non-nil.
 func NewMessageFieldNode(name *FieldReferenceNode, sep *RuneNode, val ValueNode) *MessageFieldNode {
 	if name == nil {
 		panic("name is nil")

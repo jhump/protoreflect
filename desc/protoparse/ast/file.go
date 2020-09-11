@@ -2,6 +2,8 @@ package ast
 
 import "fmt"
 
+// FileDeclNode is a placeholder interface for AST nodes that represent files.
+// This allows NoSourceNode to be used in place of *FileNode for some usages.
 type FileDeclNode interface {
 	Node
 	GetSyntax() Node
