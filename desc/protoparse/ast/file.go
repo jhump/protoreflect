@@ -15,20 +15,8 @@ var _ FileDeclNode = NoSourceNode{}
 type FileNode struct {
 	compositeNode
 	Syntax *SyntaxNode // nil if file has no syntax declaration
+	Decls  []FileElement
 
-	// Any package declarations in the file. Note that a valid file
-	// will have only zero or one such declaration.
-	Package  []*PackageNode
-	Imports  []*ImportNode
-	Options  []*OptionNode
-	Messages []*MessageNode
-	Enums    []*EnumNode
-	Extends  []*ExtendNode
-	Services []*ServiceNode
-
-	// All of the above elements in their original order as encountered
-	// in the source file.
-	AllDecls []FileElement
 	// Any comments that follow the last token in the file.
 	FinalComments []Comment
 	// Any whitespace at the end of the file (after the last token or
@@ -54,31 +42,10 @@ func NewFileNode(syntax *SyntaxNode, decls []FileElement) *FileNode {
 		children = append(children, decl)
 	}
 
-	var pkgs []*PackageNode
-	var imps []*ImportNode
-	var opts []*OptionNode
-	var msgs []*MessageNode
-	var enms []*EnumNode
-	var exts []*ExtendNode
-	var svcs []*ServiceNode
 	for _, decl := range decls {
 		switch decl := decl.(type) {
-		case *PackageNode:
-			pkgs = append(pkgs, decl)
-		case *ImportNode:
-			imps = append(imps, decl)
-		case *OptionNode:
-			opts = append(opts, decl)
-		case *MessageNode:
-			msgs = append(msgs, decl)
-		case *EnumNode:
-			enms = append(enms, decl)
-		case *ExtendNode:
-			exts = append(exts, decl)
-		case *ServiceNode:
-			svcs = append(svcs, decl)
-		case *EmptyDeclNode:
-			// no-op
+		case *PackageNode, *ImportNode, *OptionNode, *MessageNode,
+			*EnumNode, *ExtendNode, *ServiceNode, *EmptyDeclNode:
 		default:
 			panic(fmt.Sprintf("invalid FileElement type: %T", decl))
 		}
@@ -88,15 +55,8 @@ func NewFileNode(syntax *SyntaxNode, decls []FileElement) *FileNode {
 		compositeNode: compositeNode{
 			children: children,
 		},
-		Syntax:   syntax,
-		Package:  pkgs,
-		Imports:  imps,
-		Options:  opts,
-		Messages: msgs,
-		Enums:    enms,
-		Extends:  exts,
-		Services: svcs,
-		AllDecls: decls,
+		Syntax: syntax,
+		Decls:  decls,
 	}
 }
 
@@ -148,6 +108,18 @@ type SyntaxNode struct {
 //  - syntax: The actual syntax value, e.g. "proto2" or "proto3".
 //  - semicolon: The token corresponding to the ";" rune that ends the declaration.
 func NewSyntaxNode(keyword *KeywordNode, equals *RuneNode, syntax StringValueNode, semicolon *RuneNode) *SyntaxNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if equals == nil {
+		panic("equals is nil")
+	}
+	if syntax == nil {
+		panic("syntax is nil")
+	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
 	children := []Node{keyword, equals, syntax, semicolon}
 	return &SyntaxNode{
 		compositeNode: compositeNode{
@@ -186,6 +158,15 @@ type ImportNode struct {
 //  - name: The actual imported file name.
 //  - semicolon: The token corresponding to the ";" rune that ends the declaration.
 func NewImportNode(keyword *KeywordNode, public *KeywordNode, weak *KeywordNode, name StringValueNode, semicolon *RuneNode) *ImportNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if name == nil {
+		panic("name is nil")
+	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
 	numChildren := 3
 	if public != nil || weak != nil {
 		numChildren++
@@ -230,6 +211,15 @@ func (*PackageNode) fileElement() {}
 //  - name: The package name declared for the file.
 //  - semicolon: The token corresponding to the ";" rune that ends the declaration.
 func NewPackageNode(keyword *KeywordNode, name IdentValueNode, semicolon *RuneNode) *PackageNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if name == nil {
+		panic("name is nil")
+	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
 	children := []Node{keyword, name, semicolon}
 	return &PackageNode{
 		compositeNode: compositeNode{

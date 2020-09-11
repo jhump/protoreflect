@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"fmt"
 	"math"
 	"strings"
 )
@@ -74,6 +75,9 @@ type CompoundStringLiteralNode struct {
 }
 
 func NewCompoundLiteralStringNode(components ...*StringLiteralNode) *CompoundStringLiteralNode {
+	if len(components) == 0 {
+		panic("must have at least one component")
+	}
 	children := make([]Node, len(components))
 	var b strings.Builder
 	for i, comp := range components {
@@ -160,6 +164,12 @@ type PositiveUintLiteralNode struct {
 }
 
 func NewPositiveUintLiteralNode(sign *RuneNode, i *UintLiteralNode) *PositiveUintLiteralNode {
+	if sign == nil {
+		panic("sign is nil")
+	}
+	if i == nil {
+		panic("i is nil")
+	}
 	children := []Node{sign, i}
 	return &PositiveUintLiteralNode{
 		compositeNode: compositeNode{
@@ -194,6 +204,12 @@ type NegativeIntLiteralNode struct {
 }
 
 func NewNegativeIntLiteralNode(sign *RuneNode, i *UintLiteralNode) *NegativeIntLiteralNode {
+	if sign == nil {
+		panic("sign is nil")
+	}
+	if i == nil {
+		panic("i is nil")
+	}
 	children := []Node{sign, i}
 	return &NegativeIntLiteralNode{
 		compositeNode: compositeNode{
@@ -287,6 +303,12 @@ type SignedFloatLiteralNode struct {
 }
 
 func NewSignedFloatLiteralNode(sign *RuneNode, f FloatValueNode) *SignedFloatLiteralNode {
+	if sign == nil {
+		panic("sign is nil")
+	}
+	if f == nil {
+		panic("f is nil")
+	}
 	children := []Node{sign, f}
 	val := f.AsFloat()
 	if sign.Rune == '-' {
@@ -335,11 +357,26 @@ type ArrayLiteralNode struct {
 }
 
 func NewArrayLiteralNode(openBracket *RuneNode, vals []ValueNode, commas []*RuneNode, closeBracket *RuneNode) *ArrayLiteralNode {
+	if openBracket == nil {
+		panic("openBracket is nil")
+	}
+	if closeBracket == nil {
+		panic("closeBracket is nil")
+	}
+	if len(vals) > 0 && len(commas) != len(vals)-1 {
+		panic(fmt.Sprintf("%d vals requires %d commas, not %d", len(vals), len(vals)-1, len(commas)))
+	}
 	children := make([]Node, 0, len(vals)*2+1)
 	children = append(children, openBracket)
 	for i, val := range vals {
 		if i > 0 {
+			if commas[i-1] == nil {
+				panic(fmt.Sprintf("commas[%d] is nil", i-1))
+			}
 			children = append(children, commas[i-1])
+		}
+		if val == nil {
+			panic(fmt.Sprintf("vals[%d] is nil", i))
 		}
 		children = append(children, val)
 	}
@@ -374,6 +411,15 @@ type MessageLiteralNode struct {
 }
 
 func NewMessageLiteralNode(openSym *RuneNode, vals []*MessageFieldNode, seps []*RuneNode, closeSym *RuneNode) *MessageLiteralNode {
+	if openSym == nil {
+		panic("openSym is nil")
+	}
+	if closeSym == nil {
+		panic("closeSym is nil")
+	}
+	if len(seps) != len(vals) {
+		panic(fmt.Sprintf("%d vals requires %d commas, not %d", len(vals), len(vals), len(seps)))
+	}
 	numChildren := len(vals) + 2
 	for _, sep := range seps {
 		if sep != nil {
@@ -383,6 +429,9 @@ func NewMessageLiteralNode(openSym *RuneNode, vals []*MessageFieldNode, seps []*
 	children := make([]Node, 0, numChildren)
 	children = append(children, openSym)
 	for i, val := range vals {
+		if val == nil {
+			panic(fmt.Sprintf("vals[%d] is nil", i))
+		}
 		children = append(children, val)
 		if seps[i] != nil {
 			children = append(children, seps[i])
@@ -416,6 +465,12 @@ type MessageFieldNode struct {
 }
 
 func NewMessageFieldNode(name *FieldReferenceNode, sep *RuneNode, val ValueNode) *MessageFieldNode {
+	if name == nil {
+		panic("name is nil")
+	}
+	if val == nil {
+		panic("val is nil")
+	}
 	numChildren := 2
 	if sep != nil {
 		numChildren++

@@ -1664,7 +1664,7 @@ protodefault:
 		{
 			refs, dots := protoDollar[1].optNms.toNodes()
 			optName := ast.NewOptionNameNode(refs, dots)
-			protoVAL.opt = ast.NewOptionNode(nil, optName, protoDollar[2].b, protoDollar[3].v, nil)
+			protoVAL.opt = ast.NewCompactOptionNode(optName, protoDollar[2].b, protoDollar[3].v)
 		}
 	case 87:
 		protoDollar = protoS[protopt-8 : protopt+1]

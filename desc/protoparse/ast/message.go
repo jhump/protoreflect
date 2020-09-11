@@ -21,7 +21,6 @@ type MessageNode struct {
 	compositeNode
 	Keyword *KeywordNode
 	Name    *IdentNode
-
 	MessageBody
 }
 
@@ -29,6 +28,18 @@ func (*MessageNode) fileElement() {}
 func (*MessageNode) msgElement()  {}
 
 func NewMessageNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []MessageElement, closeBrace *RuneNode) *MessageNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if name == nil {
+		panic("name is nil")
+	}
+	if openBrace == nil {
+		panic("openBrace is nil")
+	}
+	if closeBrace == nil {
+		panic("closeBrace is nil")
+	}
 	children := make([]Node, 0, 4+len(decls))
 	children = append(children, keyword, name, openBrace)
 	for _, decl := range decls {
@@ -54,49 +65,19 @@ func (n *MessageNode) MessageName() Node {
 // MessageBody represents the body of a message. It is used by both
 // MessageNodes and GroupNodes.
 type MessageBody struct {
-	OpenBrace       *RuneNode
-	Options         []*OptionNode
-	Fields          []*FieldNode
-	MapFields       []*MapFieldNode
-	Groups          []*GroupNode
-	OneOfs          []*OneOfNode
-	NestedMessages  []*MessageNode
-	Enums           []*EnumNode
-	Extends         []*ExtendNode
-	ExtensionRanges []*ExtensionRangeNode
-	ReservedNode    []*ReservedNode
-	CloseBrace      *RuneNode
-
-	AllDecls []MessageElement
+	OpenBrace  *RuneNode
+	Decls      []MessageElement
+	CloseBrace *RuneNode
 }
 
 func populateMessageBody(m *MessageBody, openBrace *RuneNode, decls []MessageElement, closeBrace *RuneNode) {
 	m.OpenBrace = openBrace
-	m.AllDecls = decls
+	m.Decls = decls
 	for _, decl := range decls {
-		switch decl := decl.(type) {
-		case *OptionNode:
-			m.Options = append(m.Options, decl)
-		case *FieldNode:
-			m.Fields = append(m.Fields, decl)
-		case *MapFieldNode:
-			m.MapFields = append(m.MapFields, decl)
-		case *GroupNode:
-			m.Groups = append(m.Groups, decl)
-		case *OneOfNode:
-			m.OneOfs = append(m.OneOfs, decl)
-		case *MessageNode:
-			m.NestedMessages = append(m.NestedMessages, decl)
-		case *EnumNode:
-			m.Enums = append(m.Enums, decl)
-		case *ExtendNode:
-			m.Extends = append(m.Extends, decl)
-		case *ExtensionRangeNode:
-			m.ExtensionRanges = append(m.ExtensionRanges, decl)
-		case *ReservedNode:
-			m.ReservedNode = append(m.ReservedNode, decl)
-		case *EmptyDeclNode:
-			// no-op
+		switch decl.(type) {
+		case *OptionNode, *FieldNode, *MapFieldNode, *GroupNode, *OneOfNode,
+			*MessageNode, *EnumNode, *ExtendNode, *ExtensionRangeNode,
+			*ReservedNode, *EmptyDeclNode:
 		default:
 			panic(fmt.Sprintf("invalid MessageElement type: %T", decl))
 		}
@@ -128,17 +109,26 @@ type ExtendNode struct {
 	Keyword    *KeywordNode
 	Extendee   IdentValueNode
 	OpenBrace  *RuneNode
-	Fields     []*FieldNode
-	Groups     []*GroupNode
+	Decls      []ExtendElement
 	CloseBrace *RuneNode
-
-	AllDecls []ExtendElement
 }
 
 func (*ExtendNode) fileElement() {}
 func (*ExtendNode) msgElement()  {}
 
 func NewExtendNode(keyword *KeywordNode, extendee IdentValueNode, openBrace *RuneNode, decls []ExtendElement, closeBrace *RuneNode) *ExtendNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if extendee == nil {
+		panic("extendee is nil")
+	}
+	if openBrace == nil {
+		panic("openBrace is nil")
+	}
+	if closeBrace == nil {
+		panic("closeBrace is nil")
+	}
 	children := make([]Node, 0, 4+len(decls))
 	children = append(children, keyword, extendee, openBrace)
 	for _, decl := range decls {
@@ -153,19 +143,16 @@ func NewExtendNode(keyword *KeywordNode, extendee IdentValueNode, openBrace *Run
 		Keyword:    keyword,
 		Extendee:   extendee,
 		OpenBrace:  openBrace,
+		Decls:      decls,
 		CloseBrace: closeBrace,
-		AllDecls:   decls,
 	}
 	for _, decl := range decls {
 		switch decl := decl.(type) {
 		case *FieldNode:
-			ret.Fields = append(ret.Fields, decl)
 			decl.Extendee = ret
 		case *GroupNode:
-			ret.Groups = append(ret.Groups, decl)
 			decl.Extendee = ret
 		case *EmptyDeclNode:
-			// no-op
 		default:
 			panic(fmt.Sprintf("invalid ExtendElement type: %T", decl))
 		}

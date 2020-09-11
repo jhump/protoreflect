@@ -1,5 +1,7 @@
 package ast
 
+import "fmt"
+
 // OptionDeclNode is a node in the AST that defines an option. This
 // includes both syntaxes for options:
 //  - *OptionNode (normal syntax found in files, messages, enums,
@@ -32,21 +34,22 @@ func (e *OptionNode) serviceElement() {}
 func (e *OptionNode) methodElement()  {}
 
 func NewOptionNode(keyword *KeywordNode, name *OptionNameNode, equals *RuneNode, val ValueNode, semicolon *RuneNode) *OptionNode {
-	numChildren := 3
-	if keyword != nil {
-		numChildren++
+	if keyword == nil {
+		panic("keyword is nil")
 	}
-	if semicolon != nil {
-		numChildren++
+	if name == nil {
+		panic("name is nil")
 	}
-	children := make([]Node, 0, numChildren)
-	if keyword != nil {
-		children = append(children, keyword)
+	if equals == nil {
+		panic("equals is nil")
 	}
-	children = append(children, name, equals, val)
-	if semicolon != nil {
-		children = append(children, semicolon)
+	if val == nil {
+		panic("val is nil")
 	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
+	children := []Node{keyword, name, equals, val, semicolon}
 	return &OptionNode{
 		compositeNode: compositeNode{
 			children: children,
@@ -56,6 +59,27 @@ func NewOptionNode(keyword *KeywordNode, name *OptionNameNode, equals *RuneNode,
 		Equals:    equals,
 		Val:       val,
 		Semicolon: semicolon,
+	}
+}
+
+func NewCompactOptionNode(name *OptionNameNode, equals *RuneNode, val ValueNode) *OptionNode {
+	if name == nil {
+		panic("name is nil")
+	}
+	if equals == nil {
+		panic("equals is nil")
+	}
+	if val == nil {
+		panic("val is nil")
+	}
+	children := []Node{name, equals, val}
+	return &OptionNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		Name:      name,
+		Equals:    equals,
+		Val:       val,
 	}
 }
 
@@ -74,9 +98,21 @@ type OptionNameNode struct {
 }
 
 func NewOptionNameNode(parts []*FieldReferenceNode, dots []*RuneNode) *OptionNameNode {
+	if len(parts) == 0 {
+		panic("must have at least one part")
+	}
+	if len(dots) != len(parts)-1 {
+		panic(fmt.Sprintf("%d parts requires %d dots, not %d", len(parts), len(parts)-1, len(dots)))
+	}
 	children := make([]Node, 0, len(parts)*2-1)
 	for i, part := range parts {
+		if part == nil {
+			panic(fmt.Sprintf("parts[%d] is nil", i))
+		}
 		if i > 0 {
+			if dots[i-1] == nil {
+				panic(fmt.Sprintf("dots[%d] is nil", i-1))
+			}
 			children = append(children, dots[i-1])
 		}
 		children = append(children, part)
@@ -98,10 +134,19 @@ type FieldReferenceNode struct {
 }
 
 func NewFieldReferenceNode(openSym *RuneNode, name IdentValueNode, closeSym *RuneNode) *FieldReferenceNode {
+	if name == nil {
+		panic("name is nil")
+	}
 	var children []Node
 	if openSym != nil {
+		if closeSym == nil {
+			panic("closeSym is nil but openSym is not")
+		}
 		children = []Node{openSym, name, closeSym}
 	} else {
+		if closeSym != nil {
+			panic("openSym is nil but closeSym is not")
+		}
 		children = []Node{name}
 	}
 	return &FieldReferenceNode{
@@ -139,11 +184,29 @@ type CompactOptionsNode struct {
 }
 
 func NewCompactOptionsNode(openBracket *RuneNode, opts []*OptionNode, commas []*RuneNode, closeBracket *RuneNode) *CompactOptionsNode {
+	if openBracket == nil {
+		panic("openBracket is nil")
+	}
+	if closeBracket == nil {
+		panic("closeBracket is nil")
+	}
+	if len(opts) == 0 {
+		panic("must have at least one part")
+	}
+	if len(commas) != len(opts)-1 {
+		panic(fmt.Sprintf("%d opts requires %d commas, not %d", len(opts), len(opts)-1, len(commas)))
+	}
 	children := make([]Node, 0, len(opts)*2+1)
 	children = append(children, openBracket)
 	for i, opt := range opts {
 		if i > 0 {
+			if commas[i-1] == nil {
+				panic(fmt.Sprintf("commas[%d] is nil", i-1))
+			}
 			children = append(children, commas[i-1])
+		}
+		if opt == nil {
+			panic(fmt.Sprintf("opts[%d] is nil", i))
 		}
 		children = append(children, opt)
 	}

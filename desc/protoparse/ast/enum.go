@@ -10,12 +10,8 @@ type EnumNode struct {
 	Keyword    *KeywordNode
 	Name       *IdentNode
 	OpenBrace  *RuneNode
-	Options    []*OptionNode
-	Values     []*EnumValueNode
-	Reserved   []*ReservedNode
+	Decls      []EnumElement
 	CloseBrace *RuneNode
-
-	AllDecls []EnumElement
 }
 
 func (*EnumNode) fileElement() {}
@@ -30,6 +26,18 @@ func (*EnumNode) msgElement()  {}
 //  - decls: All declarations inside the enum body.
 //  - closeBrace: The token corresponding to the "}" rune that ends the body.
 func NewEnumNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []EnumElement, closeBrace *RuneNode) *EnumNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if name == nil {
+		panic("name is nil")
+	}
+	if openBrace == nil {
+		panic("openBrace is nil")
+	}
+	if closeBrace == nil {
+		panic("closeBrace is nil")
+	}
 	children := make([]Node, 0, 4+len(decls))
 	children = append(children, keyword, name, openBrace)
 	for _, decl := range decls {
@@ -37,19 +45,9 @@ func NewEnumNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, dec
 	}
 	children = append(children, closeBrace)
 
-	var opts []*OptionNode
-	var vals []*EnumValueNode
-	var rsvd []*ReservedNode
 	for _, decl := range decls {
-		switch decl := decl.(type) {
-		case *OptionNode:
-			opts = append(opts, decl)
-		case *EnumValueNode:
-			vals = append(vals, decl)
-		case *ReservedNode:
-			rsvd = append(rsvd, decl)
-		case *EmptyDeclNode:
-			// no-op
+		switch decl.(type) {
+		case *OptionNode, *EnumValueNode, *ReservedNode, *EmptyDeclNode:
 		default:
 			panic(fmt.Sprintf("invalid EnumElement type: %T", decl))
 		}
@@ -62,11 +60,8 @@ func NewEnumNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, dec
 		Keyword:    keyword,
 		Name:       name,
 		OpenBrace:  openBrace,
-		Options:    opts,
-		Values:     vals,
-		Reserved:   rsvd,
 		CloseBrace: closeBrace,
-		AllDecls:   decls,
+		Decls:      decls,
 	}
 }
 
@@ -113,6 +108,18 @@ func (*EnumValueNode) enumElement() {}
 //  - opts: Optional set of enum value options.
 //  - semicolon: The token corresponding to the ":" rune that ends the declaration.
 func NewEnumValueNode(name *IdentNode, equals *RuneNode, number IntValueNode, opts *CompactOptionsNode, semicolon *RuneNode) *EnumValueNode {
+	if name == nil {
+		panic("name is nil")
+	}
+	if equals == nil {
+		panic("equals is nil")
+	}
+	if number == nil {
+		panic("number is nil")
+	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
 	numChildren := 4
 	if opts != nil {
 		numChildren++

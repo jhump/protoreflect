@@ -1,6 +1,9 @@
 package ast
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // Identifier is a possibly-qualified name. This is used to distinguish
 // ValueNode values that are references/identifiers vs. those that are
@@ -49,6 +52,12 @@ type CompoundIdentNode struct {
 }
 
 func NewCompoundIdentNode(leadingDot *RuneNode, components []*IdentNode, dots []*RuneNode) *CompoundIdentNode {
+	if len(components) == 0 {
+		panic("must have at least one component")
+	}
+	if len(dots) != len(components)-1 {
+		panic(fmt.Sprintf("%d components requires %d dots, not %d", len(components), len(components)-1, len(dots)))
+	}
 	numChildren := len(components)*2 - 1
 	if leadingDot != nil {
 		numChildren++

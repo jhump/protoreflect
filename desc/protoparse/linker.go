@@ -706,12 +706,14 @@ func (l *linker) linkFile(name string, rootImportLoc *SourcePos, seen []string, 
 		decl := r.getFileNode(r.fd)
 		fnode, ok := decl.(*ast.FileNode)
 		if ok {
-			for _, dep := range fnode.Imports {
-				ldep, err := l.linkFile(dep.Name.AsString(), dep.Name.Start(), seen, linked)
-				if err != nil {
-					return nil, err
+			for _, decl := range fnode.Decls {
+				if dep, ok := decl.(*ast.ImportNode); ok {
+					ldep, err := l.linkFile(dep.Name.AsString(), dep.Name.Start(), seen, linked)
+					if err != nil {
+						return nil, err
+					}
+					deps = append(deps, ldep)
 				}
-				deps = append(deps, ldep)
 			}
 		} else {
 			// no AST? just use the descriptor

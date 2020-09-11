@@ -30,7 +30,7 @@ func (r *parseResult) generateSourceCodeInfo() *dpb.SourceCodeInfo {
 
 	var depIndex, optIndex, msgIndex, enumIndex, extendIndex, svcIndex int32
 
-	for _, child := range fn.AllDecls {
+	for _, child := range fn.Decls {
 		switch child := child.(type) {
 		case *ast.ImportNode:
 			sci.newLoc(child, append(path, internal.File_dependencyTag, int32(depIndex)))
@@ -110,9 +110,9 @@ func (r *parseResult) generateSourceCodeInfoForMessage(sci *sourceCodeInfo, n as
 	var decls []ast.MessageElement
 	switch n := n.(type) {
 	case *ast.MessageNode:
-		decls = n.AllDecls
+		decls = n.Decls
 	case *ast.GroupNode:
-		decls = n.AllDecls
+		decls = n.Decls
 	case *ast.MapFieldNode:
 		// map entry so nothing else to do
 		return
@@ -182,7 +182,7 @@ func (r *parseResult) generateSourceCodeInfoForEnum(sci *sourceCodeInfo, n *ast.
 	sci.newLoc(n.Name, append(path, internal.Enum_nameTag))
 
 	var optIndex, valIndex, reservedNameIndex, reservedRangeIndex int32
-	for _, child := range n.AllDecls {
+	for _, child := range n.Decls {
 		switch child := child.(type) {
 		case *ast.OptionNode:
 			r.generateSourceCodeInfoForOption(sci, child, false, &optIndex, append(path, internal.Enum_optionsTag))
@@ -238,7 +238,7 @@ func (r *parseResult) generateSourceCodeInfoForReservedRange(sci *sourceCodeInfo
 
 func (r *parseResult) generateSourceCodeInfoForExtensions(sci *sourceCodeInfo, n *ast.ExtendNode, extendIndex, msgIndex *int32, extendPath, msgPath []int32) {
 	sci.newLoc(n, extendPath)
-	for _, decl := range n.AllDecls {
+	for _, decl := range n.Decls {
 		switch decl := decl.(type) {
 		case *ast.FieldNode:
 			r.generateSourceCodeInfoForField(sci, decl, append(extendPath, *extendIndex))
@@ -258,7 +258,7 @@ func (r *parseResult) generateSourceCodeInfoForOneOf(sci *sourceCodeInfo, n *ast
 	sci.newLoc(n.Name, append(oneOfPath, internal.OneOf_nameTag))
 
 	var optIndex int32
-	for _, child := range n.AllDecls {
+	for _, child := range n.Decls {
 		switch child := child.(type) {
 		case *ast.OptionNode:
 			r.generateSourceCodeInfoForOption(sci, child, false, &optIndex, append(oneOfPath, internal.OneOf_optionsTag))
@@ -351,7 +351,7 @@ func (r *parseResult) generateSourceCodeInfoForService(sci *sourceCodeInfo, n *a
 	sci.newLoc(n, path)
 	sci.newLoc(n.Name, append(path, internal.Service_nameTag))
 	var optIndex, rpcIndex int32
-	for _, child := range n.AllDecls {
+	for _, child := range n.Decls {
 		switch child := child.(type) {
 		case *ast.OptionNode:
 			r.generateSourceCodeInfoForOption(sci, child, false, &optIndex, append(path, internal.Service_optionsTag))
@@ -376,8 +376,10 @@ func (r *parseResult) generateSourceCodeInfoForMethod(sci *sourceCodeInfo, n *as
 
 	optsPath := append(path, internal.Method_optionsTag)
 	var optIndex int32
-	for _, opt := range n.Options {
-		r.generateSourceCodeInfoForOption(sci, opt, false, &optIndex, optsPath)
+	for _, decl := range n.Decls {
+		if opt, ok := decl.(*ast.OptionNode); ok {
+			r.generateSourceCodeInfoForOption(sci, opt, false, &optIndex, optsPath)
+		}
 	}
 }
 

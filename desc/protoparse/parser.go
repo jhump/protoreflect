@@ -579,10 +579,12 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 			return
 		}
 		// we have an AST; use it so we can report import location in errors
-		for _, dep := range fnode.Imports {
-			parseProtoFile(acc, dep.Name.AsString(), dep.Name.Start(), errs, results, lookupImport)
-			if errs.getError() != nil {
-				return // abort
+		for _, decl := range fnode.Decls {
+			if dep, ok := decl.(*ast.ImportNode); ok {
+				parseProtoFile(acc, dep.Name.AsString(), dep.Name.Start(), errs, results, lookupImport)
+				if errs.getError() != nil {
+					return // abort
+				}
 			}
 		}
 	}

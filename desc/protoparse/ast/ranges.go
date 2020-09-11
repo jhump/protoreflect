@@ -1,5 +1,7 @@
 package ast
 
+import "fmt"
+
 type ExtensionRangeNode struct {
 	compositeNode
 	Keyword *KeywordNode
@@ -16,6 +18,18 @@ type ExtensionRangeNode struct {
 func (e *ExtensionRangeNode) msgElement() {}
 
 func NewExtensionRangeNode(keyword *KeywordNode, ranges []*RangeNode, commas []*RuneNode, opts *CompactOptionsNode, semicolon *RuneNode) *ExtensionRangeNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
+	if len(ranges) == 0 {
+		panic("must have at least one range")
+	}
+	if len(commas) != len(ranges)-1 {
+		panic(fmt.Sprintf("%d ranges requires %d commas, not %d", len(ranges), len(ranges)-1, len(commas)))
+	}
 	numChildren := len(ranges)*2 + 1
 	if opts != nil {
 		numChildren++
@@ -24,7 +38,13 @@ func NewExtensionRangeNode(keyword *KeywordNode, ranges []*RangeNode, commas []*
 	children = append(children, keyword)
 	for i, rng := range ranges {
 		if i > 0 {
+			if commas[i-1] == nil {
+				panic(fmt.Sprintf("commas[%d] is nil", i-1))
+			}
 			children = append(children, commas[i-1])
+		}
+		if rng == nil {
+			panic(fmt.Sprintf("ranges[%d] is nil", i))
 		}
 		children = append(children, rng)
 	}
@@ -62,9 +82,25 @@ type RangeNode struct {
 }
 
 func NewRangeNode(start IntValueNode, to *KeywordNode, end IntValueNode, max *KeywordNode) *RangeNode {
+	if start == nil {
+		panic("start is nil")
+	}
 	numChildren := 1
 	if to != nil {
+		if end == nil && max == nil {
+			panic("to is not nil, but end and max both are")
+		}
+		if end != nil && max != nil {
+			panic("end and max cannot be both non-nil")
+		}
 		numChildren = 3
+	} else {
+		if end != nil {
+			panic("to is nil, but end is not")
+		}
+		if max != nil {
+			panic("to is nil, but max is not")
+		}
 	}
 	children := make([]Node, 0, numChildren)
 	children = append(children, start)
@@ -146,11 +182,29 @@ func (*ReservedNode) msgElement()  {}
 func (*ReservedNode) enumElement() {}
 
 func NewReservedRangesNode(keyword *KeywordNode, ranges []*RangeNode, commas []*RuneNode, semicolon *RuneNode) *ReservedNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
+	if len(ranges) == 0 {
+		panic("must have at least one range")
+	}
+	if len(commas) != len(ranges)-1 {
+		panic(fmt.Sprintf("%d ranges requires %d commas, not %d", len(ranges), len(ranges)-1, len(commas)))
+	}
 	children := make([]Node, 0, len(ranges)*2+1)
 	children = append(children, keyword)
 	for i, rng := range ranges {
 		if i > 0 {
+			if commas[i-1] == nil {
+				panic(fmt.Sprintf("commas[%d] is nil", i-1))
+			}
 			children = append(children, commas[i-1])
+		}
+		if rng == nil {
+			panic(fmt.Sprintf("ranges[%d] is nil", i))
 		}
 		children = append(children, rng)
 	}
@@ -167,11 +221,29 @@ func NewReservedRangesNode(keyword *KeywordNode, ranges []*RangeNode, commas []*
 }
 
 func NewReservedNamesNode(keyword *KeywordNode, names []StringValueNode, commas []*RuneNode, semicolon *RuneNode) *ReservedNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
+	if len(names) == 0 {
+		panic("must have at least one name")
+	}
+	if len(commas) != len(names)-1 {
+		panic(fmt.Sprintf("%d names requires %d commas, not %d", len(names), len(names)-1, len(commas)))
+	}
 	children := make([]Node, 0, len(names)*2+1)
 	children = append(children, keyword)
 	for i, name := range names {
 		if i > 0 {
+			if commas[i-1] == nil {
+				panic(fmt.Sprintf("commas[%d] is nil", i-1))
+			}
 			children = append(children, commas[i-1])
+		}
+		if name == nil {
+			panic(fmt.Sprintf("names[%d] is nil", i))
 		}
 		children = append(children, name)
 	}

@@ -7,16 +7,25 @@ type ServiceNode struct {
 	Keyword    *KeywordNode
 	Name       *IdentNode
 	OpenBrace  *RuneNode
-	Options    []*OptionNode
-	RPCs       []*RPCNode
+	Decls      []ServiceElement
 	CloseBrace *RuneNode
-
-	AllDecls []ServiceElement
 }
 
 func (*ServiceNode) fileElement() {}
 
 func NewServiceNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []ServiceElement, closeBrace *RuneNode) *ServiceNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if name == nil {
+		panic("name is nil")
+	}
+	if openBrace == nil {
+		panic("openBrace is nil")
+	}
+	if closeBrace == nil {
+		panic("closeBrace is nil")
+	}
 	children := make([]Node, 0, 4+len(decls))
 	children = append(children, keyword, name, openBrace)
 	for _, decl := range decls {
@@ -24,16 +33,9 @@ func NewServiceNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, 
 	}
 	children = append(children, closeBrace)
 
-	var opts []*OptionNode
-	var rpcs []*RPCNode
 	for _, decl := range decls {
 		switch decl := decl.(type) {
-		case *OptionNode:
-			opts = append(opts, decl)
-		case *RPCNode:
-			rpcs = append(rpcs, decl)
-		case *EmptyDeclNode:
-			// no-op
+		case *OptionNode, *RPCNode, *EmptyDeclNode:
 		default:
 			panic(fmt.Sprintf("invalid ServiceElement type: %T", decl))
 		}
@@ -46,10 +48,8 @@ func NewServiceNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, 
 		Keyword:    keyword,
 		Name:       name,
 		OpenBrace:  openBrace,
-		Options:    opts,
-		RPCs:       rpcs,
+		Decls:      decls,
 		CloseBrace: closeBrace,
-		AllDecls:   decls,
 	}
 }
 
@@ -82,15 +82,31 @@ type RPCNode struct {
 	Output     *RPCTypeNode
 	Semicolon  *RuneNode
 	OpenBrace  *RuneNode
-	Options    []*OptionNode
+	Decls      []RPCElement
 	CloseBrace *RuneNode
-
-	AllDecls []RPCElement
 }
 
 func (n *RPCNode) serviceElement() {}
 
 func NewRPCNode(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, returns *KeywordNode, output *RPCTypeNode, semicolon *RuneNode) *RPCNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if name == nil {
+		panic("name is nil")
+	}
+	if input == nil {
+		panic("input is nil")
+	}
+	if returns == nil {
+		panic("returns is nil")
+	}
+	if output == nil {
+		panic("output is nil")
+	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
 	children := []Node{keyword, name, input, returns, output, semicolon}
 	return &RPCNode{
 		compositeNode: compositeNode{
@@ -106,6 +122,27 @@ func NewRPCNode(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, retur
 }
 
 func NewRPCNodeWithBody(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, returns *KeywordNode, output *RPCTypeNode, openBrace *RuneNode, decls []RPCElement, closeBrace *RuneNode) *RPCNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if name == nil {
+		panic("name is nil")
+	}
+	if input == nil {
+		panic("input is nil")
+	}
+	if returns == nil {
+		panic("returns is nil")
+	}
+	if output == nil {
+		panic("output is nil")
+	}
+	if openBrace == nil {
+		panic("openBrace is nil")
+	}
+	if closeBrace == nil {
+		panic("closeBrace is nil")
+	}
 	children := make([]Node, 0, 7+len(decls))
 	children = append(children, keyword, name, input, returns, output, openBrace)
 	for _, decl := range decls {
@@ -113,13 +150,9 @@ func NewRPCNodeWithBody(keyword *KeywordNode, name *IdentNode, input *RPCTypeNod
 	}
 	children = append(children, closeBrace)
 
-	var opts []*OptionNode
 	for _, decl := range decls {
 		switch decl := decl.(type) {
-		case *OptionNode:
-			opts = append(opts, decl)
-		case *EmptyDeclNode:
-			// no-op
+		case *OptionNode, *EmptyDeclNode:
 		default:
 			panic(fmt.Sprintf("invalid RPCElement type: %T", decl))
 		}
@@ -135,9 +168,8 @@ func NewRPCNodeWithBody(keyword *KeywordNode, name *IdentNode, input *RPCTypeNod
 		Returns:    returns,
 		Output:     output,
 		OpenBrace:  openBrace,
-		Options:    opts,
+		Decls:      decls,
 		CloseBrace: closeBrace,
-		AllDecls:   decls,
 	}
 }
 
@@ -168,6 +200,15 @@ type RPCTypeNode struct {
 }
 
 func NewRPCTypeNode(openParen *RuneNode, stream *KeywordNode, msgType IdentValueNode, closeParen *RuneNode) *RPCTypeNode {
+	if openParen == nil {
+		panic("openParen is nil")
+	}
+	if msgType == nil {
+		panic("msgType is nil")
+	}
+	if closeParen == nil {
+		panic("closeParen is nil")
+	}
 	var children []Node
 	if stream != nil {
 		children = []Node{openParen, stream, msgType, closeParen}

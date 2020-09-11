@@ -180,6 +180,9 @@ type EmptyDeclNode struct {
 // NewEmptyDeclNode creates a new *EmptyDeclNode. The one argument must
 // be non-nil.
 func NewEmptyDeclNode(semicolon *RuneNode) *EmptyDeclNode {
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
 	return &EmptyDeclNode{
 		compositeNode: compositeNode{
 			children: []Node{semicolon},

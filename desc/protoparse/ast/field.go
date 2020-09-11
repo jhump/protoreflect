@@ -43,6 +43,21 @@ func (*FieldNode) oneOfElement()  {}
 func (*FieldNode) extendElement() {}
 
 func NewFieldNode(label *KeywordNode, fieldType IdentValueNode, name *IdentNode, equals *RuneNode, tag *UintLiteralNode, opts *CompactOptionsNode, semicolon *RuneNode) *FieldNode {
+	if fieldType == nil {
+		panic("fieldType is nil")
+	}
+	if name == nil {
+		panic("name is nil")
+	}
+	if equals == nil {
+		panic("equals is nil")
+	}
+	if tag == nil {
+		panic("tag is nil")
+	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
 	numChildren := 5
 	if label != nil {
 		numChildren++
@@ -157,6 +172,24 @@ func (*GroupNode) oneOfElement()  {}
 func (*GroupNode) extendElement() {}
 
 func NewGroupNode(label *KeywordNode, keyword *KeywordNode, name *IdentNode, equals *RuneNode, tag *UintLiteralNode, opts *CompactOptionsNode, openBrace *RuneNode, decls []MessageElement, closeBrace *RuneNode) *GroupNode {
+	if keyword == nil {
+		panic("fieldType is nil")
+	}
+	if name == nil {
+		panic("name is nil")
+	}
+	if equals == nil {
+		panic("equals is nil")
+	}
+	if tag == nil {
+		panic("tag is nil")
+	}
+	if openBrace == nil {
+		panic("openBrace is nil")
+	}
+	if closeBrace == nil {
+		panic("closeBrace is nil")
+	}
 	numChildren := 6 + len(decls)
 	if label != nil {
 		numChildren++
@@ -237,17 +270,25 @@ type OneOfNode struct {
 	Keyword    *KeywordNode
 	Name       *IdentNode
 	OpenBrace  *RuneNode
-	Options    []*OptionNode
-	Fields     []*FieldNode
-	Groups     []*GroupNode
+	Decls      []OneOfElement
 	CloseBrace *RuneNode
-
-	AllDecls []OneOfElement
 }
 
 func (*OneOfNode) msgElement() {}
 
 func NewOneOfNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []OneOfElement, closeBrace *RuneNode) *OneOfNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if name == nil {
+		panic("name is nil")
+	}
+	if openBrace == nil {
+		panic("openBrace is nil")
+	}
+	if closeBrace == nil {
+		panic("closeBrace is nil")
+	}
 	children := make([]Node, 0, 4+len(decls))
 	children = append(children, keyword, name, openBrace)
 	for _, decl := range decls {
@@ -255,19 +296,9 @@ func NewOneOfNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, de
 	}
 	children = append(children, closeBrace)
 
-	var opts []*OptionNode
-	var flds []*FieldNode
-	var grps []*GroupNode
 	for _, decl := range decls {
 		switch decl := decl.(type) {
-		case *OptionNode:
-			opts = append(opts, decl)
-		case *FieldNode:
-			flds = append(flds, decl)
-		case *GroupNode:
-			grps = append(grps, decl)
-		case *EmptyDeclNode:
-			// no-op
+		case *OptionNode, *FieldNode, *GroupNode, *EmptyDeclNode:
 		default:
 			panic(fmt.Sprintf("invalid OneOfElement type: %T", decl))
 		}
@@ -280,11 +311,8 @@ func NewOneOfNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, de
 		Keyword:    keyword,
 		Name:       name,
 		OpenBrace:  openBrace,
-		Options:    opts,
-		Fields:     flds,
-		Groups:     grps,
+		Decls:      decls,
 		CloseBrace: closeBrace,
-		AllDecls:   decls,
 	}
 }
 
@@ -311,6 +339,24 @@ type MapTypeNode struct {
 }
 
 func NewMapTypeNode(keyword *KeywordNode, openAngle *RuneNode, keyType *IdentNode, comma *RuneNode, valType IdentValueNode, closeAngle *RuneNode) *MapTypeNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if openAngle == nil {
+		panic("openAngle is nil")
+	}
+	if keyType == nil {
+		panic("keyType is nil")
+	}
+	if comma == nil {
+		panic("comma is nil")
+	}
+	if valType == nil {
+		panic("valType is nil")
+	}
+	if closeAngle == nil {
+		panic("closeAngle is nil")
+	}
 	children := []Node{keyword, openAngle, keyType, comma, valType, closeAngle}
 	return &MapTypeNode{
 		compositeNode: compositeNode{
@@ -338,6 +384,21 @@ type MapFieldNode struct {
 func (*MapFieldNode) msgElement() {}
 
 func NewMapFieldNode(mapType *MapTypeNode, name *IdentNode, equals *RuneNode, tag *UintLiteralNode, opts *CompactOptionsNode, semicolon *RuneNode) *MapFieldNode {
+	if mapType == nil {
+		panic("mapType is nil")
+	}
+	if name == nil {
+		panic("name is nil")
+	}
+	if equals == nil {
+		panic("equals is nil")
+	}
+	if tag == nil {
+		panic("tag is nil")
+	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
 	numChildren := 5
 	if opts != nil {
 		numChildren++

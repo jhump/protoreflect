@@ -36,7 +36,7 @@ func (r *parseResult) createFileDescriptor(filename string, file *ast.FileNode) 
 		r.errs.warn(file.Start(), ErrNoSyntax)
 	}
 
-	for _, decl := range file.AllDecls {
+	for _, decl := range file.Decls {
 		if r.errs.err != nil {
 			return
 		}
@@ -131,20 +131,22 @@ func (r *parseResult) asUninterpretedOptionName(parts []*ast.FieldReferenceNode)
 func (r *parseResult) addExtensions(ext *ast.ExtendNode, flds *[]*dpb.FieldDescriptorProto, msgs *[]*dpb.DescriptorProto, isProto3 bool) {
 	extendee := string(ext.Extendee.AsIdentifier())
 	count := 0
-	for _, fld := range ext.Fields {
-		count++
-		// use higher limit since we don't know yet whether extendee is messageset wire format
-		fd := r.asFieldDescriptor(fld, internal.MaxTag, isProto3)
-		fd.Extendee = proto.String(extendee)
-		*flds = append(*flds, fd)
-	}
-	for _, grp := range ext.Groups {
-		count++
-		// ditto: use higher limit right now
-		fd, md := r.asGroupDescriptors(grp, isProto3, internal.MaxTag)
-		fd.Extendee = proto.String(extendee)
-		*flds = append(*flds, fd)
-		*msgs = append(*msgs, md)
+	for _, decl := range ext.Decls {
+		switch decl := decl.(type) {
+		case *ast.FieldNode:
+			count++
+			// use higher limit since we don't know yet whether extendee is messageset wire format
+			fd := r.asFieldDescriptor(decl, internal.MaxTag, isProto3)
+			fd.Extendee = proto.String(extendee)
+			*flds = append(*flds, fd)
+		case *ast.GroupNode:
+			count++
+			// ditto: use higher limit right now
+			fd, md := r.asGroupDescriptors(decl, isProto3, internal.MaxTag)
+			fd.Extendee = proto.String(extendee)
+			*flds = append(*flds, fd)
+			*msgs = append(*msgs, md)
+		}
 	}
 	if count == 0 {
 		_ = r.errs.handleErrorWithPos(ext.Start(), "extend sections must define at least one extension")
@@ -321,7 +323,15 @@ func (r *parseResult) asMethodDescriptor(node *ast.RPCNode) *dpb.MethodDescripto
 	// We do the same to match protoc as closely as possible
 	// https://github.com/protocolbuffers/protobuf/blob/0c3f43a6190b77f1f68b7425d1b7e1a8257a8d0c/src/google/protobuf/compiler/parser.cc#L2152
 	if node.OpenBrace != nil {
-		md.Options = &dpb.MethodOptions{UninterpretedOption: r.asUninterpretedOptions(node.Options)}
+		for _, decl := range node.Decls {
+			switch decl := decl.(type) {
+			case *ast.OptionNode:
+				if md.Options == nil {
+					md.Options = &dpb.MethodOptions{}
+				}
+				md.Options.UninterpretedOption = append(md.Options.UninterpretedOption, r.asUninterpretedOption(decl))
+			}
+		}
 	}
 	return md
 }
@@ -329,7 +339,7 @@ func (r *parseResult) asMethodDescriptor(node *ast.RPCNode) *dpb.MethodDescripto
 func (r *parseResult) asEnumDescriptor(en *ast.EnumNode) *dpb.EnumDescriptorProto {
 	ed := &dpb.EnumDescriptorProto{Name: proto.String(en.Name.Val)}
 	r.putEnumNode(ed, en)
-	for _, decl := range en.AllDecls {
+	for _, decl := range en.Decls {
 		switch decl := decl.(type) {
 		case *ast.OptionNode:
 			if ed.Options == nil {
@@ -369,11 +379,13 @@ func (r *parseResult) asMessageDescriptor(node *ast.MessageNode, isProto3 bool) 
 
 func (r *parseResult) addMessageBody(msgd *dpb.DescriptorProto, body *ast.MessageBody, isProto3 bool) {
 	// first process any options
-	for _, opt := range body.Options {
-		if msgd.Options == nil {
-			msgd.Options = &dpb.MessageOptions{}
+	for _, decl := range body.Decls {
+		if opt, ok := decl.(*ast.OptionNode); ok {
+			if msgd.Options == nil {
+				msgd.Options = &dpb.MessageOptions{}
+			}
+			msgd.Options.UninterpretedOption = append(msgd.Options.UninterpretedOption, r.asUninterpretedOption(opt))
 		}
-		msgd.Options.UninterpretedOption = append(msgd.Options.UninterpretedOption, r.asUninterpretedOption(opt))
 	}
 
 	// now that we have options, we can see if this uses messageset wire format, which
@@ -388,7 +400,7 @@ func (r *parseResult) addMessageBody(msgd *dpb.DescriptorProto, body *ast.Messag
 	rsvdNames := map[string]int{}
 
 	// now we can process the rest
-	for _, decl := range body.AllDecls {
+	for _, decl := range body.Decls {
 		switch decl := decl.(type) {
 		case *ast.EnumNode:
 			msgd.EnumType = append(msgd.EnumType, r.asEnumDescriptor(decl))
@@ -413,7 +425,7 @@ func (r *parseResult) addMessageBody(msgd *dpb.DescriptorProto, body *ast.Messag
 			r.putOneOfNode(ood, decl)
 			msgd.OneofDecl = append(msgd.OneofDecl, ood)
 			ooFields := 0
-			for _, oodecl := range decl.AllDecls {
+			for _, oodecl := range decl.Decls {
 				switch oodecl := oodecl.(type) {
 				case *ast.OptionNode:
 					if ood.Options == nil {
@@ -519,7 +531,7 @@ func getRangeBounds(res *parseResult, rng *ast.RangeNode, minVal, maxVal int32) 
 func (r *parseResult) asServiceDescriptor(svc *ast.ServiceNode) *dpb.ServiceDescriptorProto {
 	sd := &dpb.ServiceDescriptorProto{Name: proto.String(svc.Name.Val)}
 	r.putServiceNode(sd, svc)
-	for _, decl := range svc.AllDecls {
+	for _, decl := range svc.Decls {
 		switch decl := decl.(type) {
 		case *ast.OptionNode:
 			if sd.Options == nil {

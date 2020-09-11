@@ -502,7 +502,7 @@ compactOptionDecls : compactOption {
 compactOption: optionName '=' constant {
         refs, dots := $1.toNodes()
         optName := ast.NewOptionNameNode(refs, dots)
-        $$ = ast.NewOptionNode(nil, optName, $2, $3, nil)
+        $$ = ast.NewCompactOptionNode(optName, $2, $3)
 	}
 
 group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageDecls '}' {
