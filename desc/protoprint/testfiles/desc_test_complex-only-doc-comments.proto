@@ -31,7 +31,7 @@ message Test {
 
   extensions 100 to 200;
 
-  extensions 300 to 350, 500 to 550 [(label) = "jazz"];
+  extensions 249, 300 to 350, 500 to 550, 20000 to max [(label) = "jazz"];
 
   message Nested {
     extend google.protobuf.MessageOptions {

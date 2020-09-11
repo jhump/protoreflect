@@ -1456,12 +1456,12 @@ desc_test_complex.proto:29:30
 
  > message_type[1] > extension_range:
 desc_test_complex.proto:31:9
-desc_test_complex.proto:31:62
+desc_test_complex.proto:31:81
 
 
  > message_type[1] > extension_range[1]:
 desc_test_complex.proto:31:20
-desc_test_complex.proto:31:30
+desc_test_complex.proto:31:23
 
 
  > message_type[1] > extension_range[1] > start:
@@ -1469,44 +1469,89 @@ desc_test_complex.proto:31:20
 desc_test_complex.proto:31:23
 
 
- > message_type[1] > extension_range[1] > end:
-desc_test_complex.proto:31:27
-desc_test_complex.proto:31:30
-
-
  > message_type[1] > extension_range[1] > options:
-desc_test_complex.proto:31:43
-desc_test_complex.proto:31:61
+desc_test_complex.proto:31:62
+desc_test_complex.proto:31:80
 
 
  > message_type[1] > extension_range[1] > options > label:
-desc_test_complex.proto:31:44
-desc_test_complex.proto:31:60
+desc_test_complex.proto:31:63
+desc_test_complex.proto:31:79
 
 
  > message_type[1] > extension_range[2]:
-desc_test_complex.proto:31:32
-desc_test_complex.proto:31:42
+desc_test_complex.proto:31:25
+desc_test_complex.proto:31:35
 
 
  > message_type[1] > extension_range[2] > start:
+desc_test_complex.proto:31:25
+desc_test_complex.proto:31:28
+
+
+ > message_type[1] > extension_range[2] > end:
 desc_test_complex.proto:31:32
 desc_test_complex.proto:31:35
 
 
- > message_type[1] > extension_range[2] > end:
-desc_test_complex.proto:31:39
-desc_test_complex.proto:31:42
-
-
  > message_type[1] > extension_range[2] > options:
-desc_test_complex.proto:31:43
-desc_test_complex.proto:31:61
+desc_test_complex.proto:31:62
+desc_test_complex.proto:31:80
 
 
  > message_type[1] > extension_range[2] > options > label:
+desc_test_complex.proto:31:63
+desc_test_complex.proto:31:79
+
+
+ > message_type[1] > extension_range[3]:
+desc_test_complex.proto:31:37
+desc_test_complex.proto:31:47
+
+
+ > message_type[1] > extension_range[3] > start:
+desc_test_complex.proto:31:37
+desc_test_complex.proto:31:40
+
+
+ > message_type[1] > extension_range[3] > end:
 desc_test_complex.proto:31:44
-desc_test_complex.proto:31:60
+desc_test_complex.proto:31:47
+
+
+ > message_type[1] > extension_range[3] > options:
+desc_test_complex.proto:31:62
+desc_test_complex.proto:31:80
+
+
+ > message_type[1] > extension_range[3] > options > label:
+desc_test_complex.proto:31:63
+desc_test_complex.proto:31:79
+
+
+ > message_type[1] > extension_range[4]:
+desc_test_complex.proto:31:49
+desc_test_complex.proto:31:61
+
+
+ > message_type[1] > extension_range[4] > start:
+desc_test_complex.proto:31:49
+desc_test_complex.proto:31:54
+
+
+ > message_type[1] > extension_range[4] > end:
+desc_test_complex.proto:31:58
+desc_test_complex.proto:31:61
+
+
+ > message_type[1] > extension_range[4] > options:
+desc_test_complex.proto:31:62
+desc_test_complex.proto:31:80
+
+
+ > message_type[1] > extension_range[4] > options > label:
+desc_test_complex.proto:31:63
+desc_test_complex.proto:31:79
 
 
  > message_type[1] > nested_type[0]:
