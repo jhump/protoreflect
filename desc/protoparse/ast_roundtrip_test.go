@@ -22,7 +22,7 @@ func TestASTRoundTrips(t *testing.T) {
 				testutil.Ok(t, err)
 				data := string(b)
 				filename := filepath.Base(path)
-				accessor := FileContentsFromMap(map[string]string{filename: string(data)})
+				accessor := FileContentsFromMap(map[string]string{filename: data})
 				p := Parser{Accessor: accessor}
 				root, err := p.ParseToAST(filepath.Base(path))
 				testutil.Ok(t, err)
