@@ -8,7 +8,7 @@ import "io"
 // any trailing comments. If the given node is a *FileNode, it will then
 // also print the file's FinalComments and FinalWhitespace.
 func Print(w io.Writer, node Node) error {
-	sw, ok := w.(io.StringWriter)
+	sw, ok := w.(stringWriter)
 	if !ok {
 		sw = &strWriter{w}
 	}
@@ -56,7 +56,7 @@ func Print(w io.Writer, node Node) error {
 	return nil
 }
 
-func printComments(sw io.StringWriter, comments []Comment) error {
+func printComments(sw stringWriter, comments []Comment) error {
 	for _, comment := range comments {
 		if _, err := sw.WriteString(comment.LeadingWhitespace); err != nil {
 			return err
@@ -68,6 +68,12 @@ func printComments(sw io.StringWriter, comments []Comment) error {
 	return nil
 }
 
+// many io.Writer impls also provide a string-based method
+type stringWriter interface {
+	WriteString(s string) (n int, err error)
+}
+
+// adapter, in case the given writer does NOT provide a string-based method
 type strWriter struct {
 	io.Writer
 }
