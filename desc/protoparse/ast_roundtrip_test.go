@@ -2,12 +2,12 @@ package protoparse
 
 import (
 	"bytes"
-	"github.com/jhump/protoreflect/desc/protoparse/ast"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/jhump/protoreflect/desc/protoparse/ast"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 

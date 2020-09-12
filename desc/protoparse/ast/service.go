@@ -19,7 +19,7 @@ type ServiceNode struct {
 
 func (*ServiceNode) fileElement() {}
 
-// NewServiceNode creates a new *EnumNode. All arguments must be non-nil.
+// NewServiceNode creates a new *ServiceNode. All arguments must be non-nil.
 //  - keyword: The token corresponding to the "service" keyword.
 //  - name: The token corresponding to the service's name.
 //  - openBrace: The token corresponding to the "{" rune that starts the body.

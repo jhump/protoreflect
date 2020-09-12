@@ -10,8 +10,8 @@ import (
 // The single visitor returned has all functions set to record the method call.
 // The slice of visitors has one element per function, each with exactly one
 // function set. So the first visitor can be used to determine the preferred
-// function (which should matche concrete type). The slice of visitors can be
-// used to enumerate ALL matching function calls.
+// function (which should match the node's concrete type). The slice of visitors
+// can be used to enumerate ALL matching function calls.
 //
 // This function is generated via commented-out code at the bottom of this file.
 func testVisitors(methodCalled *string) (*Visitor, []*Visitor) {

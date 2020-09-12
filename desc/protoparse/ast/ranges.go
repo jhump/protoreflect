@@ -2,7 +2,7 @@ package ast
 
 import "fmt"
 
-// ExtensionRangeNode represents a extension range declaration in an extendable
+// ExtensionRangeNode represents an extension range declaration in an extendable
 // message. Example:
 //
 //  extensions 100 to max;
