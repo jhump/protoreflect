@@ -55,7 +55,7 @@ func TestErrorReporting(t *testing.T) {
 					`,
 			},
 			expectedErrs: []string{
-				"test.proto:5:41: syntax error: unexpected \"enum\", expecting ';' or '.'",
+				"test.proto:5:41: syntax error: unexpected \"enum\", expecting ';'",
 				"test.proto:5:69: syntax error: unexpected ';', expecting '='",
 				"test.proto:7:53: syntax error: unexpected '='",
 				`test.proto:2:50: syntax value must be "proto2" or "proto3"`,
