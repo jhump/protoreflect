@@ -716,6 +716,9 @@ func (r *MessageRegistry) Resolve(typeUrl string) (proto.Message, error) {
 	if err != nil {
 		return nil, err
 	}
+	if md == nil {
+		return nil, fmt.Errorf("unknown message type: %s", typeUrl)
+	}
 	return r.mf.NewMessage(md), nil
 }
 
