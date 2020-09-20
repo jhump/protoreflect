@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
@@ -286,22 +287,13 @@ func (l *linker) interpretEnumOptions(r *parseResult, fqn string, ed *descriptor
 }
 
 func (l *linker) interpretOptions(res *parseResult, fqn string, element, opts proto.Message, uninterpreted []*descriptorpb.UninterpretedOption) ([]*descriptorpb.UninterpretedOption, error) {
-	var md protoreflect.MessageDescriptor
 	optsFqn := string(proto.MessageReflect(opts).Descriptor().FullName())
-	// see if the parse included an override copy for these options
-	for _, symbols := range l.descriptorPool {
-		if _, ok := symbols[optsFqn]; ok {
-			// it did! use that descriptor instead
-			md = l.findMessageType(res.fd, optsFqn)
-			if md != nil {
-				break
-			}
-		}
-	}
+	optsv2 := proto.MessageV2(opts)
 	var msg protoreflect.Message
-	if md != nil {
-		dm := dynamicpb.NewMessage(md)
-		if err := cloneInto(dm, proto.MessageV2(opts)); err != nil {
+	// see if the parse included an override copy for these options
+	if md := l.findMessageType(res.fd, optsFqn); md != nil {
+		dm := newDynamic(md)
+		if err := cloneInto(dm, optsv2); err != nil {
 			node := res.nodes[element]
 			return nil, res.errs.handleError(ErrorWithSourcePos{Pos: node.Start(), Underlying: err})
 		}
@@ -341,7 +333,7 @@ func (l *linker) interpretOptions(res *parseResult, fqn string, element, opts pr
 	if res.lenient {
 		// If we're lenient, then we don't want to clobber the passed in message
 		// and leave it partially populated. So we convert into a copy first
-		optsClone := proto.Clone(opts)
+		optsClone := optsv2.ProtoReflect().New().Interface()
 		if err := cloneInto(optsClone, msg.Interface()); err != nil {
 			// TODO: do this in a more granular way, so we can convert individual
 			// fields and leave bad ones uninterpreted instead of skipping all of
@@ -351,7 +343,7 @@ func (l *linker) interpretOptions(res *parseResult, fqn string, element, opts pr
 		// conversion from dynamic message above worked, so now
 		// it is safe to overwrite the passed in message
 		opts.Reset()
-		proto.Merge(opts, optsClone)
+		protov2.Merge(optsv2, optsClone)
 
 		return remain, nil
 	}
@@ -364,7 +356,7 @@ func (l *linker) interpretOptions(res *parseResult, fqn string, element, opts pr
 	}
 
 	// now try to convert into the passed in message and fail if not successful
-	if err := cloneInto(opts, msg.Interface()); err != nil {
+	if err := cloneInto(optsv2, msg.Interface()); err != nil {
 		node := res.nodes[element]
 		return nil, res.errs.handleError(ErrorWithSourcePos{Pos: node.Start(), Underlying: err})
 	}
@@ -372,23 +364,121 @@ func (l *linker) interpretOptions(res *parseResult, fqn string, element, opts pr
 	return nil, nil
 }
 
-func cloneInto(dest proto.Message, src protov2.Message) error {
-	dest.Reset()
-	destV2 := proto.MessageV2(dest)
-	if destV2.ProtoReflect().Descriptor() == src.ProtoReflect().Descriptor() {
-		protov2.Merge(destV2, src)
-		if err := protov2.CheckInitialized(destV2); err != nil {
-			return err
-		}
-		return nil
-	}
-	// different descriptors means we must serialize
-	// and de-serialize in order to merge values
+func cloneInto(dest protov2.Message, src protov2.Message) error {
+	protov2.Reset(dest)
+	// NB: It would be nice if we could use the code below, to lean on proto.Merge
+	//  when the two messages have the same descriptor. (It doesn't work if the
+	//  descriptors aren't identical, i.e. pointer equality. And they differ when
+	//  the parse job includes a custom copy of descriptor.proto. So one will be
+	//  a custom-parsed descriptor and the other the compiled-in descriptor.)
+	//
+	//  However, this means the final messages *recognize* all fields. This is
+	//  problematic because of the weird order in which the v2 runtime emits
+	//  fields when doing "deterministic marshal". The result is a serialized
+	//  form that is distinctly different from protoc. While there are some known
+	//  cases where we can't perfectly mimic protoc, we try our best (and there
+	//  exist tests in downstream consumers of protoparse that verify that the
+	//  output matches protoc, to have faith in protoparse). So, sadly, that means
+	//  we have to marshal to bytes in our own deterministic order, and then
+	//  unmarshal that data into unrecognized fields. (Which is already written
+	//  in correct order, so the final descriptor is correct.)
+	//
+	//if destV2.ProtoReflect().Descriptor() == src.ProtoReflect().Descriptor() {
+	//	protov2.Merge(destV2, src)
+	//	if err := protov2.CheckInitialized(destV2); err != nil {
+	//		return err
+	//	}
+	//	return nil
+	//}
+
+	// different descriptors means we must serialize and de-serialize in order to merge values
+	// NB: we don't use deterministic marshal because that uses a weird order of fields, so
+	// instead we've wrapped all dynamic messages with logic that emits fields in the right
+	// order.
 	data, err := protov2.Marshal(src)
 	if err != nil {
 		return err
 	}
-	return protov2.Unmarshal(data, destV2)
+	return protov2.Unmarshal(data, dest)
+}
+
+func newDynamic(md protoreflect.MessageDescriptor) *deterministicDynamic {
+	return &deterministicDynamic{Message: dynamicpb.NewMessage(md)}
+}
+
+type deterministicDynamic struct {
+	*dynamicpb.Message
+}
+
+// ProtoReflect implements the protoreflect.ProtoMessage interface.
+func (d *deterministicDynamic) ProtoReflect() protoreflect.Message {
+	return d
+}
+
+func (d *deterministicDynamic) Interface() protoreflect.ProtoMessage {
+	return d
+}
+
+func (d *deterministicDynamic) Range(f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
+	var fields []protoreflect.FieldDescriptor
+	d.Message.Range(func(fd protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
+		fields = append(fields, fd)
+		return true
+	})
+	// simple sort for deterministic marshaling
+	sort.Slice(fields, func(i, j int) bool {
+		return fields[i].Number() < fields[j].Number()
+	})
+	for _, fld := range fields {
+		if !f(fld, d.Get(fld)) {
+			return
+		}
+	}
+}
+
+func (d *deterministicDynamic) Get(fd protoreflect.FieldDescriptor) protoreflect.Value {
+	v := d.Message.Get(fd)
+	if v.IsValid() && fd.IsMap() {
+		mp := v.Map()
+		if _, ok := mp.(*deterministicMap); !ok {
+			return protoreflect.ValueOfMap(&deterministicMap{Map: v.Map(), keyKind: fd.MapKey().Kind()})
+		}
+	}
+	return v
+}
+
+type deterministicMap struct {
+	protoreflect.Map
+	keyKind protoreflect.Kind
+}
+
+func (m *deterministicMap) Range(f func(protoreflect.MapKey, protoreflect.Value) bool) {
+	var keys []protoreflect.MapKey
+	m.Map.Range(func(k protoreflect.MapKey, _ protoreflect.Value) bool {
+		keys = append(keys, k)
+		return true
+	})
+	sort.Slice(keys, func(i, j int) bool {
+		switch m.keyKind {
+		case protoreflect.BoolKind:
+			return !keys[i].Bool() && keys[j].Bool()
+		case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind,
+			protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+			return keys[i].Int() < keys[j].Int()
+		case protoreflect.Uint32Kind, protoreflect.Fixed32Kind,
+			protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+			return keys[i].Uint() < keys[j].Uint()
+		case protoreflect.StringKind:
+			return keys[i].String() < keys[j].String()
+		default:
+			panic("invalid kind: " + m.keyKind.String())
+		}
+	})
+	for _, key := range keys {
+		if !f(key, m.Map.Get(key)) {
+			break
+		}
+	}
 }
 
 func validateRecursive(msg protoreflect.Message, prefix string) error {
@@ -498,7 +588,7 @@ func (l *linker) interpretField(res *parseResult, mc *messageContext, element pr
 			v := msg.Mutable(fld)
 			fdm = v.Message()
 		} else {
-			fdm = dynamicpb.NewMessage(fld.Message())
+			fdm = newDynamic(fld.Message())
 			msg.Set(fld, protoreflect.ValueOfMessage(fdm))
 		}
 		// recurse to set next part of name
@@ -539,7 +629,7 @@ func (l *linker) setOptionField(res *parseResult, mc *messageContext, msg protor
 				key := entry.Get(fld.MapKey()).MapKey()
 				val := entry.Get(fld.MapValue())
 				if dm, ok := val.Interface().(*dynamicpb.Message); ok && (dm == nil || !dm.IsValid()) {
-					val = protoreflect.ValueOfMessage(dynamicpb.NewMessage(fld.MapValue().Message()))
+					val = protoreflect.ValueOfMessage(newDynamic(fld.MapValue().Message()))
 				}
 				msg.Mutable(fld).Map().Set(key, val)
 			} else {
@@ -558,7 +648,7 @@ func (l *linker) setOptionField(res *parseResult, mc *messageContext, msg protor
 		key := entry.Get(fld.MapKey()).MapKey()
 		val := entry.Get(fld.MapValue())
 		if dm, ok := val.Interface().(*dynamicpb.Message); ok && (dm == nil || !dm.IsValid()) {
-			val = protoreflect.ValueOfMessage(dynamicpb.NewMessage(fld.MapValue().Message()))
+			val = protoreflect.ValueOfMessage(newDynamic(fld.MapValue().Message()))
 		}
 		msg.Mutable(fld).Map().Set(key, val)
 	} else if fld.IsList() {
@@ -702,7 +792,7 @@ func (l *linker) fieldValue(res *parseResult, mc *messageContext, fld protorefle
 		v := val.Value()
 		if aggs, ok := v.([]*ast.MessageFieldNode); ok {
 			fmd := fld.Message()
-			fdm := dynamicpb.NewMessage(fmd)
+			fdm := newDynamic(fmd)
 			origPath := mc.optAggPath
 			defer func() {
 				mc.optAggPath = origPath
