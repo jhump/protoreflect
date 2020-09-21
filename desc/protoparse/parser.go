@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
@@ -183,6 +184,23 @@ type Parser struct {
 // error it returns. If syntax or link errors are encountered but the configured
 // ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) {
+	l, err := p.parseAndLink(filenames)
+	if err != nil {
+		return nil, err
+	}
+	linkedProtos, err := l.createdLinkedDescriptors()
+	if err != nil {
+		return nil, err
+	}
+	fds := make([]*desc.FileDescriptor, len(filenames))
+	for i, name := range filenames {
+		fd := linkedProtos[name]
+		fds[i] = fd
+	}
+	return fds, nil
+}
+
+func (p Parser) parseAndLink(filenames []string) (*linker, error) {
 	accessor := p.Accessor
 	if accessor == nil {
 		accessor = func(name string) (io.ReadCloser, error) {
@@ -238,16 +256,7 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 			pr.fd.SourceCodeInfo = pr.generateSourceCodeInfo()
 		}
 	}
-	linkedProtos, err := l.createdLinkedDescriptors()
-	if err != nil {
-		return nil, err
-	}
-	fds := make([]*desc.FileDescriptor, len(filenames))
-	for i, name := range filenames {
-		fd := linkedProtos[name]
-		fds[i] = fd
-	}
-	return fds, nil
+	return l, nil
 }
 
 // ParseFilesButDoNotLink parses the named files into descriptor protos. The
@@ -370,6 +379,38 @@ func (p Parser) ParseToAST(filenames ...string) ([]*ast.FileNode, error) {
 		ret = append(ret, protos[name].root)
 	}
 	return ret, nil
+}
+
+// ParseFilesToProtos parses the named files into descriptors. The returned
+// slices have the same number of entries as the give filenames, in the same
+// order. So the first returned descriptor corresponds to the first given name,
+// and so on.
+//
+// This is basically the same as ParseFiles except that it avoids the final
+// step of creating a *desc.FileDescriptor for each entry. With the move to
+// API v2, desc.Descriptor implementations now WRAP protoreflect.Descriptors.
+// So that last step is overhead in two ways: (1) it re-creates
+// protoreflect.Descriptors from the protos; (2) it then wraps those descriptors
+// with *desc.FileDescriptors.
+//
+// Note that the protoreflect.FileDescriptors returned by this functions were
+// NOT created from the protos using the protodesc package. Instead, they are
+// custom descriptor implementations backed by the parsed descriptor protos and
+// the state created by the linking step. They are not as thorough but will
+// likely suffice for many usages.
+func (p Parser) ParseFilesToProtos(filenames ...string) ([]*descriptorpb.FileDescriptorProto, []protoreflect.FileDescriptor, error) {
+	l, err := p.parseAndLink(filenames)
+	if err != nil {
+		return nil, nil, err
+	}
+	fdps := make([]*descriptorpb.FileDescriptorProto, len(filenames))
+	fds := make([]protoreflect.FileDescriptor, len(filenames))
+	for i, name := range filenames {
+		pr := l.files[name]
+		fdps[i] = pr.fd
+		fds[i] = l.asFileDescriptor(pr.fd)
+	}
+	return fdps, fds, nil
 }
 
 func (p Parser) getLookupImport() (func(string) (*descriptorpb.FileDescriptorProto, error), error) {
