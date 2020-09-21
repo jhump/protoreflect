@@ -5,13 +5,13 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc/internal"
 	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
 
-func (r *parseResult) generateSourceCodeInfo() *dpb.SourceCodeInfo {
+func (r *parseResult) generateSourceCodeInfo() *descriptorpb.SourceCodeInfo {
 	if r.nodes == nil {
 		// skip files that do not have AST info (these will be files
 		// that came from well-known descriptors, instead of from source)
@@ -53,7 +53,7 @@ func (r *parseResult) generateSourceCodeInfo() *dpb.SourceCodeInfo {
 		}
 	}
 
-	return &dpb.SourceCodeInfo{Location: sci.locs}
+	return &descriptorpb.SourceCodeInfo{Location: sci.locs}
 }
 
 func (r *parseResult) generateSourceCodeInfoForOption(sci *sourceCodeInfo, n *ast.OptionNode, compact bool, uninterpIndex *int32, path []int32) {
@@ -386,14 +386,14 @@ func (r *parseResult) generateSourceCodeInfoForMethod(sci *sourceCodeInfo, n *as
 }
 
 type sourceCodeInfo struct {
-	locs         []*dpb.SourceCodeInfo_Location
+	locs         []*descriptorpb.SourceCodeInfo_Location
 	commentsUsed map[*ast.Comment]struct{}
 }
 
 func (sci *sourceCodeInfo) newLocWithoutComments(n ast.Node, path []int32) {
 	dup := make([]int32, len(path))
 	copy(dup, path)
-	sci.locs = append(sci.locs, &dpb.SourceCodeInfo_Location{
+	sci.locs = append(sci.locs, &descriptorpb.SourceCodeInfo_Location{
 		Path: dup,
 		Span: makeSpan(n.Start(), n.End()),
 	})
@@ -420,7 +420,7 @@ func (sci *sourceCodeInfo) newLoc(n ast.Node, path []int32) {
 	}
 	dup := make([]int32, len(path))
 	copy(dup, path)
-	sci.locs = append(sci.locs, &dpb.SourceCodeInfo_Location{
+	sci.locs = append(sci.locs, &descriptorpb.SourceCodeInfo_Location{
 		LeadingDetachedComments: detached,
 		LeadingComments:         lead,
 		TrailingComments:        trail,

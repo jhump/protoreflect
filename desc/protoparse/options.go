@@ -4,720 +4,67 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	protov2 "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 
-	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
 	"github.com/jhump/protoreflect/desc/protoparse/ast"
-	"github.com/jhump/protoreflect/dynamic"
 )
 
-// NB: To process options, we need descriptors, but we may not have rich
-// descriptors when trying to interpret options for unlinked parsed files.
-// So we define minimal interfaces that can be backed by both rich descriptors
-// as well as their poorer cousins, plain ol' descriptor protos.
-
-type descriptorish interface {
-	GetFile() fileDescriptorish
-	GetFullyQualifiedName() string
-	AsProto() proto.Message
-}
-
-type fileDescriptorish interface {
-	descriptorish
-	GetFileOptions() *dpb.FileOptions
-	GetPackage() string
-	FindSymbol(name string) desc.Descriptor
-	GetPublicDependencies() []fileDescriptorish
-	GetDependencies() []fileDescriptorish
-	GetMessageTypes() []msgDescriptorish
-	GetExtensions() []fldDescriptorish
-	GetEnumTypes() []enumDescriptorish
-	GetServices() []svcDescriptorish
-}
-
-type msgDescriptorish interface {
-	descriptorish
-	GetMessageOptions() *dpb.MessageOptions
-	GetFields() []fldDescriptorish
-	GetOneOfs() []oneofDescriptorish
-	GetExtensionRanges() []extRangeDescriptorish
-	GetNestedMessageTypes() []msgDescriptorish
-	GetNestedExtensions() []fldDescriptorish
-	GetNestedEnumTypes() []enumDescriptorish
-}
-
-type fldDescriptorish interface {
-	descriptorish
-	GetFieldOptions() *dpb.FieldOptions
-	GetMessageType() *desc.MessageDescriptor
-	GetEnumType() *desc.EnumDescriptor
-	AsFieldDescriptorProto() *dpb.FieldDescriptorProto
-}
-
-type oneofDescriptorish interface {
-	descriptorish
-	GetOneOfOptions() *dpb.OneofOptions
-}
-
-type enumDescriptorish interface {
-	descriptorish
-	GetEnumOptions() *dpb.EnumOptions
-	GetValues() []enumValDescriptorish
-}
-
-type enumValDescriptorish interface {
-	descriptorish
-	GetEnumValueOptions() *dpb.EnumValueOptions
-}
-
-type svcDescriptorish interface {
-	descriptorish
-	GetServiceOptions() *dpb.ServiceOptions
-	GetMethods() []methodDescriptorish
-}
-
-type methodDescriptorish interface {
-	descriptorish
-	GetMethodOptions() *dpb.MethodOptions
-}
-
-// The hierarchy of descriptorish implementations backed by
-// rich descriptors:
-
-type richFileDescriptorish struct {
-	*desc.FileDescriptor
-}
-
-func (d richFileDescriptorish) GetFile() fileDescriptorish {
-	return d
-}
-
-func (d richFileDescriptorish) GetPublicDependencies() []fileDescriptorish {
-	deps := d.FileDescriptor.GetPublicDependencies()
-	ret := make([]fileDescriptorish, len(deps))
-	for i, d := range deps {
-		ret[i] = richFileDescriptorish{FileDescriptor: d}
+func (l *linker) interpretFileOptions(r *parseResult) error {
+	fd := r.fd
+	prefix := fd.GetPackage()
+	if prefix != "" {
+		prefix += "."
 	}
-	return ret
-}
-
-func (d richFileDescriptorish) GetDependencies() []fileDescriptorish {
-	deps := d.FileDescriptor.GetDependencies()
-	ret := make([]fileDescriptorish, len(deps))
-	for i, d := range deps {
-		ret[i] = richFileDescriptorish{FileDescriptor: d}
-	}
-	return ret
-}
-
-func (d richFileDescriptorish) GetMessageTypes() []msgDescriptorish {
-	msgs := d.FileDescriptor.GetMessageTypes()
-	ret := make([]msgDescriptorish, len(msgs))
-	for i, m := range msgs {
-		ret[i] = richMsgDescriptorish{MessageDescriptor: m}
-	}
-	return ret
-}
-
-func (d richFileDescriptorish) GetExtensions() []fldDescriptorish {
-	flds := d.FileDescriptor.GetExtensions()
-	ret := make([]fldDescriptorish, len(flds))
-	for i, f := range flds {
-		ret[i] = richFldDescriptorish{FieldDescriptor: f}
-	}
-	return ret
-}
-
-func (d richFileDescriptorish) GetEnumTypes() []enumDescriptorish {
-	ens := d.FileDescriptor.GetEnumTypes()
-	ret := make([]enumDescriptorish, len(ens))
-	for i, en := range ens {
-		ret[i] = richEnumDescriptorish{EnumDescriptor: en}
-	}
-	return ret
-}
-
-func (d richFileDescriptorish) GetServices() []svcDescriptorish {
-	svcs := d.FileDescriptor.GetServices()
-	ret := make([]svcDescriptorish, len(svcs))
-	for i, s := range svcs {
-		ret[i] = richSvcDescriptorish{ServiceDescriptor: s}
-	}
-	return ret
-}
-
-type richMsgDescriptorish struct {
-	*desc.MessageDescriptor
-}
-
-func (d richMsgDescriptorish) GetFile() fileDescriptorish {
-	return richFileDescriptorish{FileDescriptor: d.MessageDescriptor.GetFile()}
-}
-
-func (d richMsgDescriptorish) GetFields() []fldDescriptorish {
-	flds := d.MessageDescriptor.GetFields()
-	ret := make([]fldDescriptorish, len(flds))
-	for i, f := range flds {
-		ret[i] = richFldDescriptorish{FieldDescriptor: f}
-	}
-	return ret
-}
-
-func (d richMsgDescriptorish) GetOneOfs() []oneofDescriptorish {
-	oos := d.MessageDescriptor.GetOneOfs()
-	ret := make([]oneofDescriptorish, len(oos))
-	for i, oo := range oos {
-		ret[i] = richOneOfDescriptorish{OneOfDescriptor: oo}
-	}
-	return ret
-}
-
-func (d richMsgDescriptorish) GetExtensionRanges() []extRangeDescriptorish {
-	md := d.MessageDescriptor
-	mdFqn := md.GetFullyQualifiedName()
-	extrs := md.AsDescriptorProto().GetExtensionRange()
-	ret := make([]extRangeDescriptorish, len(extrs))
-	for i, extr := range extrs {
-		ret[i] = extRangeDescriptorish{
-			er:   extr,
-			qual: mdFqn,
-			file: richFileDescriptorish{FileDescriptor: md.GetFile()},
-		}
-	}
-	return ret
-}
-
-func (d richMsgDescriptorish) GetNestedMessageTypes() []msgDescriptorish {
-	msgs := d.MessageDescriptor.GetNestedMessageTypes()
-	ret := make([]msgDescriptorish, len(msgs))
-	for i, m := range msgs {
-		ret[i] = richMsgDescriptorish{MessageDescriptor: m}
-	}
-	return ret
-}
-
-func (d richMsgDescriptorish) GetNestedExtensions() []fldDescriptorish {
-	flds := d.MessageDescriptor.GetNestedExtensions()
-	ret := make([]fldDescriptorish, len(flds))
-	for i, f := range flds {
-		ret[i] = richFldDescriptorish{FieldDescriptor: f}
-	}
-	return ret
-}
-
-func (d richMsgDescriptorish) GetNestedEnumTypes() []enumDescriptorish {
-	ens := d.MessageDescriptor.GetNestedEnumTypes()
-	ret := make([]enumDescriptorish, len(ens))
-	for i, en := range ens {
-		ret[i] = richEnumDescriptorish{EnumDescriptor: en}
-	}
-	return ret
-}
-
-type richFldDescriptorish struct {
-	*desc.FieldDescriptor
-}
-
-func (d richFldDescriptorish) GetFile() fileDescriptorish {
-	return richFileDescriptorish{FileDescriptor: d.FieldDescriptor.GetFile()}
-}
-
-func (d richFldDescriptorish) AsFieldDescriptorProto() *dpb.FieldDescriptorProto {
-	return d.FieldDescriptor.AsFieldDescriptorProto()
-}
-
-type richOneOfDescriptorish struct {
-	*desc.OneOfDescriptor
-}
-
-func (d richOneOfDescriptorish) GetFile() fileDescriptorish {
-	return richFileDescriptorish{FileDescriptor: d.OneOfDescriptor.GetFile()}
-}
-
-type richEnumDescriptorish struct {
-	*desc.EnumDescriptor
-}
-
-func (d richEnumDescriptorish) GetFile() fileDescriptorish {
-	return richFileDescriptorish{FileDescriptor: d.EnumDescriptor.GetFile()}
-}
-
-func (d richEnumDescriptorish) GetValues() []enumValDescriptorish {
-	vals := d.EnumDescriptor.GetValues()
-	ret := make([]enumValDescriptorish, len(vals))
-	for i, val := range vals {
-		ret[i] = richEnumValDescriptorish{EnumValueDescriptor: val}
-	}
-	return ret
-}
-
-type richEnumValDescriptorish struct {
-	*desc.EnumValueDescriptor
-}
-
-func (d richEnumValDescriptorish) GetFile() fileDescriptorish {
-	return richFileDescriptorish{FileDescriptor: d.EnumValueDescriptor.GetFile()}
-}
-
-type richSvcDescriptorish struct {
-	*desc.ServiceDescriptor
-}
-
-func (d richSvcDescriptorish) GetFile() fileDescriptorish {
-	return richFileDescriptorish{FileDescriptor: d.ServiceDescriptor.GetFile()}
-}
-
-func (d richSvcDescriptorish) GetMethods() []methodDescriptorish {
-	mtds := d.ServiceDescriptor.GetMethods()
-	ret := make([]methodDescriptorish, len(mtds))
-	for i, mtd := range mtds {
-		ret[i] = richMethodDescriptorish{MethodDescriptor: mtd}
-	}
-	return ret
-}
-
-type richMethodDescriptorish struct {
-	*desc.MethodDescriptor
-}
-
-func (d richMethodDescriptorish) GetFile() fileDescriptorish {
-	return richFileDescriptorish{FileDescriptor: d.MethodDescriptor.GetFile()}
-}
-
-// The hierarchy of descriptorish implementations backed by
-// plain descriptor protos:
-
-type poorFileDescriptorish struct {
-	*dpb.FileDescriptorProto
-}
-
-func (d poorFileDescriptorish) GetFile() fileDescriptorish {
-	return d
-}
-
-func (d poorFileDescriptorish) GetFullyQualifiedName() string {
-	return d.FileDescriptorProto.GetName()
-}
-
-func (d poorFileDescriptorish) AsProto() proto.Message {
-	return d.FileDescriptorProto
-}
-
-func (d poorFileDescriptorish) GetFileOptions() *dpb.FileOptions {
-	return d.FileDescriptorProto.GetOptions()
-}
-
-func (d poorFileDescriptorish) FindSymbol(name string) desc.Descriptor {
-	return nil
-}
-
-func (d poorFileDescriptorish) GetPublicDependencies() []fileDescriptorish {
-	return nil
-}
-
-func (d poorFileDescriptorish) GetDependencies() []fileDescriptorish {
-	return nil
-}
-
-func (d poorFileDescriptorish) GetMessageTypes() []msgDescriptorish {
-	msgs := d.FileDescriptorProto.GetMessageType()
-	pkg := d.FileDescriptorProto.GetPackage()
-	ret := make([]msgDescriptorish, len(msgs))
-	for i, m := range msgs {
-		ret[i] = poorMsgDescriptorish{
-			DescriptorProto: m,
-			qual:            pkg,
-			file:            d,
-		}
-	}
-	return ret
-}
-
-func (d poorFileDescriptorish) GetExtensions() []fldDescriptorish {
-	exts := d.FileDescriptorProto.GetExtension()
-	pkg := d.FileDescriptorProto.GetPackage()
-	ret := make([]fldDescriptorish, len(exts))
-	for i, e := range exts {
-		ret[i] = poorFldDescriptorish{
-			FieldDescriptorProto: e,
-			qual:                 pkg,
-			file:                 d,
-		}
-	}
-	return ret
-}
-
-func (d poorFileDescriptorish) GetEnumTypes() []enumDescriptorish {
-	ens := d.FileDescriptorProto.GetEnumType()
-	pkg := d.FileDescriptorProto.GetPackage()
-	ret := make([]enumDescriptorish, len(ens))
-	for i, e := range ens {
-		ret[i] = poorEnumDescriptorish{
-			EnumDescriptorProto: e,
-			qual:                pkg,
-			file:                d,
-		}
-	}
-	return ret
-}
-
-func (d poorFileDescriptorish) GetServices() []svcDescriptorish {
-	svcs := d.FileDescriptorProto.GetService()
-	pkg := d.FileDescriptorProto.GetPackage()
-	ret := make([]svcDescriptorish, len(svcs))
-	for i, s := range svcs {
-		ret[i] = poorSvcDescriptorish{
-			ServiceDescriptorProto: s,
-			qual:                   pkg,
-			file:                   d,
-		}
-	}
-	return ret
-}
-
-type poorMsgDescriptorish struct {
-	*dpb.DescriptorProto
-	qual string
-	file fileDescriptorish
-}
-
-func (d poorMsgDescriptorish) GetFile() fileDescriptorish {
-	return d.file
-}
-
-func (d poorMsgDescriptorish) GetFullyQualifiedName() string {
-	return qualify(d.qual, d.DescriptorProto.GetName())
-}
-
-func qualify(qual, name string) string {
-	if qual == "" {
-		return name
-	} else {
-		return fmt.Sprintf("%s.%s", qual, name)
-	}
-}
-
-func (d poorMsgDescriptorish) AsProto() proto.Message {
-	return d.DescriptorProto
-}
-
-func (d poorMsgDescriptorish) GetMessageOptions() *dpb.MessageOptions {
-	return d.DescriptorProto.GetOptions()
-}
-
-func (d poorMsgDescriptorish) GetFields() []fldDescriptorish {
-	flds := d.DescriptorProto.GetField()
-	ret := make([]fldDescriptorish, len(flds))
-	for i, f := range flds {
-		ret[i] = poorFldDescriptorish{
-			FieldDescriptorProto: f,
-			qual:                 d.GetFullyQualifiedName(),
-			file:                 d.file,
-		}
-	}
-	return ret
-}
-
-func (d poorMsgDescriptorish) GetOneOfs() []oneofDescriptorish {
-	oos := d.DescriptorProto.GetOneofDecl()
-	ret := make([]oneofDescriptorish, len(oos))
-	for i, oo := range oos {
-		ret[i] = poorOneOfDescriptorish{
-			OneofDescriptorProto: oo,
-			qual:                 d.GetFullyQualifiedName(),
-			file:                 d.file,
-		}
-	}
-	return ret
-}
-
-func (d poorMsgDescriptorish) GetExtensionRanges() []extRangeDescriptorish {
-	mdFqn := d.GetFullyQualifiedName()
-	extrs := d.DescriptorProto.GetExtensionRange()
-	ret := make([]extRangeDescriptorish, len(extrs))
-	for i, extr := range extrs {
-		ret[i] = extRangeDescriptorish{
-			er:   extr,
-			qual: mdFqn,
-			file: d.file,
-		}
-	}
-	return ret
-}
-
-func (d poorMsgDescriptorish) GetNestedMessageTypes() []msgDescriptorish {
-	msgs := d.DescriptorProto.GetNestedType()
-	ret := make([]msgDescriptorish, len(msgs))
-	for i, m := range msgs {
-		ret[i] = poorMsgDescriptorish{
-			DescriptorProto: m,
-			qual:            d.GetFullyQualifiedName(),
-			file:            d.file,
-		}
-	}
-	return ret
-}
-
-func (d poorMsgDescriptorish) GetNestedExtensions() []fldDescriptorish {
-	flds := d.DescriptorProto.GetExtension()
-	ret := make([]fldDescriptorish, len(flds))
-	for i, f := range flds {
-		ret[i] = poorFldDescriptorish{
-			FieldDescriptorProto: f,
-			qual:                 d.GetFullyQualifiedName(),
-			file:                 d.file,
-		}
-	}
-	return ret
-}
-
-func (d poorMsgDescriptorish) GetNestedEnumTypes() []enumDescriptorish {
-	ens := d.DescriptorProto.GetEnumType()
-	ret := make([]enumDescriptorish, len(ens))
-	for i, en := range ens {
-		ret[i] = poorEnumDescriptorish{
-			EnumDescriptorProto: en,
-			qual:                d.GetFullyQualifiedName(),
-			file:                d.file,
-		}
-	}
-	return ret
-}
-
-type poorFldDescriptorish struct {
-	*dpb.FieldDescriptorProto
-	qual string
-	file fileDescriptorish
-}
-
-func (d poorFldDescriptorish) GetFile() fileDescriptorish {
-	return d.file
-}
-
-func (d poorFldDescriptorish) GetFullyQualifiedName() string {
-	return qualify(d.qual, d.FieldDescriptorProto.GetName())
-}
-
-func (d poorFldDescriptorish) AsProto() proto.Message {
-	return d.FieldDescriptorProto
-}
-
-func (d poorFldDescriptorish) GetFieldOptions() *dpb.FieldOptions {
-	return d.FieldDescriptorProto.GetOptions()
-}
-
-func (d poorFldDescriptorish) GetMessageType() *desc.MessageDescriptor {
-	return nil
-}
-
-func (d poorFldDescriptorish) GetEnumType() *desc.EnumDescriptor {
-	return nil
-}
-
-type poorOneOfDescriptorish struct {
-	*dpb.OneofDescriptorProto
-	qual string
-	file fileDescriptorish
-}
-
-func (d poorOneOfDescriptorish) GetFile() fileDescriptorish {
-	return d.file
-}
-
-func (d poorOneOfDescriptorish) GetFullyQualifiedName() string {
-	return qualify(d.qual, d.OneofDescriptorProto.GetName())
-}
-
-func (d poorOneOfDescriptorish) AsProto() proto.Message {
-	return d.OneofDescriptorProto
-}
-
-func (d poorOneOfDescriptorish) GetOneOfOptions() *dpb.OneofOptions {
-	return d.OneofDescriptorProto.GetOptions()
-}
-
-func (d poorFldDescriptorish) AsFieldDescriptorProto() *dpb.FieldDescriptorProto {
-	return d.FieldDescriptorProto
-}
-
-type poorEnumDescriptorish struct {
-	*dpb.EnumDescriptorProto
-	qual string
-	file fileDescriptorish
-}
-
-func (d poorEnumDescriptorish) GetFile() fileDescriptorish {
-	return d.file
-}
-
-func (d poorEnumDescriptorish) GetFullyQualifiedName() string {
-	return qualify(d.qual, d.EnumDescriptorProto.GetName())
-}
-
-func (d poorEnumDescriptorish) AsProto() proto.Message {
-	return d.EnumDescriptorProto
-}
-
-func (d poorEnumDescriptorish) GetEnumOptions() *dpb.EnumOptions {
-	return d.EnumDescriptorProto.GetOptions()
-}
-
-func (d poorEnumDescriptorish) GetValues() []enumValDescriptorish {
-	vals := d.EnumDescriptorProto.GetValue()
-	ret := make([]enumValDescriptorish, len(vals))
-	for i, v := range vals {
-		ret[i] = poorEnumValDescriptorish{
-			EnumValueDescriptorProto: v,
-			qual:                     d.GetFullyQualifiedName(),
-			file:                     d.file,
-		}
-	}
-	return ret
-}
-
-type poorEnumValDescriptorish struct {
-	*dpb.EnumValueDescriptorProto
-	qual string
-	file fileDescriptorish
-}
-
-func (d poorEnumValDescriptorish) GetFile() fileDescriptorish {
-	return d.file
-}
-
-func (d poorEnumValDescriptorish) GetFullyQualifiedName() string {
-	return qualify(d.qual, d.EnumValueDescriptorProto.GetName())
-}
-
-func (d poorEnumValDescriptorish) AsProto() proto.Message {
-	return d.EnumValueDescriptorProto
-}
-
-func (d poorEnumValDescriptorish) GetEnumValueOptions() *dpb.EnumValueOptions {
-	return d.EnumValueDescriptorProto.GetOptions()
-}
-
-type poorSvcDescriptorish struct {
-	*dpb.ServiceDescriptorProto
-	qual string
-	file fileDescriptorish
-}
-
-func (d poorSvcDescriptorish) GetFile() fileDescriptorish {
-	return d.file
-}
-
-func (d poorSvcDescriptorish) GetFullyQualifiedName() string {
-	return qualify(d.qual, d.ServiceDescriptorProto.GetName())
-}
-
-func (d poorSvcDescriptorish) AsProto() proto.Message {
-	return d.ServiceDescriptorProto
-}
-
-func (d poorSvcDescriptorish) GetServiceOptions() *dpb.ServiceOptions {
-	return d.ServiceDescriptorProto.GetOptions()
-}
-
-func (d poorSvcDescriptorish) GetMethods() []methodDescriptorish {
-	mtds := d.ServiceDescriptorProto.GetMethod()
-	ret := make([]methodDescriptorish, len(mtds))
-	for i, m := range mtds {
-		ret[i] = poorMethodDescriptorish{
-			MethodDescriptorProto: m,
-			qual:                  d.GetFullyQualifiedName(),
-			file:                  d.file,
-		}
-	}
-	return ret
-}
-
-type poorMethodDescriptorish struct {
-	*dpb.MethodDescriptorProto
-	qual string
-	file fileDescriptorish
-}
-
-func (d poorMethodDescriptorish) GetFile() fileDescriptorish {
-	return d.file
-}
-
-func (d poorMethodDescriptorish) GetFullyQualifiedName() string {
-	return qualify(d.qual, d.MethodDescriptorProto.GetName())
-}
-
-func (d poorMethodDescriptorish) AsProto() proto.Message {
-	return d.MethodDescriptorProto
-}
-
-func (d poorMethodDescriptorish) GetMethodOptions() *dpb.MethodOptions {
-	return d.MethodDescriptorProto.GetOptions()
-}
-
-type extRangeDescriptorish struct {
-	er   *dpb.DescriptorProto_ExtensionRange
-	qual string
-	file fileDescriptorish
-}
-
-func (er extRangeDescriptorish) GetFile() fileDescriptorish {
-	return er.file
-}
-
-func (er extRangeDescriptorish) GetFullyQualifiedName() string {
-	return qualify(er.qual, fmt.Sprintf("%d-%d", er.er.GetStart(), er.er.GetEnd()-1))
-}
-
-func (er extRangeDescriptorish) AsProto() proto.Message {
-	return er.er
-}
-
-func (er extRangeDescriptorish) GetExtensionRangeOptions() *dpb.ExtensionRangeOptions {
-	return er.er.GetOptions()
-}
-
-func interpretFileOptions(r *parseResult, fd fileDescriptorish) error {
-	opts := fd.GetFileOptions()
+	opts := fd.GetOptions()
 	if opts != nil {
 		if len(opts.UninterpretedOption) > 0 {
-			if remain, err := interpretOptions(r, fd, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := l.interpretOptions(r, fd.GetName(), fd, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
 			}
 		}
 	}
-	for _, md := range fd.GetMessageTypes() {
-		if err := interpretMessageOptions(r, md); err != nil {
+	for _, md := range fd.GetMessageType() {
+		fqn := prefix + md.GetName()
+		if err := l.interpretMessageOptions(r, fqn, md); err != nil {
 			return err
 		}
 	}
-	for _, fld := range fd.GetExtensions() {
-		if err := interpretFieldOptions(r, fld); err != nil {
+	for _, fld := range fd.GetExtension() {
+		fqn := prefix + fld.GetName()
+		if err := l.interpretFieldOptions(r, fqn, fld); err != nil {
 			return err
 		}
 	}
-	for _, ed := range fd.GetEnumTypes() {
-		if err := interpretEnumOptions(r, ed); err != nil {
+	for _, ed := range fd.GetEnumType() {
+		fqn := prefix + ed.GetName()
+		if err := l.interpretEnumOptions(r, fqn, ed); err != nil {
 			return err
 		}
 	}
-	for _, sd := range fd.GetServices() {
-		opts := sd.GetServiceOptions()
+	for _, sd := range fd.GetService() {
+		fqn := prefix + sd.GetName()
+		opts := sd.GetOptions()
 		if len(opts.GetUninterpretedOption()) > 0 {
-			if remain, err := interpretOptions(r, sd, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := l.interpretOptions(r, fqn, sd, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
 			}
 		}
-		for _, mtd := range sd.GetMethods() {
-			opts := mtd.GetMethodOptions()
+		for _, mtd := range sd.GetMethod() {
+			mtdFqn := fqn + "." + mtd.GetName()
+			opts := mtd.GetOptions()
 			if len(opts.GetUninterpretedOption()) > 0 {
-				if remain, err := interpretOptions(r, mtd, opts, opts.UninterpretedOption); err != nil {
+				if remain, err := l.interpretOptions(r, mtdFqn, mtd, opts, opts.UninterpretedOption); err != nil {
 					return err
 				} else {
 					opts.UninterpretedOption = remain
@@ -728,65 +75,71 @@ func interpretFileOptions(r *parseResult, fd fileDescriptorish) error {
 	return nil
 }
 
-func interpretMessageOptions(r *parseResult, md msgDescriptorish) error {
-	opts := md.GetMessageOptions()
+func (l *linker) interpretMessageOptions(r *parseResult, fqn string, md *descriptorpb.DescriptorProto) error {
+	opts := md.GetOptions()
 	if opts != nil {
 		if len(opts.UninterpretedOption) > 0 {
-			if remain, err := interpretOptions(r, md, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := l.interpretOptions(r, fqn, md, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
 			}
 		}
 	}
-	for _, fld := range md.GetFields() {
-		if err := interpretFieldOptions(r, fld); err != nil {
+	for _, fld := range md.GetField() {
+		fldFqn := fqn + "." + fld.GetName()
+		if err := l.interpretFieldOptions(r, fldFqn, fld); err != nil {
 			return err
 		}
 	}
-	for _, ood := range md.GetOneOfs() {
-		opts := ood.GetOneOfOptions()
+	for _, ood := range md.GetOneofDecl() {
+		oodFqn := fqn + "." + ood.GetName()
+		opts := ood.GetOptions()
 		if len(opts.GetUninterpretedOption()) > 0 {
-			if remain, err := interpretOptions(r, ood, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := l.interpretOptions(r, oodFqn, ood, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
 			}
 		}
 	}
-	for _, fld := range md.GetNestedExtensions() {
-		if err := interpretFieldOptions(r, fld); err != nil {
+	for _, fld := range md.GetExtension() {
+		fldFqn := fqn + "." + fld.GetName()
+		if err := l.interpretFieldOptions(r, fldFqn, fld); err != nil {
 			return err
 		}
 	}
-	for _, er := range md.GetExtensionRanges() {
-		opts := er.GetExtensionRangeOptions()
+	for _, er := range md.GetExtensionRange() {
+		erFqn := fmt.Sprintf("%s.%d-%d", fqn, er.GetStart(), er.GetEnd())
+		opts := er.GetOptions()
 		if len(opts.GetUninterpretedOption()) > 0 {
-			if remain, err := interpretOptions(r, er, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := l.interpretOptions(r, erFqn, er, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
 			}
 		}
 	}
-	for _, nmd := range md.GetNestedMessageTypes() {
-		if err := interpretMessageOptions(r, nmd); err != nil {
+	for _, nmd := range md.GetNestedType() {
+		nmdFqn := fqn + "." + nmd.GetName()
+		if err := l.interpretMessageOptions(r, nmdFqn, nmd); err != nil {
 			return err
 		}
 	}
-	for _, ed := range md.GetNestedEnumTypes() {
-		if err := interpretEnumOptions(r, ed); err != nil {
+	for _, ed := range md.GetEnumType() {
+		edFqn := fqn + "." + ed.GetName()
+		if err := l.interpretEnumOptions(r, edFqn, ed); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func interpretFieldOptions(r *parseResult, fld fldDescriptorish) error {
-	opts := fld.GetFieldOptions()
+func (l *linker) interpretFieldOptions(r *parseResult, fqn string, fld *descriptorpb.FieldDescriptorProto) error {
+	opts := fld.GetOptions()
 	if len(opts.GetUninterpretedOption()) > 0 {
 		uo := opts.UninterpretedOption
-		scope := fmt.Sprintf("field %s", fld.GetFullyQualifiedName())
+		scope := fmt.Sprintf("field %s", fqn)
 
 		// process json_name pseudo-option
 		if index, err := findOption(r, scope, uo, "json_name"); err != nil && !r.lenient {
@@ -805,12 +158,12 @@ func interpretFieldOptions(r *parseResult, fld fldDescriptorish) error {
 					return err
 				}
 			} else {
-				fld.AsFieldDescriptorProto().JsonName = proto.String(string(opt.StringValue))
+				fld.JsonName = proto.String(string(opt.StringValue))
 			}
 		}
 
 		// and process default pseudo-option
-		if index, err := processDefaultOption(r, scope, fld, uo); err != nil && !r.lenient {
+		if index, err := l.processDefaultOption(r, scope, fqn, fld, uo); err != nil && !r.lenient {
 			return err
 		} else if index >= 0 {
 			// attribute source code info
@@ -823,8 +176,8 @@ func interpretFieldOptions(r *parseResult, fld fldDescriptorish) error {
 
 		if len(uo) == 0 {
 			// no real options, only pseudo-options above? clear out options
-			fld.AsFieldDescriptorProto().Options = nil
-		} else if remain, err := interpretOptions(r, fld, opts, uo); err != nil {
+			fld.Options = nil
+		} else if remain, err := l.interpretOptions(r, fqn, fld, opts, uo); err != nil {
 			return err
 		} else {
 			opts.UninterpretedOption = remain
@@ -833,18 +186,17 @@ func interpretFieldOptions(r *parseResult, fld fldDescriptorish) error {
 	return nil
 }
 
-func processDefaultOption(res *parseResult, scope string, fld fldDescriptorish, uos []*dpb.UninterpretedOption) (defaultIndex int, err error) {
+func (l *linker) processDefaultOption(res *parseResult, scope string, fqn string, fld *descriptorpb.FieldDescriptorProto, uos []*descriptorpb.UninterpretedOption) (defaultIndex int, err error) {
 	found, err := findOption(res, scope, uos, "default")
 	if err != nil || found == -1 {
 		return -1, err
 	}
 	opt := uos[found]
 	optNode := res.getOptionNode(opt)
-	fdp := fld.AsFieldDescriptorProto()
-	if fdp.GetLabel() == dpb.FieldDescriptorProto_LABEL_REPEATED {
+	if fld.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
 		return -1, res.errs.handleErrorWithPos(optNode.GetName().Start(), "%s: default value cannot be set because field is repeated", scope)
 	}
-	if fdp.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP || fdp.GetType() == dpb.FieldDescriptorProto_TYPE_MESSAGE {
+	if fld.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP || fld.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
 		return -1, res.errs.handleErrorWithPos(optNode.GetName().Start(), "%s: default value cannot be set because field is a message", scope)
 	}
 	val := optNode.GetValue()
@@ -853,19 +205,29 @@ func processDefaultOption(res *parseResult, scope string, fld fldDescriptorish, 
 	}
 	mc := &messageContext{
 		res:         res,
-		file:        fld.GetFile(),
-		elementName: fld.GetFullyQualifiedName(),
-		elementType: descriptorType(fld.AsProto()),
+		file:        res.fd,
+		elementName: fqn,
+		elementType: descriptorType(fld),
 		option:      opt,
 	}
-	v, err := fieldValue(res, mc, fld, val, true)
-	if err != nil {
-		return -1, res.errs.handleError(err)
+	var v interface{}
+	if fld.GetType() == descriptorpb.FieldDescriptorProto_TYPE_ENUM {
+		ed := l.findEnumType(res.fd, fld.GetTypeName())
+		ev, err := l.enumFieldValue(mc, ed, val)
+		if err != nil {
+			return -1, res.errs.handleError(err)
+		}
+		v = string(ev.Name())
+	} else {
+		v, err = l.scalarFieldValue(mc, fld.GetType(), val)
+		if err != nil {
+			return -1, res.errs.handleError(err)
+		}
 	}
 	if str, ok := v.(string); ok {
-		fld.AsFieldDescriptorProto().DefaultValue = proto.String(str)
+		fld.DefaultValue = proto.String(str)
 	} else if b, ok := v.([]byte); ok {
-		fld.AsFieldDescriptorProto().DefaultValue = proto.String(encodeDefaultBytes(b))
+		fld.DefaultValue = proto.String(encodeDefaultBytes(b))
 	} else {
 		var flt float64
 		var ok bool
@@ -877,16 +239,16 @@ func processDefaultOption(res *parseResult, scope string, fld fldDescriptorish, 
 		}
 		if ok {
 			if math.IsInf(flt, 1) {
-				fld.AsFieldDescriptorProto().DefaultValue = proto.String("inf")
+				fld.DefaultValue = proto.String("inf")
 			} else if ok && math.IsInf(flt, -1) {
-				fld.AsFieldDescriptorProto().DefaultValue = proto.String("-inf")
+				fld.DefaultValue = proto.String("-inf")
 			} else if ok && math.IsNaN(flt) {
-				fld.AsFieldDescriptorProto().DefaultValue = proto.String("nan")
+				fld.DefaultValue = proto.String("nan")
 			} else {
-				fld.AsFieldDescriptorProto().DefaultValue = proto.String(fmt.Sprintf("%v", v))
+				fld.DefaultValue = proto.String(fmt.Sprintf("%v", v))
 			}
 		} else {
-			fld.AsFieldDescriptorProto().DefaultValue = proto.String(fmt.Sprintf("%v", v))
+			fld.DefaultValue = proto.String(fmt.Sprintf("%v", v))
 		}
 	}
 	return found, nil
@@ -898,21 +260,22 @@ func encodeDefaultBytes(b []byte) string {
 	return buf.String()
 }
 
-func interpretEnumOptions(r *parseResult, ed enumDescriptorish) error {
-	opts := ed.GetEnumOptions()
+func (l *linker) interpretEnumOptions(r *parseResult, fqn string, ed *descriptorpb.EnumDescriptorProto) error {
+	opts := ed.GetOptions()
 	if opts != nil {
 		if len(opts.UninterpretedOption) > 0 {
-			if remain, err := interpretOptions(r, ed, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := l.interpretOptions(r, fqn, ed, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
 			}
 		}
 	}
-	for _, evd := range ed.GetValues() {
-		opts := evd.GetEnumValueOptions()
+	for _, evd := range ed.GetValue() {
+		evdFqn := fqn + "." + evd.GetName()
+		opts := evd.GetOptions()
 		if len(opts.GetUninterpretedOption()) > 0 {
-			if remain, err := interpretOptions(r, evd, opts, opts.UninterpretedOption); err != nil {
+			if remain, err := l.interpretOptions(r, evdFqn, evd, opts, opts.UninterpretedOption); err != nil {
 				return err
 			} else {
 				opts.UninterpretedOption = remain
@@ -922,26 +285,33 @@ func interpretEnumOptions(r *parseResult, ed enumDescriptorish) error {
 	return nil
 }
 
-func interpretOptions(res *parseResult, element descriptorish, opts proto.Message, uninterpreted []*dpb.UninterpretedOption) ([]*dpb.UninterpretedOption, error) {
-	optsd, err := desc.LoadMessageDescriptorForMessage(opts)
-	if err != nil {
-		if res.lenient {
-			return uninterpreted, nil
+func (l *linker) interpretOptions(res *parseResult, fqn string, element, opts proto.Message, uninterpreted []*descriptorpb.UninterpretedOption) ([]*descriptorpb.UninterpretedOption, error) {
+	var md protoreflect.MessageDescriptor
+	optsFqn := string(proto.MessageReflect(opts).Descriptor().FullName())
+	// see if the parse included an override copy for these options
+	for _, symbols := range l.descriptorPool {
+		if _, ok := symbols[optsFqn]; ok {
+			// it did! use that descriptor instead
+			md = l.findMessageType(res.fd, optsFqn)
+			if md != nil {
+				break
+			}
 		}
-		return nil, res.errs.handleError(err)
 	}
-	dm := dynamic.NewMessage(optsd)
-	err = dm.ConvertFrom(opts)
-	if err != nil {
-		if res.lenient {
-			return uninterpreted, nil
+	var msg protoreflect.Message
+	if md != nil {
+		dm := dynamicpb.NewMessage(md)
+		if err := cloneInto(dm, proto.MessageV2(opts)); err != nil {
+			node := res.nodes[element]
+			return nil, res.errs.handleError(ErrorWithSourcePos{Pos: node.Start(), Underlying: err})
 		}
-		node := res.nodes[element.AsProto()]
-		return nil, res.errs.handleError(ErrorWithSourcePos{Pos: node.Start(), Underlying: err})
+		msg = dm
+	} else {
+		msg = proto.MessageReflect(proto.Clone(opts))
 	}
 
-	mc := &messageContext{res: res, file: element.GetFile(), elementName: element.GetFullyQualifiedName(), elementType: descriptorType(element.AsProto())}
-	var remain []*dpb.UninterpretedOption
+	mc := &messageContext{res: res, file: res.fd, elementName: fqn, elementType: descriptorType(element)}
+	var remain []*descriptorpb.UninterpretedOption
 	for _, uo := range uninterpreted {
 		node := res.getOptionNode(uo)
 		if !uo.Name[0].GetIsExtension() && uo.Name[0].GetNamePart() == "uninterpreted_option" {
@@ -955,7 +325,7 @@ func interpretOptions(res *parseResult, element descriptorish, opts proto.Messag
 			}
 		}
 		mc.option = uo
-		path, err := interpretField(res, mc, element, dm, uo, 0, nil)
+		path, err := l.interpretField(res, mc, element, msg, uo, 0, nil)
 		if err != nil {
 			if res.lenient {
 				remain = append(remain, uo)
@@ -972,7 +342,7 @@ func interpretOptions(res *parseResult, element descriptorish, opts proto.Messag
 		// If we're lenient, then we don't want to clobber the passed in message
 		// and leave it partially populated. So we convert into a copy first
 		optsClone := proto.Clone(opts)
-		if err := dm.ConvertToDeterministic(optsClone); err != nil {
+		if err := cloneInto(optsClone, msg.Interface()); err != nil {
 			// TODO: do this in a more granular way, so we can convert individual
 			// fields and leave bad ones uninterpreted instead of skipping all of
 			// the work we've done so far.
@@ -986,24 +356,100 @@ func interpretOptions(res *parseResult, element descriptorish, opts proto.Messag
 		return remain, nil
 	}
 
-	if err := dm.ValidateRecursive(); err != nil {
-		node := res.nodes[element.AsProto()]
-		if err := res.errs.handleErrorWithPos(node.Start(), "error in %s options: %v", descriptorType(element.AsProto()), err); err != nil {
+	if err := validateRecursive(msg, ""); err != nil {
+		node := res.nodes[element]
+		if err := res.errs.handleErrorWithPos(node.Start(), "error in %s options: %v", descriptorType(element), err); err != nil {
 			return nil, err
 		}
 	}
 
-	// nw try to convert into the passed in message and fail if not successful
-	if err := dm.ConvertToDeterministic(opts); err != nil {
-		node := res.nodes[element.AsProto()]
+	// now try to convert into the passed in message and fail if not successful
+	if err := cloneInto(opts, msg.Interface()); err != nil {
+		node := res.nodes[element]
 		return nil, res.errs.handleError(ErrorWithSourcePos{Pos: node.Start(), Underlying: err})
 	}
 
 	return nil, nil
 }
 
-func interpretField(res *parseResult, mc *messageContext, element descriptorish, dm *dynamic.Message, opt *dpb.UninterpretedOption, nameIndex int, pathPrefix []int32) (path []int32, err error) {
-	var fld *desc.FieldDescriptor
+func cloneInto(dest proto.Message, src protov2.Message) error {
+	dest.Reset()
+	destV2 := proto.MessageV2(dest)
+	if destV2.ProtoReflect().Descriptor() == src.ProtoReflect().Descriptor() {
+		protov2.Merge(destV2, src)
+		if err := protov2.CheckInitialized(destV2); err != nil {
+			return err
+		}
+		return nil
+	}
+	// different descriptors means we must serialize
+	// and de-serialize in order to merge values
+	data, err := protov2.Marshal(src)
+	if err != nil {
+		return err
+	}
+	return protov2.Unmarshal(data, destV2)
+}
+
+func validateRecursive(msg protoreflect.Message, prefix string) error {
+	flds := msg.Descriptor().Fields()
+	var missingFields []string
+	for i := 0; i < flds.Len(); i++ {
+		fld := flds.Get(i)
+		if fld.Cardinality() == protoreflect.Required && !msg.Has(fld) {
+			missingFields = append(missingFields, fmt.Sprintf("%s%s", prefix, fld.Name()))
+		}
+	}
+	if len(missingFields) > 0 {
+		return fmt.Errorf("some required fields missing: %v", strings.Join(missingFields, ", "))
+	}
+
+	var err error
+	msg.Range(func(fld protoreflect.FieldDescriptor, val protoreflect.Value) bool {
+		if fld.IsMap() {
+			md := fld.MapValue().Message()
+			if md != nil {
+				val.Map().Range(func(k protoreflect.MapKey, v protoreflect.Value) bool {
+					chprefix := fmt.Sprintf("%s%s[%v].", prefix, fieldName(fld), k)
+					err = validateRecursive(v.Message(), chprefix)
+					if err != nil {
+						return false
+					}
+					return true
+				})
+				if err != nil {
+					return false
+				}
+			}
+		} else {
+			md := fld.Message()
+			if md != nil {
+				if fld.IsList() {
+					sl := val.List()
+					for i := 0; i < sl.Len(); i++ {
+						v := sl.Get(i)
+						chprefix := fmt.Sprintf("%s%s[%d].", prefix, fieldName(fld), i)
+						err = validateRecursive(v.Message(), chprefix)
+						if err != nil {
+							return false
+						}
+					}
+				} else {
+					chprefix := fmt.Sprintf("%s%s.", prefix, fieldName(fld))
+					err = validateRecursive(val.Message(), chprefix)
+					if err != nil {
+						return false
+					}
+				}
+			}
+		}
+		return true
+	})
+	return err
+}
+
+func (l *linker) interpretField(res *parseResult, mc *messageContext, element proto.Message, msg protoreflect.Message, opt *descriptorpb.UninterpretedOption, nameIndex int, pathPrefix []int32) (path []int32, err error) {
+	var fld protoreflect.FieldDescriptor
 	nm := opt.GetName()[nameIndex]
 	node := res.getOptionNamePartNode(nm)
 	if nm.GetIsExtension() {
@@ -1011,106 +457,71 @@ func interpretField(res *parseResult, mc *messageContext, element descriptorish,
 		if extName[0] == '.' {
 			extName = extName[1:] /* skip leading dot */
 		}
-		fld = findExtension(element.GetFile(), extName, false, map[fileDescriptorish]struct{}{})
+		fld = l.findExtension(res.fd, extName)
 		if fld == nil {
 			return nil, res.errs.handleErrorWithPos(node.Start(),
 				"%vunrecognized extension %s of %s",
-				mc, extName, dm.GetMessageDescriptor().GetFullyQualifiedName())
+				mc, extName, msg.Descriptor().FullName())
 		}
-		if fld.GetOwner().GetFullyQualifiedName() != dm.GetMessageDescriptor().GetFullyQualifiedName() {
+		if fld.ContainingMessage().FullName() != msg.Descriptor().FullName() {
 			return nil, res.errs.handleErrorWithPos(node.Start(),
 				"%vextension %s should extend %s but instead extends %s",
-				mc, extName, dm.GetMessageDescriptor().GetFullyQualifiedName(), fld.GetOwner().GetFullyQualifiedName())
+				mc, extName, msg.Descriptor().FullName(), fld.ContainingMessage().FullName())
 		}
 	} else {
-		fld = dm.GetMessageDescriptor().FindFieldByName(nm.GetNamePart())
+		fld = msg.Descriptor().Fields().ByName(protoreflect.Name(nm.GetNamePart()))
 		if fld == nil {
 			return nil, res.errs.handleErrorWithPos(node.Start(),
 				"%vfield %s of %s does not exist",
-				mc, nm.GetNamePart(), dm.GetMessageDescriptor().GetFullyQualifiedName())
+				mc, nm.GetNamePart(), msg.Descriptor().FullName())
 		}
 	}
 
-	path = append(pathPrefix, fld.GetNumber())
+	path = append(pathPrefix, int32(fld.Number()))
 
 	if len(opt.GetName()) > nameIndex+1 {
 		nextnm := opt.GetName()[nameIndex+1]
 		nextnode := res.getOptionNamePartNode(nextnm)
-		if fld.GetType() != dpb.FieldDescriptorProto_TYPE_MESSAGE {
+		k := fld.Kind()
+		if k != protoreflect.MessageKind && k != protoreflect.GroupKind {
 			return nil, res.errs.handleErrorWithPos(nextnode.Start(),
 				"%vcannot set field %s because %s is not a message",
 				mc, nextnm.GetNamePart(), nm.GetNamePart())
 		}
-		if fld.IsRepeated() {
+		if fld.Cardinality() == protoreflect.Repeated {
 			return nil, res.errs.handleErrorWithPos(nextnode.Start(),
 				"%vcannot set field %s because %s is repeated (must use an aggregate)",
 				mc, nextnm.GetNamePart(), nm.GetNamePart())
 		}
-		var fdm *dynamic.Message
-		var err error
-		if dm.HasField(fld) {
-			var v interface{}
-			v, err = dm.TryGetField(fld)
-			fdm, _ = v.(*dynamic.Message)
+		var fdm protoreflect.Message
+		if msg.Has(fld) {
+			v := msg.Mutable(fld)
+			fdm = v.Message()
 		} else {
-			fdm = dynamic.NewMessage(fld.GetMessageType())
-			err = dm.TrySetField(fld, fdm)
-		}
-		if err != nil {
-			return nil, res.errs.handleError(ErrorWithSourcePos{Pos: node.Start(), Underlying: err})
+			fdm = dynamicpb.NewMessage(fld.Message())
+			msg.Set(fld, protoreflect.ValueOfMessage(fdm))
 		}
 		// recurse to set next part of name
-		return interpretField(res, mc, element, fdm, opt, nameIndex+1, path)
+		return l.interpretField(res, mc, element, fdm, opt, nameIndex+1, path)
 	}
 
 	optNode := res.getOptionNode(opt)
-	if err := setOptionField(res, mc, dm, fld, node, optNode.GetValue()); err != nil {
+	if err := l.setOptionField(res, mc, msg, fld, node, optNode.GetValue()); err != nil {
 		return nil, res.errs.handleError(err)
 	}
-	if fld.IsRepeated() {
-		path = append(path, int32(dm.FieldLength(fld))-1)
+	if fld.IsMap() {
+		path = append(path, int32(msg.Get(fld).Map().Len())-1)
+	} else if fld.IsList() {
+		path = append(path, int32(msg.Get(fld).List().Len())-1)
 	}
 	return path, nil
 }
 
-func findExtension(fd fileDescriptorish, name string, public bool, checked map[fileDescriptorish]struct{}) *desc.FieldDescriptor {
-	if _, ok := checked[fd]; ok {
-		return nil
-	}
-	checked[fd] = struct{}{}
-	d := fd.FindSymbol(name)
-	if d != nil {
-		if fld, ok := d.(*desc.FieldDescriptor); ok {
-			return fld
-		}
-		return nil
-	}
-
-	// When public = false, we are searching only directly imported symbols. But we
-	// also need to search transitive public imports due to semantics of public imports.
-	if public {
-		for _, dep := range fd.GetPublicDependencies() {
-			d := findExtension(dep, name, true, checked)
-			if d != nil {
-				return d
-			}
-		}
-	} else {
-		for _, dep := range fd.GetDependencies() {
-			d := findExtension(dep, name, true, checked)
-			if d != nil {
-				return d
-			}
-		}
-	}
-	return nil
-}
-
-func setOptionField(res *parseResult, mc *messageContext, dm *dynamic.Message, fld *desc.FieldDescriptor, name ast.Node, val ast.ValueNode) error {
+func (l *linker) setOptionField(res *parseResult, mc *messageContext, msg protoreflect.Message, fld protoreflect.FieldDescriptor, name ast.Node, val ast.ValueNode) error {
 	v := val.Value()
 	if sl, ok := v.([]ast.ValueNode); ok {
 		// handle slices a little differently than the others
-		if !fld.IsRepeated() {
+		if fld.Cardinality() != protoreflect.Repeated {
 			return errorWithPos(val.Start(), "%vvalue is an array but field is not repeated", mc)
 		}
 		origPath := mc.optAggPath
@@ -1119,35 +530,50 @@ func setOptionField(res *parseResult, mc *messageContext, dm *dynamic.Message, f
 		}()
 		for index, item := range sl {
 			mc.optAggPath = fmt.Sprintf("%s[%d]", origPath, index)
-			if v, err := fieldValue(res, mc, richFldDescriptorish{FieldDescriptor: fld}, item, false); err != nil {
+			value, err := l.fieldValue(res, mc, fld, item)
+			if err != nil {
 				return err
-			} else if err = dm.TryAddRepeatedField(fld, v); err != nil {
-				return errorWithPos(val.Start(), "%verror setting value: %s", mc, err)
+			}
+			if fld.IsMap() {
+				entry := value.Message()
+				key := entry.Get(fld.MapKey()).MapKey()
+				val := entry.Get(fld.MapValue())
+				if dm, ok := val.Interface().(*dynamicpb.Message); ok && (dm == nil || !dm.IsValid()) {
+					val = protoreflect.ValueOfMessage(dynamicpb.NewMessage(fld.MapValue().Message()))
+				}
+				msg.Mutable(fld).Map().Set(key, val)
+			} else {
+				msg.Mutable(fld).List().Append(value)
 			}
 		}
 		return nil
 	}
 
-	v, err := fieldValue(res, mc, richFldDescriptorish{FieldDescriptor: fld}, val, false)
+	value, err := l.fieldValue(res, mc, fld, val)
 	if err != nil {
 		return err
 	}
-	if fld.IsRepeated() {
-		err = dm.TryAddRepeatedField(fld, v)
+	if fld.IsMap() {
+		entry := value.Message()
+		key := entry.Get(fld.MapKey()).MapKey()
+		val := entry.Get(fld.MapValue())
+		if dm, ok := val.Interface().(*dynamicpb.Message); ok && (dm == nil || !dm.IsValid()) {
+			val = protoreflect.ValueOfMessage(dynamicpb.NewMessage(fld.MapValue().Message()))
+		}
+		msg.Mutable(fld).Map().Set(key, val)
+	} else if fld.IsList() {
+		msg.Mutable(fld).List().Append(value)
 	} else {
-		if dm.HasField(fld) {
+		if msg.Has(fld) {
 			return errorWithPos(name.Start(), "%vnon-repeated option field %s already set", mc, fieldName(fld))
 		}
-		err = dm.TrySetField(fld, v)
-	}
-	if err != nil {
-		return errorWithPos(val.Start(), "%verror setting value: %s", mc, err)
+		msg.Set(fld, value)
 	}
 
 	return nil
 }
 
-func findOption(res *parseResult, scope string, opts []*dpb.UninterpretedOption, name string) (int, error) {
+func findOption(res *parseResult, scope string, opts []*descriptorpb.UninterpretedOption, name string) (int, error) {
 	found := -1
 	for i, opt := range opts {
 		if len(opt.Name) != 1 {
@@ -1165,10 +591,10 @@ func findOption(res *parseResult, scope string, opts []*dpb.UninterpretedOption,
 	return found, nil
 }
 
-func removeOption(uo []*dpb.UninterpretedOption, indexToRemove int) []*dpb.UninterpretedOption {
+func removeOption(uo []*descriptorpb.UninterpretedOption, indexToRemove int) []*descriptorpb.UninterpretedOption {
 	if indexToRemove == 0 {
 		return uo[1:]
-	} else if int(indexToRemove) == len(uo)-1 {
+	} else if indexToRemove == len(uo)-1 {
 		return uo[:len(uo)-1]
 	} else {
 		return append(uo[:indexToRemove], uo[indexToRemove+1:]...)
@@ -1177,10 +603,10 @@ func removeOption(uo []*dpb.UninterpretedOption, indexToRemove int) []*dpb.Unint
 
 type messageContext struct {
 	res         *parseResult
-	file        fileDescriptorish
+	file        *descriptorpb.FileDescriptorProto
 	elementType string
 	elementName string
-	option      *dpb.UninterpretedOption
+	option      *descriptorpb.UninterpretedOption
 	optAggPath  string
 }
 
@@ -1205,7 +631,7 @@ func (c *messageContext) String() string {
 	return ctx.String()
 }
 
-func writeOptionName(buf *bytes.Buffer, parts []*dpb.UninterpretedOption_NamePart) {
+func writeOptionName(buf *bytes.Buffer, parts []*descriptorpb.UninterpretedOption_NamePart) {
 	first := true
 	for _, p := range parts {
 		if first {
@@ -1228,11 +654,11 @@ func writeOptionName(buf *bytes.Buffer, parts []*dpb.UninterpretedOption_NamePar
 	}
 }
 
-func fieldName(fld *desc.FieldDescriptor) string {
+func fieldName(fld protoreflect.FieldDescriptor) string {
 	if fld.IsExtension() {
-		return fld.GetFullyQualifiedName()
+		return fmt.Sprintf("(%s)", fld.FullName())
 	} else {
-		return fld.GetName()
+		return string(fld.Name())
 	}
 }
 
@@ -1262,27 +688,21 @@ func valueKind(val interface{}) string {
 	}
 }
 
-func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val ast.ValueNode, enumAsString bool) (interface{}, error) {
-	v := val.Value()
-	t := fld.AsFieldDescriptorProto().GetType()
-	switch t {
-	case dpb.FieldDescriptorProto_TYPE_ENUM:
-		if id, ok := v.(ast.Identifier); ok {
-			ev := fld.GetEnumType().FindValueByName(string(id))
-			if ev == nil {
-				return nil, errorWithPos(val.Start(), "%venum %s has no value named %s", mc, fld.GetEnumType().GetFullyQualifiedName(), id)
-			}
-			if enumAsString {
-				return ev.GetName(), nil
-			} else {
-				return ev.GetNumber(), nil
-			}
+func (l *linker) fieldValue(res *parseResult, mc *messageContext, fld protoreflect.FieldDescriptor, val ast.ValueNode) (protoreflect.Value, error) {
+	k := fld.Kind()
+	switch k {
+	case protoreflect.EnumKind:
+		evd, err := l.enumFieldValue(mc, fld.Enum(), val)
+		if err != nil {
+			return protoreflect.Value{}, err
 		}
-		return nil, errorWithPos(val.Start(), "%vexpecting enum, got %s", mc, valueKind(v))
-	case dpb.FieldDescriptorProto_TYPE_MESSAGE, dpb.FieldDescriptorProto_TYPE_GROUP:
+		return protoreflect.ValueOfEnum(evd.Number()), nil
+
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		v := val.Value()
 		if aggs, ok := v.([]*ast.MessageFieldNode); ok {
-			fmd := fld.GetMessageType()
-			fdm := dynamic.NewMessage(fmd)
+			fmd := fld.Message()
+			fdm := dynamicpb.NewMessage(fmd)
 			origPath := mc.optAggPath
 			defer func() {
 				mc.optAggPath = origPath
@@ -1293,46 +713,71 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 				} else {
 					mc.optAggPath = origPath + "." + a.Name.Value()
 				}
-				var ffld *desc.FieldDescriptor
+				var ffld protoreflect.FieldDescriptor
 				if a.Name.IsExtension() {
 					n := string(a.Name.Name.AsIdentifier())
-					ffld = findExtension(mc.file, n, false, map[fileDescriptorish]struct{}{})
+					ffld = l.findExtension(res.fd, n)
 					if ffld == nil {
 						// may need to qualify with package name
 						pkg := mc.file.GetPackage()
 						if pkg != "" {
-							ffld = findExtension(mc.file, pkg+"."+n, false, map[fileDescriptorish]struct{}{})
+							ffld = l.findExtension(res.fd, pkg+"."+n)
 						}
 					}
 				} else {
-					ffld = fmd.FindFieldByName(a.Name.Value())
+					ffld = fmd.Fields().ByName(protoreflect.Name(a.Name.Value()))
 				}
 				if ffld == nil {
-					return nil, errorWithPos(val.Start(), "%vfield %s not found", mc, string(a.Name.Name.AsIdentifier()))
+					return protoreflect.Value{}, errorWithPos(val.Start(), "%vfield %s not found", mc, string(a.Name.Name.AsIdentifier()))
 				}
-				if err := setOptionField(res, mc, fdm, ffld, a.Name, a.Val); err != nil {
-					return nil, err
+				if err := l.setOptionField(res, mc, fdm, ffld, a.Name, a.Val); err != nil {
+					return protoreflect.Value{}, err
 				}
 			}
-			return fdm, nil
+			return protoreflect.ValueOfMessage(fdm), nil
 		}
-		return nil, errorWithPos(val.Start(), "%vexpecting message, got %s", mc, valueKind(v))
-	case dpb.FieldDescriptorProto_TYPE_BOOL:
+		return protoreflect.Value{}, errorWithPos(val.Start(), "%vexpecting message, got %s", mc, valueKind(v))
+
+	default:
+		v, err := l.scalarFieldValue(mc, descriptorpb.FieldDescriptorProto_Type(k), val)
+		if err != nil {
+			return protoreflect.Value{}, err
+		}
+		return protoreflect.ValueOf(v), nil
+	}
+}
+
+func (l *linker) enumFieldValue(mc *messageContext, ed protoreflect.EnumDescriptor, val ast.ValueNode) (protoreflect.EnumValueDescriptor, error) {
+	v := val.Value()
+	if id, ok := v.(ast.Identifier); ok {
+		ev := ed.Values().ByName(protoreflect.Name(id))
+		if ev == nil {
+			return nil, errorWithPos(val.Start(), "%venum %s has no value named %s", mc, ed.FullName(), id)
+		}
+		return ev, nil
+	}
+	return nil, errorWithPos(val.Start(), "%vexpecting enum, got %s", mc, valueKind(v))
+}
+
+func (l *linker) scalarFieldValue(mc *messageContext, fldType descriptorpb.FieldDescriptorProto_Type, val ast.ValueNode) (interface{}, error) {
+	v := val.Value()
+	switch fldType {
+	case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
 		if b, ok := v.(bool); ok {
 			return b, nil
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting bool, got %s", mc, valueKind(v))
-	case dpb.FieldDescriptorProto_TYPE_BYTES:
+	case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
 		if str, ok := v.(string); ok {
 			return []byte(str), nil
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting bytes, got %s", mc, valueKind(v))
-	case dpb.FieldDescriptorProto_TYPE_STRING:
+	case descriptorpb.FieldDescriptorProto_TYPE_STRING:
 		if str, ok := v.(string); ok {
 			return str, nil
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting string, got %s", mc, valueKind(v))
-	case dpb.FieldDescriptorProto_TYPE_INT32, dpb.FieldDescriptorProto_TYPE_SINT32, dpb.FieldDescriptorProto_TYPE_SFIXED32:
+	case descriptorpb.FieldDescriptorProto_TYPE_INT32, descriptorpb.FieldDescriptorProto_TYPE_SINT32, descriptorpb.FieldDescriptorProto_TYPE_SFIXED32:
 		if i, ok := v.(int64); ok {
 			if i > math.MaxInt32 || i < math.MinInt32 {
 				return nil, errorWithPos(val.Start(), "%vvalue %d is out of range for int32", mc, i)
@@ -1346,7 +791,7 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 			return int32(ui), nil
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting int32, got %s", mc, valueKind(v))
-	case dpb.FieldDescriptorProto_TYPE_UINT32, dpb.FieldDescriptorProto_TYPE_FIXED32:
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_FIXED32:
 		if i, ok := v.(int64); ok {
 			if i > math.MaxUint32 || i < 0 {
 				return nil, errorWithPos(val.Start(), "%vvalue %d is out of range for uint32", mc, i)
@@ -1360,7 +805,7 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 			return uint32(ui), nil
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting uint32, got %s", mc, valueKind(v))
-	case dpb.FieldDescriptorProto_TYPE_INT64, dpb.FieldDescriptorProto_TYPE_SINT64, dpb.FieldDescriptorProto_TYPE_SFIXED64:
+	case descriptorpb.FieldDescriptorProto_TYPE_INT64, descriptorpb.FieldDescriptorProto_TYPE_SINT64, descriptorpb.FieldDescriptorProto_TYPE_SFIXED64:
 		if i, ok := v.(int64); ok {
 			return i, nil
 		}
@@ -1371,7 +816,7 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 			return int64(ui), nil
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting int64, got %s", mc, valueKind(v))
-	case dpb.FieldDescriptorProto_TYPE_UINT64, dpb.FieldDescriptorProto_TYPE_FIXED64:
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT64, descriptorpb.FieldDescriptorProto_TYPE_FIXED64:
 		if i, ok := v.(int64); ok {
 			if i < 0 {
 				return nil, errorWithPos(val.Start(), "%vvalue %d is out of range for uint64", mc, i)
@@ -1382,7 +827,7 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 			return ui, nil
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting uint64, got %s", mc, valueKind(v))
-	case dpb.FieldDescriptorProto_TYPE_DOUBLE:
+	case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
 		if d, ok := v.(float64); ok {
 			return d, nil
 		}
@@ -1393,7 +838,7 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 			return float64(u), nil
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting double, got %s", mc, valueKind(v))
-	case dpb.FieldDescriptorProto_TYPE_FLOAT:
+	case descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
 		if d, ok := v.(float64); ok {
 			if (d > math.MaxFloat32 || d < -math.MaxFloat32) && !math.IsInf(d, 1) && !math.IsInf(d, -1) && !math.IsNaN(d) {
 				return nil, errorWithPos(val.Start(), "%vvalue %f is out of range for float", mc, d)
@@ -1408,6 +853,6 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting float, got %s", mc, valueKind(v))
 	default:
-		return nil, errorWithPos(val.Start(), "%vunrecognized field type: %s", mc, t)
+		return nil, errorWithPos(val.Start(), "%vunrecognized field type: %s", mc, fldType)
 	}
 }

@@ -27,11 +27,11 @@ func TestBasicValidation(t *testing.T) {
 			succeeds: true,
 		},
 		{
-			contents: `message Foo { optional double bar = 536870912; option message_set_wire_format = true; }`,
+			contents: `message Foo { extensions 100 to max; option message_set_wire_format = true; } message Bar { } extend Foo { optional Bar bar = 536870912; }`,
 			succeeds: true,
 		},
 		{
-			contents: `message Foo { oneof bar { group Baz = 1 [deprecated=true] { optional int abc = 1; } } }`,
+			contents: `message Foo { oneof bar { group Baz = 1 [deprecated=true] { optional int32 abc = 1; } } }`,
 			succeeds: true,
 		},
 		{
