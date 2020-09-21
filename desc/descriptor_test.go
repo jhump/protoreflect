@@ -10,13 +10,13 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
-	_ "github.com/golang/protobuf/protoc-gen-go/plugin"
-	_ "github.com/golang/protobuf/ptypes/empty"
-	_ "google.golang.org/genproto/protobuf/api"
-	_ "google.golang.org/genproto/protobuf/field_mask"
-	_ "google.golang.org/genproto/protobuf/ptype"
-	_ "google.golang.org/genproto/protobuf/source_context"
+	"google.golang.org/protobuf/types/descriptorpb"
+	_ "google.golang.org/protobuf/types/known/apipb"
+	_ "google.golang.org/protobuf/types/known/emptypb"
+	_ "google.golang.org/protobuf/types/known/fieldmaskpb"
+	_ "google.golang.org/protobuf/types/known/sourcecontextpb"
+	_ "google.golang.org/protobuf/types/known/typepb"
+	_ "google.golang.org/protobuf/types/pluginpb"
 
 	"github.com/jhump/protoreflect/internal"
 	"github.com/jhump/protoreflect/internal/testprotos"
@@ -812,7 +812,7 @@ func checkDescriptor(t *testing.T, caseName string, num int32, d Descriptor, par
 			// There are no comments on synthetic map-entry messages.
 			expectedComment = ""
 		} else if field, ok := d.(*FieldDescriptor); ok {
-			if field.GetOwner().IsMapEntry() || field.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP {
+			if field.GetOwner().IsMapEntry() || field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 				// There are no comments for fields of synthetic map-entry messages either.
 				// And comments for group fields end up on the synthetic message, not the field.
 				expectedComment = ""
@@ -851,12 +851,12 @@ func runQuery(d Descriptor, query interface{}) []Descriptor {
 
 func TestFileDescriptorDeps(t *testing.T) {
 	// tests accessors for public and weak dependencies
-	fd1 := createDesc(t, &dpb.FileDescriptorProto{Name: proto.String("a")})
-	fd2 := createDesc(t, &dpb.FileDescriptorProto{Name: proto.String("b")})
-	fd3 := createDesc(t, &dpb.FileDescriptorProto{Name: proto.String("c")})
-	fd4 := createDesc(t, &dpb.FileDescriptorProto{Name: proto.String("d")})
-	fd5 := createDesc(t, &dpb.FileDescriptorProto{Name: proto.String("e")})
-	fd := createDesc(t, &dpb.FileDescriptorProto{
+	fd1 := createDesc(t, &descriptorpb.FileDescriptorProto{Name: proto.String("a")})
+	fd2 := createDesc(t, &descriptorpb.FileDescriptorProto{Name: proto.String("b")})
+	fd3 := createDesc(t, &descriptorpb.FileDescriptorProto{Name: proto.String("c")})
+	fd4 := createDesc(t, &descriptorpb.FileDescriptorProto{Name: proto.String("d")})
+	fd5 := createDesc(t, &descriptorpb.FileDescriptorProto{Name: proto.String("e")})
+	fd := createDesc(t, &descriptorpb.FileDescriptorProto{
 		Name:             proto.String("f"),
 		Dependency:       []string{"a", "b", "c", "d", "e"},
 		PublicDependency: []int32{1, 3},
@@ -891,7 +891,7 @@ func TestFileDescriptorDeps(t *testing.T) {
 	testutil.Eq(t, fd7, deps[0])
 }
 
-func createDesc(t *testing.T, fd *dpb.FileDescriptorProto, deps ...*FileDescriptor) *FileDescriptor {
+func createDesc(t *testing.T, fd *descriptorpb.FileDescriptorProto, deps ...*FileDescriptor) *FileDescriptor {
 	desc, err := CreateFileDescriptor(fd, deps...)
 	testutil.Ok(t, err)
 	return desc
@@ -1018,8 +1018,7 @@ func TestLoadFileDescriptorForWellKnownProtos(t *testing.T) {
 			continue
 		}
 		fd, err = LoadFileDescriptor(file)
-		testutil.Ok(t, err)
-		testutil.Eq(t, file, fd.GetName())
+		testutil.Ok(t, err, "failed to load %q", file)
 		for _, typ := range types {
 			d := fd.FindSymbol(typ)
 			testutil.Require(t, d != nil, "file %q does not have type %s", file, typ)
@@ -1166,7 +1165,7 @@ func TestUnescape(t *testing.T) {
 }
 
 func loadProtoset(path string) (*FileDescriptor, error) {
-	var fds dpb.FileDescriptorSet
+	var fds descriptorpb.FileDescriptorSet
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err

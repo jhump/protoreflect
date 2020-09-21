@@ -43,19 +43,43 @@ import (
 
 var (
 	// GlobalFiles is a registry of descriptors that include source code info, if the
-	// file they belong to were processed with protoc-gen-gosrcinfo.
+	// files they belong to were processed with protoc-gen-gosrcinfo.
 	//
 	// If is mean to serve as a drop-in alternative to protoregistry.GlobalFiles that
 	// can include source code info in the returned descriptors.
 	GlobalFiles Resolver = registry{}
+
+	// GlobalTypes is a registry of descriptors that include source code info, if the
+	// files they belong to were processed with protoc-gen-gosrcinfo.
+	//
+	// If is mean to serve as a drop-in alternative to protoregistry.GlobalTypes that
+	// can include source code info in the returned descriptors.
+	GlobalTypes TypeResolver = registry{}
 
 	mu               sync.RWMutex
 	sourceInfoByFile = map[string]*descriptorpb.SourceCodeInfo{}
 	fileDescriptors  = map[protoreflect.FileDescriptor]protoreflect.FileDescriptor{}
 )
 
+// Resolver can resolve file names into file descriptors and also provides methods for
+// resolving extensions.
 type Resolver interface {
 	protodesc.Resolver
+	protoregistry.ExtensionTypeResolver
+	RangeExtensionsByMessage(message protoreflect.FullName, f func(protoreflect.ExtensionType) bool)
+}
+
+// NB: These interfaces are far from ideal. Ideally, Resolver would have
+//    * EITHER been named FileResolver and not included the extension methods.
+//    * OR also included message methods (i.e. embed protoregistry.MessageTypeResolver).
+//   Now (since it's been released) we can't add the message methods to the interface as
+//   that's not a backwards-compatible change. So we have to introduce the new interface
+//   below, which is now a little confusing since it has some overlap with Resolver.
+
+// TypeResolver can resolve message names and URLs into message descriptors and also
+// provides methods for resolving extensions.
+type TypeResolver interface {
+	protoregistry.MessageTypeResolver
 	protoregistry.ExtensionTypeResolver
 	RangeExtensionsByMessage(message protoreflect.FullName, f func(protoreflect.ExtensionType) bool)
 }
@@ -181,6 +205,22 @@ func (r registry) FindDescriptorByName(name protoreflect.FullName) (protoreflect
 	default:
 		return nil, fmt.Errorf("unrecognized descriptor type: %T", d)
 	}
+}
+
+func (r registry) FindMessageByName(message protoreflect.FullName) (protoreflect.MessageType, error) {
+	mt, err := protoregistry.GlobalTypes.FindMessageByName(message)
+	if err != nil {
+		return nil, err
+	}
+	return messageType{mt}, nil
+}
+
+func (r registry) FindMessageByURL(url string) (protoreflect.MessageType, error) {
+	mt, err := protoregistry.GlobalTypes.FindMessageByURL(url)
+	if err != nil {
+		return nil, err
+	}
+	return messageType{mt}, nil
 }
 
 func (r registry) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
