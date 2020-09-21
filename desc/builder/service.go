@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
@@ -16,7 +16,7 @@ import (
 type ServiceBuilder struct {
 	baseBuilder
 
-	Options *dpb.ServiceOptions
+	Options *descriptorpb.ServiceOptions
 
 	methods []*MethodBuilder
 	symbols map[string]*MethodBuilder
@@ -183,15 +183,15 @@ func (sb *ServiceBuilder) TryAddMethod(mtb *MethodBuilder) error {
 
 // SetOptions sets the service options for this service and returns the service,
 // for method chaining.
-func (sb *ServiceBuilder) SetOptions(options *dpb.ServiceOptions) *ServiceBuilder {
+func (sb *ServiceBuilder) SetOptions(options *descriptorpb.ServiceOptions) *ServiceBuilder {
 	sb.Options = options
 	return sb
 }
 
-func (sb *ServiceBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.ServiceDescriptorProto, error) {
+func (sb *ServiceBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceCodeInfo) (*descriptorpb.ServiceDescriptorProto, error) {
 	addCommentsTo(sourceInfo, path, &sb.comments)
 
-	methods := make([]*dpb.MethodDescriptorProto, 0, len(sb.methods))
+	methods := make([]*descriptorpb.MethodDescriptorProto, 0, len(sb.methods))
 	for _, mtb := range sb.methods {
 		path := append(path, internal.Service_methodsTag, int32(len(methods)))
 		if mtd, err := mtb.buildProto(path, sourceInfo); err != nil {
@@ -201,7 +201,7 @@ func (sb *ServiceBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 		}
 	}
 
-	return &dpb.ServiceDescriptorProto{
+	return &descriptorpb.ServiceDescriptorProto{
 		Name:    proto.String(sb.name),
 		Options: sb.Options,
 		Method:  methods,
@@ -236,7 +236,7 @@ func (sb *ServiceBuilder) BuildDescriptor() (desc.Descriptor, error) {
 type MethodBuilder struct {
 	baseBuilder
 
-	Options  *dpb.MethodOptions
+	Options  *descriptorpb.MethodOptions
 	ReqType  *RpcType
 	RespType *RpcType
 }
@@ -329,7 +329,7 @@ func (mtb *MethodBuilder) renamedChild(b Builder, oldName string) error {
 
 // SetOptions sets the method options for this method and returns the method,
 // for method chaining.
-func (mtb *MethodBuilder) SetOptions(options *dpb.MethodOptions) *MethodBuilder {
+func (mtb *MethodBuilder) SetOptions(options *descriptorpb.MethodOptions) *MethodBuilder {
 	mtb.Options = options
 	return mtb
 }
@@ -348,10 +348,10 @@ func (mtb *MethodBuilder) SetResponseType(t *RpcType) *MethodBuilder {
 	return mtb
 }
 
-func (mtb *MethodBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.MethodDescriptorProto, error) {
+func (mtb *MethodBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceCodeInfo) (*descriptorpb.MethodDescriptorProto, error) {
 	addCommentsTo(sourceInfo, path, &mtb.comments)
 
-	mtd := &dpb.MethodDescriptorProto{
+	mtd := &descriptorpb.MethodDescriptorProto{
 		Name:       proto.String(mtb.name),
 		Options:    mtb.Options,
 		InputType:  proto.String("." + mtb.ReqType.GetTypeName()),

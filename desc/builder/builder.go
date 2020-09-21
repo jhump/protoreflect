@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -125,13 +125,13 @@ type Comments struct {
 	TrailingComment         string
 }
 
-func setComments(c *Comments, loc *dpb.SourceCodeInfo_Location) {
+func setComments(c *Comments, loc *descriptorpb.SourceCodeInfo_Location) {
 	c.LeadingDetachedComments = loc.GetLeadingDetachedComments()
 	c.LeadingComment = loc.GetLeadingComments()
 	c.TrailingComment = loc.GetTrailingComments()
 }
 
-func addCommentsTo(sourceInfo *dpb.SourceCodeInfo, path []int32, c *Comments) {
+func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Comments) {
 	var lead, trail *string
 	if c.LeadingComment != "" {
 		lead = proto.String(c.LeadingComment)
@@ -150,7 +150,7 @@ func addCommentsTo(sourceInfo *dpb.SourceCodeInfo, path []int32, c *Comments) {
 		copy(detached, c.LeadingDetachedComments)
 	}
 
-	sourceInfo.Location = append(sourceInfo.Location, &dpb.SourceCodeInfo_Location{
+	sourceInfo.Location = append(sourceInfo.Location, &descriptorpb.SourceCodeInfo_Location{
 		LeadingDetachedComments: detached,
 		LeadingComments:         lead,
 		TrailingComments:        trail,

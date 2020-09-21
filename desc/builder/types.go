@@ -3,7 +3,7 @@ package builder
 import (
 	"fmt"
 
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 )
@@ -16,7 +16,7 @@ import (
 //
 // There are numerous factory methods for creating FieldType instances.
 type FieldType struct {
-	fieldType       dpb.FieldDescriptorProto_Type
+	fieldType       descriptorpb.FieldDescriptorProto_Type
 	foreignMsgType  *desc.MessageDescriptor
 	localMsgType    *MessageBuilder
 	foreignEnumType *desc.EnumDescriptor
@@ -26,7 +26,7 @@ type FieldType struct {
 // GetType returns the enum value indicating the type of the field. If the type
 // is a message (or group) or enum type, GetTypeName provides the name of the
 // referenced type.
-func (ft *FieldType) GetType() dpb.FieldDescriptorProto_Type {
+func (ft *FieldType) GetType() descriptorpb.FieldDescriptorProto_Type {
 	return ft.fieldType
 }
 
@@ -47,28 +47,28 @@ func (ft *FieldType) GetTypeName() string {
 	}
 }
 
-var scalarTypes = map[dpb.FieldDescriptorProto_Type]*FieldType{
-	dpb.FieldDescriptorProto_TYPE_BOOL:     {fieldType: dpb.FieldDescriptorProto_TYPE_BOOL},
-	dpb.FieldDescriptorProto_TYPE_INT32:    {fieldType: dpb.FieldDescriptorProto_TYPE_INT32},
-	dpb.FieldDescriptorProto_TYPE_INT64:    {fieldType: dpb.FieldDescriptorProto_TYPE_INT64},
-	dpb.FieldDescriptorProto_TYPE_SINT32:   {fieldType: dpb.FieldDescriptorProto_TYPE_SINT32},
-	dpb.FieldDescriptorProto_TYPE_SINT64:   {fieldType: dpb.FieldDescriptorProto_TYPE_SINT64},
-	dpb.FieldDescriptorProto_TYPE_UINT32:   {fieldType: dpb.FieldDescriptorProto_TYPE_UINT32},
-	dpb.FieldDescriptorProto_TYPE_UINT64:   {fieldType: dpb.FieldDescriptorProto_TYPE_UINT64},
-	dpb.FieldDescriptorProto_TYPE_FIXED32:  {fieldType: dpb.FieldDescriptorProto_TYPE_FIXED32},
-	dpb.FieldDescriptorProto_TYPE_FIXED64:  {fieldType: dpb.FieldDescriptorProto_TYPE_FIXED64},
-	dpb.FieldDescriptorProto_TYPE_SFIXED32: {fieldType: dpb.FieldDescriptorProto_TYPE_SFIXED32},
-	dpb.FieldDescriptorProto_TYPE_SFIXED64: {fieldType: dpb.FieldDescriptorProto_TYPE_SFIXED64},
-	dpb.FieldDescriptorProto_TYPE_FLOAT:    {fieldType: dpb.FieldDescriptorProto_TYPE_FLOAT},
-	dpb.FieldDescriptorProto_TYPE_DOUBLE:   {fieldType: dpb.FieldDescriptorProto_TYPE_DOUBLE},
-	dpb.FieldDescriptorProto_TYPE_STRING:   {fieldType: dpb.FieldDescriptorProto_TYPE_STRING},
-	dpb.FieldDescriptorProto_TYPE_BYTES:    {fieldType: dpb.FieldDescriptorProto_TYPE_BYTES},
+var scalarTypes = map[descriptorpb.FieldDescriptorProto_Type]*FieldType{
+	descriptorpb.FieldDescriptorProto_TYPE_BOOL:     {fieldType: descriptorpb.FieldDescriptorProto_TYPE_BOOL},
+	descriptorpb.FieldDescriptorProto_TYPE_INT32:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_INT32},
+	descriptorpb.FieldDescriptorProto_TYPE_INT64:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_INT64},
+	descriptorpb.FieldDescriptorProto_TYPE_SINT32:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SINT32},
+	descriptorpb.FieldDescriptorProto_TYPE_SINT64:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SINT64},
+	descriptorpb.FieldDescriptorProto_TYPE_UINT32:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_UINT32},
+	descriptorpb.FieldDescriptorProto_TYPE_UINT64:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_UINT64},
+	descriptorpb.FieldDescriptorProto_TYPE_FIXED32:  {fieldType: descriptorpb.FieldDescriptorProto_TYPE_FIXED32},
+	descriptorpb.FieldDescriptorProto_TYPE_FIXED64:  {fieldType: descriptorpb.FieldDescriptorProto_TYPE_FIXED64},
+	descriptorpb.FieldDescriptorProto_TYPE_SFIXED32: {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SFIXED32},
+	descriptorpb.FieldDescriptorProto_TYPE_SFIXED64: {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SFIXED64},
+	descriptorpb.FieldDescriptorProto_TYPE_FLOAT:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_FLOAT},
+	descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_DOUBLE},
+	descriptorpb.FieldDescriptorProto_TYPE_STRING:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_STRING},
+	descriptorpb.FieldDescriptorProto_TYPE_BYTES:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_BYTES},
 }
 
 // FieldTypeScalar returns a FieldType for the given scalar type. If the given
 // type is not scalar (e.g. it is a message, group, or enum) than this function
 // will panic.
-func FieldTypeScalar(t dpb.FieldDescriptorProto_Type) *FieldType {
+func FieldTypeScalar(t descriptorpb.FieldDescriptorProto_Type) *FieldType {
 	if ft, ok := scalarTypes[t]; ok {
 		return ft
 	}
@@ -77,83 +77,83 @@ func FieldTypeScalar(t dpb.FieldDescriptorProto_Type) *FieldType {
 
 // FieldTypeInt32 returns a FieldType for the int32 scalar type.
 func FieldTypeInt32() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_INT32)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_INT32)
 }
 
 // FieldTypeUInt32 returns a FieldType for the uint32 scalar type.
 func FieldTypeUInt32() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_UINT32)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_UINT32)
 }
 
 // FieldTypeSInt32 returns a FieldType for the sint32 scalar type.
 func FieldTypeSInt32() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_SINT32)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_SINT32)
 }
 
 // FieldTypeFixed32 returns a FieldType for the fixed32 scalar type.
 func FieldTypeFixed32() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_FIXED32)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_FIXED32)
 }
 
 // FieldTypeSFixed32 returns a FieldType for the sfixed32 scalar type.
 func FieldTypeSFixed32() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_SFIXED32)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_SFIXED32)
 }
 
 // FieldTypeInt64 returns a FieldType for the int64 scalar type.
 func FieldTypeInt64() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_INT64)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_INT64)
 }
 
 // FieldTypeUInt64 returns a FieldType for the uint64 scalar type.
 func FieldTypeUInt64() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_UINT64)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_UINT64)
 }
 
 // FieldTypeSInt64 returns a FieldType for the sint64 scalar type.
 func FieldTypeSInt64() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_SINT64)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_SINT64)
 }
 
 // FieldTypeFixed64 returns a FieldType for the fixed64 scalar type.
 func FieldTypeFixed64() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_FIXED64)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_FIXED64)
 }
 
 // FieldTypeSFixed64 returns a FieldType for the sfixed64 scalar type.
 func FieldTypeSFixed64() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_SFIXED64)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_SFIXED64)
 }
 
 // FieldTypeFloat returns a FieldType for the float scalar type.
 func FieldTypeFloat() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_FLOAT)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_FLOAT)
 }
 
 // FieldTypeDouble returns a FieldType for the double scalar type.
 func FieldTypeDouble() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_DOUBLE)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_DOUBLE)
 }
 
 // FieldTypeBool returns a FieldType for the bool scalar type.
 func FieldTypeBool() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_BOOL)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_BOOL)
 }
 
 // FieldTypeString returns a FieldType for the string scalar type.
 func FieldTypeString() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_STRING)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_STRING)
 }
 
 // FieldTypeBytes returns a FieldType for the bytes scalar type.
 func FieldTypeBytes() *FieldType {
-	return FieldTypeScalar(dpb.FieldDescriptorProto_TYPE_BYTES)
+	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_BYTES)
 }
 
 // FieldTypeMessage returns a FieldType for the given message type.
 func FieldTypeMessage(mb *MessageBuilder) *FieldType {
 	return &FieldType{
-		fieldType:    dpb.FieldDescriptorProto_TYPE_MESSAGE,
+		fieldType:    descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
 		localMsgType: mb,
 	}
 }
@@ -162,7 +162,7 @@ func FieldTypeMessage(mb *MessageBuilder) *FieldType {
 // message descriptor.
 func FieldTypeImportedMessage(md *desc.MessageDescriptor) *FieldType {
 	return &FieldType{
-		fieldType:      dpb.FieldDescriptorProto_TYPE_MESSAGE,
+		fieldType:      descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
 		foreignMsgType: md,
 	}
 }
@@ -170,7 +170,7 @@ func FieldTypeImportedMessage(md *desc.MessageDescriptor) *FieldType {
 // FieldTypeEnum returns a FieldType for the given enum type.
 func FieldTypeEnum(eb *EnumBuilder) *FieldType {
 	return &FieldType{
-		fieldType:     dpb.FieldDescriptorProto_TYPE_ENUM,
+		fieldType:     descriptorpb.FieldDescriptorProto_TYPE_ENUM,
 		localEnumType: eb,
 	}
 }
@@ -179,18 +179,18 @@ func FieldTypeEnum(eb *EnumBuilder) *FieldType {
 // descriptor.
 func FieldTypeImportedEnum(ed *desc.EnumDescriptor) *FieldType {
 	return &FieldType{
-		fieldType:       dpb.FieldDescriptorProto_TYPE_ENUM,
+		fieldType:       descriptorpb.FieldDescriptorProto_TYPE_ENUM,
 		foreignEnumType: ed,
 	}
 }
 
 func fieldTypeFromDescriptor(fld *desc.FieldDescriptor) *FieldType {
 	switch fld.GetType() {
-	case dpb.FieldDescriptorProto_TYPE_GROUP:
-		return &FieldType{fieldType: dpb.FieldDescriptorProto_TYPE_GROUP, foreignMsgType: fld.GetMessageType()}
-	case dpb.FieldDescriptorProto_TYPE_MESSAGE:
+	case descriptorpb.FieldDescriptorProto_TYPE_GROUP:
+		return &FieldType{fieldType: descriptorpb.FieldDescriptorProto_TYPE_GROUP, foreignMsgType: fld.GetMessageType()}
+	case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE:
 		return FieldTypeImportedMessage(fld.GetMessageType())
-	case dpb.FieldDescriptorProto_TYPE_ENUM:
+	case descriptorpb.FieldDescriptorProto_TYPE_ENUM:
 		return FieldTypeImportedEnum(fld.GetEnumType())
 	default:
 		return FieldTypeScalar(fld.GetType())
