@@ -8,13 +8,13 @@ import (
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/wrappers"
-	"google.golang.org/genproto/protobuf/api"
-	"google.golang.org/genproto/protobuf/ptype"
-	"google.golang.org/genproto/protobuf/source_context"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/apipb"
+	"google.golang.org/protobuf/types/known/sourcecontextpb"
+	"google.golang.org/protobuf/types/known/typepb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -246,7 +246,7 @@ func (r *MessageRegistry) getRegisteredEnumTypeByUrl(url string) (*desc.EnumDesc
 // ResolveApiIntoServiceDescriptor constructs a service descriptor that describes the given API.
 // If any of the service's request or response type URLs cannot be resolved by this registry, a
 // nil descriptor is returned.
-func (r *MessageRegistry) ResolveApiIntoServiceDescriptor(a *api.Api) (*desc.ServiceDescriptor, error) {
+func (r *MessageRegistry) ResolveApiIntoServiceDescriptor(a *apipb.Api) (*desc.ServiceDescriptor, error) {
 	if r == nil {
 		return nil, nil
 	}
@@ -304,7 +304,7 @@ func (r *MessageRegistry) ResolveApiIntoServiceDescriptor(a *api.Api) (*desc.Ser
 	// now we add all types we care about to a typeTrie and use that to generate file descriptors
 	files := map[string]*fileEntry{}
 	fe := &fileEntry{}
-	fe.proto3 = a.Syntax == ptype.Syntax_SYNTAX_PROTO3
+	fe.proto3 = a.Syntax == typepb.Syntax_SYNTAX_PROTO3
 	files[fileName] = fe
 	fe.types.addType(a.Name, createServiceDescriptor(a, r))
 	added := newNameTracker()
@@ -323,11 +323,11 @@ func (r *MessageRegistry) ResolveApiIntoServiceDescriptor(a *api.Api) (*desc.Ser
 // UnmarshalAny will unmarshal the value embedded in the given Any value. This will use this
 // registry to resolve the given value's type URL. Use this instead of ptypes.UnmarshalAny for
 // cases where the type might not be statically linked into the current program.
-func (r *MessageRegistry) UnmarshalAny(any *any.Any) (proto.Message, error) {
+func (r *MessageRegistry) UnmarshalAny(any *anypb.Any) (proto.Message, error) {
 	return r.unmarshalAny(any, r.FindMessageTypeByUrl)
 }
 
-func (r *MessageRegistry) unmarshalAny(any *any.Any, fetch func(string) (*desc.MessageDescriptor, error)) (proto.Message, error) {
+func (r *MessageRegistry) unmarshalAny(any *anypb.Any, fetch func(string) (*desc.MessageDescriptor, error)) (proto.Message, error) {
 	name, err := ptypes.AnyMessageName(any)
 	if err != nil {
 		return nil, err
@@ -376,7 +376,7 @@ func (r *MessageRegistry) AddBaseUrlForElement(baseUrl, packageOrTypeName string
 }
 
 // MarshalAny wraps the given message in an Any value.
-func (r *MessageRegistry) MarshalAny(m proto.Message) (*any.Any, error) {
+func (r *MessageRegistry) MarshalAny(m proto.Message) (*anypb.Any, error) {
 	var md *desc.MessageDescriptor
 	if dm, ok := m.(*dynamic.Message); ok {
 		md = dm.GetMessageDescriptor()
@@ -391,16 +391,16 @@ func (r *MessageRegistry) MarshalAny(m proto.Message) (*any.Any, error) {
 	if b, err := proto.Marshal(m); err != nil {
 		return nil, err
 	} else {
-		return &any.Any{TypeUrl: r.ComputeUrl(md), Value: b}, nil
+		return &anypb.Any{TypeUrl: r.ComputeUrl(md), Value: b}, nil
 	}
 }
 
 // MessageAsPType converts the given message descriptor into a ptype.Type. Registered
 // base URLs are used to compute type URLs for any fields that have message or enum
 // types.
-func (r *MessageRegistry) MessageAsPType(md *desc.MessageDescriptor) *ptype.Type {
+func (r *MessageRegistry) MessageAsPType(md *desc.MessageDescriptor) *typepb.Type {
 	fs := md.GetFields()
-	fields := make([]*ptype.Field, len(fs))
+	fields := make([]*typepb.Field, len(fs))
 	for i, f := range fs {
 		fields[i] = r.fieldAsPType(f)
 	}
@@ -409,17 +409,17 @@ func (r *MessageRegistry) MessageAsPType(md *desc.MessageDescriptor) *ptype.Type
 	for i, oo := range oos {
 		oneOfs[i] = oo.GetName()
 	}
-	return &ptype.Type{
+	return &typepb.Type{
 		Name:          md.GetFullyQualifiedName(),
 		Fields:        fields,
 		Oneofs:        oneOfs,
 		Options:       r.options(md.GetOptions()),
 		Syntax:        syntax(md.GetFile()),
-		SourceContext: &source_context.SourceContext{FileName: md.GetFile().GetName()},
+		SourceContext: &sourcecontextpb.SourceContext{FileName: md.GetFile().GetName()},
 	}
 }
 
-func (r *MessageRegistry) fieldAsPType(fd *desc.FieldDescriptor) *ptype.Field {
+func (r *MessageRegistry) fieldAsPType(fd *desc.FieldDescriptor) *typepb.Field {
 	opts := r.options(fd.GetOptions())
 	// remove the "packed" option as that is represented via separate field in ptype.Field
 	for i, o := range opts {
@@ -434,61 +434,61 @@ func (r *MessageRegistry) fieldAsPType(fd *desc.FieldDescriptor) *ptype.Field {
 		oneOf = fd.AsFieldDescriptorProto().GetOneofIndex() + 1
 	}
 
-	var card ptype.Field_Cardinality
+	var card typepb.Field_Cardinality
 	switch fd.GetLabel() {
-	case descriptor.FieldDescriptorProto_LABEL_OPTIONAL:
-		card = ptype.Field_CARDINALITY_OPTIONAL
-	case descriptor.FieldDescriptorProto_LABEL_REPEATED:
-		card = ptype.Field_CARDINALITY_REPEATED
-	case descriptor.FieldDescriptorProto_LABEL_REQUIRED:
-		card = ptype.Field_CARDINALITY_REQUIRED
+	case descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL:
+		card = typepb.Field_CARDINALITY_OPTIONAL
+	case descriptorpb.FieldDescriptorProto_LABEL_REPEATED:
+		card = typepb.Field_CARDINALITY_REPEATED
+	case descriptorpb.FieldDescriptorProto_LABEL_REQUIRED:
+		card = typepb.Field_CARDINALITY_REQUIRED
 	}
 
 	var url string
-	var kind ptype.Field_Kind
+	var kind typepb.Field_Kind
 	switch fd.GetType() {
-	case descriptor.FieldDescriptorProto_TYPE_ENUM:
-		kind = ptype.Field_TYPE_ENUM
+	case descriptorpb.FieldDescriptorProto_TYPE_ENUM:
+		kind = typepb.Field_TYPE_ENUM
 		url = r.ComputeUrl(fd.GetEnumType())
-	case descriptor.FieldDescriptorProto_TYPE_GROUP:
-		kind = ptype.Field_TYPE_GROUP
+	case descriptorpb.FieldDescriptorProto_TYPE_GROUP:
+		kind = typepb.Field_TYPE_GROUP
 		url = r.ComputeUrl(fd.GetMessageType())
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		kind = ptype.Field_TYPE_MESSAGE
+	case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE:
+		kind = typepb.Field_TYPE_MESSAGE
 		url = r.ComputeUrl(fd.GetMessageType())
-	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		kind = ptype.Field_TYPE_BYTES
-	case descriptor.FieldDescriptorProto_TYPE_STRING:
-		kind = ptype.Field_TYPE_STRING
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		kind = ptype.Field_TYPE_BOOL
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		kind = ptype.Field_TYPE_DOUBLE
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		kind = ptype.Field_TYPE_FLOAT
-	case descriptor.FieldDescriptorProto_TYPE_FIXED32:
-		kind = ptype.Field_TYPE_FIXED32
-	case descriptor.FieldDescriptorProto_TYPE_FIXED64:
-		kind = ptype.Field_TYPE_FIXED64
-	case descriptor.FieldDescriptorProto_TYPE_INT32:
-		kind = ptype.Field_TYPE_INT32
-	case descriptor.FieldDescriptorProto_TYPE_INT64:
-		kind = ptype.Field_TYPE_INT64
-	case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
-		kind = ptype.Field_TYPE_SFIXED32
-	case descriptor.FieldDescriptorProto_TYPE_SFIXED64:
-		kind = ptype.Field_TYPE_SFIXED64
-	case descriptor.FieldDescriptorProto_TYPE_SINT32:
-		kind = ptype.Field_TYPE_SINT32
-	case descriptor.FieldDescriptorProto_TYPE_SINT64:
-		kind = ptype.Field_TYPE_SINT64
-	case descriptor.FieldDescriptorProto_TYPE_UINT32:
-		kind = ptype.Field_TYPE_UINT32
-	case descriptor.FieldDescriptorProto_TYPE_UINT64:
-		kind = ptype.Field_TYPE_UINT64
+	case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
+		kind = typepb.Field_TYPE_BYTES
+	case descriptorpb.FieldDescriptorProto_TYPE_STRING:
+		kind = typepb.Field_TYPE_STRING
+	case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
+		kind = typepb.Field_TYPE_BOOL
+	case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
+		kind = typepb.Field_TYPE_DOUBLE
+	case descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
+		kind = typepb.Field_TYPE_FLOAT
+	case descriptorpb.FieldDescriptorProto_TYPE_FIXED32:
+		kind = typepb.Field_TYPE_FIXED32
+	case descriptorpb.FieldDescriptorProto_TYPE_FIXED64:
+		kind = typepb.Field_TYPE_FIXED64
+	case descriptorpb.FieldDescriptorProto_TYPE_INT32:
+		kind = typepb.Field_TYPE_INT32
+	case descriptorpb.FieldDescriptorProto_TYPE_INT64:
+		kind = typepb.Field_TYPE_INT64
+	case descriptorpb.FieldDescriptorProto_TYPE_SFIXED32:
+		kind = typepb.Field_TYPE_SFIXED32
+	case descriptorpb.FieldDescriptorProto_TYPE_SFIXED64:
+		kind = typepb.Field_TYPE_SFIXED64
+	case descriptorpb.FieldDescriptorProto_TYPE_SINT32:
+		kind = typepb.Field_TYPE_SINT32
+	case descriptorpb.FieldDescriptorProto_TYPE_SINT64:
+		kind = typepb.Field_TYPE_SINT64
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT32:
+		kind = typepb.Field_TYPE_UINT32
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT64:
+		kind = typepb.Field_TYPE_UINT64
 	}
 
-	return &ptype.Field{
+	return &typepb.Field{
 		Name:         fd.GetName(),
 		Number:       fd.GetNumber(),
 		JsonName:     fd.AsFieldDescriptorProto().GetJsonName(),
@@ -503,23 +503,23 @@ func (r *MessageRegistry) fieldAsPType(fd *desc.FieldDescriptor) *ptype.Field {
 }
 
 // EnumAsPType converts the given enum descriptor into a ptype.Enum.
-func (r *MessageRegistry) EnumAsPType(ed *desc.EnumDescriptor) *ptype.Enum {
+func (r *MessageRegistry) EnumAsPType(ed *desc.EnumDescriptor) *typepb.Enum {
 	vs := ed.GetValues()
-	vals := make([]*ptype.EnumValue, len(vs))
+	vals := make([]*typepb.EnumValue, len(vs))
 	for i, v := range vs {
 		vals[i] = r.enumValueAsPType(v)
 	}
-	return &ptype.Enum{
+	return &typepb.Enum{
 		Name:          ed.GetFullyQualifiedName(),
 		Enumvalue:     vals,
 		Options:       r.options(ed.GetOptions()),
 		Syntax:        syntax(ed.GetFile()),
-		SourceContext: &source_context.SourceContext{FileName: ed.GetFile().GetName()},
+		SourceContext: &sourcecontextpb.SourceContext{FileName: ed.GetFile().GetName()},
 	}
 }
 
-func (r *MessageRegistry) enumValueAsPType(vd *desc.EnumValueDescriptor) *ptype.EnumValue {
-	return &ptype.EnumValue{
+func (r *MessageRegistry) enumValueAsPType(vd *desc.EnumValueDescriptor) *typepb.EnumValue {
+	return &typepb.EnumValue{
 		Name:    vd.GetName(),
 		Number:  vd.GetNumber(),
 		Options: r.options(vd.GetOptions()),
@@ -527,23 +527,23 @@ func (r *MessageRegistry) enumValueAsPType(vd *desc.EnumValueDescriptor) *ptype.
 }
 
 // ServiceAsApi converts the given service descriptor into a ptype API description.
-func (r *MessageRegistry) ServiceAsApi(sd *desc.ServiceDescriptor) *api.Api {
+func (r *MessageRegistry) ServiceAsApi(sd *desc.ServiceDescriptor) *apipb.Api {
 	ms := sd.GetMethods()
-	methods := make([]*api.Method, len(ms))
+	methods := make([]*apipb.Method, len(ms))
 	for i, m := range ms {
 		methods[i] = r.methodAsApi(m)
 	}
-	return &api.Api{
+	return &apipb.Api{
 		Name:          sd.GetFullyQualifiedName(),
 		Methods:       methods,
 		Options:       r.options(sd.GetOptions()),
 		Syntax:        syntax(sd.GetFile()),
-		SourceContext: &source_context.SourceContext{FileName: sd.GetFile().GetName()},
+		SourceContext: &sourcecontextpb.SourceContext{FileName: sd.GetFile().GetName()},
 	}
 }
 
-func (r *MessageRegistry) methodAsApi(md *desc.MethodDescriptor) *api.Method {
-	return &api.Method{
+func (r *MessageRegistry) methodAsApi(md *desc.MethodDescriptor) *apipb.Method {
+	return &apipb.Method{
 		Name:              md.GetName(),
 		RequestStreaming:  md.IsClientStreaming(),
 		ResponseStreaming: md.IsServerStreaming(),
@@ -554,7 +554,7 @@ func (r *MessageRegistry) methodAsApi(md *desc.MethodDescriptor) *api.Method {
 	}
 }
 
-func (r *MessageRegistry) options(options proto.Message) []*ptype.Option {
+func (r *MessageRegistry) options(options proto.Message) []*typepb.Option {
 	rv := reflect.ValueOf(options)
 	if rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
@@ -562,7 +562,7 @@ func (r *MessageRegistry) options(options proto.Message) []*ptype.Option {
 		}
 		rv = rv.Elem()
 	}
-	var opts []*ptype.Option
+	var opts []*typepb.Option
 	for _, p := range proto.GetProperties(rv.Type()).Prop {
 		if p.Tag == 0 {
 			continue
@@ -588,10 +588,10 @@ func (r *MessageRegistry) options(options proto.Message) []*ptype.Option {
 
 var typeOfBytes = reflect.TypeOf([]byte(nil))
 
-func (r *MessageRegistry) option(name string, value reflect.Value) []*ptype.Option {
+func (r *MessageRegistry) option(name string, value reflect.Value) []*typepb.Option {
 	if value.Kind() == reflect.Slice && value.Type() != typeOfBytes {
 		// repeated field
-		ret := make([]*ptype.Option, value.Len())
+		ret := make([]*typepb.Option, value.Len())
 		j := 0
 		for i := 0; i < value.Len(); i++ {
 			opt := r.singleOption(name, value.Index(i))
@@ -604,13 +604,13 @@ func (r *MessageRegistry) option(name string, value reflect.Value) []*ptype.Opti
 	} else {
 		opt := r.singleOption(name, value)
 		if opt != nil {
-			return []*ptype.Option{opt}
+			return []*typepb.Option{opt}
 		}
 		return nil
 	}
 }
 
-func (r *MessageRegistry) singleOption(name string, value reflect.Value) *ptype.Option {
+func (r *MessageRegistry) singleOption(name string, value reflect.Value) *typepb.Option {
 	pm := wrap(value)
 	if pm == nil {
 		return nil
@@ -619,7 +619,7 @@ func (r *MessageRegistry) singleOption(name string, value reflect.Value) *ptype.
 	if err != nil {
 		return nil
 	}
-	return &ptype.Option{
+	return &typepb.Option{
 		Name:  name,
 		Value: a,
 	}
@@ -640,36 +640,36 @@ func wrap(v reflect.Value) proto.Message {
 	}
 	switch v.Kind() {
 	case reflect.Bool:
-		return &wrappers.BoolValue{Value: v.Bool()}
+		return &wrapperspb.BoolValue{Value: v.Bool()}
 	case reflect.Slice:
 		if v.Type() != typeOfBytes {
 			panic(fmt.Sprintf("cannot convert/wrap %T as proto", v.Type()))
 		}
-		return &wrappers.BytesValue{Value: v.Bytes()}
+		return &wrapperspb.BytesValue{Value: v.Bytes()}
 	case reflect.String:
-		return &wrappers.StringValue{Value: v.String()}
+		return &wrapperspb.StringValue{Value: v.String()}
 	case reflect.Float32:
-		return &wrappers.FloatValue{Value: float32(v.Float())}
+		return &wrapperspb.FloatValue{Value: float32(v.Float())}
 	case reflect.Float64:
-		return &wrappers.DoubleValue{Value: v.Float()}
+		return &wrapperspb.DoubleValue{Value: v.Float()}
 	case reflect.Int32:
-		return &wrappers.Int32Value{Value: int32(v.Int())}
+		return &wrapperspb.Int32Value{Value: int32(v.Int())}
 	case reflect.Int64:
-		return &wrappers.Int64Value{Value: v.Int()}
+		return &wrapperspb.Int64Value{Value: v.Int()}
 	case reflect.Uint32:
-		return &wrappers.UInt32Value{Value: uint32(v.Uint())}
+		return &wrapperspb.UInt32Value{Value: uint32(v.Uint())}
 	case reflect.Uint64:
-		return &wrappers.UInt64Value{Value: v.Uint()}
+		return &wrapperspb.UInt64Value{Value: v.Uint()}
 	default:
 		panic(fmt.Sprintf("cannot convert/wrap %T as proto", v.Type()))
 	}
 }
 
-func syntax(fd *desc.FileDescriptor) ptype.Syntax {
+func syntax(fd *desc.FileDescriptor) typepb.Syntax {
 	if fd.IsProto3() {
-		return ptype.Syntax_SYNTAX_PROTO3
+		return typepb.Syntax_SYNTAX_PROTO3
 	} else {
-		return ptype.Syntax_SYNTAX_PROTO2
+		return typepb.Syntax_SYNTAX_PROTO2
 	}
 }
 
