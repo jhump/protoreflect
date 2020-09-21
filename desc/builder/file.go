@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
@@ -47,7 +47,7 @@ type FileBuilder struct {
 
 	IsProto3 bool
 	Package  string
-	Options  *dpb.FileOptions
+	Options  *descriptorpb.FileOptions
 
 	comments        Comments
 	SyntaxComments  Comments
@@ -600,7 +600,7 @@ func (fb *FileBuilder) AddImportedDependency(dep *desc.FileDescriptor) *FileBuil
 
 // SetOptions sets the file options for this file and returns the file, for
 // method chaining.
-func (fb *FileBuilder) SetOptions(options *dpb.FileOptions) *FileBuilder {
+func (fb *FileBuilder) SetOptions(options *descriptorpb.FileOptions) *FileBuilder {
 	fb.Options = options
 	return fb
 }
@@ -619,7 +619,7 @@ func (fb *FileBuilder) SetProto3(isProto3 bool) *FileBuilder {
 	return fb
 }
 
-func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescriptorProto, error) {
+func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*descriptorpb.FileDescriptorProto, error) {
 	name := fb.name
 	if name == "" {
 		name = uniqueFileName()
@@ -634,7 +634,7 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescrip
 	}
 
 	path := make([]int32, 0, 10)
-	sourceInfo := dpb.SourceCodeInfo{}
+	sourceInfo := descriptorpb.SourceCodeInfo{}
 	addCommentsTo(&sourceInfo, path, &fb.comments)
 	addCommentsTo(&sourceInfo, append(path, internal.File_syntaxTag), &fb.SyntaxComments)
 	addCommentsTo(&sourceInfo, append(path, internal.File_packageTag), &fb.PackageComments)
@@ -645,7 +645,7 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescrip
 	}
 	sort.Strings(imports)
 
-	messages := make([]*dpb.DescriptorProto, 0, len(fb.messages))
+	messages := make([]*descriptorpb.DescriptorProto, 0, len(fb.messages))
 	for _, mb := range fb.messages {
 		path := append(path, internal.File_messagesTag, int32(len(messages)))
 		if md, err := mb.buildProto(path, &sourceInfo); err != nil {
@@ -655,7 +655,7 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescrip
 		}
 	}
 
-	enums := make([]*dpb.EnumDescriptorProto, 0, len(fb.enums))
+	enums := make([]*descriptorpb.EnumDescriptorProto, 0, len(fb.enums))
 	for _, eb := range fb.enums {
 		path := append(path, internal.File_enumsTag, int32(len(enums)))
 		if ed, err := eb.buildProto(path, &sourceInfo); err != nil {
@@ -665,7 +665,7 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescrip
 		}
 	}
 
-	extensions := make([]*dpb.FieldDescriptorProto, 0, len(fb.extensions))
+	extensions := make([]*descriptorpb.FieldDescriptorProto, 0, len(fb.extensions))
 	for _, exb := range fb.extensions {
 		path := append(path, internal.File_extensionsTag, int32(len(extensions)))
 		if exd, err := exb.buildProto(path, &sourceInfo, isExtendeeMessageSet(exb)); err != nil {
@@ -675,7 +675,7 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescrip
 		}
 	}
 
-	services := make([]*dpb.ServiceDescriptorProto, 0, len(fb.services))
+	services := make([]*descriptorpb.ServiceDescriptorProto, 0, len(fb.services))
 	for _, sb := range fb.services {
 		path := append(path, internal.File_servicesTag, int32(len(services)))
 		if sd, err := sb.buildProto(path, &sourceInfo); err != nil {
@@ -685,7 +685,7 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*dpb.FileDescrip
 		}
 	}
 
-	return &dpb.FileDescriptorProto{
+	return &descriptorpb.FileDescriptorProto{
 		Name:           proto.String(name),
 		Package:        pkg,
 		Dependency:     imports,

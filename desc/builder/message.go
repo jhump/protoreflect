@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
@@ -22,9 +22,9 @@ import (
 type MessageBuilder struct {
 	baseBuilder
 
-	Options         *dpb.MessageOptions
-	ExtensionRanges []*dpb.DescriptorProto_ExtensionRange
-	ReservedRanges  []*dpb.DescriptorProto_ReservedRange
+	Options         *descriptorpb.MessageOptions
+	ExtensionRanges []*descriptorpb.DescriptorProto_ExtensionRange
+	ReservedRanges  []*descriptorpb.DescriptorProto_ReservedRange
 	ReservedNames   []string
 
 	fieldsAndOneOfs  []Builder
@@ -157,7 +157,7 @@ func (mb *MessageBuilder) SetName(newName string) *MessageBuilder {
 // modeled as children of their associated field builder, in the protobuf IDL
 // they are actually all defined in the enclosing message's namespace.
 func (mb *MessageBuilder) TrySetName(newName string) error {
-	if p, ok := mb.parent.(*FieldBuilder); ok && p.fieldType.fieldType != dpb.FieldDescriptorProto_TYPE_GROUP {
+	if p, ok := mb.parent.(*FieldBuilder); ok && p.fieldType.fieldType != descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 		return fmt.Errorf("cannot change name of map entry %s; change name of field instead", GetFullyQualifiedName(mb))
 	}
 	return mb.trySetNameInternal(newName)
@@ -617,7 +617,7 @@ func (mb *MessageBuilder) TryAddNestedEnum(eb *EnumBuilder) error {
 
 // SetOptions sets the message options for this message and returns the message,
 // for method chaining.
-func (mb *MessageBuilder) SetOptions(options *dpb.MessageOptions) *MessageBuilder {
+func (mb *MessageBuilder) SetOptions(options *descriptorpb.MessageOptions) *MessageBuilder {
 	mb.Options = options
 	return mb
 }
@@ -632,8 +632,8 @@ func (mb *MessageBuilder) AddExtensionRange(start, end int32) *MessageBuilder {
 // AddExtensionRangeWithOptions adds the given extension range to this message.
 // The range is inclusive of both the start and end, just like defining a range
 // in proto IDL source. This returns the message, for method chaining.
-func (mb *MessageBuilder) AddExtensionRangeWithOptions(start, end int32, options *dpb.ExtensionRangeOptions) *MessageBuilder {
-	er := &dpb.DescriptorProto_ExtensionRange{
+func (mb *MessageBuilder) AddExtensionRangeWithOptions(start, end int32, options *descriptorpb.ExtensionRangeOptions) *MessageBuilder {
+	er := &descriptorpb.DescriptorProto_ExtensionRange{
 		Start:   proto.Int32(start),
 		End:     proto.Int32(end + 1),
 		Options: options,
@@ -647,7 +647,7 @@ func (mb *MessageBuilder) AddExtensionRangeWithOptions(start, end int32, options
 // defined in proto IDL source, a DescriptorProto_ExtensionRange struct treats
 // the end of the range as *exclusive*. So the range is inclusive of the start
 // but exclusive of the end. This returns the message, for method chaining.
-func (mb *MessageBuilder) SetExtensionRanges(ranges []*dpb.DescriptorProto_ExtensionRange) *MessageBuilder {
+func (mb *MessageBuilder) SetExtensionRanges(ranges []*descriptorpb.DescriptorProto_ExtensionRange) *MessageBuilder {
 	mb.ExtensionRanges = ranges
 	return mb
 }
@@ -656,7 +656,7 @@ func (mb *MessageBuilder) SetExtensionRanges(ranges []*dpb.DescriptorProto_Exten
 // inclusive of both the start and end, just like defining a range in proto IDL
 // source. This returns the message, for method chaining.
 func (mb *MessageBuilder) AddReservedRange(start, end int32) *MessageBuilder {
-	rr := &dpb.DescriptorProto_ReservedRange{
+	rr := &descriptorpb.DescriptorProto_ReservedRange{
 		Start: proto.Int32(start),
 		End:   proto.Int32(end + 1),
 	}
@@ -670,7 +670,7 @@ func (mb *MessageBuilder) AddReservedRange(start, end int32) *MessageBuilder {
 // the end of the range as *exclusive* (so it would be the value defined in the
 // IDL plus one). So the range is inclusive of the start but exclusive of the
 // end. This returns the message, for method chaining.
-func (mb *MessageBuilder) SetReservedRanges(ranges []*dpb.DescriptorProto_ReservedRange) *MessageBuilder {
+func (mb *MessageBuilder) SetReservedRanges(ranges []*descriptorpb.DescriptorProto_ReservedRange) *MessageBuilder {
 	mb.ReservedRanges = ranges
 	return mb
 }
@@ -689,11 +689,11 @@ func (mb *MessageBuilder) SetReservedNames(names []string) *MessageBuilder {
 	return mb
 }
 
-func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.DescriptorProto, error) {
+func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceCodeInfo) (*descriptorpb.DescriptorProto, error) {
 	addCommentsTo(sourceInfo, path, &mb.comments)
 
-	var needTagsAssigned []*dpb.FieldDescriptorProto
-	nestedMessages := make([]*dpb.DescriptorProto, 0, len(mb.nestedMessages))
+	var needTagsAssigned []*descriptorpb.FieldDescriptorProto
+	nestedMessages := make([]*descriptorpb.DescriptorProto, 0, len(mb.nestedMessages))
 	oneOfCount := 0
 	for _, b := range mb.fieldsAndOneOfs {
 		if _, ok := b.(*OneOfBuilder); ok {
@@ -701,10 +701,10 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 		}
 	}
 
-	fields := make([]*dpb.FieldDescriptorProto, 0, len(mb.fieldsAndOneOfs)-oneOfCount)
-	oneOfs := make([]*dpb.OneofDescriptorProto, 0, oneOfCount)
+	fields := make([]*descriptorpb.FieldDescriptorProto, 0, len(mb.fieldsAndOneOfs)-oneOfCount)
+	oneOfs := make([]*descriptorpb.OneofDescriptorProto, 0, oneOfCount)
 
-	addField := func(flb *FieldBuilder, fld *dpb.FieldDescriptorProto) error {
+	addField := func(flb *FieldBuilder, fld *descriptorpb.FieldDescriptorProto) error {
 		fields = append(fields, fld)
 		if flb.number == 0 {
 			needTagsAssigned = append(needTagsAssigned, fld)
@@ -783,7 +783,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 		}
 	}
 
-	nestedExtensions := make([]*dpb.FieldDescriptorProto, 0, len(mb.nestedExtensions))
+	nestedExtensions := make([]*descriptorpb.FieldDescriptorProto, 0, len(mb.nestedExtensions))
 	for _, exb := range mb.nestedExtensions {
 		path := append(path, internal.Message_extensionsTag, int32(len(nestedExtensions)))
 		if exd, err := exb.buildProto(path, sourceInfo, isExtendeeMessageSet(exb)); err != nil {
@@ -793,7 +793,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 		}
 	}
 
-	nestedEnums := make([]*dpb.EnumDescriptorProto, 0, len(mb.nestedEnums))
+	nestedEnums := make([]*descriptorpb.EnumDescriptorProto, 0, len(mb.nestedEnums))
 	for _, eb := range mb.nestedEnums {
 		path := append(path, internal.Message_enumsTag, int32(len(nestedEnums)))
 		if ed, err := eb.buildProto(path, sourceInfo); err != nil {
@@ -803,7 +803,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 		}
 	}
 
-	md := &dpb.DescriptorProto{
+	md := &descriptorpb.DescriptorProto{
 		Name:           proto.String(mb.name),
 		Options:        mb.Options,
 		Field:          fields,
