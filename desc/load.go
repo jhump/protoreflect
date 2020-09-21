@@ -124,8 +124,7 @@ func LoadMessageDescriptorForMessage(message proto.Message) (*MessageDescriptor,
 	} else {
 		md = proto.MessageReflect(message).Descriptor()
 	}
-	md = sourceinfo.WrapMessage(md)
-	return loadMessageDescriptor(md)
+	return loadMessageDescriptor(sourceinfo.WrapMessage(md))
 }
 
 func messageFromType(mt reflect.Type) (proto.Message, error) {

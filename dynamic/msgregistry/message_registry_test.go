@@ -390,9 +390,9 @@ func TestMessageRegistry_FindEnum_WithFetcher(t *testing.T) {
 	testutil.Ceq(t, eo, ed.GetEnumOptions(), eqpm)
 
 	vals := ed.GetValues()
-	testutil.Eq(t, 2, len(vals))
+	testutil.Eq(t, 3, len(vals))
 	testutil.Eq(t, "ABC", vals[0].GetName())
-	testutil.Eq(t, int32(1), vals[0].GetNumber())
+	testutil.Eq(t, int32(0), vals[0].GetNumber())
 
 	evo := &descriptor.EnumValueOptions{
 		Deprecated: proto.Bool(true),
@@ -410,7 +410,10 @@ func TestMessageRegistry_FindEnum_WithFetcher(t *testing.T) {
 	testutil.Ceq(t, evo, vals[0].GetEnumValueOptions(), eqpm)
 
 	testutil.Eq(t, "XYZ", vals[1].GetName())
-	testutil.Eq(t, int32(2), vals[1].GetNumber())
+	testutil.Eq(t, int32(1), vals[1].GetNumber())
+
+	testutil.Eq(t, "WXY", vals[2].GetName())
+	testutil.Eq(t, int32(1), vals[2].GetNumber())
 }
 
 func createFetcher(t *testing.T) TypeFetcher {
@@ -540,7 +543,7 @@ func createFetcher(t *testing.T) TypeFetcher {
 			Enumvalue: []*ptype.EnumValue{
 				{
 					Name:   "ABC",
-					Number: 1,
+					Number: 0,
 					Options: []*ptype.Option{
 						{
 							Name:  "deprecated",
@@ -570,7 +573,11 @@ func createFetcher(t *testing.T) TypeFetcher {
 				},
 				{
 					Name:   "XYZ",
-					Number: 2,
+					Number: 1,
+				},
+				{
+					Name:   "WXY",
+					Number: 1,
 				},
 			},
 			Options: []*ptype.Option{

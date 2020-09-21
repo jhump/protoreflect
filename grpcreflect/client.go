@@ -315,7 +315,7 @@ func (cr *Client) getAndCacheFileDescriptors(req *refv1alpha.ServerReflectionReq
 	// should be the answer). If we're looking for a file by name, we can be
 	// smarter and make sure to grab one by name instead of just grabbing the
 	// first one.
-	var fds []*dpb.FileDescriptorProto
+	var fds []*descriptorpb.FileDescriptorProto
 	for _, fdBytes := range fdResp.FileDescriptorProto {
 		fd := &descriptorpb.FileDescriptorProto{}
 		if err = proto.Unmarshal(fdBytes, fd); err != nil {

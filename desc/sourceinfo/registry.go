@@ -129,6 +129,11 @@ func SourceInfoForFile(file string) *descriptorpb.SourceCodeInfo {
 	return sourceInfoByFile[file]
 }
 
+func canWrap(d protoreflect.Descriptor) bool {
+	srcInfo := SourceInfoForFile(d.ParentFile().Path())
+	return len(srcInfo.GetLocation()) > 0
+}
+
 func getFile(fd protoreflect.FileDescriptor) protoreflect.FileDescriptor {
 	if fd == nil {
 		return nil
@@ -180,6 +185,9 @@ func (r registry) FindFileByPath(path string) (protoreflect.FileDescriptor, erro
 
 func (r registry) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
 	d, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
+	if !canWrap(d) {
+		return d, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -212,6 +220,9 @@ func (r registry) FindMessageByName(message protoreflect.FullName) (protoreflect
 	if err != nil {
 		return nil, err
 	}
+	if !canWrap(mt.Descriptor()) {
+		return mt, nil
+	}
 	return messageType{mt}, nil
 }
 
@@ -219,6 +230,9 @@ func (r registry) FindMessageByURL(url string) (protoreflect.MessageType, error)
 	mt, err := protoregistry.GlobalTypes.FindMessageByURL(url)
 	if err != nil {
 		return nil, err
+	}
+	if !canWrap(mt.Descriptor()) {
+		return mt, nil
 	}
 	return messageType{mt}, nil
 }
@@ -228,6 +242,9 @@ func (r registry) FindExtensionByName(field protoreflect.FullName) (protoreflect
 	if err != nil {
 		return nil, err
 	}
+	if !canWrap(xt.TypeDescriptor()) {
+		return xt, nil
+	}
 	return extensionType{xt}, nil
 }
 
@@ -236,11 +253,17 @@ func (r registry) FindExtensionByNumber(message protoreflect.FullName, field pro
 	if err != nil {
 		return nil, err
 	}
+	if !canWrap(xt.TypeDescriptor()) {
+		return xt, nil
+	}
 	return extensionType{xt}, nil
 }
 
 func (r registry) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionType) bool) {
 	protoregistry.GlobalTypes.RangeExtensionsByMessage(message, func(xt protoreflect.ExtensionType) bool {
-		return fn(extensionType{xt})
+		if canWrap(xt.TypeDescriptor()) {
+			xt = extensionType{xt}
+		}
+		return fn(xt)
 	})
 }

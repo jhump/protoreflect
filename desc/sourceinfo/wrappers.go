@@ -544,6 +544,9 @@ func WrapMessage(md protoreflect.MessageDescriptor) protoreflect.MessageDescript
 		// no need to wrap since it includes source info already
 		return md
 	}
+	if !canWrap(md) {
+		return md
+	}
 	return messageDescriptor{md}
 }
 
@@ -560,6 +563,9 @@ func WrapEnum(ed protoreflect.EnumDescriptor) protoreflect.EnumDescriptor {
 		// no need to wrap since it includes source info already
 		return ed
 	}
+	if !canWrap(ed) {
+		return ed
+	}
 	return enumDescriptor{ed}
 }
 
@@ -574,6 +580,9 @@ func WrapService(sd protoreflect.ServiceDescriptor) protoreflect.ServiceDescript
 	}
 	if sd.ParentFile().SourceLocations().Len() > 0 {
 		// no need to wrap since it includes source info already
+		return sd
+	}
+	if !canWrap(sd) {
 		return sd
 	}
 	return serviceDescriptor{sd}
@@ -593,6 +602,9 @@ func WrapExtensionType(xt protoreflect.ExtensionType) protoreflect.ExtensionType
 		// no need to wrap since it includes source info already
 		return xt
 	}
+	if !canWrap(xt.TypeDescriptor()) {
+		return xt
+	}
 	return extensionType{xt}
 }
 
@@ -608,6 +620,9 @@ func WrapMessageType(mt protoreflect.MessageType) protoreflect.MessageType {
 	}
 	if mt.Descriptor().ParentFile().SourceLocations().Len() > 0 {
 		// no need to wrap since it includes source info already
+		return mt
+	}
+	if !canWrap(mt.Descriptor()) {
 		return mt
 	}
 	return messageType{mt}
