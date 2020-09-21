@@ -11,10 +11,10 @@ import (
 	"sync/atomic"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
-	"github.com/golang/protobuf/ptypes/wrappers"
-	"google.golang.org/genproto/protobuf/api"
-	"google.golang.org/genproto/protobuf/ptype"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/known/apipb"
+	"google.golang.org/protobuf/types/known/typepb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -28,27 +28,27 @@ var (
 
 func init() {
 	var err error
-	enumOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.EnumOptions)(nil))
+	enumOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.EnumOptions)(nil))
 	if err != nil {
 		panic("Failed to load descriptor for EnumOptions")
 	}
-	enumValueOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.EnumValueOptions)(nil))
+	enumValueOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.EnumValueOptions)(nil))
 	if err != nil {
 		panic("Failed to load descriptor for EnumValueOptions")
 	}
-	msgOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.MessageOptions)(nil))
+	msgOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.MessageOptions)(nil))
 	if err != nil {
 		panic("Failed to load descriptor for MessageOptions")
 	}
-	fieldOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.FieldOptions)(nil))
+	fieldOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.FieldOptions)(nil))
 	if err != nil {
 		panic("Failed to load descriptor for FieldOptions")
 	}
-	svcOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.ServiceOptions)(nil))
+	svcOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.ServiceOptions)(nil))
 	if err != nil {
 		panic("Failed to load descriptor for ServiceOptions")
 	}
-	methodOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptor.MethodOptions)(nil))
+	methodOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.MethodOptions)(nil))
 	if err != nil {
 		panic("Failed to load descriptor for MethodOptions")
 	}
@@ -255,14 +255,14 @@ func addDescriptors(ref string, files map[string]*fileEntry, d desc.Descriptor, 
 
 	if md, ok := d.(*desc.MessageDescriptor); ok {
 		for _, fld := range md.GetFields() {
-			if fld.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE || fld.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP {
+			if fld.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE || fld.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 				// prefer descriptor in msgs map over what the field descriptor indicates
 				md := msgs[fld.GetMessageType().GetFullyQualifiedName()]
 				if md == nil {
 					md = fld.GetMessageType()
 				}
 				addDescriptors(fileName, files, md, msgs, onAdd)
-			} else if fld.GetType() == descriptor.FieldDescriptorProto_TYPE_ENUM {
+			} else if fld.GetType() == descriptorpb.FieldDescriptorProto_TYPE_ENUM {
 				addDescriptors(fileName, files, fld.GetEnumType(), msgs, onAdd)
 			}
 		}
@@ -315,12 +315,12 @@ func (rc *resolutionContext) addType(url string, enum bool) error {
 	}
 
 	if enum {
-		rc.recordEnum(url, m.(*ptype.Enum))
+		rc.recordEnum(url, m.(*typepb.Enum))
 		return nil
 	}
 
 	// for messages, resolve dependencies in parallel
-	t := m.(*ptype.Type)
+	t := m.(*typepb.Type)
 	fe, fileName := rc.recordType(url, t)
 	if fe == nil {
 		// already resolved this one
@@ -330,7 +330,7 @@ func (rc *resolutionContext) addType(url string, enum bool) error {
 	var wg sync.WaitGroup
 	var failed int32
 	for _, f := range t.Fields {
-		if f.Kind == ptype.Field_TYPE_GROUP || f.Kind == ptype.Field_TYPE_MESSAGE || f.Kind == ptype.Field_TYPE_ENUM {
+		if f.Kind == typepb.Field_TYPE_GROUP || f.Kind == typepb.Field_TYPE_MESSAGE || f.Kind == typepb.Field_TYPE_ENUM {
 			typeUrl := ensureScheme(f.TypeUrl)
 			kind := f.Kind
 			wg.Add(1)
@@ -339,7 +339,7 @@ func (rc *resolutionContext) addType(url string, enum bool) error {
 				// first check the registry for descriptors
 				var d desc.Descriptor
 				var innerErr error
-				if kind == ptype.Field_TYPE_ENUM {
+				if kind == typepb.Field_TYPE_ENUM {
 					var ed *desc.EnumDescriptor
 					ed, innerErr = rc.res.mr.getRegisteredEnumTypeByUrl(typeUrl)
 					if ed != nil {
@@ -359,7 +359,7 @@ func (rc *resolutionContext) addType(url string, enum bool) error {
 						rc.recordDescriptor(typeUrl, fileName, d)
 					} else {
 						// not in registry, so we have to recursively fetch
-						innerErr = rc.addType(typeUrl, kind == ptype.Field_TYPE_ENUM)
+						innerErr = rc.addType(typeUrl, kind == typepb.Field_TYPE_ENUM)
 					}
 				}
 
@@ -388,7 +388,7 @@ func (rc *resolutionContext) addType(url string, enum bool) error {
 	defer rc.mu.Unlock()
 
 	for _, f := range t.Fields {
-		if f.Kind == ptype.Field_TYPE_GROUP || f.Kind == ptype.Field_TYPE_MESSAGE || f.Kind == ptype.Field_TYPE_ENUM {
+		if f.Kind == typepb.Field_TYPE_GROUP || f.Kind == typepb.Field_TYPE_MESSAGE || f.Kind == typepb.Field_TYPE_ENUM {
 			typeUrl := ensureScheme(f.TypeUrl)
 			if fe.deps == nil {
 				fe.deps = map[string]struct{}{}
@@ -402,7 +402,7 @@ func (rc *resolutionContext) addType(url string, enum bool) error {
 	return nil
 }
 
-func (rc *resolutionContext) recordEnum(url string, e *ptype.Enum) {
+func (rc *resolutionContext) recordEnum(url string, e *typepb.Enum) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
@@ -421,12 +421,12 @@ func (rc *resolutionContext) recordEnum(url string, e *ptype.Enum) {
 		rc.files[fileName] = fe
 	}
 	fe.types.addType(e.Name, e)
-	if e.Syntax == ptype.Syntax_SYNTAX_PROTO3 {
+	if e.Syntax == typepb.Syntax_SYNTAX_PROTO3 {
 		fe.proto3 = true
 	}
 }
 
-func (rc *resolutionContext) recordType(url string, t *ptype.Type) (*fileEntry, string) {
+func (rc *resolutionContext) recordType(url string, t *typepb.Type) (*fileEntry, string) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
@@ -449,7 +449,7 @@ func (rc *resolutionContext) recordType(url string, t *ptype.Type) (*fileEntry, 
 		rc.files[fileName] = fe
 	}
 	fe.types.addType(t.Name, t)
-	if t.Syntax == ptype.Syntax_SYNTAX_PROTO3 {
+	if t.Syntax == typepb.Syntax_SYNTAX_PROTO3 {
 		fe.proto3 = true
 	}
 
@@ -491,7 +491,7 @@ func (rc *resolutionContext) toFileDescriptors(mr *MessageRegistry) (map[string]
 // converts a map of file entries into a map of file descriptors using the given function to convert
 // each trie node into a descriptor proto.
 func toFileDescriptors(files map[string]*fileEntry, trieFn func(*typeTrie, string) (proto.Message, error)) (map[string]*desc.FileDescriptor, error) {
-	fdps := map[string]*descriptor.FileDescriptorProto{}
+	fdps := map[string]*descriptorpb.FileDescriptorProto{}
 	for name, file := range files {
 		fdp, err := file.toFileDescriptor(name, trieFn)
 		if err != nil {
@@ -512,7 +512,7 @@ func toFileDescriptors(files map[string]*fileEntry, trieFn func(*typeTrie, strin
 	return fds, nil
 }
 
-func makeFileDesc(fdp *descriptor.FileDescriptorProto, fds map[string]*desc.FileDescriptor, fdps map[string]*descriptor.FileDescriptorProto) (*desc.FileDescriptor, error) {
+func makeFileDesc(fdp *descriptorpb.FileDescriptorProto, fds map[string]*desc.FileDescriptor, fdps map[string]*descriptorpb.FileDescriptorProto) (*desc.FileDescriptor, error) {
 	deps := make([]*desc.FileDescriptor, len(fdp.Dependency))
 	for i, dep := range fdp.Dependency {
 		d := fds[dep]
@@ -546,7 +546,7 @@ type fileEntry struct {
 
 // toFileDescriptor converts this file entry into a file descriptor proto. The given function
 // is used to transform nodes in a typeTrie into message and/or enum descriptor protos.
-func (fe *fileEntry) toFileDescriptor(name string, trieFn func(*typeTrie, string) (proto.Message, error)) (*descriptor.FileDescriptorProto, error) {
+func (fe *fileEntry) toFileDescriptor(name string, trieFn func(*typeTrie, string) (proto.Message, error)) (*descriptorpb.FileDescriptorProto, error) {
 	var pkg bytes.Buffer
 	tt := &fe.types
 	first := true
@@ -572,12 +572,12 @@ func (fe *fileEntry) toFileDescriptor(name string, trieFn func(*typeTrie, string
 		if err != nil {
 			return nil, err
 		}
-		if mdp, ok := pm.(*descriptor.DescriptorProto); ok {
+		if mdp, ok := pm.(*descriptorpb.DescriptorProto); ok {
 			fd.MessageType = append(fd.MessageType, mdp)
-		} else if edp, ok := pm.(*descriptor.EnumDescriptorProto); ok {
+		} else if edp, ok := pm.(*descriptorpb.EnumDescriptorProto); ok {
 			fd.EnumType = append(fd.EnumType, edp)
 		} else {
-			sdp := pm.(*descriptor.ServiceDescriptorProto)
+			sdp := pm.(*descriptorpb.ServiceDescriptorProto)
 			fd.Service = append(fd.Service, sdp)
 		}
 	} else {
@@ -586,12 +586,12 @@ func (fe *fileEntry) toFileDescriptor(name string, trieFn func(*typeTrie, string
 			if err != nil {
 				return nil, err
 			}
-			if mdp, ok := pm.(*descriptor.DescriptorProto); ok {
+			if mdp, ok := pm.(*descriptorpb.DescriptorProto); ok {
 				fd.MessageType = append(fd.MessageType, mdp)
-			} else if edp, ok := pm.(*descriptor.EnumDescriptorProto); ok {
+			} else if edp, ok := pm.(*descriptorpb.EnumDescriptorProto); ok {
 				fd.EnumType = append(fd.EnumType, edp)
 			} else {
-				sdp := pm.(*descriptor.ServiceDescriptorProto)
+				sdp := pm.(*descriptorpb.ServiceDescriptorProto)
 				fd.Service = append(fd.Service, sdp)
 			}
 		}
@@ -636,20 +636,20 @@ func (t *typeTrie) addType(key string, typ proto.Message) {
 // *descriptor.EnumDescriptorProto then it is returned as is. This function
 // should not be used in type tries that may have service descriptors. That will
 // result in a panic.
-func (t *typeTrie) ptypeToDescriptor(name string, mr *MessageRegistry) (*descriptor.DescriptorProto, *descriptor.EnumDescriptorProto) {
+func (t *typeTrie) ptypeToDescriptor(name string, mr *MessageRegistry) (*descriptorpb.DescriptorProto, *descriptorpb.EnumDescriptorProto) {
 	switch typ := t.typ.(type) {
-	case *descriptor.EnumDescriptorProto:
+	case *descriptorpb.EnumDescriptorProto:
 		return nil, typ
-	case *ptype.Enum:
+	case *typepb.Enum:
 		return nil, createEnumDescriptor(typ, mr)
-	case *descriptor.DescriptorProto:
+	case *descriptorpb.DescriptorProto:
 		return typ, nil
 	default:
-		var msg *descriptor.DescriptorProto
+		var msg *descriptorpb.DescriptorProto
 		if t.typ == nil {
 			msg = createIntermediateMessageDescriptor(name)
 		} else {
-			msg = createMessageDescriptor(t.typ.(*ptype.Type), mr)
+			msg = createMessageDescriptor(t.typ.(*typepb.Type), mr)
 		}
 		// sort children for deterministic output
 		var keys []string
@@ -678,23 +678,23 @@ func (t *typeTrie) ptypeToDescriptor(name string, mr *MessageRegistry) (*descrip
 // children.
 func (t *typeTrie) rewriteDescriptor(name string) (proto.Message, error) {
 	if len(t.children) == 0 && t.typ != nil {
-		if mdp, ok := t.typ.(*descriptor.DescriptorProto); ok {
+		if mdp, ok := t.typ.(*descriptorpb.DescriptorProto); ok {
 			if len(mdp.NestedType) == 0 && len(mdp.EnumType) == 0 {
 				return mdp, nil
 			}
-			mdp = proto.Clone(mdp).(*descriptor.DescriptorProto)
+			mdp = proto.Clone(mdp).(*descriptorpb.DescriptorProto)
 			mdp.NestedType = nil
 			mdp.EnumType = nil
 			return mdp, nil
 		}
 		return t.typ, nil
 	}
-	var mdp *descriptor.DescriptorProto
+	var mdp *descriptorpb.DescriptorProto
 	if t.typ == nil {
 		mdp = createIntermediateMessageDescriptor(name)
 	} else {
-		mdp = t.typ.(*descriptor.DescriptorProto)
-		mdp = proto.Clone(mdp).(*descriptor.DescriptorProto)
+		mdp = t.typ.(*descriptorpb.DescriptorProto)
+		mdp = proto.Clone(mdp).(*descriptorpb.DescriptorProto)
 		mdp.NestedType = nil
 		mdp.EnumType = nil
 	}
@@ -710,9 +710,9 @@ func (t *typeTrie) rewriteDescriptor(name string) (proto.Message, error) {
 			return nil, err
 		}
 		switch typ := typ.(type) {
-		case (*descriptor.DescriptorProto):
+		case (*descriptorpb.DescriptorProto):
 			mdp.NestedType = append(mdp.NestedType, typ)
-		case (*descriptor.EnumDescriptorProto):
+		case (*descriptorpb.EnumDescriptorProto):
 			mdp.EnumType = append(mdp.EnumType, typ)
 		default:
 			// TODO: this should probably panic instead
@@ -731,63 +731,63 @@ func split(s string) (string, string) {
 	}
 }
 
-func createEnumDescriptor(e *ptype.Enum, mr *MessageRegistry) *descriptor.EnumDescriptorProto {
-	var opts *descriptor.EnumOptions
+func createEnumDescriptor(e *typepb.Enum, mr *MessageRegistry) *descriptorpb.EnumDescriptorProto {
+	var opts *descriptorpb.EnumOptions
 	if len(e.Options) > 0 {
 		dopts := createOptions(e.Options, enumOptionsDesc, mr)
-		opts = &descriptor.EnumOptions{}
+		opts = &descriptorpb.EnumOptions{}
 		dopts.ConvertTo(opts) // ignore any error
 	}
 
-	var vals []*descriptor.EnumValueDescriptorProto
+	var vals []*descriptorpb.EnumValueDescriptorProto
 	for _, v := range e.Enumvalue {
 		evd := createEnumValueDescriptor(v, mr)
 		vals = append(vals, evd)
 	}
 
-	return &descriptor.EnumDescriptorProto{
+	return &descriptorpb.EnumDescriptorProto{
 		Name:    proto.String(base(e.Name)),
 		Options: opts,
 		Value:   vals,
 	}
 }
 
-func createEnumValueDescriptor(v *ptype.EnumValue, mr *MessageRegistry) *descriptor.EnumValueDescriptorProto {
-	var opts *descriptor.EnumValueOptions
+func createEnumValueDescriptor(v *typepb.EnumValue, mr *MessageRegistry) *descriptorpb.EnumValueDescriptorProto {
+	var opts *descriptorpb.EnumValueOptions
 	if len(v.Options) > 0 {
 		dopts := createOptions(v.Options, enumValueOptionsDesc, mr)
-		opts = &descriptor.EnumValueOptions{}
+		opts = &descriptorpb.EnumValueOptions{}
 		dopts.ConvertTo(opts) // ignore any error
 	}
 
-	return &descriptor.EnumValueDescriptorProto{
+	return &descriptorpb.EnumValueDescriptorProto{
 		Name:    proto.String(v.Name),
 		Number:  proto.Int32(v.Number),
 		Options: opts,
 	}
 }
 
-func createMessageDescriptor(m *ptype.Type, mr *MessageRegistry) *descriptor.DescriptorProto {
-	var opts *descriptor.MessageOptions
+func createMessageDescriptor(m *typepb.Type, mr *MessageRegistry) *descriptorpb.DescriptorProto {
+	var opts *descriptorpb.MessageOptions
 	if len(m.Options) > 0 {
 		dopts := createOptions(m.Options, msgOptionsDesc, mr)
-		opts = &descriptor.MessageOptions{}
+		opts = &descriptorpb.MessageOptions{}
 		dopts.ConvertTo(opts) // ignore any error
 	}
 
-	var fields []*descriptor.FieldDescriptorProto
+	var fields []*descriptorpb.FieldDescriptorProto
 	for _, f := range m.Fields {
 		fields = append(fields, createFieldDescriptor(f, mr))
 	}
 
-	var oneOfs []*descriptor.OneofDescriptorProto
+	var oneOfs []*descriptorpb.OneofDescriptorProto
 	for _, o := range m.Oneofs {
-		oneOfs = append(oneOfs, &descriptor.OneofDescriptorProto{
+		oneOfs = append(oneOfs, &descriptorpb.OneofDescriptorProto{
 			Name: proto.String(o),
 		})
 	}
 
-	return &descriptor.DescriptorProto{
+	return &descriptorpb.DescriptorProto{
 		Name:      proto.String(base(m.Name)),
 		Options:   opts,
 		Field:     fields,
@@ -795,16 +795,16 @@ func createMessageDescriptor(m *ptype.Type, mr *MessageRegistry) *descriptor.Des
 	}
 }
 
-func createFieldDescriptor(f *ptype.Field, mr *MessageRegistry) *descriptor.FieldDescriptorProto {
-	var opts *descriptor.FieldOptions
+func createFieldDescriptor(f *typepb.Field, mr *MessageRegistry) *descriptorpb.FieldDescriptorProto {
+	var opts *descriptorpb.FieldOptions
 	if len(f.Options) > 0 {
 		dopts := createOptions(f.Options, fieldOptionsDesc, mr)
-		opts = &descriptor.FieldOptions{}
+		opts = &descriptorpb.FieldOptions{}
 		dopts.ConvertTo(opts) // ignore any error
 	}
 	if f.Packed {
 		if opts == nil {
-			opts = &descriptor.FieldOptions{Packed: proto.Bool(true)}
+			opts = &descriptorpb.FieldOptions{Packed: proto.Bool(true)}
 		} else {
 			opts.Packed = proto.Bool(true)
 		}
@@ -816,69 +816,68 @@ func createFieldDescriptor(f *ptype.Field, mr *MessageRegistry) *descriptor.Fiel
 	}
 
 	var typeName string
-	if f.Kind == ptype.Field_TYPE_GROUP || f.Kind == ptype.Field_TYPE_MESSAGE || f.Kind == ptype.Field_TYPE_ENUM {
+	if f.Kind == typepb.Field_TYPE_GROUP || f.Kind == typepb.Field_TYPE_MESSAGE || f.Kind == typepb.Field_TYPE_ENUM {
 		pos := strings.LastIndex(f.TypeUrl, "/")
 		typeName = "." + f.TypeUrl[pos+1:]
 	}
 
-	var label descriptor.FieldDescriptorProto_Label
+	var label descriptorpb.FieldDescriptorProto_Label
 	switch f.Cardinality {
-	case ptype.Field_CARDINALITY_OPTIONAL:
-		label = descriptor.FieldDescriptorProto_LABEL_OPTIONAL
-	case ptype.Field_CARDINALITY_REPEATED:
-		label = descriptor.FieldDescriptorProto_LABEL_REPEATED
-	case ptype.Field_CARDINALITY_REQUIRED:
-		label = descriptor.FieldDescriptorProto_LABEL_REQUIRED
+	case typepb.Field_CARDINALITY_OPTIONAL:
+		label = descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL
+	case typepb.Field_CARDINALITY_REPEATED:
+		label = descriptorpb.FieldDescriptorProto_LABEL_REPEATED
+	case typepb.Field_CARDINALITY_REQUIRED:
+		label = descriptorpb.FieldDescriptorProto_LABEL_REQUIRED
 	}
 
-	var typ descriptor.FieldDescriptorProto_Type
+	var typ descriptorpb.FieldDescriptorProto_Type
 	switch f.Kind {
-	case ptype.Field_TYPE_ENUM:
-		typ = descriptor.FieldDescriptorProto_TYPE_ENUM
-	case ptype.Field_TYPE_GROUP:
-		typ = descriptor.FieldDescriptorProto_TYPE_GROUP
-	case ptype.Field_TYPE_MESSAGE:
-		typ = descriptor.FieldDescriptorProto_TYPE_MESSAGE
-	case ptype.Field_TYPE_BYTES:
-		typ = descriptor.FieldDescriptorProto_TYPE_BYTES
-	case ptype.Field_TYPE_STRING:
-		typ = descriptor.FieldDescriptorProto_TYPE_STRING
-	case ptype.Field_TYPE_BOOL:
-		typ = descriptor.FieldDescriptorProto_TYPE_BOOL
-	case ptype.Field_TYPE_DOUBLE:
-		typ = descriptor.FieldDescriptorProto_TYPE_DOUBLE
-	case ptype.Field_TYPE_FLOAT:
-		typ = descriptor.FieldDescriptorProto_TYPE_FLOAT
-	case ptype.Field_TYPE_FIXED32:
-		typ = descriptor.FieldDescriptorProto_TYPE_FIXED32
-	case ptype.Field_TYPE_FIXED64:
-		typ = descriptor.FieldDescriptorProto_TYPE_FIXED64
-	case ptype.Field_TYPE_INT32:
-		typ = descriptor.FieldDescriptorProto_TYPE_INT32
-	case ptype.Field_TYPE_INT64:
-		typ = descriptor.FieldDescriptorProto_TYPE_INT64
-	case ptype.Field_TYPE_SFIXED32:
-		typ = descriptor.FieldDescriptorProto_TYPE_SFIXED32
-	case ptype.Field_TYPE_SFIXED64:
-		typ = descriptor.FieldDescriptorProto_TYPE_SFIXED64
-	case ptype.Field_TYPE_SINT32:
-		typ = descriptor.FieldDescriptorProto_TYPE_SINT32
-	case ptype.Field_TYPE_SINT64:
-		typ = descriptor.FieldDescriptorProto_TYPE_SINT64
-	case ptype.Field_TYPE_UINT32:
-		typ = descriptor.FieldDescriptorProto_TYPE_UINT32
-	case ptype.Field_TYPE_UINT64:
-		typ = descriptor.FieldDescriptorProto_TYPE_UINT64
+	case typepb.Field_TYPE_ENUM:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_ENUM
+	case typepb.Field_TYPE_GROUP:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_GROUP
+	case typepb.Field_TYPE_MESSAGE:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_MESSAGE
+	case typepb.Field_TYPE_BYTES:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_BYTES
+	case typepb.Field_TYPE_STRING:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_STRING
+	case typepb.Field_TYPE_BOOL:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_BOOL
+	case typepb.Field_TYPE_DOUBLE:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_DOUBLE
+	case typepb.Field_TYPE_FLOAT:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_FLOAT
+	case typepb.Field_TYPE_FIXED32:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_FIXED32
+	case typepb.Field_TYPE_FIXED64:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_FIXED64
+	case typepb.Field_TYPE_INT32:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_INT32
+	case typepb.Field_TYPE_INT64:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_INT64
+	case typepb.Field_TYPE_SFIXED32:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_SFIXED32
+	case typepb.Field_TYPE_SFIXED64:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_SFIXED64
+	case typepb.Field_TYPE_SINT32:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_SINT32
+	case typepb.Field_TYPE_SINT64:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_SINT64
+	case typepb.Field_TYPE_UINT32:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_UINT32
+	case typepb.Field_TYPE_UINT64:
+		typ = descriptorpb.FieldDescriptorProto_TYPE_UINT64
 	}
-	var defVal *string
+	var defaultVal *string
 	if f.DefaultValue != "" {
-		defVal = proto.String(f.DefaultValue)
+		defaultVal = proto.String(f.DefaultValue)
 	}
-
-	return &descriptor.FieldDescriptorProto{
+	return &descriptorpb.FieldDescriptorProto{
 		Name:         proto.String(f.Name),
 		Number:       proto.Int32(f.Number),
-		DefaultValue: defVal,
+		DefaultValue: defaultVal,
 		JsonName:     proto.String(f.JsonName),
 		OneofIndex:   oneOf,
 		TypeName:     proto.String(typeName),
@@ -888,31 +887,31 @@ func createFieldDescriptor(f *ptype.Field, mr *MessageRegistry) *descriptor.Fiel
 	}
 }
 
-func createServiceDescriptor(a *api.Api, mr *MessageRegistry) *descriptor.ServiceDescriptorProto {
-	var opts *descriptor.ServiceOptions
+func createServiceDescriptor(a *apipb.Api, mr *MessageRegistry) *descriptorpb.ServiceDescriptorProto {
+	var opts *descriptorpb.ServiceOptions
 	if len(a.Options) > 0 {
 		dopts := createOptions(a.Options, svcOptionsDesc, mr)
-		opts = &descriptor.ServiceOptions{}
+		opts = &descriptorpb.ServiceOptions{}
 		dopts.ConvertTo(opts) // ignore any error
 	}
 
-	methods := make([]*descriptor.MethodDescriptorProto, len(a.Methods))
+	methods := make([]*descriptorpb.MethodDescriptorProto, len(a.Methods))
 	for i, m := range a.Methods {
 		methods[i] = createMethodDescriptor(m, mr)
 	}
 
-	return &descriptor.ServiceDescriptorProto{
+	return &descriptorpb.ServiceDescriptorProto{
 		Name:    proto.String(base(a.Name)),
 		Method:  methods,
 		Options: opts,
 	}
 }
 
-func createMethodDescriptor(m *api.Method, mr *MessageRegistry) *descriptor.MethodDescriptorProto {
-	var opts *descriptor.MethodOptions
+func createMethodDescriptor(m *apipb.Method, mr *MessageRegistry) *descriptorpb.MethodDescriptorProto {
+	var opts *descriptorpb.MethodOptions
 	if len(m.Options) > 0 {
 		dopts := createOptions(m.Options, methodOptionsDesc, mr)
-		opts = &descriptor.MethodOptions{}
+		opts = &descriptorpb.MethodOptions{}
 		dopts.ConvertTo(opts) // ignore any error
 	}
 
@@ -922,7 +921,7 @@ func createMethodDescriptor(m *api.Method, mr *MessageRegistry) *descriptor.Meth
 	pos = strings.LastIndex(m.ResponseTypeUrl, "/")
 	respType = "." + m.ResponseTypeUrl[pos+1:]
 
-	return &descriptor.MethodDescriptorProto{
+	return &descriptorpb.MethodDescriptorProto{
 		Name:            proto.String(m.Name),
 		Options:         opts,
 		ClientStreaming: proto.Bool(m.RequestStreaming),
@@ -932,13 +931,13 @@ func createMethodDescriptor(m *api.Method, mr *MessageRegistry) *descriptor.Meth
 	}
 }
 
-func createIntermediateMessageDescriptor(name string) *descriptor.DescriptorProto {
-	return &descriptor.DescriptorProto{
+func createIntermediateMessageDescriptor(name string) *descriptorpb.DescriptorProto {
+	return &descriptorpb.DescriptorProto{
 		Name: proto.String(name),
 	}
 }
 
-func createFileDescriptor(name, pkg string, proto3 bool, deps map[string]struct{}) *descriptor.FileDescriptorProto {
+func createFileDescriptor(name, pkg string, proto3 bool, deps map[string]struct{}) *descriptorpb.FileDescriptorProto {
 	imports := make([]string, 0, len(deps))
 	for k := range deps {
 		imports = append(imports, k)
@@ -950,7 +949,7 @@ func createFileDescriptor(name, pkg string, proto3 bool, deps map[string]struct{
 	} else {
 		syntax = "proto2"
 	}
-	return &descriptor.FileDescriptorProto{
+	return &descriptorpb.FileDescriptorProto{
 		Name:       proto.String(name),
 		Package:    proto.String(pkg),
 		Syntax:     proto.String(syntax),
@@ -958,7 +957,7 @@ func createFileDescriptor(name, pkg string, proto3 bool, deps map[string]struct{
 	}
 }
 
-func createOptions(options []*ptype.Option, optionsDesc *desc.MessageDescriptor, mr *MessageRegistry) *dynamic.Message {
+func createOptions(options []*typepb.Option, optionsDesc *desc.MessageDescriptor, mr *MessageRegistry) *dynamic.Message {
 	// these are created "best effort" so entries which are unresolvable
 	// (or seemingly invalid) are simply ignored...
 	dopts := mr.mf.NewDynamicMessage(optionsDesc)
@@ -977,8 +976,8 @@ func createOptions(options []*ptype.Option, optionsDesc *desc.MessageDescriptor,
 		v, err := mr.unmarshalAny(o.Value, func(url string) (*desc.MessageDescriptor, error) {
 			// we don't want to try to recursively fetch this value's type, so if it doesn't
 			// match the type of the extension field, we'll skip it
-			if (field.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP ||
-				field.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE) &&
+			if (field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP ||
+				field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE) &&
 				typeName(url) == field.GetMessageType().GetFullyQualifiedName() {
 
 				return field.GetMessageType(), nil
@@ -990,7 +989,7 @@ func createOptions(options []*ptype.Option, optionsDesc *desc.MessageDescriptor,
 			continue
 		}
 		var fv interface{}
-		if field.GetType() != descriptor.FieldDescriptorProto_TYPE_MESSAGE && field.GetType() != descriptor.FieldDescriptorProto_TYPE_GROUP {
+		if field.GetType() != descriptorpb.FieldDescriptorProto_TYPE_MESSAGE && field.GetType() != descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 			fv = unwrap(v)
 			if v == nil {
 				// non-wrapper type for scalar field? skip it
@@ -1018,23 +1017,23 @@ func base(name string) string {
 
 func unwrap(msg proto.Message) interface{} {
 	switch m := msg.(type) {
-	case (*wrappers.BoolValue):
+	case (*wrapperspb.BoolValue):
 		return m.Value
-	case (*wrappers.FloatValue):
+	case (*wrapperspb.FloatValue):
 		return m.Value
-	case (*wrappers.DoubleValue):
+	case (*wrapperspb.DoubleValue):
 		return m.Value
-	case (*wrappers.Int32Value):
+	case (*wrapperspb.Int32Value):
 		return m.Value
-	case (*wrappers.Int64Value):
+	case (*wrapperspb.Int64Value):
 		return m.Value
-	case (*wrappers.UInt32Value):
+	case (*wrapperspb.UInt32Value):
 		return m.Value
-	case (*wrappers.UInt64Value):
+	case (*wrapperspb.UInt64Value):
 		return m.Value
-	case (*wrappers.BytesValue):
+	case (*wrapperspb.BytesValue):
 		return m.Value
-	case (*wrappers.StringValue):
+	case (*wrapperspb.StringValue):
 		return m.Value
 	default:
 		return nil

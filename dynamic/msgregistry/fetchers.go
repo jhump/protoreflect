@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
-	"google.golang.org/genproto/protobuf/ptype"
+	"google.golang.org/protobuf/types/known/typepb"
 )
 
 // TypeFetcher is a simple operation that retrieves a type definition for a given type URL.
@@ -29,7 +29,7 @@ func CachingTypeFetcher(fetcher TypeFetcher) TypeFetcher {
 		if err != nil {
 			return nil, err
 		}
-		if _, isEnum := m.(*ptype.Enum); enum != isEnum {
+		if _, isEnum := m.(*typepb.Enum); enum != isEnum {
 			var want, got string
 			if enum {
 				want = "enum"
@@ -146,13 +146,13 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 
 		// now we can de-serialize the type definition
 		if enum {
-			var ret ptype.Enum
+			var ret typepb.Enum
 			if err = proto.Unmarshal(b.Bytes(), &ret); err != nil {
 				return nil, err
 			}
 			return &ret, nil
 		} else {
-			var ret ptype.Type
+			var ret typepb.Type
 			if err = proto.Unmarshal(b.Bytes(), &ret); err != nil {
 				return nil, err
 			}
