@@ -5,13 +5,13 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/duration"
-	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/golang/protobuf/ptypes/struct"
-	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal/testprotos"
@@ -19,19 +19,19 @@ import (
 )
 
 var wellKnownTypes = []proto.Message{
-	(*wrappers.BoolValue)(nil),
-	(*wrappers.BytesValue)(nil),
-	(*wrappers.StringValue)(nil),
-	(*wrappers.FloatValue)(nil),
-	(*wrappers.DoubleValue)(nil),
-	(*wrappers.Int32Value)(nil),
-	(*wrappers.Int64Value)(nil),
-	(*wrappers.UInt32Value)(nil),
-	(*wrappers.UInt64Value)(nil),
-	(*timestamp.Timestamp)(nil),
-	(*duration.Duration)(nil),
-	(*any.Any)(nil),
-	(*empty.Empty)(nil),
+	(*wrapperspb.BoolValue)(nil),
+	(*wrapperspb.BytesValue)(nil),
+	(*wrapperspb.StringValue)(nil),
+	(*wrapperspb.FloatValue)(nil),
+	(*wrapperspb.DoubleValue)(nil),
+	(*wrapperspb.Int32Value)(nil),
+	(*wrapperspb.Int64Value)(nil),
+	(*wrapperspb.UInt32Value)(nil),
+	(*wrapperspb.UInt64Value)(nil),
+	(*timestamppb.Timestamp)(nil),
+	(*durationpb.Duration)(nil),
+	(*anypb.Any)(nil),
+	(*emptypb.Empty)(nil),
 	(*structpb.Struct)(nil),
 	(*structpb.Value)(nil),
 	(*structpb.ListValue)(nil),
@@ -39,31 +39,31 @@ var wellKnownTypes = []proto.Message{
 
 func TestKnownTypeRegistry_AddKnownType(t *testing.T) {
 	ktr := &KnownTypeRegistry{}
-	dp := (*descriptor.DescriptorProto)(nil)
+	dp := (*descriptorpb.DescriptorProto)(nil)
 	ktr.AddKnownType(dp)
 
 	checkKnownTypes(t, ktr, wellKnownTypes...)
 	checkKnownTypes(t, ktr, dp)
-	checkUnknownTypes(t, ktr, (*descriptor.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
+	checkUnknownTypes(t, ktr, (*descriptorpb.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
 }
 
 func TestKnownTypeRegistry_WithoutWellKnownTypes(t *testing.T) {
 	ktr := NewKnownTypeRegistryWithoutWellKnownTypes()
-	dp := (*descriptor.DescriptorProto)(nil)
+	dp := (*descriptorpb.DescriptorProto)(nil)
 	ktr.AddKnownType(dp)
 
 	checkKnownTypes(t, ktr, dp)
 	checkUnknownTypes(t, ktr, wellKnownTypes...)
-	checkUnknownTypes(t, ktr, (*descriptor.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
+	checkUnknownTypes(t, ktr, (*descriptorpb.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
 }
 
 func TestKnownTypeRegistry_WithDefaults(t *testing.T) {
 	ktr := NewKnownTypeRegistryWithDefaults()
-	dp := (*descriptor.DescriptorProto)(nil)
+	dp := (*descriptorpb.DescriptorProto)(nil)
 
 	// they're all known
 	checkKnownTypes(t, ktr, dp)
-	checkKnownTypes(t, ktr, (*descriptor.DescriptorProto)(nil), (*descriptor.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
+	checkKnownTypes(t, ktr, (*descriptorpb.DescriptorProto)(nil), (*descriptorpb.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
 }
 
 func checkKnownTypes(t *testing.T, ktr *KnownTypeRegistry, knownTypes ...proto.Message) {
@@ -89,14 +89,14 @@ func TestMessageFactory(t *testing.T) {
 	mf := &MessageFactory{}
 
 	checkTypes(t, mf, false, wellKnownTypes...)
-	checkTypes(t, mf, true, (*descriptor.DescriptorProto)(nil), (*descriptor.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
+	checkTypes(t, mf, true, (*descriptorpb.DescriptorProto)(nil), (*descriptorpb.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
 }
 
 func TestMessageFactory_WithDefaults(t *testing.T) {
 	mf := NewMessageFactoryWithDefaults()
 
 	checkTypes(t, mf, false, wellKnownTypes...)
-	checkTypes(t, mf, false, (*descriptor.DescriptorProto)(nil), (*descriptor.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
+	checkTypes(t, mf, false, (*descriptorpb.DescriptorProto)(nil), (*descriptorpb.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
 }
 
 func TestMessageFactory_WithKnownTypeRegistry(t *testing.T) {
@@ -104,7 +104,7 @@ func TestMessageFactory_WithKnownTypeRegistry(t *testing.T) {
 	mf := NewMessageFactoryWithKnownTypeRegistry(ktr)
 
 	checkTypes(t, mf, true, wellKnownTypes...)
-	checkTypes(t, mf, true, (*descriptor.DescriptorProto)(nil), (*descriptor.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
+	checkTypes(t, mf, true, (*descriptorpb.DescriptorProto)(nil), (*descriptorpb.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
 }
 
 func checkTypes(t *testing.T, mf *MessageFactory, dynamic bool, types ...proto.Message) {
