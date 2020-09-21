@@ -10,6 +10,6 @@ require (
 	golang.org/x/tools v0.0.0-20200717024301-6ddee64345a6 // indirect
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
 	google.golang.org/grpc v1.27.0
-	google.golang.org/protobuf v1.25.1-0.20200805231151-a709e31e5d12
+	google.golang.org/protobuf v1.25.0
 	honnef.co/go/tools v0.0.1-2020.1.4 // indirect
 )
