@@ -22,6 +22,7 @@ type linker struct {
 	descriptorPool map[*descriptorpb.FileDescriptorProto]map[string]proto.Message
 	extensions     map[string]map[int32]string
 	descriptors    map[proto.Message]protoreflect.Descriptor
+	usedImports    map[*descriptorpb.FileDescriptorProto]map[string]struct{}
 }
 
 func newLinker(files *parseResults, errs *errorHandler) *linker {
@@ -32,6 +33,7 @@ func newLinker(files *parseResults, errs *errorHandler) *linker {
 		descriptorPool: map[*descriptorpb.FileDescriptorProto]map[string]proto.Message{},
 		extensions:     map[string]map[int32]string{},
 		descriptors:    map[proto.Message]protoreflect.Descriptor{},
+		usedImports:    map[*descriptorpb.FileDescriptorProto]map[string]struct{}{},
 	}
 }
 
@@ -78,6 +80,7 @@ func (l *linker) linkFiles() error {
 	if err := l.errs.getError(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -520,9 +523,9 @@ opts:
 func (l *linker) resolve(fd *descriptorpb.FileDescriptorProto, name string, allowed func(proto.Message) bool, scopes []scope) (fqn string, element proto.Message, proto3 bool) {
 	if strings.HasPrefix(name, ".") {
 		// already fully-qualified
-		d, proto3 := l.findSymbol(fd, name[1:], false, map[*descriptorpb.FileDescriptorProto]struct{}{})
+		srcFd, d := l.findElement(fd, name[1:])
 		if d != nil {
-			return name[1:], d, proto3
+			return name[1:], d, isProto3(srcFd)
 		}
 	} else {
 		// unqualified, so we look in the enclosing (last) scope first and move
@@ -585,9 +588,9 @@ func fileScope(fd *descriptorpb.FileDescriptorProto, l *linker) scope {
 			} else {
 				n = prefix + "." + name
 			}
-			d, proto3 := l.findSymbol(fd, n, false, map[*descriptorpb.FileDescriptorProto]struct{}{})
+			srcFd, d := l.findElement(fd, n)
 			if d != nil {
-				return n, d, proto3
+				return n, d, isProto3(srcFd)
 			}
 		}
 		return "", nil, false
@@ -602,12 +605,6 @@ func messageScope(messageName string, proto3 bool, filePool map[string]proto.Mes
 		}
 		return "", nil, false
 	}
-}
-
-// TODO: consolidate with findElement
-func (l *linker) findSymbol(fd *descriptorpb.FileDescriptorProto, name string, public bool, checked map[*descriptorpb.FileDescriptorProto]struct{}) (element proto.Message, proto3 bool) {
-	fd, d := l.findElement(fd, name, public, checked)
-	return d, isProto3(fd)
 }
 
 func isProto3(fd *descriptorpb.FileDescriptorProto) bool {
@@ -775,4 +772,38 @@ func (l *linker) checkMessageSetsExtension(fld *descriptorpb.FieldDescriptorProt
 		return errorWithPos(pos, "tag number %d is higher than max allowed tag number (%d)", fld.GetNumber(), internal.MaxNormalTag)
 	}
 	return nil
+}
+
+func (l *linker) checkForUnusedImports(filename string) {
+	r := l.files[filename]
+	usedImports := l.usedImports[r.fd]
+	node := r.nodes[r.fd]
+	fileNode, _ := node.(*fileNode)
+	for i, dep := range r.fd.Dependency {
+		if _, ok := usedImports[dep]; !ok {
+			isPublic := false
+			// it's fine if it's a public import
+			for _, j := range r.fd.PublicDependency {
+				if i == int(j) {
+					isPublic = true
+					break
+				}
+			}
+			if isPublic {
+				break
+			}
+			var pos *SourcePos
+			if fileNode != nil {
+				for _, imp := range fileNode.imports {
+					if imp.name.val == dep {
+						pos = imp.start()
+					}
+				}
+			}
+			if pos == nil {
+				pos = unknownPos(r.fd.GetName())
+			}
+			r.errs.warn(pos, errUnusedImport(dep))
+		}
+	}
 }

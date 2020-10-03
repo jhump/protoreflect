@@ -1160,7 +1160,7 @@ func (m *mtdDescriptor) IsStreamingServer() bool {
 
 func (l *linker) findMessageType(entryPoint *descriptorpb.FileDescriptorProto, fqn string) protoreflect.MessageDescriptor {
 	fqn = strings.TrimPrefix(fqn, ".")
-	fd, d := l.findElement(entryPoint, fqn, false, map[*descriptorpb.FileDescriptorProto]struct{}{})
+	fd, d := l.findElement(entryPoint, fqn)
 	msg, ok := d.(*descriptorpb.DescriptorProto)
 	if !ok {
 		return nil
@@ -1176,7 +1176,7 @@ func (l *linker) findMessageType(entryPoint *descriptorpb.FileDescriptorProto, f
 
 func (l *linker) findEnumType(entryPoint *descriptorpb.FileDescriptorProto, fqn string) protoreflect.EnumDescriptor {
 	fqn = strings.TrimPrefix(fqn, ".")
-	fd, d := l.findElement(entryPoint, fqn, false, map[*descriptorpb.FileDescriptorProto]struct{}{})
+	fd, d := l.findElement(entryPoint, fqn)
 	en, ok := d.(*descriptorpb.EnumDescriptorProto)
 	if !ok {
 		return nil
@@ -1192,7 +1192,7 @@ func (l *linker) findEnumType(entryPoint *descriptorpb.FileDescriptorProto, fqn 
 
 func (l *linker) findExtension(entryPoint *descriptorpb.FileDescriptorProto, fqn string) protoreflect.ExtensionDescriptor {
 	fqn = strings.TrimPrefix(fqn, ".")
-	fd, d := l.findElement(entryPoint, fqn, false, map[*descriptorpb.FileDescriptorProto]struct{}{})
+	fd, d := l.findElement(entryPoint, fqn)
 	fld, ok := d.(*descriptorpb.FieldDescriptorProto)
 	if !ok {
 		return nil
@@ -1210,14 +1210,23 @@ func (l *linker) findExtension(entryPoint *descriptorpb.FileDescriptorProto, fqn
 	return l.asFieldDescriptor(fld, file, parent, index, fqn)
 }
 
-func (l *linker) findElement(fd *descriptorpb.FileDescriptorProto, fqn string, public bool, checked map[*descriptorpb.FileDescriptorProto]struct{}) (*descriptorpb.FileDescriptorProto, proto.Message) {
+func (l *linker) findElement(entryPoint *descriptorpb.FileDescriptorProto, fqn string) (*descriptorpb.FileDescriptorProto, proto.Message) {
+	importedFd, srcFd, d := l.findElementRecursive(entryPoint, fqn, false, map[*descriptorpb.FileDescriptorProto]struct{}{})
+	if importedFd != nil {
+		l.markUsed(entryPoint, importedFd)
+	}
+	return srcFd, d
+}
+
+func (l *linker) findElementRecursive(fd *descriptorpb.FileDescriptorProto, fqn string, public bool, checked map[*descriptorpb.FileDescriptorProto]struct{}) (imported *descriptorpb.FileDescriptorProto, final *descriptorpb.FileDescriptorProto, element proto.Message) {
 	if _, ok := checked[fd]; ok {
-		return nil, nil
+		return nil, nil, nil
 	}
 	checked[fd] = struct{}{}
 	d := l.descriptorPool[fd][fqn]
 	if d != nil {
-		return fd, d
+		// not imported, but present in fd
+		return nil, fd, d
 	}
 
 	// When public = false, we are searching only directly imported symbols. But we
@@ -1226,28 +1235,37 @@ func (l *linker) findElement(fd *descriptorpb.FileDescriptorProto, fqn string, p
 		for _, dep := range fd.GetPublicDependency() {
 			depFile := l.files[fd.GetDependency()[dep]]
 			if depFile == nil {
-				return nil, nil
+				return nil, nil, nil
 			}
 			depFd := depFile.fd
-			fd, d := l.findElement(depFd, fqn, true, checked)
+			_, srcFd, d := l.findElementRecursive(depFd, fqn, true, checked)
 			if d != nil {
-				return fd, d
+				return depFd, srcFd, d
 			}
 		}
 	} else {
 		for _, dep := range fd.GetDependency() {
 			depFile := l.files[dep]
 			if depFile == nil {
-				return nil, nil
+				return nil, nil, nil
 			}
 			depFd := depFile.fd
-			fd, d := l.findElement(depFd, fqn, true, checked)
+			_, srcFd, d := l.findElementRecursive(depFd, fqn, true, checked)
 			if d != nil {
-				return fd, d
+				return depFd, srcFd, d
 			}
 		}
 	}
-	return nil, nil
+	return nil, nil, nil
+}
+
+func (l *linker) markUsed(entryPoint, used *descriptorpb.FileDescriptorProto) {
+	importsForFile := l.usedImports[entryPoint]
+	if importsForFile == nil {
+		importsForFile = map[string]struct{}{}
+		l.usedImports[entryPoint] = importsForFile
+	}
+	importsForFile[used.GetName()] = struct{}{}
 }
 
 func findParent(l *linker, file *fileDescriptor, fqn string) (protoreflect.Descriptor, int) {
