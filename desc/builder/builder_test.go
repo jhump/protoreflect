@@ -1380,6 +1380,33 @@ func TestRemoveField(t *testing.T) {
 	testutil.Eq(t, "three", children[1].GetName())
 }
 
+func TestInterleavedFieldNumbers(t *testing.T) {
+	msg := NewMessage("MessageWithInterleavedFieldNumbers").
+		AddField(NewField("one", FieldTypeInt64()).SetNumber(1)).
+		AddField(NewField("two", FieldTypeInt64())).
+		AddField(NewField("three", FieldTypeString()).SetNumber(3)).
+		AddField(NewField("four", FieldTypeInt64())).
+		AddField(NewField("five", FieldTypeString()).SetNumber(5))
+
+	md, err := msg.Build()
+	testutil.Ok(t, err)
+
+	testutil.Require(t, md.FindFieldByName("one") != nil)
+	testutil.Require(t, md.FindFieldByName("one").GetNumber() == 1)
+
+	testutil.Require(t, md.FindFieldByName("two") != nil)
+	testutil.Require(t, md.FindFieldByName("two").GetNumber() == 2)
+
+	testutil.Require(t, md.FindFieldByName("three") != nil)
+	testutil.Require(t, md.FindFieldByName("three").GetNumber() == 3)
+
+	testutil.Require(t, md.FindFieldByName("four") != nil)
+	testutil.Require(t, md.FindFieldByName("four").GetNumber() == 4)
+
+	testutil.Require(t, md.FindFieldByName("five") != nil)
+	testutil.Require(t, md.FindFieldByName("five").GetNumber() == 5)
+}
+
 func clone(t *testing.T, fb *FileBuilder) *FileBuilder {
 	fd, err := fb.Build()
 	testutil.Ok(t, err)
