@@ -1392,19 +1392,19 @@ func TestInterleavedFieldNumbers(t *testing.T) {
 	testutil.Ok(t, err)
 
 	testutil.Require(t, md.FindFieldByName("one") != nil)
-	testutil.Require(t, md.FindFieldByName("one").GetNumber() == 1)
+	testutil.Eq(t, int32(1), md.FindFieldByName("one").GetNumber())
 
 	testutil.Require(t, md.FindFieldByName("two") != nil)
-	testutil.Require(t, md.FindFieldByName("two").GetNumber() == 2)
+	testutil.Eq(t, int32(2), md.FindFieldByName("two").GetNumber())
 
 	testutil.Require(t, md.FindFieldByName("three") != nil)
-	testutil.Require(t, md.FindFieldByName("three").GetNumber() == 3)
+	testutil.Eq(t, int32(3), md.FindFieldByName("three").GetNumber())
 
 	testutil.Require(t, md.FindFieldByName("four") != nil)
-	testutil.Require(t, md.FindFieldByName("four").GetNumber() == 4)
+	testutil.Eq(t, int32(4), md.FindFieldByName("four").GetNumber())
 
 	testutil.Require(t, md.FindFieldByName("five") != nil)
-	testutil.Require(t, md.FindFieldByName("five").GetNumber() == 5)
+	testutil.Eq(t, int32(5), md.FindFieldByName("five").GetNumber())
 }
 
 func clone(t *testing.T, fb *FileBuilder) *FileBuilder {
