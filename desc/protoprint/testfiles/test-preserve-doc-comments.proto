@@ -4,7 +4,7 @@ package foo.bar;
 
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
-import "google/protobuf/empty.proto";
+import public "google/protobuf/empty.proto";
 
 import "desc_test_options.proto";
 

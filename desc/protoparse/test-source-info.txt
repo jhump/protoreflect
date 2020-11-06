@@ -50,7 +50,7 @@ desc_test_comments.proto:15:75
 
  > dependency[0]:
 desc_test_comments.proto:17:1
-desc_test_comments.proto:17:38
+desc_test_comments.proto:17:45
 
 
  > dependency[1]:

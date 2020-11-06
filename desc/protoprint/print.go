@@ -455,7 +455,7 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 	if fdp.Package != nil {
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_packageTag, elementIndex: 0, order: -3})
 	}
-	for i := range fd.AsFileDescriptorProto().GetDependency() {
+	for i := range fdp.GetDependency() {
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_dependencyTag, elementIndex: i, order: -2})
 	}
 	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.File_optionsTag, -1, opts)...)
@@ -506,8 +506,23 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 			})
 		case imp:
 			si := sourceInfo.Get(path)
+			var modifier string
+			for _, idx := range fdp.PublicDependency {
+				if fdp.Dependency[idx] == string(d) {
+					modifier = "public "
+					break
+				}
+			}
+			if modifier == "" {
+				for _, idx := range fdp.WeakDependency {
+					if fdp.Dependency[idx] == string(d) {
+						modifier = "weak "
+						break
+					}
+				}
+			}
 			p.printElement(false, si, w, 0, func(w *writer) {
-				fmt.Fprintf(w, "import %q;", d)
+				fmt.Fprintf(w, "import %s%q;", modifier, d)
 			})
 		case []option:
 			p.printOptionsLong(d, w, sourceInfo, path, 0)
