@@ -2,7 +2,7 @@
 syntax = "proto2";
 package foo.bar;
 import "desc_test_options.proto";
-import "google/protobuf/empty.proto";
+import public "google/protobuf/empty.proto";
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 message AnEmptyMessage {
 }
