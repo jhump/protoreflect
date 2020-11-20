@@ -104,6 +104,50 @@ func TestParseAndPrintPreservesAsMuchAsPossible(t *testing.T) {
 	checkFile(t, &Printer{OmitComments: CommentsNonDoc}, fd, "test-preserve-doc-comments.proto")
 }
 
+func TestParseAndPrintWithUnrecognizedOptions(t *testing.T) {
+	files := map[string]string{"test.proto": `
+syntax = "proto3";
+
+import "google/protobuf/descriptor.proto";
+
+message Test {}
+
+message Foo {
+  repeated Bar bar = 1;
+
+  message Bar {
+    Baz baz = 1;
+    string name = 2;
+  }
+
+  enum Baz {
+	ZERO = 0;
+	FROB = 1;
+	NITZ = 2;
+  }
+}
+
+extend google.protobuf.MethodOptions {
+  Foo foo = 54321;
+}
+
+service TestService {
+  rpc Get (Test) returns (Test) {
+    option (foo).bar = { baz:FROB name:"abc" };
+    option (foo).bar = { baz:NITZ name:"xyz" };
+  }
+}
+`}
+
+	pa := &protoparse.Parser{
+		Accessor: protoparse.FileContentsFromMap(files),
+	}
+	fds, err := pa.ParseFiles("test.proto")
+	testutil.Ok(t, err)
+
+	checkFile(t, &Printer{}, fds[0], "test-unrecognized-options.proto")
+}
+
 func TestPrintNonFileDescriptors(t *testing.T) {
 	pa := protoparse.Parser{ImportPaths: []string{"../../internal/testprotos"}, IncludeSourceCodeInfo: true}
 	fds, err := pa.ParseFiles("desc_test_comments.proto")
