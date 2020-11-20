@@ -2529,26 +2529,14 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 
 	// extension fields
 	rexts, _ := proto.ExtensionDescs(pm)
-	type unknownExt struct {
-		tag  int32
-		data []byte
-	}
-	var unknownExtensions []unknownExt
-	unknownExtensionsLen := 0
 	for _, ed := range rexts {
 		v, _ := proto.GetExtension(pm, ed)
 		if v == nil {
 			continue
 		}
 		if ed.ExtensionType == nil {
-			extBytes, _ := v.([]byte)
-			if len(extBytes) > 0 {
-				unknownExtensions = append(unknownExtensions, unknownExt{
-					tag:  ed.Field,
-					data: extBytes,
-				})
-				unknownExtensionsLen += len(extBytes)
-			}
+			// unrecognized extension: we'll handle that below when we
+			// handle other unrecognized fields
 			continue
 		}
 		fd := m.er.FindExtension(m.md.GetFullyQualifiedName(), ed.Field)
@@ -2578,24 +2566,6 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 		_ = m.UnmarshalMerge(data)
 	}
 
-	// lastly, also extract any unknown extensions the message may have (unknown extensions
-	// are stored with other extensions, not in the XXX_unrecognized field, so we have to do
-	// more than just the step above...)
-	if len(unknownExtensions) > 0 {
-		unknownBytes := make([]byte, 0, unknownExtensionsLen)
-		for _, ext := range unknownExtensions {
-			_, ok := m.values[ext.tag]
-			if ok {
-				// skip any tags that have already been processed
-				continue
-			}
-			unknownBytes = append(unknownBytes, ext.data...)
-		}
-		if len(unknownBytes) > 0 {
-			// pulling in unknown fields is best-effort, so we just ignore errors
-			_ = m.UnmarshalMerge(unknownBytes)
-		}
-	}
 	return nil
 }
 
