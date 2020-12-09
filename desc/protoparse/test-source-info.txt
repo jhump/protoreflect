@@ -1554,272 +1554,272 @@ desc_test_complex.proto:31:63
 desc_test_complex.proto:31:79
 
 
- > message_type[1] > nested_type[0]:
+ > message_type[1] > nested_type[1]:
 desc_test_complex.proto:33:9
 desc_test_complex.proto:58:10
 
 
- > message_type[1] > nested_type[0] > name:
+ > message_type[1] > nested_type[1] > name:
 desc_test_complex.proto:33:17
 desc_test_complex.proto:33:23
 
 
- > message_type[1] > nested_type[0] > extension:
+ > message_type[1] > nested_type[1] > extension:
 desc_test_complex.proto:34:17
 desc_test_complex.proto:36:18
 
 
- > message_type[1] > nested_type[0] > extension[0]:
+ > message_type[1] > nested_type[1] > extension[0]:
 desc_test_complex.proto:35:25
 desc_test_complex.proto:35:56
 
 
- > message_type[1] > nested_type[0] > extension[0] !!!  > extendee:
+ > message_type[1] > nested_type[1] > extension[0] > extendee:
 desc_test_complex.proto:34:24
 desc_test_complex.proto:34:54
 
 
- > message_type[1] > nested_type[0] > extension[0] !!!  > label:
+ > message_type[1] > nested_type[1] > extension[0] > label:
 desc_test_complex.proto:35:25
 desc_test_complex.proto:35:33
 
 
- > message_type[1] > nested_type[0] > extension[0] !!!  > type:
+ > message_type[1] > nested_type[1] > extension[0] > type:
 desc_test_complex.proto:35:34
 desc_test_complex.proto:35:39
 
 
- > message_type[1] > nested_type[0] > extension[0] !!!  > name:
+ > message_type[1] > nested_type[1] > extension[0] > name:
 desc_test_complex.proto:35:40
 desc_test_complex.proto:35:47
 
 
- > message_type[1] > nested_type[0] > extension[0] !!!  > number:
+ > message_type[1] > nested_type[1] > extension[0] > number:
 desc_test_complex.proto:35:50
 desc_test_complex.proto:35:55
 
 
- > message_type[1] > nested_type[0] > nested_type[0]:
+ > message_type[1] > nested_type[1] > nested_type[0]:
 desc_test_complex.proto:37:17
 desc_test_complex.proto:57:18
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > name:
 desc_test_complex.proto:37:25
 desc_test_complex.proto:37:38
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0]:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0]:
 desc_test_complex.proto:38:25
 desc_test_complex.proto:46:26
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > name:
 desc_test_complex.proto:38:30
 desc_test_complex.proto:38:33
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[0]:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[0]:
 desc_test_complex.proto:39:33
 desc_test_complex.proto:39:40
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[0] > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[0] > name:
 desc_test_complex.proto:39:33
 desc_test_complex.proto:39:35
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[0] > number:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[0] > number:
 desc_test_complex.proto:39:38
 desc_test_complex.proto:39:39
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[1]:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[1]:
 desc_test_complex.proto:40:33
 desc_test_complex.proto:40:40
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[1] > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[1] > name:
 desc_test_complex.proto:40:33
 desc_test_complex.proto:40:35
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[1] > number:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[1] > number:
 desc_test_complex.proto:40:38
 desc_test_complex.proto:40:39
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[2]:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[2]:
 desc_test_complex.proto:41:33
 desc_test_complex.proto:41:40
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[2] > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[2] > name:
 desc_test_complex.proto:41:33
 desc_test_complex.proto:41:35
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[2] > number:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[2] > number:
 desc_test_complex.proto:41:38
 desc_test_complex.proto:41:39
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[3]:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[3]:
 desc_test_complex.proto:42:33
 desc_test_complex.proto:42:40
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[3] > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[3] > name:
 desc_test_complex.proto:42:33
 desc_test_complex.proto:42:35
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[3] > number:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[3] > number:
 desc_test_complex.proto:42:38
 desc_test_complex.proto:42:39
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[4]:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[4]:
 desc_test_complex.proto:43:33
 desc_test_complex.proto:43:40
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[4] > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[4] > name:
 desc_test_complex.proto:43:33
 desc_test_complex.proto:43:35
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[4] > number:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[4] > number:
 desc_test_complex.proto:43:38
 desc_test_complex.proto:43:39
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[5]:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[5]:
 desc_test_complex.proto:44:33
 desc_test_complex.proto:44:40
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[5] > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[5] > name:
 desc_test_complex.proto:44:33
 desc_test_complex.proto:44:35
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[5] > number:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[5] > number:
 desc_test_complex.proto:44:38
 desc_test_complex.proto:44:39
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[6]:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[6]:
 desc_test_complex.proto:45:33
 desc_test_complex.proto:45:40
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[6] > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[6] > name:
 desc_test_complex.proto:45:33
 desc_test_complex.proto:45:35
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > enum_type[0] > value[6] > number:
+ > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[6] > number:
 desc_test_complex.proto:45:38
 desc_test_complex.proto:45:39
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > options:
+ > message_type[1] > nested_type[1] > nested_type[0] > options:
 desc_test_complex.proto:47:25
 desc_test_complex.proto:47:50
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > options > fooblez:
+ > message_type[1] > nested_type[1] > nested_type[0] > options > fooblez:
 desc_test_complex.proto:47:25
 desc_test_complex.proto:47:50
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > extension:
+ > message_type[1] > nested_type[1] > nested_type[0] > extension:
 desc_test_complex.proto:48:25
 desc_test_complex.proto:50:26
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > extension[0]:
+ > message_type[1] > nested_type[1] > nested_type[0] > extension[0]:
 desc_test_complex.proto:49:33
 desc_test_complex.proto:49:64
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > extension[0] > extendee:
+ > message_type[1] > nested_type[1] > nested_type[0] > extension[0] > extendee:
 desc_test_complex.proto:48:32
 desc_test_complex.proto:48:36
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > extension[0] > label:
+ > message_type[1] > nested_type[1] > nested_type[0] > extension[0] > label:
 desc_test_complex.proto:49:33
 desc_test_complex.proto:49:41
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > extension[0] > type:
+ > message_type[1] > nested_type[1] > nested_type[0] > extension[0] > type:
 desc_test_complex.proto:49:42
 desc_test_complex.proto:49:48
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > extension[0] > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > extension[0] > name:
 desc_test_complex.proto:49:49
 desc_test_complex.proto:49:57
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > extension[0] > number:
+ > message_type[1] > nested_type[1] > nested_type[0] > extension[0] > number:
 desc_test_complex.proto:49:60
 desc_test_complex.proto:49:63
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > options:
+ > message_type[1] > nested_type[1] > nested_type[0] > options:
 desc_test_complex.proto:51:25
 desc_test_complex.proto:51:108
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > options > rept[0]:
+ > message_type[1] > nested_type[1] > nested_type[0] > options > rept[0]:
 desc_test_complex.proto:51:25
 desc_test_complex.proto:51:108
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > nested_type[0]:
+ > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0]:
 desc_test_complex.proto:52:25
 desc_test_complex.proto:56:26
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > nested_type[0] > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > name:
 desc_test_complex.proto:52:33
 desc_test_complex.proto:52:51
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > nested_type[0] > options:
+ > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > options:
 desc_test_complex.proto:53:33
 desc_test_complex.proto:53:109
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > nested_type[0] > options > rept[0]:
+ > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > options > rept[0]:
 desc_test_complex.proto:53:33
 desc_test_complex.proto:53:109
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > nested_type[0] > field[0]:
+ > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > field[0]:
 desc_test_complex.proto:55:33
 desc_test_complex.proto:55:56
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > nested_type[0] > field[0] > label:
+ > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > field[0] > label:
 desc_test_complex.proto:55:33
 desc_test_complex.proto:55:41
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > nested_type[0] > field[0] > type_name:
+ > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > field[0] > type_name:
 desc_test_complex.proto:55:42
 desc_test_complex.proto:55:46
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > nested_type[0] > field[0] > name:
+ > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > field[0] > name:
 desc_test_complex.proto:55:47
 desc_test_complex.proto:55:51
 
 
- > message_type[1] > nested_type[0] > nested_type[0] !!!  > nested_type[0] > field[0] > number:
+ > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > field[0] > number:
 desc_test_complex.proto:55:54
 desc_test_complex.proto:55:55
 
