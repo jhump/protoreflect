@@ -6,7 +6,7 @@ import (
 	"unicode"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
@@ -32,8 +32,8 @@ type FieldBuilder struct {
 	msgType   *MessageBuilder
 	fieldType *FieldType
 
-	Options        *dpb.FieldOptions
-	Label          dpb.FieldDescriptorProto_Label
+	Options        *descriptorpb.FieldOptions
+	Label          descriptorpb.FieldDescriptorProto_Label
 	Proto3Optional bool
 	Default        string
 	JsonName       string
@@ -72,18 +72,18 @@ func NewField(name string, typ *FieldType) *FieldBuilder {
 // tag number.
 func NewMapField(name string, keyTyp, valTyp *FieldType) *FieldBuilder {
 	switch keyTyp.fieldType {
-	case dpb.FieldDescriptorProto_TYPE_BOOL,
-		dpb.FieldDescriptorProto_TYPE_STRING,
-		dpb.FieldDescriptorProto_TYPE_INT32, dpb.FieldDescriptorProto_TYPE_INT64,
-		dpb.FieldDescriptorProto_TYPE_SINT32, dpb.FieldDescriptorProto_TYPE_SINT64,
-		dpb.FieldDescriptorProto_TYPE_UINT32, dpb.FieldDescriptorProto_TYPE_UINT64,
-		dpb.FieldDescriptorProto_TYPE_FIXED32, dpb.FieldDescriptorProto_TYPE_FIXED64,
-		dpb.FieldDescriptorProto_TYPE_SFIXED32, dpb.FieldDescriptorProto_TYPE_SFIXED64:
+	case descriptorpb.FieldDescriptorProto_TYPE_BOOL,
+		descriptorpb.FieldDescriptorProto_TYPE_STRING,
+		descriptorpb.FieldDescriptorProto_TYPE_INT32, descriptorpb.FieldDescriptorProto_TYPE_INT64,
+		descriptorpb.FieldDescriptorProto_TYPE_SINT32, descriptorpb.FieldDescriptorProto_TYPE_SINT64,
+		descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_UINT64,
+		descriptorpb.FieldDescriptorProto_TYPE_FIXED32, descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
+		descriptorpb.FieldDescriptorProto_TYPE_SFIXED32, descriptorpb.FieldDescriptorProto_TYPE_SFIXED64:
 		// allowed
 	default:
 		panic(fmt.Sprintf("Map types cannot have keys of type %v", keyTyp.fieldType))
 	}
-	if valTyp.fieldType == dpb.FieldDescriptorProto_TYPE_GROUP {
+	if valTyp.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 		panic(fmt.Sprintf("Map types cannot have values of type %v", valTyp.fieldType))
 	}
 	entryMsg := NewMessage(entryTypeName(name))
@@ -93,10 +93,10 @@ func NewMapField(name string, keyTyp, valTyp *FieldType) *FieldBuilder {
 	valFlb.number = 2
 	entryMsg.AddField(keyFlb)
 	entryMsg.AddField(valFlb)
-	entryMsg.Options = &dpb.MessageOptions{MapEntry: proto.Bool(true)}
+	entryMsg.Options = &descriptorpb.MessageOptions{MapEntry: proto.Bool(true)}
 
 	flb := NewField(name, FieldTypeMessage(entryMsg)).
-		SetLabel(dpb.FieldDescriptorProto_LABEL_REPEATED)
+		SetLabel(descriptorpb.FieldDescriptorProto_LABEL_REPEATED)
 	flb.msgType = entryMsg
 	entryMsg.setParent(flb)
 	return flb
@@ -122,7 +122,7 @@ func NewGroupField(mb *MessageBuilder) *FieldBuilder {
 	Unlink(mb)
 
 	ft := &FieldType{
-		fieldType:    dpb.FieldDescriptorProto_TYPE_GROUP,
+		fieldType:    descriptorpb.FieldDescriptorProto_TYPE_GROUP,
 		localMsgType: mb,
 	}
 	fieldName := strings.ToLower(mb.GetName())
@@ -222,7 +222,7 @@ func (flb *FieldBuilder) SetName(newName string) *FieldBuilder {
 func (flb *FieldBuilder) TrySetName(newName string) error {
 	var oldMsgName string
 	if flb.msgType != nil {
-		if flb.fieldType.fieldType == dpb.FieldDescriptorProto_TYPE_GROUP {
+		if flb.fieldType.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 			return fmt.Errorf("cannot change name of group field %s; change name of group instead", GetFullyQualifiedName(flb))
 		} else {
 			oldMsgName = flb.msgType.name
@@ -234,7 +234,7 @@ func (flb *FieldBuilder) TrySetName(newName string) error {
 	}
 	if err := flb.baseBuilder.setName(flb, newName); err != nil {
 		// undo change to map entry name
-		if flb.msgType != nil && flb.fieldType.fieldType != dpb.FieldDescriptorProto_TYPE_GROUP {
+		if flb.msgType != nil && flb.fieldType.fieldType != descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 			flb.msgType.setNameInternal(oldMsgName)
 		}
 		return err
@@ -292,7 +292,7 @@ func (flb *FieldBuilder) removeChild(b Builder) {
 func (flb *FieldBuilder) renamedChild(b Builder, oldName string) error {
 	if flb.msgType != nil {
 		var oldFieldName string
-		if flb.fieldType.fieldType == dpb.FieldDescriptorProto_TYPE_GROUP {
+		if flb.fieldType.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 			if !unicode.IsUpper(rune(b.GetName()[0])) {
 				return fmt.Errorf("group name %s must start with capital letter", b.GetName())
 			}
@@ -305,7 +305,7 @@ func (flb *FieldBuilder) renamedChild(b Builder, oldName string) error {
 		}
 		if p, ok := flb.parent.(*MessageBuilder); ok {
 			if err := p.addSymbol(b); err != nil {
-				if flb.fieldType.fieldType == dpb.FieldDescriptorProto_TYPE_GROUP {
+				if flb.fieldType.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 					// revert the field rename
 					flb.setNameInternal(oldFieldName)
 				}
@@ -383,14 +383,14 @@ func (flb *FieldBuilder) TrySetNumber(tag int32) error {
 
 // SetOptions sets the field options for this field and returns the field, for
 // method chaining.
-func (flb *FieldBuilder) SetOptions(options *dpb.FieldOptions) *FieldBuilder {
+func (flb *FieldBuilder) SetOptions(options *descriptorpb.FieldOptions) *FieldBuilder {
 	flb.Options = options
 	return flb
 }
 
 // SetLabel sets the label for this field, which can be optional, repeated, or
 // required. It returns the field builder, for method chaining.
-func (flb *FieldBuilder) SetLabel(lbl dpb.FieldDescriptorProto_Label) *FieldBuilder {
+func (flb *FieldBuilder) SetLabel(lbl descriptorpb.FieldDescriptorProto_Label) *FieldBuilder {
 	flb.Label = lbl
 	return flb
 }
@@ -405,43 +405,43 @@ func (flb *FieldBuilder) SetProto3Optional(p3o bool) *FieldBuilder {
 // SetRepeated sets the label for this field to repeated. It returns the field
 // builder, for method chaining.
 func (flb *FieldBuilder) SetRepeated() *FieldBuilder {
-	return flb.SetLabel(dpb.FieldDescriptorProto_LABEL_REPEATED)
+	return flb.SetLabel(descriptorpb.FieldDescriptorProto_LABEL_REPEATED)
 }
 
 // SetRequired sets the label for this field to required. It returns the field
 // builder, for method chaining.
 func (flb *FieldBuilder) SetRequired() *FieldBuilder {
-	return flb.SetLabel(dpb.FieldDescriptorProto_LABEL_REQUIRED)
+	return flb.SetLabel(descriptorpb.FieldDescriptorProto_LABEL_REQUIRED)
 }
 
 // SetOptional sets the label for this field to optional. It returns the field
 // builder, for method chaining.
 func (flb *FieldBuilder) SetOptional() *FieldBuilder {
-	return flb.SetLabel(dpb.FieldDescriptorProto_LABEL_OPTIONAL)
+	return flb.SetLabel(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL)
 }
 
 // IsRepeated returns true if this field's label is repeated. Fields created via
 // NewMapField will be repeated (since map's are represented "under the hood" as
 // a repeated field of map entry messages).
 func (flb *FieldBuilder) IsRepeated() bool {
-	return flb.Label == dpb.FieldDescriptorProto_LABEL_REPEATED
+	return flb.Label == descriptorpb.FieldDescriptorProto_LABEL_REPEATED
 }
 
 // IsRequired returns true if this field's label is required.
 func (flb *FieldBuilder) IsRequired() bool {
-	return flb.Label == dpb.FieldDescriptorProto_LABEL_REQUIRED
+	return flb.Label == descriptorpb.FieldDescriptorProto_LABEL_REQUIRED
 }
 
 // IsOptional returns true if this field's label is optional.
 func (flb *FieldBuilder) IsOptional() bool {
-	return flb.Label == dpb.FieldDescriptorProto_LABEL_OPTIONAL
+	return flb.Label == descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL
 }
 
 // IsMap returns true if this field is a map field.
 func (flb *FieldBuilder) IsMap() bool {
 	return flb.IsRepeated() &&
 		flb.msgType != nil &&
-		flb.fieldType.fieldType != dpb.FieldDescriptorProto_TYPE_GROUP &&
+		flb.fieldType.fieldType != descriptorpb.FieldDescriptorProto_TYPE_GROUP &&
 		flb.msgType.Options != nil &&
 		flb.msgType.Options.GetMapEntry()
 }
@@ -492,7 +492,7 @@ func (flb *FieldBuilder) GetExtendeeTypeName() string {
 	}
 }
 
-func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo, isMessageSet bool) (*dpb.FieldDescriptorProto, error) {
+func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceCodeInfo, isMessageSet bool) (*descriptorpb.FieldDescriptorProto, error) {
 	addCommentsTo(sourceInfo, path, &flb.comments)
 
 	isProto3 := flb.GetFile().IsProto3
@@ -508,9 +508,9 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 		}
 	}
 
-	var lbl *dpb.FieldDescriptorProto_Label
+	var lbl *descriptorpb.FieldDescriptorProto_Label
 	if int32(flb.Label) != 0 {
-		if isProto3 && flb.Label == dpb.FieldDescriptorProto_LABEL_REQUIRED {
+		if isProto3 && flb.Label == descriptorpb.FieldDescriptorProto_LABEL_REQUIRED {
 			return nil, fmt.Errorf("field %s: proto3 does not allow required fields", GetFullyQualifiedName(flb))
 		}
 		lbl = flb.Label.Enum()
@@ -532,25 +532,27 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 	if flb.Default != "" {
 		def = proto.String(flb.Default)
 	}
+	var proto3Optional *bool
+	if flb.Proto3Optional {
+		proto3Optional = proto.Bool(true)
+	}
 
 	maxTag := internal.GetMaxTag(isMessageSet)
 	if flb.number > maxTag {
 		return nil, fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), maxTag)
 	}
 
-	fd := &dpb.FieldDescriptorProto{
-		Name:         proto.String(flb.name),
-		Number:       proto.Int32(flb.number),
-		Options:      flb.Options,
-		Label:        lbl,
-		Type:         flb.fieldType.fieldType.Enum(),
-		TypeName:     typeName,
-		JsonName:     proto.String(jsName),
-		DefaultValue: def,
-		Extendee:     extendee,
-	}
-	if flb.Proto3Optional {
-		internal.SetProto3Optional(fd)
+	fd := &descriptorpb.FieldDescriptorProto{
+		Name:           proto.String(flb.name),
+		Number:         proto.Int32(flb.number),
+		Options:        flb.Options,
+		Label:          lbl,
+		Type:           flb.fieldType.fieldType.Enum(),
+		TypeName:       typeName,
+		JsonName:       proto.String(jsName),
+		DefaultValue:   def,
+		Extendee:       extendee,
+		Proto3Optional: proto3Optional,
 	}
 	return fd, nil
 }
@@ -582,7 +584,7 @@ func (flb *FieldBuilder) BuildDescriptor() (desc.Descriptor, error) {
 type OneOfBuilder struct {
 	baseBuilder
 
-	Options *dpb.OneofOptions
+	Options *descriptorpb.OneofOptions
 
 	choices []*FieldBuilder
 	symbols map[string]*FieldBuilder
@@ -778,7 +780,7 @@ func (oob *OneOfBuilder) TryAddChoice(flb *FieldBuilder) error {
 	if flb.IsExtension() {
 		return fmt.Errorf("field %s is an extension, not a regular field", flb.GetName())
 	}
-	if flb.msgType != nil && flb.fieldType.fieldType != dpb.FieldDescriptorProto_TYPE_GROUP {
+	if flb.msgType != nil && flb.fieldType.fieldType != descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 		return fmt.Errorf("cannot add a map field %q to one-of %s", flb.name, GetFullyQualifiedName(oob))
 	}
 	if flb.IsRepeated() || flb.IsRequired() {
@@ -813,12 +815,12 @@ func (oob *OneOfBuilder) TryAddChoice(flb *FieldBuilder) error {
 
 // SetOptions sets the one-of options for this one-of and returns the one-of,
 // for method chaining.
-func (oob *OneOfBuilder) SetOptions(options *dpb.OneofOptions) *OneOfBuilder {
+func (oob *OneOfBuilder) SetOptions(options *descriptorpb.OneofOptions) *OneOfBuilder {
 	oob.Options = options
 	return oob
 }
 
-func (oob *OneOfBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.OneofDescriptorProto, error) {
+func (oob *OneOfBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceCodeInfo) (*descriptorpb.OneofDescriptorProto, error) {
 	addCommentsTo(sourceInfo, path, &oob.comments)
 
 	for _, flb := range oob.choices {
@@ -827,7 +829,7 @@ func (oob *OneOfBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 		}
 	}
 
-	return &dpb.OneofDescriptorProto{
+	return &descriptorpb.OneofDescriptorProto{
 		Name:    proto.String(oob.name),
 		Options: oob.Options,
 	}, nil

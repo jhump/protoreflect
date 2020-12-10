@@ -1,19 +1,19 @@
 package protoparse
 
 import (
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 	// link in packages that include the standard protos included with protoc
-	_ "github.com/golang/protobuf/protoc-gen-go/plugin"
-	_ "github.com/golang/protobuf/ptypes/any"
-	_ "github.com/golang/protobuf/ptypes/duration"
-	_ "github.com/golang/protobuf/ptypes/empty"
-	_ "github.com/golang/protobuf/ptypes/struct"
-	_ "github.com/golang/protobuf/ptypes/timestamp"
-	_ "github.com/golang/protobuf/ptypes/wrappers"
-	_ "google.golang.org/genproto/protobuf/api"
-	_ "google.golang.org/genproto/protobuf/field_mask"
-	_ "google.golang.org/genproto/protobuf/ptype"
-	_ "google.golang.org/genproto/protobuf/source_context"
+	_ "google.golang.org/protobuf/types/known/anypb"
+	_ "google.golang.org/protobuf/types/known/apipb"
+	_ "google.golang.org/protobuf/types/known/durationpb"
+	_ "google.golang.org/protobuf/types/known/emptypb"
+	_ "google.golang.org/protobuf/types/known/fieldmaskpb"
+	_ "google.golang.org/protobuf/types/known/sourcecontextpb"
+	_ "google.golang.org/protobuf/types/known/structpb"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
+	_ "google.golang.org/protobuf/types/known/typepb"
+	_ "google.golang.org/protobuf/types/known/wrapperspb"
+	_ "google.golang.org/protobuf/types/pluginpb"
 
 	"github.com/jhump/protoreflect/internal"
 )
@@ -21,7 +21,7 @@ import (
 // All files that are included with protoc are also included with this package
 // so that clients do not need to explicitly supply a copy of these protos (just
 // like callers of protoc do not need to supply them).
-var standardImports map[string]*dpb.FileDescriptorProto
+var standardImports map[string]*descriptorpb.FileDescriptorProto
 
 func init() {
 	standardFilenames := []string{
@@ -39,7 +39,7 @@ func init() {
 		"google/protobuf/wrappers.proto",
 	}
 
-	standardImports = map[string]*dpb.FileDescriptorProto{}
+	standardImports = map[string]*descriptorpb.FileDescriptorProto{}
 	for _, fn := range standardFilenames {
 		fd, err := internal.LoadFileDescriptor(fn)
 		if err != nil {

@@ -7,32 +7,32 @@ import (
 	"math"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 )
 
-var varintTypes = map[descriptor.FieldDescriptorProto_Type]bool{}
-var fixed32Types = map[descriptor.FieldDescriptorProto_Type]bool{}
-var fixed64Types = map[descriptor.FieldDescriptorProto_Type]bool{}
+var varintTypes = map[descriptorpb.FieldDescriptorProto_Type]bool{}
+var fixed32Types = map[descriptorpb.FieldDescriptorProto_Type]bool{}
+var fixed64Types = map[descriptorpb.FieldDescriptorProto_Type]bool{}
 
 func init() {
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_BOOL] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_INT32] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_INT64] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_UINT32] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_UINT64] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_SINT32] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_SINT64] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_ENUM] = true
+	varintTypes[descriptorpb.FieldDescriptorProto_TYPE_BOOL] = true
+	varintTypes[descriptorpb.FieldDescriptorProto_TYPE_INT32] = true
+	varintTypes[descriptorpb.FieldDescriptorProto_TYPE_INT64] = true
+	varintTypes[descriptorpb.FieldDescriptorProto_TYPE_UINT32] = true
+	varintTypes[descriptorpb.FieldDescriptorProto_TYPE_UINT64] = true
+	varintTypes[descriptorpb.FieldDescriptorProto_TYPE_SINT32] = true
+	varintTypes[descriptorpb.FieldDescriptorProto_TYPE_SINT64] = true
+	varintTypes[descriptorpb.FieldDescriptorProto_TYPE_ENUM] = true
 
-	fixed32Types[descriptor.FieldDescriptorProto_TYPE_FIXED32] = true
-	fixed32Types[descriptor.FieldDescriptorProto_TYPE_SFIXED32] = true
-	fixed32Types[descriptor.FieldDescriptorProto_TYPE_FLOAT] = true
+	fixed32Types[descriptorpb.FieldDescriptorProto_TYPE_FIXED32] = true
+	fixed32Types[descriptorpb.FieldDescriptorProto_TYPE_SFIXED32] = true
+	fixed32Types[descriptorpb.FieldDescriptorProto_TYPE_FLOAT] = true
 
-	fixed64Types[descriptor.FieldDescriptorProto_TYPE_FIXED64] = true
-	fixed64Types[descriptor.FieldDescriptorProto_TYPE_SFIXED64] = true
-	fixed64Types[descriptor.FieldDescriptorProto_TYPE_DOUBLE] = true
+	fixed64Types[descriptorpb.FieldDescriptorProto_TYPE_FIXED64] = true
+	fixed64Types[descriptorpb.FieldDescriptorProto_TYPE_SFIXED64] = true
+	fixed64Types[descriptorpb.FieldDescriptorProto_TYPE_DOUBLE] = true
 }
 
 // ErrWireTypeEndGroup is returned from DecodeFieldValue if the tag and wire-type
@@ -117,53 +117,53 @@ func (cb *Buffer) DecodeFieldValue(fieldFinder func(int32) *desc.FieldDescriptor
 // messages, bytes, and strings), an error is returned.
 func DecodeScalarField(fd *desc.FieldDescriptor, v uint64) (interface{}, error) {
 	switch fd.GetType() {
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
+	case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
 		return v != 0, nil
-	case descriptor.FieldDescriptorProto_TYPE_UINT32,
-		descriptor.FieldDescriptorProto_TYPE_FIXED32:
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT32,
+		descriptorpb.FieldDescriptorProto_TYPE_FIXED32:
 		if v > math.MaxUint32 {
 			return nil, ErrOverflow
 		}
 		return uint32(v), nil
 
-	case descriptor.FieldDescriptorProto_TYPE_INT32,
-		descriptor.FieldDescriptorProto_TYPE_ENUM:
+	case descriptorpb.FieldDescriptorProto_TYPE_INT32,
+		descriptorpb.FieldDescriptorProto_TYPE_ENUM:
 		s := int64(v)
 		if s > math.MaxInt32 || s < math.MinInt32 {
 			return nil, ErrOverflow
 		}
 		return int32(s), nil
 
-	case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
+	case descriptorpb.FieldDescriptorProto_TYPE_SFIXED32:
 		if v > math.MaxUint32 {
 			return nil, ErrOverflow
 		}
 		return int32(v), nil
 
-	case descriptor.FieldDescriptorProto_TYPE_SINT32:
+	case descriptorpb.FieldDescriptorProto_TYPE_SINT32:
 		if v > math.MaxUint32 {
 			return nil, ErrOverflow
 		}
 		return DecodeZigZag32(v), nil
 
-	case descriptor.FieldDescriptorProto_TYPE_UINT64,
-		descriptor.FieldDescriptorProto_TYPE_FIXED64:
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT64,
+		descriptorpb.FieldDescriptorProto_TYPE_FIXED64:
 		return v, nil
 
-	case descriptor.FieldDescriptorProto_TYPE_INT64,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED64:
+	case descriptorpb.FieldDescriptorProto_TYPE_INT64,
+		descriptorpb.FieldDescriptorProto_TYPE_SFIXED64:
 		return int64(v), nil
 
-	case descriptor.FieldDescriptorProto_TYPE_SINT64:
+	case descriptorpb.FieldDescriptorProto_TYPE_SINT64:
 		return DecodeZigZag64(v), nil
 
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
+	case descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
 		if v > math.MaxUint32 {
 			return nil, ErrOverflow
 		}
 		return math.Float32frombits(uint32(v)), nil
 
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+	case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
 		return math.Float64frombits(v), nil
 
 	default:
@@ -184,14 +184,14 @@ func DecodeScalarField(fd *desc.FieldDescriptor, v uint64) (interface{}, error) 
 // contains multiple values, only the last value is returned.
 func DecodeLengthDelimitedField(fd *desc.FieldDescriptor, bytes []byte, mf MessageFactory) (interface{}, error) {
 	switch {
-	case fd.GetType() == descriptor.FieldDescriptorProto_TYPE_BYTES:
+	case fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_BYTES:
 		return bytes, nil
 
-	case fd.GetType() == descriptor.FieldDescriptorProto_TYPE_STRING:
+	case fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_STRING:
 		return string(bytes), nil
 
-	case fd.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE ||
-		fd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP:
+	case fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE ||
+		fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP:
 		msg := mf.NewMessage(fd.GetMessageType())
 		err := proto.Unmarshal(bytes, msg)
 		if err != nil {
@@ -263,7 +263,7 @@ func (b *Buffer) decodeKnownField(fd *desc.FieldDescriptor, encoding int8, fact 
 		}
 
 	case proto.WireBytes:
-		alloc := fd.GetType() == descriptor.FieldDescriptorProto_TYPE_BYTES
+		alloc := fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_BYTES
 		var raw []byte
 		raw, err = b.DecodeRawBytes(alloc)
 		if err == nil {

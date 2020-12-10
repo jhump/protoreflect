@@ -2,12 +2,12 @@ package dynamic
 
 import (
 	"fmt"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"math"
 	"reflect"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal/testprotos"
@@ -196,40 +196,40 @@ var mdForUnknownMsg *desc.MessageDescriptor
 
 func init() {
 	// NB: can't use desc/builder package because that would cause dependency cycle :(
-	fdp := &descriptor.FileDescriptorProto{
+	fdp := &descriptorpb.FileDescriptorProto{
 		Name:    proto.String("foo.proto"),
 		Syntax:  proto.String("proto3"),
 		Package: proto.String("example"),
-		MessageType: []*descriptor.DescriptorProto{
+		MessageType: []*descriptorpb.DescriptorProto{
 			{
 				Name: proto.String("Message"),
-				Field: []*descriptor.FieldDescriptorProto{
+				Field: []*descriptorpb.FieldDescriptorProto{
 					{
 						Name:     proto.String("vals"),
-						Type:     descriptor.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
 						Number:   proto.Int32(1),
-						Label:    descriptor.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
 						TypeName: proto.String(".example.Message.ValsEntry"),
 					},
 				},
-				NestedType: []*descriptor.DescriptorProto{
+				NestedType: []*descriptorpb.DescriptorProto{
 					{
 						Name: proto.String("ValsEntry"),
-						Options: &descriptor.MessageOptions{
+						Options: &descriptorpb.MessageOptions{
 							MapEntry: proto.Bool(true),
 						},
-						Field: []*descriptor.FieldDescriptorProto{
+						Field: []*descriptorpb.FieldDescriptorProto{
 							{
 								Name:   proto.String("key"),
 								Number: proto.Int32(1),
-								Type:   descriptor.FieldDescriptorProto_TYPE_STRING.Enum(),
-								Label:  descriptor.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+								Type:   descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+								Label:  descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
 							},
 							{
 								Name:     proto.String("value"),
 								Number:   proto.Int32(2),
-								Type:     descriptor.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
-								Label:    descriptor.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+								Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+								Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
 								TypeName: proto.String(".example.Message"),
 							},
 						},

@@ -15,7 +15,7 @@ import (
 	"unicode"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
@@ -208,7 +208,7 @@ func marshalKnownFieldMapEntryText(b *indentBuffer, fd *desc.FieldDescriptor, kf
 }
 
 func marshalKnownFieldText(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}) error {
-	group := fd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP
+	group := fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP
 	if group {
 		var name string
 		if fd.IsExtension() {
@@ -518,7 +518,7 @@ func (m *Message) unmarshalText(tr *txtReader, end tokenType) error {
 			if fd == nil {
 				// See if it's a group name
 				for _, field := range m.md.GetFields() {
-					if field.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP && field.GetMessageType().GetName() == fieldName {
+					if field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP && field.GetMessageType().GetName() == fieldName {
 						fd = field
 						break
 					}
@@ -581,8 +581,8 @@ func (m *Message) unmarshalText(tr *txtReader, end tokenType) error {
 				return err
 			}
 
-		} else if (fd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP ||
-			fd.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE) &&
+		} else if (fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP ||
+			fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE) &&
 			tok.tokTyp.EndToken() != tokenError {
 
 			// TODO: use mf.NewMessage and, if not a dynamic message, use proto.UnmarshalText to unmarshal it
@@ -689,7 +689,7 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 
 	var expected string
 	switch fd.GetType() {
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
+	case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
 		if tok.tokTyp == tokenIdent {
 			if tok.val.(string) == "true" {
 				return set(m, fd, true)
@@ -698,17 +698,17 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 			}
 		}
 		expected = "boolean value"
-	case descriptor.FieldDescriptorProto_TYPE_BYTES:
+	case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
 		if tok.tokTyp == tokenString {
 			return set(m, fd, []byte(tok.val.(string)))
 		}
 		expected = "bytes string value"
-	case descriptor.FieldDescriptorProto_TYPE_STRING:
+	case descriptorpb.FieldDescriptorProto_TYPE_STRING:
 		if tok.tokTyp == tokenString {
 			return set(m, fd, tok.val)
 		}
 		expected = "string value"
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
+	case descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
 		switch tok.tokTyp {
 		case tokenFloat:
 			return set(m, fd, float32(tok.val.(float64)))
@@ -736,7 +736,7 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 			}
 		}
 		expected = "float value"
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+	case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
 		switch tok.tokTyp {
 		case tokenFloat:
 			return set(m, fd, tok.val)
@@ -764,9 +764,9 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 			}
 		}
 		expected = "float value"
-	case descriptor.FieldDescriptorProto_TYPE_INT32,
-		descriptor.FieldDescriptorProto_TYPE_SINT32,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED32:
+	case descriptorpb.FieldDescriptorProto_TYPE_INT32,
+		descriptorpb.FieldDescriptorProto_TYPE_SINT32,
+		descriptorpb.FieldDescriptorProto_TYPE_SFIXED32:
 		if tok.tokTyp == tokenInt {
 			if i, err := strconv.ParseInt(tok.val.(string), 10, 32); err != nil {
 				return err
@@ -775,9 +775,9 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 			}
 		}
 		expected = "int value"
-	case descriptor.FieldDescriptorProto_TYPE_INT64,
-		descriptor.FieldDescriptorProto_TYPE_SINT64,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED64:
+	case descriptorpb.FieldDescriptorProto_TYPE_INT64,
+		descriptorpb.FieldDescriptorProto_TYPE_SINT64,
+		descriptorpb.FieldDescriptorProto_TYPE_SFIXED64:
 		if tok.tokTyp == tokenInt {
 			if i, err := strconv.ParseInt(tok.val.(string), 10, 64); err != nil {
 				return err
@@ -786,8 +786,8 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 			}
 		}
 		expected = "int value"
-	case descriptor.FieldDescriptorProto_TYPE_UINT32,
-		descriptor.FieldDescriptorProto_TYPE_FIXED32:
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT32,
+		descriptorpb.FieldDescriptorProto_TYPE_FIXED32:
 		if tok.tokTyp == tokenInt {
 			if i, err := strconv.ParseUint(tok.val.(string), 10, 32); err != nil {
 				return err
@@ -796,8 +796,8 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 			}
 		}
 		expected = "unsigned int value"
-	case descriptor.FieldDescriptorProto_TYPE_UINT64,
-		descriptor.FieldDescriptorProto_TYPE_FIXED64:
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT64,
+		descriptorpb.FieldDescriptorProto_TYPE_FIXED64:
 		if tok.tokTyp == tokenInt {
 			if i, err := strconv.ParseUint(tok.val.(string), 10, 64); err != nil {
 				return err
@@ -806,7 +806,7 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 			}
 		}
 		expected = "unsigned int value"
-	case descriptor.FieldDescriptorProto_TYPE_ENUM:
+	case descriptorpb.FieldDescriptorProto_TYPE_ENUM:
 		if tok.tokTyp == tokenIdent {
 			// TODO: add a flag to just ignore unrecognized enum value names?
 			vd := fd.GetEnumType().FindValueByName(tok.val.(string))
@@ -821,8 +821,8 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 			}
 		}
 		expected = fmt.Sprintf("enum %s value", fd.GetEnumType().GetFullyQualifiedName())
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
-		descriptor.FieldDescriptorProto_TYPE_GROUP:
+	case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
+		descriptorpb.FieldDescriptorProto_TYPE_GROUP:
 
 		endTok := tok.tokTyp.EndToken()
 		if endTok != tokenError {

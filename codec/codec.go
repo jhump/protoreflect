@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/golang/protobuf/proto"
+
 	"github.com/jhump/protoreflect/internal/codec"
 )
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	_ "github.com/jhump/protoreflect/internal/testprotos"
@@ -22,7 +22,7 @@ func TestSimpleLink(t *testing.T) {
 
 	b, err := ioutil.ReadFile("../../internal/testprotos/desc_test_complex.protoset")
 	testutil.Ok(t, err)
-	var files dpb.FileDescriptorSet
+	var files descriptorpb.FileDescriptorSet
 	err = proto.Unmarshal(b, &files)
 	testutil.Ok(t, err)
 	testutil.Require(t, proto.Equal(files.File[0], fds[0].AsProto()), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(files.File[0]), toString(fds[0].AsProto()))
@@ -46,7 +46,7 @@ func TestProto3Optional(t *testing.T) {
 
 	data, err := ioutil.ReadFile("../../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset")
 	testutil.Ok(t, err)
-	var fdset dpb.FileDescriptorSet
+	var fdset descriptorpb.FileDescriptorSet
 	err = proto.Unmarshal(data, &fdset)
 	testutil.Ok(t, err)
 
@@ -65,7 +65,14 @@ func checkFiles(t *testing.T, act, exp *desc.FileDescriptor, checked map[string]
 	}
 	checked[act.GetName()] = struct{}{}
 
-	testutil.Require(t, proto.Equal(exp.AsFileDescriptorProto(), act.AsProto()), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(exp.AsProto()), toString(act.AsProto()))
+	// NB: protoc emits missing package	as absent/nil, but when converting a
+	// protoreflect.FileDescriptor to proto using the protodesc package, it
+	// instead emits a present-but-empty package name.
+	expProto := exp.AsFileDescriptorProto()
+	if expProto.GetPackage() == "" {
+		expProto.Package = nil
+	}
+	testutil.Require(t, proto.Equal(expProto, act.AsProto()), "linked descriptor did not match version loaded from protoregistry.GlobalFiles:\nwanted: %s\ngot: %s", toString(exp.AsProto()), toString(act.AsProto()))
 
 	for i, dep := range act.GetDependencies() {
 		checkFiles(t, dep, exp.GetDependencies()[i], checked)
@@ -289,7 +296,7 @@ func TestLinkerValidation(t *testing.T) {
 					"option (f) = { a: \"a\" };\n" +
 					"option (f) = { a: \"b\" };",
 			},
-			"foo.proto:6:8: option (f): non-repeated option field f already set",
+			"foo.proto:6:8: option (f): non-repeated option field (f) already set",
 		},
 		{
 			map[string]string{

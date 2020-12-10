@@ -13,7 +13,8 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
@@ -123,7 +124,7 @@ type Parser struct {
 	// a FileDescriptorProto instead of a FileDescriptor.
 	//
 	// It is an error to set both LookupImport and LookupImportProto.
-	LookupImportProto func(string) (*dpb.FileDescriptorProto, error)
+	LookupImportProto func(string) (*descriptorpb.FileDescriptorProto, error)
 
 	// Used to create a reader for a given filename, when loading proto source
 	// file contents. If unset, os.Open is used. If ImportPaths is also empty
@@ -183,6 +184,23 @@ type Parser struct {
 // error it returns. If syntax or link errors are encountered but the configured
 // ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) {
+	l, err := p.parseAndLink(filenames)
+	if err != nil {
+		return nil, err
+	}
+	linkedProtos, err := l.createdLinkedDescriptors()
+	if err != nil {
+		return nil, err
+	}
+	fds := make([]*desc.FileDescriptor, len(filenames))
+	for i, name := range filenames {
+		fd := linkedProtos[name]
+		fds[i] = fd
+	}
+	return fds, nil
+}
+
+func (p Parser) parseAndLink(filenames []string) (*linker, error) {
 	accessor := p.Accessor
 	if accessor == nil {
 		accessor = func(name string) (io.ReadCloser, error) {
@@ -226,25 +244,19 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	}
 	if p.InferImportPaths {
 		// TODO: if this re-writes one of the names in filenames, lookups below will break
-		protos = fixupFilenames(protos)
+		_ = fixupFilenames(protos)
 	}
-	linkedProtos, err := newLinker(results, errs).linkFiles()
+	l := newLinker(results, errs)
+	err = l.linkFiles()
 	if err != nil {
 		return nil, err
 	}
 	if p.IncludeSourceCodeInfo {
-		for name, fd := range linkedProtos {
-			pr := protos[name]
-			fd.AsFileDescriptorProto().SourceCodeInfo = pr.generateSourceCodeInfo()
-			internal.RecomputeSourceInfo(fd)
+		for _, pr := range results.resultsByFilename {
+			pr.fd.SourceCodeInfo = pr.generateSourceCodeInfo()
 		}
 	}
-	fds := make([]*desc.FileDescriptor, len(filenames))
-	for i, name := range filenames {
-		fd := linkedProtos[name]
-		fds[i] = fd
-	}
-	return fds, nil
+	return l, nil
 }
 
 // ParseFilesButDoNotLink parses the named files into descriptor protos. The
@@ -278,7 +290,7 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 // ErrorReporter configured and it returns non-nil, parsing will abort with the
 // error it returns. If syntax errors are encountered but the configured
 // ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
-func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescriptorProto, error) {
+func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*descriptorpb.FileDescriptorProto, error) {
 	accessor := p.Accessor
 	if accessor == nil {
 		accessor = func(name string) (io.ReadCloser, error) {
@@ -305,7 +317,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 		// TODO: if this re-writes one of the names in filenames, lookups below will break
 		protos = fixupFilenames(protos)
 	}
-	fds := make([]*dpb.FileDescriptorProto, len(filenames))
+	fds := make([]*descriptorpb.FileDescriptorProto, len(filenames))
 	for i, name := range filenames {
 		pr := protos[name]
 		fd := pr.fd
@@ -316,7 +328,8 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 			pr.errs.errReporter = func(err ErrorWithPos) error {
 				return err
 			}
-			_ = interpretFileOptions(pr, poorFileDescriptorish{FileDescriptorProto: fd})
+			var emptyLinker linker
+			_ = emptyLinker.interpretFileOptions(pr)
 		}
 		if p.IncludeSourceCodeInfo {
 			fd.SourceCodeInfo = pr.generateSourceCodeInfo()
@@ -368,7 +381,39 @@ func (p Parser) ParseToAST(filenames ...string) ([]*ast.FileNode, error) {
 	return ret, nil
 }
 
-func (p Parser) getLookupImport() (func(string) (*dpb.FileDescriptorProto, error), error) {
+// ParseFilesToProtos parses the named files into descriptors. The returned
+// slices have the same number of entries as the give filenames, in the same
+// order. So the first returned descriptor corresponds to the first given name,
+// and so on.
+//
+// This is basically the same as ParseFiles except that it avoids the final
+// step of creating a *desc.FileDescriptor for each entry. With the move to
+// API v2, desc.Descriptor implementations now WRAP protoreflect.Descriptors.
+// So that last step is overhead in two ways: (1) it re-creates
+// protoreflect.Descriptors from the protos; (2) it then wraps those descriptors
+// with *desc.FileDescriptors.
+//
+// Note that the protoreflect.FileDescriptors returned by this functions were
+// NOT created from the protos using the protodesc package. Instead, they are
+// custom descriptor implementations backed by the parsed descriptor protos and
+// the state created by the linking step. They are not as thorough but will
+// likely suffice for many usages.
+func (p Parser) ParseFilesToProtos(filenames ...string) ([]*descriptorpb.FileDescriptorProto, []protoreflect.FileDescriptor, error) {
+	l, err := p.parseAndLink(filenames)
+	if err != nil {
+		return nil, nil, err
+	}
+	fdps := make([]*descriptorpb.FileDescriptorProto, len(filenames))
+	fds := make([]protoreflect.FileDescriptor, len(filenames))
+	for i, name := range filenames {
+		pr := l.files[name]
+		fdps[i] = pr.fd
+		fds[i] = l.asFileDescriptor(pr.fd)
+	}
+	return fdps, fds, nil
+}
+
+func (p Parser) getLookupImport() (func(string) (*descriptorpb.FileDescriptorProto, error), error) {
 	if p.LookupImport != nil && p.LookupImportProto != nil {
 		return nil, ErrLookupImportAndProtoSet
 	}
@@ -376,7 +421,7 @@ func (p Parser) getLookupImport() (func(string) (*dpb.FileDescriptorProto, error
 		return p.LookupImportProto, nil
 	}
 	if p.LookupImport != nil {
-		return func(path string) (*dpb.FileDescriptorProto, error) {
+		return func(path string) (*descriptorpb.FileDescriptorProto, error) {
 			value, err := p.LookupImport(path)
 			if value != nil {
 				return value.AsFileDescriptorProto(), err
@@ -495,7 +540,7 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	return revisedProtos
 }
 
-func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, parsed *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error)) {
+func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, parsed *parseResults, lookupImport func(string) (*descriptorpb.FileDescriptorProto, error)) {
 	for _, name := range filenames {
 		parseProtoFile(acc, name, nil, errs, parsed, lookupImport)
 		if errs.err != nil {
@@ -504,12 +549,12 @@ func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, p
 	}
 }
 
-func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, results *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error)) {
+func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, results *parseResults, lookupImport func(string) (*descriptorpb.FileDescriptorProto, error)) {
 	if results.has(filename) {
 		return
 	}
 	if lookupImport == nil {
-		lookupImport = func(string) (*dpb.FileDescriptorProto, error) {
+		lookupImport = func(string) (*descriptorpb.FileDescriptorProto, error) {
 			return nil, errors.New("no import lookup function")
 		}
 	}
@@ -528,13 +573,13 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 	} else if d, lookupErr := lookupImport(filename); lookupErr == nil {
 		// This is a user-provided descriptor, which is acting similarly to a
 		// well-known import.
-		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
+		result = &parseResult{fd: proto.Clone(d).(*descriptorpb.FileDescriptorProto)}
 	} else if d, ok := standardImports[filename]; ok {
 		// it's a well-known import
 		// (we clone it to make sure we're not sharing state with other
 		//  parsers, which could result in unsafe races if multiple
 		//  parsers are trying to access it concurrently)
-		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
+		result = &parseResult{fd: proto.Clone(d).(*descriptorpb.FileDescriptorProto)}
 	} else {
 		if !strings.Contains(err.Error(), filename) {
 			// an error message that doesn't indicate the file is awful!
@@ -615,7 +660,7 @@ type parseResult struct {
 	// the root of the AST
 	root *ast.FileNode
 	// the parsed file descriptor
-	fd *dpb.FileDescriptorProto
+	fd *descriptorpb.FileDescriptorProto
 
 	// if set to true, enables lenient interpretation of options, where
 	// unrecognized options will be left uninterpreted instead of resulting in a
@@ -631,125 +676,125 @@ type parseResult struct {
 	interpretedOptions map[*ast.OptionNode][]int32
 }
 
-func (r *parseResult) getFileNode(f *dpb.FileDescriptorProto) ast.FileDeclNode {
+func (r *parseResult) getFileNode(f *descriptorpb.FileDescriptorProto) ast.FileDeclNode {
 	if r.nodes == nil {
 		return ast.NewNoSourceNode(f.GetName())
 	}
 	return r.nodes[f].(ast.FileDeclNode)
 }
 
-func (r *parseResult) getOptionNode(o *dpb.UninterpretedOption) ast.OptionDeclNode {
+func (r *parseResult) getOptionNode(o *descriptorpb.UninterpretedOption) ast.OptionDeclNode {
 	if r.nodes == nil {
 		return ast.NewNoSourceNode(r.fd.GetName())
 	}
 	return r.nodes[o].(ast.OptionDeclNode)
 }
 
-func (r *parseResult) getOptionNamePartNode(o *dpb.UninterpretedOption_NamePart) ast.Node {
+func (r *parseResult) getOptionNamePartNode(o *descriptorpb.UninterpretedOption_NamePart) ast.Node {
 	if r.nodes == nil {
 		return ast.NewNoSourceNode(r.fd.GetName())
 	}
 	return r.nodes[o]
 }
 
-func (r *parseResult) getFieldNode(f *dpb.FieldDescriptorProto) ast.FieldDeclNode {
+func (r *parseResult) getFieldNode(f *descriptorpb.FieldDescriptorProto) ast.FieldDeclNode {
 	if r.nodes == nil {
 		return ast.NewNoSourceNode(r.fd.GetName())
 	}
 	return r.nodes[f].(ast.FieldDeclNode)
 }
 
-func (r *parseResult) getExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange) ast.RangeDeclNode {
+func (r *parseResult) getExtensionRangeNode(e *descriptorpb.DescriptorProto_ExtensionRange) ast.RangeDeclNode {
 	if r.nodes == nil {
 		return ast.NewNoSourceNode(r.fd.GetName())
 	}
 	return r.nodes[e].(ast.RangeDeclNode)
 }
 
-func (r *parseResult) getMessageReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange) ast.RangeDeclNode {
+func (r *parseResult) getMessageReservedRangeNode(rr *descriptorpb.DescriptorProto_ReservedRange) ast.RangeDeclNode {
 	if r.nodes == nil {
 		return ast.NewNoSourceNode(r.fd.GetName())
 	}
 	return r.nodes[rr].(ast.RangeDeclNode)
 }
 
-func (r *parseResult) getEnumNode(e *dpb.EnumDescriptorProto) ast.Node {
+func (r *parseResult) getEnumNode(e *descriptorpb.EnumDescriptorProto) ast.Node {
 	if r.nodes == nil {
 		return ast.NewNoSourceNode(r.fd.GetName())
 	}
 	return r.nodes[e]
 }
 
-func (r *parseResult) getEnumValueNode(e *dpb.EnumValueDescriptorProto) ast.EnumValueDeclNode {
+func (r *parseResult) getEnumValueNode(e *descriptorpb.EnumValueDescriptorProto) ast.EnumValueDeclNode {
 	if r.nodes == nil {
 		return ast.NewNoSourceNode(r.fd.GetName())
 	}
 	return r.nodes[e].(ast.EnumValueDeclNode)
 }
 
-func (r *parseResult) getEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumReservedRange) ast.RangeDeclNode {
+func (r *parseResult) getEnumReservedRangeNode(rr *descriptorpb.EnumDescriptorProto_EnumReservedRange) ast.RangeDeclNode {
 	if r.nodes == nil {
 		return ast.NewNoSourceNode(r.fd.GetName())
 	}
 	return r.nodes[rr].(ast.RangeDeclNode)
 }
 
-func (r *parseResult) getMethodNode(m *dpb.MethodDescriptorProto) ast.RPCDeclNode {
+func (r *parseResult) getMethodNode(m *descriptorpb.MethodDescriptorProto) ast.RPCDeclNode {
 	if r.nodes == nil {
 		return ast.NewNoSourceNode(r.fd.GetName())
 	}
 	return r.nodes[m].(ast.RPCDeclNode)
 }
 
-func (r *parseResult) putFileNode(f *dpb.FileDescriptorProto, n *ast.FileNode) {
+func (r *parseResult) putFileNode(f *descriptorpb.FileDescriptorProto, n *ast.FileNode) {
 	r.nodes[f] = n
 }
 
-func (r *parseResult) putOptionNode(o *dpb.UninterpretedOption, n *ast.OptionNode) {
+func (r *parseResult) putOptionNode(o *descriptorpb.UninterpretedOption, n *ast.OptionNode) {
 	r.nodes[o] = n
 }
 
-func (r *parseResult) putOptionNamePartNode(o *dpb.UninterpretedOption_NamePart, n *ast.FieldReferenceNode) {
+func (r *parseResult) putOptionNamePartNode(o *descriptorpb.UninterpretedOption_NamePart, n *ast.FieldReferenceNode) {
 	r.nodes[o] = n
 }
 
-func (r *parseResult) putMessageNode(m *dpb.DescriptorProto, n ast.MessageDeclNode) {
+func (r *parseResult) putMessageNode(m *descriptorpb.DescriptorProto, n ast.MessageDeclNode) {
 	r.nodes[m] = n
 }
 
-func (r *parseResult) putFieldNode(f *dpb.FieldDescriptorProto, n ast.FieldDeclNode) {
+func (r *parseResult) putFieldNode(f *descriptorpb.FieldDescriptorProto, n ast.FieldDeclNode) {
 	r.nodes[f] = n
 }
 
-func (r *parseResult) putOneOfNode(o *dpb.OneofDescriptorProto, n *ast.OneOfNode) {
+func (r *parseResult) putOneOfNode(o *descriptorpb.OneofDescriptorProto, n *ast.OneOfNode) {
 	r.nodes[o] = n
 }
 
-func (r *parseResult) putExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange, n *ast.RangeNode) {
+func (r *parseResult) putExtensionRangeNode(e *descriptorpb.DescriptorProto_ExtensionRange, n *ast.RangeNode) {
 	r.nodes[e] = n
 }
 
-func (r *parseResult) putMessageReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange, n *ast.RangeNode) {
+func (r *parseResult) putMessageReservedRangeNode(rr *descriptorpb.DescriptorProto_ReservedRange, n *ast.RangeNode) {
 	r.nodes[rr] = n
 }
 
-func (r *parseResult) putEnumNode(e *dpb.EnumDescriptorProto, n *ast.EnumNode) {
+func (r *parseResult) putEnumNode(e *descriptorpb.EnumDescriptorProto, n *ast.EnumNode) {
 	r.nodes[e] = n
 }
 
-func (r *parseResult) putEnumValueNode(e *dpb.EnumValueDescriptorProto, n *ast.EnumValueNode) {
+func (r *parseResult) putEnumValueNode(e *descriptorpb.EnumValueDescriptorProto, n *ast.EnumValueNode) {
 	r.nodes[e] = n
 }
 
-func (r *parseResult) putEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumReservedRange, n *ast.RangeNode) {
+func (r *parseResult) putEnumReservedRangeNode(rr *descriptorpb.EnumDescriptorProto_EnumReservedRange, n *ast.RangeNode) {
 	r.nodes[rr] = n
 }
 
-func (r *parseResult) putServiceNode(s *dpb.ServiceDescriptorProto, n *ast.ServiceNode) {
+func (r *parseResult) putServiceNode(s *descriptorpb.ServiceDescriptorProto, n *ast.ServiceNode) {
 	r.nodes[s] = n
 }
 
-func (r *parseResult) putMethodNode(m *dpb.MethodDescriptorProto, n *ast.RPCNode) {
+func (r *parseResult) putMethodNode(m *descriptorpb.MethodDescriptorProto, n *ast.RPCNode) {
 	r.nodes[m] = n
 }
 
@@ -794,49 +839,6 @@ func checkTag(pos *SourcePos, v uint64, maxTag int32) error {
 		return errorWithPos(pos, "tag number %d is higher than max allowed tag number (%d)", v, maxTag)
 	} else if v >= internal.SpecialReservedStart && v <= internal.SpecialReservedEnd {
 		return errorWithPos(pos, "tag number %d is in disallowed reserved range %d-%d", v, internal.SpecialReservedStart, internal.SpecialReservedEnd)
-	}
-	return nil
-}
-
-func checkExtensionTagsInFile(fd *desc.FileDescriptor, res *parseResult) error {
-	for _, fld := range fd.GetExtensions() {
-		if err := checkExtensionTag(fld, res); err != nil {
-			return err
-		}
-	}
-	for _, md := range fd.GetMessageTypes() {
-		if err := checkExtensionTagsInMessage(md, res); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func checkExtensionTagsInMessage(md *desc.MessageDescriptor, res *parseResult) error {
-	for _, fld := range md.GetNestedExtensions() {
-		if err := checkExtensionTag(fld, res); err != nil {
-			return err
-		}
-	}
-	for _, nmd := range md.GetNestedMessageTypes() {
-		if err := checkExtensionTagsInMessage(nmd, res); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func checkExtensionTag(fld *desc.FieldDescriptor, res *parseResult) error {
-	// NB: This is kind of gross that we don't enforce this in validateBasic(). But it would
-	// require doing some minimal linking there (to identify the extendee and locate its
-	// descriptor). To keep the code simpler, we just wait until things are fully linked.
-
-	// In validateBasic() we just made sure these were within bounds for any message. But
-	// now that things are linked, we can check if the extendee is messageset wire format
-	// and, if not, enforce tighter limit.
-	if !fld.GetOwner().GetMessageOptions().GetMessageSetWireFormat() && fld.GetNumber() > internal.MaxNormalTag {
-		pos := res.getFieldNode(fld.AsFieldDescriptorProto()).FieldTag().Start()
-		return errorWithPos(pos, "tag number %d is higher than max allowed tag number (%d)", fld.GetNumber(), internal.MaxNormalTag)
 	}
 	return nil
 }

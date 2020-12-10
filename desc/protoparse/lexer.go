@@ -61,11 +61,6 @@ func (rr *runeReader) endMark() string {
 	return m
 }
 
-func lexError(l protoLexer, pos *SourcePos, err string) {
-	pl := l.(*protoLex)
-	_ = pl.errs.handleErrorWithPos(pos, err)
-}
-
 type protoLex struct {
 	filename string
 	input    *runeReader

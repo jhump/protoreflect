@@ -7,14 +7,14 @@ import (
 	"unicode"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc/internal"
 	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
 
 func (r *parseResult) createFileDescriptor(filename string, file *ast.FileNode) {
-	fd := &dpb.FileDescriptorProto{Name: proto.String(filename)}
+	fd := &descriptorpb.FileDescriptorProto{Name: proto.String(filename)}
 	r.fd = fd
 	r.putFileNode(fd, file)
 
@@ -57,7 +57,7 @@ func (r *parseResult) createFileDescriptor(filename string, file *ast.FileNode) 
 			fd.MessageType = append(fd.MessageType, r.asMessageDescriptor(decl, isProto3))
 		case *ast.OptionNode:
 			if fd.Options == nil {
-				fd.Options = &dpb.FileOptions{}
+				fd.Options = &descriptorpb.FileOptions{}
 			}
 			fd.Options.UninterpretedOption = append(fd.Options.UninterpretedOption, r.asUninterpretedOption(decl))
 		case *ast.ServiceNode:
@@ -73,19 +73,19 @@ func (r *parseResult) createFileDescriptor(filename string, file *ast.FileNode) 
 	}
 }
 
-func (r *parseResult) asUninterpretedOptions(nodes []*ast.OptionNode) []*dpb.UninterpretedOption {
+func (r *parseResult) asUninterpretedOptions(nodes []*ast.OptionNode) []*descriptorpb.UninterpretedOption {
 	if len(nodes) == 0 {
 		return nil
 	}
-	opts := make([]*dpb.UninterpretedOption, len(nodes))
+	opts := make([]*descriptorpb.UninterpretedOption, len(nodes))
 	for i, n := range nodes {
 		opts[i] = r.asUninterpretedOption(n)
 	}
 	return opts
 }
 
-func (r *parseResult) asUninterpretedOption(node *ast.OptionNode) *dpb.UninterpretedOption {
-	opt := &dpb.UninterpretedOption{Name: r.asUninterpretedOptionName(node.Name.Parts)}
+func (r *parseResult) asUninterpretedOption(node *ast.OptionNode) *descriptorpb.UninterpretedOption {
+	opt := &descriptorpb.UninterpretedOption{Name: r.asUninterpretedOptionName(node.Name.Parts)}
 	r.putOptionNode(opt, node)
 
 	switch val := node.Val.Value().(type) {
@@ -115,10 +115,10 @@ func (r *parseResult) asUninterpretedOption(node *ast.OptionNode) *dpb.Uninterpr
 	return opt
 }
 
-func (r *parseResult) asUninterpretedOptionName(parts []*ast.FieldReferenceNode) []*dpb.UninterpretedOption_NamePart {
-	ret := make([]*dpb.UninterpretedOption_NamePart, len(parts))
+func (r *parseResult) asUninterpretedOptionName(parts []*ast.FieldReferenceNode) []*descriptorpb.UninterpretedOption_NamePart {
+	ret := make([]*descriptorpb.UninterpretedOption_NamePart, len(parts))
 	for i, part := range parts {
-		np := &dpb.UninterpretedOption_NamePart{
+		np := &descriptorpb.UninterpretedOption_NamePart{
 			NamePart:    proto.String(string(part.Name.AsIdentifier())),
 			IsExtension: proto.Bool(part.IsExtension()),
 		}
@@ -128,7 +128,7 @@ func (r *parseResult) asUninterpretedOptionName(parts []*ast.FieldReferenceNode)
 	return ret
 }
 
-func (r *parseResult) addExtensions(ext *ast.ExtendNode, flds *[]*dpb.FieldDescriptorProto, msgs *[]*dpb.DescriptorProto, isProto3 bool) {
+func (r *parseResult) addExtensions(ext *ast.ExtendNode, flds *[]*descriptorpb.FieldDescriptorProto, msgs *[]*descriptorpb.DescriptorProto, isProto3 bool) {
 	extendee := string(ext.Extendee.AsIdentifier())
 	count := 0
 	for _, decl := range ext.Decls {
@@ -153,21 +153,21 @@ func (r *parseResult) addExtensions(ext *ast.ExtendNode, flds *[]*dpb.FieldDescr
 	}
 }
 
-func asLabel(lbl *ast.FieldLabel) *dpb.FieldDescriptorProto_Label {
+func asLabel(lbl *ast.FieldLabel) *descriptorpb.FieldDescriptorProto_Label {
 	if !lbl.IsPresent() {
 		return nil
 	}
 	switch {
 	case lbl.Repeated:
-		return dpb.FieldDescriptorProto_LABEL_REPEATED.Enum()
+		return descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum()
 	case lbl.Required:
-		return dpb.FieldDescriptorProto_LABEL_REQUIRED.Enum()
+		return descriptorpb.FieldDescriptorProto_LABEL_REQUIRED.Enum()
 	default:
-		return dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
+		return descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
 	}
 }
 
-func (r *parseResult) asFieldDescriptor(node *ast.FieldNode, maxTag int32, isProto3 bool) *dpb.FieldDescriptorProto {
+func (r *parseResult) asFieldDescriptor(node *ast.FieldNode, maxTag int32, isProto3 bool) *descriptorpb.FieldDescriptorProto {
 	tag := node.Tag.Val
 	if err := checkTag(node.Tag.Start(), tag, maxTag); err != nil {
 		_ = r.errs.handleError(err)
@@ -175,34 +175,34 @@ func (r *parseResult) asFieldDescriptor(node *ast.FieldNode, maxTag int32, isPro
 	fd := newFieldDescriptor(node.Name.Val, string(node.FldType.AsIdentifier()), int32(tag), asLabel(&node.Label))
 	r.putFieldNode(fd, node)
 	if opts := node.Options.GetElements(); len(opts) > 0 {
-		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
+		fd.Options = &descriptorpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
-	if isProto3 && fd.Label != nil && fd.GetLabel() == dpb.FieldDescriptorProto_LABEL_OPTIONAL {
-		internal.SetProto3Optional(fd)
+	if isProto3 && fd.Label != nil && fd.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL {
+		fd.Proto3Optional = proto.Bool(true)
 	}
 	return fd
 }
 
-var fieldTypes = map[string]dpb.FieldDescriptorProto_Type{
-	"double":   dpb.FieldDescriptorProto_TYPE_DOUBLE,
-	"float":    dpb.FieldDescriptorProto_TYPE_FLOAT,
-	"int32":    dpb.FieldDescriptorProto_TYPE_INT32,
-	"int64":    dpb.FieldDescriptorProto_TYPE_INT64,
-	"uint32":   dpb.FieldDescriptorProto_TYPE_UINT32,
-	"uint64":   dpb.FieldDescriptorProto_TYPE_UINT64,
-	"sint32":   dpb.FieldDescriptorProto_TYPE_SINT32,
-	"sint64":   dpb.FieldDescriptorProto_TYPE_SINT64,
-	"fixed32":  dpb.FieldDescriptorProto_TYPE_FIXED32,
-	"fixed64":  dpb.FieldDescriptorProto_TYPE_FIXED64,
-	"sfixed32": dpb.FieldDescriptorProto_TYPE_SFIXED32,
-	"sfixed64": dpb.FieldDescriptorProto_TYPE_SFIXED64,
-	"bool":     dpb.FieldDescriptorProto_TYPE_BOOL,
-	"string":   dpb.FieldDescriptorProto_TYPE_STRING,
-	"bytes":    dpb.FieldDescriptorProto_TYPE_BYTES,
+var fieldTypes = map[string]descriptorpb.FieldDescriptorProto_Type{
+	"double":   descriptorpb.FieldDescriptorProto_TYPE_DOUBLE,
+	"float":    descriptorpb.FieldDescriptorProto_TYPE_FLOAT,
+	"int32":    descriptorpb.FieldDescriptorProto_TYPE_INT32,
+	"int64":    descriptorpb.FieldDescriptorProto_TYPE_INT64,
+	"uint32":   descriptorpb.FieldDescriptorProto_TYPE_UINT32,
+	"uint64":   descriptorpb.FieldDescriptorProto_TYPE_UINT64,
+	"sint32":   descriptorpb.FieldDescriptorProto_TYPE_SINT32,
+	"sint64":   descriptorpb.FieldDescriptorProto_TYPE_SINT64,
+	"fixed32":  descriptorpb.FieldDescriptorProto_TYPE_FIXED32,
+	"fixed64":  descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
+	"sfixed32": descriptorpb.FieldDescriptorProto_TYPE_SFIXED32,
+	"sfixed64": descriptorpb.FieldDescriptorProto_TYPE_SFIXED64,
+	"bool":     descriptorpb.FieldDescriptorProto_TYPE_BOOL,
+	"string":   descriptorpb.FieldDescriptorProto_TYPE_STRING,
+	"bytes":    descriptorpb.FieldDescriptorProto_TYPE_BYTES,
 }
 
-func newFieldDescriptor(name string, fieldType string, tag int32, lbl *dpb.FieldDescriptorProto_Label) *dpb.FieldDescriptorProto {
-	fd := &dpb.FieldDescriptorProto{
+func newFieldDescriptor(name string, fieldType string, tag int32, lbl *descriptorpb.FieldDescriptorProto_Label) *descriptorpb.FieldDescriptorProto {
+	fd := &descriptorpb.FieldDescriptorProto{
 		Name:     proto.String(name),
 		JsonName: proto.String(internal.JsonName(name)),
 		Number:   proto.Int32(tag),
@@ -220,7 +220,7 @@ func newFieldDescriptor(name string, fieldType string, tag int32, lbl *dpb.Field
 	return fd
 }
 
-func (r *parseResult) asGroupDescriptors(group *ast.GroupNode, isProto3 bool, maxTag int32) (*dpb.FieldDescriptorProto, *dpb.DescriptorProto) {
+func (r *parseResult) asGroupDescriptors(group *ast.GroupNode, isProto3 bool, maxTag int32) (*descriptorpb.FieldDescriptorProto, *descriptorpb.DescriptorProto) {
 	tag := group.Tag.Val
 	if err := checkTag(group.Tag.Start(), tag, maxTag); err != nil {
 		_ = r.errs.handleError(err)
@@ -229,63 +229,63 @@ func (r *parseResult) asGroupDescriptors(group *ast.GroupNode, isProto3 bool, ma
 		_ = r.errs.handleErrorWithPos(group.Name.Start(), "group %s should have a name that starts with a capital letter", group.Name.Val)
 	}
 	fieldName := strings.ToLower(group.Name.Val)
-	fd := &dpb.FieldDescriptorProto{
+	fd := &descriptorpb.FieldDescriptorProto{
 		Name:     proto.String(fieldName),
 		JsonName: proto.String(internal.JsonName(fieldName)),
 		Number:   proto.Int32(int32(tag)),
 		Label:    asLabel(&group.Label),
-		Type:     dpb.FieldDescriptorProto_TYPE_GROUP.Enum(),
+		Type:     descriptorpb.FieldDescriptorProto_TYPE_GROUP.Enum(),
 		TypeName: proto.String(group.Name.Val),
 	}
 	r.putFieldNode(fd, group)
 	if opts := group.Options.GetElements(); len(opts) > 0 {
-		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
+		fd.Options = &descriptorpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
-	md := &dpb.DescriptorProto{Name: proto.String(group.Name.Val)}
+	md := &descriptorpb.DescriptorProto{Name: proto.String(group.Name.Val)}
 	r.putMessageNode(md, group)
 	r.addMessageBody(md, &group.MessageBody, isProto3)
 	return fd, md
 }
 
-func (r *parseResult) asMapDescriptors(mapField *ast.MapFieldNode, isProto3 bool, maxTag int32) (*dpb.FieldDescriptorProto, *dpb.DescriptorProto) {
+func (r *parseResult) asMapDescriptors(mapField *ast.MapFieldNode, isProto3 bool, maxTag int32) (*descriptorpb.FieldDescriptorProto, *descriptorpb.DescriptorProto) {
 	tag := mapField.Tag.Val
 	if err := checkTag(mapField.Tag.Start(), tag, maxTag); err != nil {
 		_ = r.errs.handleError(err)
 	}
-	var lbl *dpb.FieldDescriptorProto_Label
+	var lbl *descriptorpb.FieldDescriptorProto_Label
 	if !isProto3 {
-		lbl = dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
+		lbl = descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
 	}
 	keyFd := newFieldDescriptor("key", mapField.MapType.KeyType.Val, 1, lbl)
 	r.putFieldNode(keyFd, mapField.KeyField())
 	valFd := newFieldDescriptor("value", string(mapField.MapType.ValueType.AsIdentifier()), 2, lbl)
 	r.putFieldNode(valFd, mapField.ValueField())
 	entryName := internal.InitCap(internal.JsonName(mapField.Name.Val)) + "Entry"
-	fd := newFieldDescriptor(mapField.Name.Val, entryName, int32(tag), dpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
+	fd := newFieldDescriptor(mapField.Name.Val, entryName, int32(tag), descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
 	if opts := mapField.Options.GetElements(); len(opts) > 0 {
-		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
+		fd.Options = &descriptorpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	r.putFieldNode(fd, mapField)
-	md := &dpb.DescriptorProto{
+	md := &descriptorpb.DescriptorProto{
 		Name:    proto.String(entryName),
-		Options: &dpb.MessageOptions{MapEntry: proto.Bool(true)},
-		Field:   []*dpb.FieldDescriptorProto{keyFd, valFd},
+		Options: &descriptorpb.MessageOptions{MapEntry: proto.Bool(true)},
+		Field:   []*descriptorpb.FieldDescriptorProto{keyFd, valFd},
 	}
 	r.putMessageNode(md, mapField)
 	return fd, md
 }
 
-func (r *parseResult) asExtensionRanges(node *ast.ExtensionRangeNode, maxTag int32) []*dpb.DescriptorProto_ExtensionRange {
+func (r *parseResult) asExtensionRanges(node *ast.ExtensionRangeNode, maxTag int32) []*descriptorpb.DescriptorProto_ExtensionRange {
 	opts := r.asUninterpretedOptions(node.Options.GetElements())
-	ers := make([]*dpb.DescriptorProto_ExtensionRange, len(node.Ranges))
+	ers := make([]*descriptorpb.DescriptorProto_ExtensionRange, len(node.Ranges))
 	for i, rng := range node.Ranges {
 		start, end := getRangeBounds(r, rng, 0, maxTag)
-		er := &dpb.DescriptorProto_ExtensionRange{
+		er := &descriptorpb.DescriptorProto_ExtensionRange{
 			Start: proto.Int32(start),
 			End:   proto.Int32(end + 1),
 		}
 		if len(opts) > 0 {
-			er.Options = &dpb.ExtensionRangeOptions{UninterpretedOption: opts}
+			er.Options = &descriptorpb.ExtensionRangeOptions{UninterpretedOption: opts}
 		}
 		r.putExtensionRangeNode(er, rng)
 		ers[i] = er
@@ -293,21 +293,21 @@ func (r *parseResult) asExtensionRanges(node *ast.ExtensionRangeNode, maxTag int
 	return ers
 }
 
-func (r *parseResult) asEnumValue(ev *ast.EnumValueNode) *dpb.EnumValueDescriptorProto {
+func (r *parseResult) asEnumValue(ev *ast.EnumValueNode) *descriptorpb.EnumValueDescriptorProto {
 	num, ok := ast.AsInt32(ev.Number, math.MinInt32, math.MaxInt32)
 	if !ok {
 		_ = r.errs.handleErrorWithPos(ev.Number.Start(), "value %d is out of range: should be between %d and %d", ev.Number.Value(), math.MinInt32, math.MaxInt32)
 	}
-	evd := &dpb.EnumValueDescriptorProto{Name: proto.String(ev.Name.Val), Number: proto.Int32(num)}
+	evd := &descriptorpb.EnumValueDescriptorProto{Name: proto.String(ev.Name.Val), Number: proto.Int32(num)}
 	r.putEnumValueNode(evd, ev)
 	if opts := ev.Options.GetElements(); len(opts) > 0 {
-		evd.Options = &dpb.EnumValueOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
+		evd.Options = &descriptorpb.EnumValueOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	return evd
 }
 
-func (r *parseResult) asMethodDescriptor(node *ast.RPCNode) *dpb.MethodDescriptorProto {
-	md := &dpb.MethodDescriptorProto{
+func (r *parseResult) asMethodDescriptor(node *ast.RPCNode) *descriptorpb.MethodDescriptorProto {
+	md := &descriptorpb.MethodDescriptorProto{
 		Name:       proto.String(node.Name.Val),
 		InputType:  proto.String(string(node.Input.MessageType.AsIdentifier())),
 		OutputType: proto.String(string(node.Output.MessageType.AsIdentifier())),
@@ -323,7 +323,7 @@ func (r *parseResult) asMethodDescriptor(node *ast.RPCNode) *dpb.MethodDescripto
 	// We do the same to match protoc as closely as possible
 	// https://github.com/protocolbuffers/protobuf/blob/0c3f43a6190b77f1f68b7425d1b7e1a8257a8d0c/src/google/protobuf/compiler/parser.cc#L2152
 	if node.OpenBrace != nil {
-		md.Options = &dpb.MethodOptions{}
+		md.Options = &descriptorpb.MethodOptions{}
 		for _, decl := range node.Decls {
 			switch decl := decl.(type) {
 			case *ast.OptionNode:
@@ -334,14 +334,14 @@ func (r *parseResult) asMethodDescriptor(node *ast.RPCNode) *dpb.MethodDescripto
 	return md
 }
 
-func (r *parseResult) asEnumDescriptor(en *ast.EnumNode) *dpb.EnumDescriptorProto {
-	ed := &dpb.EnumDescriptorProto{Name: proto.String(en.Name.Val)}
+func (r *parseResult) asEnumDescriptor(en *ast.EnumNode) *descriptorpb.EnumDescriptorProto {
+	ed := &descriptorpb.EnumDescriptorProto{Name: proto.String(en.Name.Val)}
 	r.putEnumNode(ed, en)
 	for _, decl := range en.Decls {
 		switch decl := decl.(type) {
 		case *ast.OptionNode:
 			if ed.Options == nil {
-				ed.Options = &dpb.EnumOptions{}
+				ed.Options = &descriptorpb.EnumOptions{}
 			}
 			ed.Options.UninterpretedOption = append(ed.Options.UninterpretedOption, r.asUninterpretedOption(decl))
 		case *ast.EnumValueNode:
@@ -358,9 +358,9 @@ func (r *parseResult) asEnumDescriptor(en *ast.EnumNode) *dpb.EnumDescriptorProt
 	return ed
 }
 
-func (r *parseResult) asEnumReservedRange(rng *ast.RangeNode) *dpb.EnumDescriptorProto_EnumReservedRange {
+func (r *parseResult) asEnumReservedRange(rng *ast.RangeNode) *descriptorpb.EnumDescriptorProto_EnumReservedRange {
 	start, end := getRangeBounds(r, rng, math.MinInt32, math.MaxInt32)
-	rr := &dpb.EnumDescriptorProto_EnumReservedRange{
+	rr := &descriptorpb.EnumDescriptorProto_EnumReservedRange{
 		Start: proto.Int32(start),
 		End:   proto.Int32(end),
 	}
@@ -368,19 +368,19 @@ func (r *parseResult) asEnumReservedRange(rng *ast.RangeNode) *dpb.EnumDescripto
 	return rr
 }
 
-func (r *parseResult) asMessageDescriptor(node *ast.MessageNode, isProto3 bool) *dpb.DescriptorProto {
-	msgd := &dpb.DescriptorProto{Name: proto.String(node.Name.Val)}
+func (r *parseResult) asMessageDescriptor(node *ast.MessageNode, isProto3 bool) *descriptorpb.DescriptorProto {
+	msgd := &descriptorpb.DescriptorProto{Name: proto.String(node.Name.Val)}
 	r.putMessageNode(msgd, node)
 	r.addMessageBody(msgd, &node.MessageBody, isProto3)
 	return msgd
 }
 
-func (r *parseResult) addMessageBody(msgd *dpb.DescriptorProto, body *ast.MessageBody, isProto3 bool) {
+func (r *parseResult) addMessageBody(msgd *descriptorpb.DescriptorProto, body *ast.MessageBody, isProto3 bool) {
 	// first process any options
 	for _, decl := range body.Decls {
 		if opt, ok := decl.(*ast.OptionNode); ok {
 			if msgd.Options == nil {
-				msgd.Options = &dpb.MessageOptions{}
+				msgd.Options = &descriptorpb.MessageOptions{}
 			}
 			msgd.Options.UninterpretedOption = append(msgd.Options.UninterpretedOption, r.asUninterpretedOption(opt))
 		}
@@ -419,7 +419,7 @@ func (r *parseResult) addMessageBody(msgd *dpb.DescriptorProto, body *ast.Messag
 			msgd.NestedType = append(msgd.NestedType, md)
 		case *ast.OneOfNode:
 			oodIndex := len(msgd.OneofDecl)
-			ood := &dpb.OneofDescriptorProto{Name: proto.String(decl.Name.Val)}
+			ood := &descriptorpb.OneofDescriptorProto{Name: proto.String(decl.Name.Val)}
 			r.putOneOfNode(ood, decl)
 			msgd.OneofDecl = append(msgd.OneofDecl, ood)
 			ooFields := 0
@@ -427,7 +427,7 @@ func (r *parseResult) addMessageBody(msgd *dpb.DescriptorProto, body *ast.Messag
 				switch oodecl := oodecl.(type) {
 				case *ast.OptionNode:
 					if ood.Options == nil {
-						ood.Options = &dpb.OneofOptions{}
+						ood.Options = &descriptorpb.OneofOptions{}
 					}
 					ood.Options.UninterpretedOption = append(ood.Options.UninterpretedOption, r.asUninterpretedOption(oodecl))
 				case *ast.FieldNode:
@@ -469,7 +469,7 @@ func (r *parseResult) addMessageBody(msgd *dpb.DescriptorProto, body *ast.Messag
 	}
 }
 
-func isMessageSetWireFormat(res *parseResult, scope string, md *dpb.DescriptorProto) (bool, error) {
+func isMessageSetWireFormat(res *parseResult, scope string, md *descriptorpb.DescriptorProto) (bool, error) {
 	uo := md.GetOptions().GetUninterpretedOption()
 	index, err := findOption(res, scope, uo, "message_set_wire_format")
 	if err != nil {
@@ -493,9 +493,9 @@ func isMessageSetWireFormat(res *parseResult, scope string, md *dpb.DescriptorPr
 	}
 }
 
-func (r *parseResult) asMessageReservedRange(rng *ast.RangeNode, maxTag int32) *dpb.DescriptorProto_ReservedRange {
+func (r *parseResult) asMessageReservedRange(rng *ast.RangeNode, maxTag int32) *descriptorpb.DescriptorProto_ReservedRange {
 	start, end := getRangeBounds(r, rng, 0, maxTag)
-	rr := &dpb.DescriptorProto_ReservedRange{
+	rr := &descriptorpb.DescriptorProto_ReservedRange{
 		Start: proto.Int32(start),
 		End:   proto.Int32(end + 1),
 	}
@@ -526,14 +526,14 @@ func getRangeBounds(res *parseResult, rng *ast.RangeNode, minVal, maxVal int32) 
 	return start, end
 }
 
-func (r *parseResult) asServiceDescriptor(svc *ast.ServiceNode) *dpb.ServiceDescriptorProto {
-	sd := &dpb.ServiceDescriptorProto{Name: proto.String(svc.Name.Val)}
+func (r *parseResult) asServiceDescriptor(svc *ast.ServiceNode) *descriptorpb.ServiceDescriptorProto {
+	sd := &descriptorpb.ServiceDescriptorProto{Name: proto.String(svc.Name.Val)}
 	r.putServiceNode(sd, svc)
 	for _, decl := range svc.Decls {
 		switch decl := decl.(type) {
 		case *ast.OptionNode:
 			if sd.Options == nil {
-				sd.Options = &dpb.ServiceOptions{}
+				sd.Options = &descriptorpb.ServiceOptions{}
 			}
 			sd.Options.UninterpretedOption = append(sd.Options.UninterpretedOption, r.asUninterpretedOption(decl))
 		case *ast.RPCNode:

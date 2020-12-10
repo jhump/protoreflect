@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
@@ -71,7 +71,7 @@ func TestPrinter(t *testing.T) {
 }
 
 func loadProtoset(path string) (*desc.FileDescriptor, error) {
-	var fds descriptor.FileDescriptorSet
+	var fds descriptorpb.FileDescriptorSet
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err

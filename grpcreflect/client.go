@@ -9,11 +9,11 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal"
@@ -116,7 +116,7 @@ type Client struct {
 	stream rpb.ServerReflection_ServerReflectionInfoClient
 
 	cacheMu          sync.RWMutex
-	protosByName     map[string]*dpb.FileDescriptorProto
+	protosByName     map[string]*descriptorpb.FileDescriptorProto
 	filesByName      map[string]*desc.FileDescriptor
 	filesBySymbol    map[string]*desc.FileDescriptor
 	filesByExtension map[extDesc]*desc.FileDescriptor
@@ -128,7 +128,7 @@ func NewClient(ctx context.Context, stub rpb.ServerReflectionClient) *Client {
 	cr := &Client{
 		ctx:              ctx,
 		stub:             stub,
-		protosByName:     map[string]*dpb.FileDescriptorProto{},
+		protosByName:     map[string]*descriptorpb.FileDescriptorProto{},
 		filesByName:      map[string]*desc.FileDescriptor{},
 		filesBySymbol:    map[string]*desc.FileDescriptor{},
 		filesByExtension: map[extDesc]*desc.FileDescriptor{},
@@ -253,9 +253,9 @@ func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest, e
 	// should be the answer). If we're looking for a file by name, we can be
 	// smarter and make sure to grab one by name instead of just grabbing the
 	// first one.
-	var firstFd *dpb.FileDescriptorProto
+	var firstFd *descriptorpb.FileDescriptorProto
 	for _, fdBytes := range fdResp.FileDescriptorProto {
-		fd := &dpb.FileDescriptorProto{}
+		fd := &descriptorpb.FileDescriptorProto{}
 		if err = proto.Unmarshal(fdBytes, fd); err != nil {
 			return nil, err
 		}
@@ -291,7 +291,7 @@ func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest, e
 	return cr.descriptorFromProto(firstFd)
 }
 
-func (cr *Client) descriptorFromProto(fd *dpb.FileDescriptorProto) (*desc.FileDescriptor, error) {
+func (cr *Client) descriptorFromProto(fd *descriptorpb.FileDescriptorProto) (*desc.FileDescriptor, error) {
 	deps := make([]*desc.FileDescriptor, len(fd.GetDependency()))
 	for i, depName := range fd.GetDependency() {
 		if dep, err := cr.FileByFilename(depName); err != nil {

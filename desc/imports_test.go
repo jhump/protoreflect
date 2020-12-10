@@ -3,7 +3,7 @@ package desc_test
 import (
 	"testing"
 
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
@@ -107,7 +107,7 @@ func TestImportResolver_CreateFileDescriptors(t *testing.T) {
 	// Since we didn't link, fu.Baz.foobar field in second file has no type
 	// (it can't know whether it's a message or enum until linking is done).
 	// So go ahead and fill in the correct type:
-	fds[1].MessageType[0].Field[0].Type = descriptor.FieldDescriptorProto_TYPE_MESSAGE.Enum()
+	fds[1].MessageType[0].Field[0].Type = descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
 
 	// sanity check: make sure linking fails without an import resolver
 	_, err = desc.CreateFileDescriptors(fds)

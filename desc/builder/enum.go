@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
@@ -17,8 +17,8 @@ import (
 type EnumBuilder struct {
 	baseBuilder
 
-	Options        *dpb.EnumOptions
-	ReservedRanges []*dpb.EnumDescriptorProto_EnumReservedRange
+	Options        *descriptorpb.EnumOptions
+	ReservedRanges []*descriptorpb.EnumDescriptorProto_EnumReservedRange
 	ReservedNames  []string
 
 	values  []*EnumValueBuilder
@@ -146,7 +146,7 @@ func (eb *EnumBuilder) addSymbol(b *EnumValueBuilder) error {
 
 // SetOptions sets the enum options for this enum and returns the enum, for
 // method chaining.
-func (eb *EnumBuilder) SetOptions(options *dpb.EnumOptions) *EnumBuilder {
+func (eb *EnumBuilder) SetOptions(options *descriptorpb.EnumOptions) *EnumBuilder {
 	eb.Options = options
 	return eb
 }
@@ -202,7 +202,7 @@ func (eb *EnumBuilder) TryAddValue(evb *EnumValueBuilder) error {
 // inclusive of both the start and end, just like defining a range in proto IDL
 // source. This returns the message, for method chaining.
 func (eb *EnumBuilder) AddReservedRange(start, end int32) *EnumBuilder {
-	rr := &dpb.EnumDescriptorProto_EnumReservedRange{
+	rr := &descriptorpb.EnumDescriptorProto_EnumReservedRange{
 		Start: proto.Int32(start),
 		End:   proto.Int32(end),
 	}
@@ -212,7 +212,7 @@ func (eb *EnumBuilder) AddReservedRange(start, end int32) *EnumBuilder {
 
 // SetReservedRanges replaces all of this enum's reserved ranges with the
 // given slice of ranges. This returns the enum, for method chaining.
-func (eb *EnumBuilder) SetReservedRanges(ranges []*dpb.EnumDescriptorProto_EnumReservedRange) *EnumBuilder {
+func (eb *EnumBuilder) SetReservedRanges(ranges []*descriptorpb.EnumDescriptorProto_EnumReservedRange) *EnumBuilder {
 	eb.ReservedRanges = ranges
 	return eb
 }
@@ -231,11 +231,11 @@ func (eb *EnumBuilder) SetReservedNames(names []string) *EnumBuilder {
 	return eb
 }
 
-func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.EnumDescriptorProto, error) {
+func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceCodeInfo) (*descriptorpb.EnumDescriptorProto, error) {
 	addCommentsTo(sourceInfo, path, &eb.comments)
 
-	var needNumbersAssigned []*dpb.EnumValueDescriptorProto
-	values := make([]*dpb.EnumValueDescriptorProto, 0, len(eb.values))
+	var needNumbersAssigned []*descriptorpb.EnumValueDescriptorProto
+	values := make([]*descriptorpb.EnumValueDescriptorProto, 0, len(eb.values))
 	for _, evb := range eb.values {
 		path := append(path, internal.Enum_valuesTag, int32(len(values)))
 		evp, err := evb.buildProto(path, sourceInfo)
@@ -275,7 +275,7 @@ func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) 
 		}
 	}
 
-	return &dpb.EnumDescriptorProto{
+	return &descriptorpb.EnumDescriptorProto{
 		Name:          proto.String(eb.name),
 		Options:       eb.Options,
 		Value:         values,
@@ -314,7 +314,7 @@ type EnumValueBuilder struct {
 
 	number    int32
 	numberSet bool
-	Options   *dpb.EnumValueOptions
+	Options   *descriptorpb.EnumValueOptions
 }
 
 // NewEnumValue creates a new EnumValueBuilder for an enum value with the given
@@ -403,7 +403,7 @@ func (evb *EnumValueBuilder) renamedChild(b Builder, oldName string) error {
 
 // SetOptions sets the enum value options for this enum value and returns the
 // enum value, for method chaining.
-func (evb *EnumValueBuilder) SetOptions(options *dpb.EnumValueOptions) *EnumValueBuilder {
+func (evb *EnumValueBuilder) SetOptions(options *descriptorpb.EnumValueOptions) *EnumValueBuilder {
 	evb.Options = options
 	return evb
 }
@@ -438,10 +438,10 @@ func (evb *EnumValueBuilder) SetNumber(number int32) *EnumValueBuilder {
 	return evb
 }
 
-func (evb *EnumValueBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo) (*dpb.EnumValueDescriptorProto, error) {
+func (evb *EnumValueBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceCodeInfo) (*descriptorpb.EnumValueDescriptorProto, error) {
 	addCommentsTo(sourceInfo, path, &evb.comments)
 
-	return &dpb.EnumValueDescriptorProto{
+	return &descriptorpb.EnumValueDescriptorProto{
 		Name:    proto.String(evb.name),
 		Number:  proto.Int32(evb.number),
 		Options: evb.Options,
