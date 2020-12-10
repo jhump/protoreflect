@@ -143,6 +143,7 @@ func (r *parseResult) generateSourceCodeInfoForMessage(sci *sourceCodeInfo, n as
 		case *ast.MapFieldNode:
 			r.generateSourceCodeInfoForField(sci, child, append(path, internal.Message_fieldsTag, fieldIndex))
 			fieldIndex++
+			nestedMsgIndex++
 		case *ast.OneOfNode:
 			r.generateSourceCodeInfoForOneOf(sci, child, &fieldIndex, &nestedMsgIndex, append(path, internal.Message_fieldsTag), append(dup(path), internal.Message_nestedMessagesTag), append(dup(path), internal.Message_oneOfsTag, oneOfIndex))
 			oneOfIndex++
