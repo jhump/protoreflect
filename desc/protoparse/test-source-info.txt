@@ -5261,6 +5261,8 @@ desc_test_complex.proto:268:48
  > message_type[9]:
 desc_test_complex.proto:271:1
 desc_test_complex.proto:296:2
+    Trailing comments:
+ comment for last element in file, KeywordCollisionOptions
 
 
  > message_type[9] > name:

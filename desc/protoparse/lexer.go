@@ -209,8 +209,8 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			// we're not actually returning a rune, but this will associate
 			// accumulated comments as a trailing comment on last symbol
 			// (if appropriate)
-			l.setIdent(lval, "")
-			l.eof = lval.id
+			l.setRune(lval, 0)
+			l.eof = lval.b
 			return 0
 		} else if err != nil {
 			// we don't call setError because we don't want it wrapped

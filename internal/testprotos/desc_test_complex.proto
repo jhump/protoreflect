@@ -294,3 +294,4 @@ message KeywordCollisionOptions {
 		}
 	];
 }
+// comment for last element in file, KeywordCollisionOptions
