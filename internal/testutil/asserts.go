@@ -2,46 +2,33 @@ package testutil
 
 import (
 	"bytes"
-	"fmt"
 	"math"
-	"os"
 	"reflect"
-	"runtime"
-	"strings"
 	"testing"
 )
 
 // Ceq is a custom equals check; the given function returns true if its arguments are equal
 func Ceq(t *testing.T, expected, actual interface{}, eq func(a, b interface{}) bool, context ...interface{}) bool {
-	return ceq(getCaller(), t, expected, actual, eq, context)
-}
-
-func ceq(caller string, t *testing.T, expected, actual interface{}, eq func(a, b interface{}) bool, context []interface{}) bool {
+	t.Helper()
 	e := eq(expected, actual)
-	require(caller, t, e, mergeContext(context, "Expecting %v (%v), got %v (%v)", expected, reflect.TypeOf(expected), actual, reflect.TypeOf(actual)))
+	Require(t, e, mergeContext(context, "Expecting %v (%v), got %v (%v)", expected, reflect.TypeOf(expected), actual, reflect.TypeOf(actual))...)
 	return e
 }
 
 // Cneq is a custom not-equals check; the given function returns true if its arguments are equal
 func Cneq(t *testing.T, unexpected, actual interface{}, eq func(a, b interface{}) bool, context ...interface{}) bool {
-	return cneq(getCaller(), t, unexpected, actual, eq, context)
-}
-
-func cneq(caller string, t *testing.T, unexpected, actual interface{}, eq func(a, b interface{}) bool, context []interface{}) bool {
+	t.Helper()
 	ne := !eq(unexpected, actual)
-	require(caller, t, ne, mergeContext(context, "Value should not be %v (%v)", unexpected, reflect.TypeOf(unexpected)))
+	Require(t, ne, mergeContext(context, "Value should not be %v (%v)", unexpected, reflect.TypeOf(unexpected))...)
 	return ne
 }
 
 // Require is an assertion that logs a failure if its given argument is not true
 func Require(t *testing.T, condition bool, context ...interface{}) {
-	require(getCaller(), t, condition, context)
-}
-
-func require(caller string, t *testing.T, condition bool, context []interface{}) {
+	t.Helper()
 	if !condition {
 		if len(context) == 0 {
-			t.Fatalf("%s: Assertion failed", caller)
+			t.Fatalf("Assertion failed")
 		} else {
 			msg := context[0].(string)
 			// if any args were deferred (e.g. a function instead of a value), get those args now
@@ -53,82 +40,48 @@ func require(caller string, t *testing.T, condition bool, context []interface{})
 				}
 				args[i] = a
 			}
-			t.Fatalf("%s: %s", caller, fmt.Sprintf(msg, args...))
+			t.Fatalf(msg, args...)
 		}
 	}
 }
 
 func mergeContext(context []interface{}, msg string, msgArgs ...interface{}) []interface{} {
 	if len(context) == 0 {
-		ret := make([]interface{}, len(msgArgs)+1)
-		ret[0] = msg
-		for i, a := range msgArgs {
-			ret[i+1] = a
-		}
+		ret := make([]interface{}, 0, len(msgArgs)+1)
+		ret = append(ret, msg)
+		ret = append(ret, msgArgs...)
 		return ret
 	} else {
-		ret := make([]interface{}, len(msgArgs)+2)
-		ret[0] = msg + ": %s"
-		for i, a := range msgArgs {
-			ret[i+1] = a
-		}
-		ret[len(ret)-1] = func() string {
-			f := context[0].(string)
-			return fmt.Sprintf(f, context[1:]...)
-		}
+		ret := make([]interface{}, 0, len(context)+len(msgArgs))
+		ret = append(ret, msg+": "+context[0].(string))
+		ret = append(ret, msgArgs...)
+		ret = append(ret, context[1:]...)
 		return ret
 	}
-}
-
-func getCaller() string {
-	pc, file, line, ok := runtime.Caller(2)
-	if !ok {
-		return "?"
-	}
-	fn := runtime.FuncForPC(pc)
-	var fnName string
-	if fn == nil {
-		fnName = "?"
-	} else {
-		fnName = fn.Name()
-	}
-	return fmt.Sprintf("%s(%s:%d)", lastComponents(fnName, 1), lastComponents(file, 2), line)
-}
-
-const pathSep = string(os.PathSeparator)
-
-func lastComponents(s string, count int) string {
-	ss := s
-	var i int
-	for count > 0 {
-		i = strings.LastIndex(ss, pathSep)
-		if i < 0 {
-			return s
-		}
-		count--
-		ss = ss[:i]
-	}
-	return s[i+1:]
 }
 
 // Ok asserts that the given error is nil
 func Ok(t *testing.T, err error, context ...interface{}) {
-	require(getCaller(), t, err == nil, mergeContext(context, "Unexpected error: %s", func() interface{} { return err.Error() }))
+	t.Helper()
+	Require(t, err == nil, mergeContext(context, "Unexpected error: %s", func() interface{} { return err.Error() })...)
 }
 
 // Nok asserts that the given error is not nil
 func Nok(t *testing.T, err error, context ...interface{}) {
-	require(getCaller(), t, err != nil, mergeContext(context, "Expected error but got none"))
+	t.Helper()
+	Require(t, err != nil, mergeContext(context, "Expected error but got none")...)
 }
 
 // Eq asserts that the given two values are equal
 func Eq(t *testing.T, expected, actual interface{}, context ...interface{}) bool {
-	return ceq(getCaller(), t, expected, actual, eqany, context)
+	t.Helper()
+	return Ceq(t, expected, actual, eqany, context...)
 }
 
 // Neq asserts that the given two values are not equal
 func Neq(t *testing.T, unexpected, actual interface{}, context ...interface{}) bool {
-	return cneq(getCaller(), t, unexpected, actual, eqany, context)
+	t.Helper()
+	return Cneq(t, unexpected, actual, eqany, context...)
 }
 
 // default equality test and helpers
