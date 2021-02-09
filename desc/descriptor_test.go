@@ -1244,4 +1244,6 @@ func TestProto3Optional(t *testing.T) {
 		testutil.Eq(t, fld.GetOneOf(), md.GetOneOfs()[i])
 		testutil.Require(t, md.GetOneOfs()[i].IsSynthetic())
 	}
+	fld := fd.FindSymbol("some_custom_options").(*FieldDescriptor)
+	testutil.Require(t, fld.IsProto3Optional())
 }

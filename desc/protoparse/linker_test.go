@@ -54,6 +54,9 @@ func TestProto3Optional(t *testing.T) {
 	testutil.Ok(t, err)
 	// not comparing source code info
 	exp.AsFileDescriptorProto().SourceCodeInfo = nil
+	for _, dep := range exp.GetDependencies() {
+		dep.AsFileDescriptorProto().SourceCodeInfo = nil
+	}
 
 	checkFiles(t, fds[0], exp, map[string]struct{}{})
 }
