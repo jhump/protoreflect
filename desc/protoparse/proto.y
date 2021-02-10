@@ -88,14 +88,14 @@ import (
 %type <cmpctOpts> compactOptions
 %type <v>         constant scalarConstant aggregate numLit
 %type <il>        intLit
-%type <id>        name keyType
-%type <cid>       ident
-%type <tid>       typeIdent
+%type <id>        name keyType msgElementName extElementName oneofElementName enumElementName
+%type <cid>       ident msgElementIdent extElementIdent oneofElementIdent
+%type <tid>       typeIdent msgElementTypeIdent extElementTypeIdent oneofElementTypeIdent
 %type <sl>        constantList
 %type <msgField>  aggFieldEntry
 %type <msgEntry>  aggField
 %type <msgLit>    aggFields
-%type <fld>       field oneofField
+%type <fld>       oneofField msgField extField
 %type <oo>        oneof
 %type <grp>       group oneofGroup
 %type <mapFld>    mapField
@@ -156,18 +156,18 @@ file : syntax {
 	}
 
 fileDecls : fileDecls fileDecl {
-        if $2 != nil {
-    		$$ = append($1, $2)
-        } else {
-            $$ = $1
-        }
+		if $2 != nil {
+			$$ = append($1, $2)
+		} else {
+			$$ = $1
+		}
 	}
 	| fileDecl {
-	    if $1 != nil {
-	        $$ = []ast.FileElement{$1}
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			$$ = []ast.FileElement{$1}
+		} else {
+			$$ = nil
+		}
 	}
 
 fileDecl : import {
@@ -195,10 +195,10 @@ fileDecl : import {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
-	    $$ = nil
+		$$ = nil
 	}
 	| error {
-	    $$ = nil
+		$$ = nil
 	}
 
 syntax : _SYNTAX '=' stringLit ';' {
@@ -220,23 +220,48 @@ package : _PACKAGE ident ';' {
 	}
 
 ident : name {
-        $$ = &identList{$1, nil, nil}
-    }
+		$$ = &identList{$1, nil, nil}
+	}
 	| name '.' ident {
-        $$ = &identList{$1, $2, $3}
+		$$ = &identList{$1, $2, $3}
+	}
+
+// to mimic limitations of protoc recursive-descent parser,
+// we don't allowed message statement keywords as identifiers
+// (or oneof statement keywords [e.g. "option"] below)
+
+msgElementIdent : msgElementName {
+		$$ = &identList{$1, nil, nil}
+	}
+	| msgElementName '.' ident {
+		$$ = &identList{$1, $2, $3}
+	}
+
+extElementIdent : extElementName {
+		$$ = &identList{$1, nil, nil}
+	}
+	| extElementName '.' ident {
+		$$ = &identList{$1, $2, $3}
+	}
+
+oneofElementIdent : oneofElementName {
+		$$ = &identList{$1, nil, nil}
+	}
+	| oneofElementName '.' ident {
+		$$ = &identList{$1, $2, $3}
 	}
 
 option : _OPTION optionName '=' constant ';' {
-        refs, dots := $2.toNodes()
-        optName := ast.NewOptionNameNode(refs, dots)
-        $$ = ast.NewOptionNode($1.ToKeyword(), optName, $3, $4, $5)
+		refs, dots := $2.toNodes()
+		optName := ast.NewOptionNameNode(refs, dots)
+		$$ = ast.NewOptionNode($1.ToKeyword(), optName, $3, $4, $5)
 	}
 
 optionName : optionNameComponent {
-        $$ = &fieldRefList{$1, nil, nil}
-    }
-    | optionNameComponent '.' optionName {
-        $$ = &fieldRefList{$1, $2, $3}
+		$$ = &fieldRefList{$1, nil, nil}
+	}
+	| optionNameComponent '.' optionName {
+		$$ = &fieldRefList{$1, $2, $3}
 	}
 
 optionNameComponent : name {
@@ -264,8 +289,8 @@ scalarConstant : stringLit {
 	}
 
 numLit : _FLOAT_LIT {
-        $$ = $1
-    }
+		$$ = $1
+	}
 	| '-' _FLOAT_LIT {
 		$$ = ast.NewSignedFloatLiteralNode($1, $2)
 	}
@@ -273,274 +298,320 @@ numLit : _FLOAT_LIT {
 		$$ = ast.NewSignedFloatLiteralNode($1, $2)
 	}
 	| '+' _INF {
-	    f := ast.NewSpecialFloatLiteralNode($2.ToKeyword())
+		f := ast.NewSpecialFloatLiteralNode($2.ToKeyword())
 		$$ = ast.NewSignedFloatLiteralNode($1, f)
 	}
 	| '-' _INF {
-	    f := ast.NewSpecialFloatLiteralNode($2.ToKeyword())
+		f := ast.NewSpecialFloatLiteralNode($2.ToKeyword())
 		$$ = ast.NewSignedFloatLiteralNode($1, f)
 	}
 	| _INT_LIT {
-        $$ = $1
-    }
-    | '+' _INT_LIT {
-        $$ = ast.NewPositiveUintLiteralNode($1, $2)
-    }
-    | '-' _INT_LIT {
-        if $2.Val > math.MaxInt64 + 1 {
-            // can't represent as int so treat as float literal
-            $$ = ast.NewSignedFloatLiteralNode($1, $2)
-        } else {
-            $$ = ast.NewNegativeIntLiteralNode($1, $2)
-        }
-    }
+		$$ = $1
+	}
+	| '+' _INT_LIT {
+		$$ = ast.NewPositiveUintLiteralNode($1, $2)
+	}
+	| '-' _INT_LIT {
+		if $2.Val > math.MaxInt64 + 1 {
+			// can't represent as int so treat as float literal
+			$$ = ast.NewSignedFloatLiteralNode($1, $2)
+		} else {
+			$$ = ast.NewNegativeIntLiteralNode($1, $2)
+		}
+	}
 
 stringLit : _STRING_LIT {
-        $$ = &stringList{$1, nil}
-    }
-    | _STRING_LIT stringLit  {
-        $$ = &stringList{$1, $2}
-    }
+		$$ = &stringList{$1, nil}
+	}
+	| _STRING_LIT stringLit  {
+		$$ = &stringList{$1, $2}
+	}
 
 aggregate : '{' aggFields '}' {
-        fields, delims := $2.toNodes()
-        $$ = ast.NewMessageLiteralNode($1, fields, delims, $3)
+		fields, delims := $2.toNodes()
+		$$ = ast.NewMessageLiteralNode($1, fields, delims, $3)
 	}
 
 aggFields : aggField {
-	    if $1 != nil {
-	        $$ = &messageFieldList{$1, nil}
-        } else {
-            $$ = nil
-        }
-    }
+		if $1 != nil {
+			$$ = &messageFieldList{$1, nil}
+		} else {
+			$$ = nil
+		}
+	}
 	| aggField aggFields {
-        if $1 != nil {
-            $$ = &messageFieldList{$1, $2}
-        } else {
-            $$ = $2
-        }
+		if $1 != nil {
+			$$ = &messageFieldList{$1, $2}
+		} else {
+			$$ = $2
+		}
 	}
 	| {
 		$$ = nil
 	}
 
 aggField : aggFieldEntry {
-        if $1 != nil {
-            $$ = &messageFieldEntry{$1, nil}
-        } else {
-            $$ = nil
-        }
-    }
+		if $1 != nil {
+			$$ = &messageFieldEntry{$1, nil}
+		} else {
+			$$ = nil
+		}
+	}
 	| aggFieldEntry ',' {
-	    if $1 != nil {
-    		$$ = &messageFieldEntry{$1, $2}
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			$$ = &messageFieldEntry{$1, $2}
+		} else {
+			$$ = nil
+		}
 	}
 	| aggFieldEntry ';' {
-	    if $1 != nil {
-    		$$ = &messageFieldEntry{$1, $2}
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			$$ = &messageFieldEntry{$1, $2}
+		} else {
+			$$ = nil
+		}
 	}
 	| error ',' {
-	    $$ = nil
+		$$ = nil
 	}
 	| error ';' {
-	    $$ = nil
+		$$ = nil
 	}
 	| error {
-	    $$ = nil
+		$$ = nil
 	}
 
 aggFieldEntry : aggName ':' scalarConstant {
-        if $1 != nil {
-            $$ = ast.NewMessageFieldNode($1, $2, $3)
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			$$ = ast.NewMessageFieldNode($1, $2, $3)
+		} else {
+			$$ = nil
+		}
 	}
 	| aggName ':' '[' ']' {
-	    if $1 != nil {
-            val := ast.NewArrayLiteralNode($3, nil, nil, $4)
-            $$ = ast.NewMessageFieldNode($1, $2, val)
-	    } else {
-	        $$ = nil
-	    }
+		if $1 != nil {
+			val := ast.NewArrayLiteralNode($3, nil, nil, $4)
+			$$ = ast.NewMessageFieldNode($1, $2, val)
+		} else {
+			$$ = nil
+		}
 	}
 	| aggName ':' '[' constantList ']' {
-	    if $1 != nil {
-            vals, commas := $4.toNodes()
-            val := ast.NewArrayLiteralNode($3, vals, commas, $5)
-            $$ = ast.NewMessageFieldNode($1, $2, val)
-	    } else {
-	        $$ = nil
-	    }
+		if $1 != nil {
+			vals, commas := $4.toNodes()
+			val := ast.NewArrayLiteralNode($3, vals, commas, $5)
+			$$ = ast.NewMessageFieldNode($1, $2, val)
+		} else {
+			$$ = nil
+		}
 	}
 	| aggName ':' '[' error ']' {
-	    $$ = nil
+		$$ = nil
 	}
 	| aggName ':' aggregate {
-	    if $1 != nil {
-            $$ = ast.NewMessageFieldNode($1, $2, $3)
-	    } else {
-	        $$ = nil
-	    }
+		if $1 != nil {
+			$$ = ast.NewMessageFieldNode($1, $2, $3)
+		} else {
+			$$ = nil
+		}
 	}
 	| aggName aggregate {
-        if $1 != nil {
-            $$ = ast.NewMessageFieldNode($1, nil, $2)
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			$$ = ast.NewMessageFieldNode($1, nil, $2)
+		} else {
+			$$ = nil
+		}
 	}
 	| aggName ':' '<' aggFields '>' {
-	    if $1 != nil {
-            fields, delims := $4.toNodes()
-            msg := ast.NewMessageLiteralNode($3, fields, delims, $5)
-            $$ = ast.NewMessageFieldNode($1, $2, msg)
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			fields, delims := $4.toNodes()
+			msg := ast.NewMessageLiteralNode($3, fields, delims, $5)
+			$$ = ast.NewMessageFieldNode($1, $2, msg)
+		} else {
+			$$ = nil
+		}
 	}
 	| aggName '<' aggFields '>' {
-	    if $1 != nil {
-            fields, delims := $3.toNodes()
-            msg := ast.NewMessageLiteralNode($2, fields, delims, $4)
-            $$ = ast.NewMessageFieldNode($1, nil, msg)
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			fields, delims := $3.toNodes()
+			msg := ast.NewMessageLiteralNode($2, fields, delims, $4)
+			$$ = ast.NewMessageFieldNode($1, nil, msg)
+		} else {
+			$$ = nil
+		}
 	}
 	| aggName ':' '<' error '>' {
-	    $$ = nil
+		$$ = nil
 	}
 	| aggName '<' error '>' {
-	    $$ = nil
+		$$ = nil
 	}
 
 aggName : name {
-        $$ = ast.NewFieldReferenceNode($1)
+		$$ = ast.NewFieldReferenceNode($1)
 	}
 	| '[' typeIdent ']' {
-        $$ = ast.NewExtensionFieldReferenceNode($1, $2, $3)
+		$$ = ast.NewExtensionFieldReferenceNode($1, $2, $3)
 	}
 	| '[' error ']' {
-	    $$ = nil
+		$$ = nil
 	}
 
 constantList : constant {
-        $$ = &valueList{$1, nil, nil}
+		$$ = &valueList{$1, nil, nil}
 	}
 	| constant ',' constantList {
-        $$ = &valueList{$1, $2, $3}
+		$$ = &valueList{$1, $2, $3}
 	}
 	| '<' aggFields '>' {
-        fields, delims := $2.toNodes()
-        msg := ast.NewMessageLiteralNode($1, fields, delims, $3)
-        $$ = &valueList{msg, nil, nil}
+		fields, delims := $2.toNodes()
+		msg := ast.NewMessageLiteralNode($1, fields, delims, $3)
+		$$ = &valueList{msg, nil, nil}
 	}
 	| '<' aggFields '>' ',' constantList {
-        fields, delims := $2.toNodes()
-        msg := ast.NewMessageLiteralNode($1, fields, delims, $3)
-        $$ = &valueList{msg, $4, $5}
+		fields, delims := $2.toNodes()
+		msg := ast.NewMessageLiteralNode($1, fields, delims, $3)
+		$$ = &valueList{msg, $4, $5}
 	}
 	| '<' error '>' {
-	    $$ = nil
+		$$ = nil
 	}
 	| '<' error '>' ',' constantList {
-	    $$ = $5
+		$$ = $5
 	}
 
 typeIdent : ident {
-        $$ = $1.toIdentValueNode(nil)
-    }
-    | '.' ident {
-        $$ = $2.toIdentValueNode($1)
-    }
+		$$ = $1.toIdentValueNode(nil)
+	}
+	| '.' ident {
+		$$ = $2.toIdentValueNode($1)
+	}
 
-field : _REQUIRED typeIdent name '=' _INT_LIT ';' {
-        $$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
+msgElementTypeIdent : msgElementIdent {
+		$$ = $1.toIdentValueNode(nil)
+	}
+	| '.' ident {
+		$$ = $2.toIdentValueNode($1)
+	}
+
+extElementTypeIdent : extElementIdent {
+		$$ = $1.toIdentValueNode(nil)
+	}
+	| '.' ident {
+		$$ = $2.toIdentValueNode($1)
+	}
+
+oneofElementTypeIdent : oneofElementIdent {
+		$$ = $1.toIdentValueNode(nil)
+	}
+	| '.' ident {
+		$$ = $2.toIdentValueNode($1)
+	}
+
+msgField : _REQUIRED typeIdent name '=' _INT_LIT ';' {
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
 	}
 	| _OPTIONAL typeIdent name '=' _INT_LIT ';' {
-        $$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
 	}
 	| _REPEATED typeIdent name '=' _INT_LIT ';' {
-        $$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
-	}
-	| typeIdent name '=' _INT_LIT ';' {
-        $$ = ast.NewFieldNode(nil, $1, $2, $3, $4, nil, $5)
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
 	}
 	| _REQUIRED typeIdent name '=' _INT_LIT compactOptions ';' {
-        $$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
 	}
 	| _OPTIONAL typeIdent name '=' _INT_LIT compactOptions ';' {
-        $$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
 	}
 	| _REPEATED typeIdent name '=' _INT_LIT compactOptions ';' {
-        $$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
 	}
-	| typeIdent name '=' _INT_LIT compactOptions ';' {
-        $$ = ast.NewFieldNode(nil, $1, $2, $3, $4, $5, $6)
+	| msgElementTypeIdent name '=' _INT_LIT ';' {
+		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, nil, $5)
+	}
+	| msgElementTypeIdent name '=' _INT_LIT compactOptions ';' {
+		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, $5, $6)
+	}
+
+extField : _REQUIRED typeIdent name '=' _INT_LIT ';' {
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
+	}
+	| _OPTIONAL typeIdent name '=' _INT_LIT ';' {
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
+	}
+	| _REPEATED typeIdent name '=' _INT_LIT ';' {
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
+	}
+	| _REQUIRED typeIdent name '=' _INT_LIT compactOptions ';' {
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
+	}
+	| _OPTIONAL typeIdent name '=' _INT_LIT compactOptions ';' {
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
+	}
+	| _REPEATED typeIdent name '=' _INT_LIT compactOptions ';' {
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
+	}
+	| extElementTypeIdent name '=' _INT_LIT ';' {
+		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, nil, $5)
+	}
+	| extElementTypeIdent name '=' _INT_LIT compactOptions ';' {
+		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, $5, $6)
 	}
 
 compactOptions: '[' compactOptionDecls ']' {
-        opts, commas := $2.toNodes()
-        $$ = ast.NewCompactOptionsNode($1, opts, commas, $3)
-    }
+		opts, commas := $2.toNodes()
+		$$ = ast.NewCompactOptionsNode($1, opts, commas, $3)
+	}
 
 compactOptionDecls : compactOption {
-        $$ = &compactOptionList{$1, nil, nil}
-    }
-    | compactOption ',' compactOptionDecls {
-        $$ = &compactOptionList{$1, $2, $3}
+		$$ = &compactOptionList{$1, nil, nil}
+	}
+	| compactOption ',' compactOptionDecls {
+		$$ = &compactOptionList{$1, $2, $3}
 	}
 
 compactOption: optionName '=' constant {
-        refs, dots := $1.toNodes()
-        optName := ast.NewOptionNameNode(refs, dots)
-        $$ = ast.NewCompactOptionNode(optName, $2, $3)
+		refs, dots := $1.toNodes()
+		optName := ast.NewOptionNameNode(refs, dots)
+		$$ = ast.NewCompactOptionNode(optName, $2, $3)
 	}
 
 group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageDecls '}' {
-        $$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, nil, $6, $7, $8)
+		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, nil, $6, $7, $8)
 	}
 	| _OPTIONAL _GROUP name '=' _INT_LIT '{' messageDecls '}' {
-        $$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, nil, $6, $7, $8)
+		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, nil, $6, $7, $8)
 	}
 	| _REPEATED _GROUP name '=' _INT_LIT '{' messageDecls '}' {
-        $$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, nil, $6, $7, $8)
+		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, nil, $6, $7, $8)
 	}
 	| _REQUIRED _GROUP name '=' _INT_LIT compactOptions '{' messageDecls '}' {
-        $$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, $6, $7, $8, $9)
+		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, $6, $7, $8, $9)
 	}
 	| _OPTIONAL _GROUP name '=' _INT_LIT compactOptions '{' messageDecls '}' {
-        $$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, $6, $7, $8, $9)
+		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, $6, $7, $8, $9)
 	}
 	| _REPEATED _GROUP name '=' _INT_LIT compactOptions '{' messageDecls '}' {
-        $$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, $6, $7, $8, $9)
+		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, $6, $7, $8, $9)
 	}
 
 oneof : _ONEOF name '{' ooDecls '}' {
-        $$ = ast.NewOneOfNode($1.ToKeyword(), $2, $3, $4, $5)
+		$$ = ast.NewOneOfNode($1.ToKeyword(), $2, $3, $4, $5)
 	}
 
 ooDecls : ooDecls ooDecl {
-        if $2 != nil {
-    		$$ = append($1, $2)
-        } else {
-            $$ = $1
-        }
+		if $2 != nil {
+			$$ = append($1, $2)
+		} else {
+			$$ = $1
+		}
 	}
 	| ooDecl {
-	    if $1 != nil {
-	        $$ = []ast.OneOfElement{$1}
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			$$ = []ast.OneOfElement{$1}
+		} else {
+			$$ = nil
+		}
 	}
 	| {
 		$$ = nil
@@ -556,39 +627,39 @@ ooDecl : option {
 		$$ = $1
 	}
 	| ';' {
-	    $$ = ast.NewEmptyDeclNode($1)
+		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
-	    $$ = nil
+		$$ = nil
 	}
 	| error {
-	    $$ = nil
+		$$ = nil
 	}
 
-oneofField : typeIdent name '=' _INT_LIT ';' {
-        $$ = ast.NewFieldNode(nil, $1, $2, $3, $4, nil, $5)
+oneofField : oneofElementTypeIdent name '=' _INT_LIT ';' {
+		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, nil, $5)
 	}
-	| typeIdent name '=' _INT_LIT compactOptions ';' {
-        $$ = ast.NewFieldNode(nil, $1, $2, $3, $4, $5, $6)
+	| oneofElementTypeIdent name '=' _INT_LIT compactOptions ';' {
+		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, $5, $6)
 	}
 
 oneofGroup : _GROUP name '=' _INT_LIT '{' messageDecls '}' {
-        $$ = ast.NewGroupNode(nil, $1.ToKeyword(), $2, $3, $4, nil, $5, $6, $7)
+		$$ = ast.NewGroupNode(nil, $1.ToKeyword(), $2, $3, $4, nil, $5, $6, $7)
 	}
 	| _GROUP name '=' _INT_LIT compactOptions '{' messageDecls '}' {
-        $$ = ast.NewGroupNode(nil, $1.ToKeyword(), $2, $3, $4, $5, $6, $7, $8)
+		$$ = ast.NewGroupNode(nil, $1.ToKeyword(), $2, $3, $4, $5, $6, $7, $8)
 	}
 
 mapField : mapType name '=' _INT_LIT ';' {
-        $$ = ast.NewMapFieldNode($1, $2, $3, $4, nil, $5)
+		$$ = ast.NewMapFieldNode($1, $2, $3, $4, nil, $5)
 	}
 	| mapType name '=' _INT_LIT compactOptions ';' {
-        $$ = ast.NewMapFieldNode($1, $2, $3, $4, $5, $6)
+		$$ = ast.NewMapFieldNode($1, $2, $3, $4, $5, $6)
 	}
 
 mapType : _MAP '<' keyType ',' typeIdent '>' {
-        $$ = ast.NewMapTypeNode($1.ToKeyword(), $2, $3, $4, $5, $6)
-    }
+		$$ = ast.NewMapTypeNode($1.ToKeyword(), $2, $3, $4, $5, $6)
+	}
 
 keyType : _INT32
 	| _INT64
@@ -604,96 +675,96 @@ keyType : _INT32
 	| _STRING
 
 extensions : _EXTENSIONS tagRanges ';' {
-        ranges, commas := $2.toNodes()
-        $$ = ast.NewExtensionRangeNode($1.ToKeyword(), ranges, commas, nil, $3)
+		ranges, commas := $2.toNodes()
+		$$ = ast.NewExtensionRangeNode($1.ToKeyword(), ranges, commas, nil, $3)
 	}
 	| _EXTENSIONS tagRanges compactOptions ';' {
-        ranges, commas := $2.toNodes()
-        $$ = ast.NewExtensionRangeNode($1.ToKeyword(), ranges, commas, $3, $4)
+		ranges, commas := $2.toNodes()
+		$$ = ast.NewExtensionRangeNode($1.ToKeyword(), ranges, commas, $3, $4)
 	}
 
 tagRanges : tagRange {
 		$$ = &rangeList{$1, nil, nil}
-    }
-    | tagRange ',' tagRanges {
+	}
+	| tagRange ',' tagRanges {
 		$$ = &rangeList{$1, $2, $3}
 	}
 
 tagRange : _INT_LIT {
-        $$ = ast.NewRangeNode($1, nil, nil, nil)
+		$$ = ast.NewRangeNode($1, nil, nil, nil)
 	}
 	| _INT_LIT _TO _INT_LIT {
-        $$ = ast.NewRangeNode($1, $2.ToKeyword(), $3, nil)
+		$$ = ast.NewRangeNode($1, $2.ToKeyword(), $3, nil)
 	}
 	| _INT_LIT _TO _MAX {
-        $$ = ast.NewRangeNode($1, $2.ToKeyword(), nil, $3.ToKeyword())
+		$$ = ast.NewRangeNode($1, $2.ToKeyword(), nil, $3.ToKeyword())
 	}
 
 enumRanges : enumRange {
 		$$ = &rangeList{$1, nil, nil}
-    }
-    | enumRange ',' enumRanges {
+	}
+	| enumRange ',' enumRanges {
 		$$ = &rangeList{$1, $2, $3}
 	}
 
 enumRange : intLit {
-        $$ = ast.NewRangeNode($1, nil, nil, nil)
+		$$ = ast.NewRangeNode($1, nil, nil, nil)
 	}
 	| intLit _TO intLit {
-        $$ = ast.NewRangeNode($1, $2.ToKeyword(), $3, nil)
+		$$ = ast.NewRangeNode($1, $2.ToKeyword(), $3, nil)
 	}
 	| intLit _TO _MAX {
-        $$ = ast.NewRangeNode($1, $2.ToKeyword(), nil, $3.ToKeyword())
+		$$ = ast.NewRangeNode($1, $2.ToKeyword(), nil, $3.ToKeyword())
 	}
 
 intLit : _INT_LIT {
-        $$ = $1
+		$$ = $1
 	}
 	| '-' _INT_LIT {
-	    $$ = ast.NewNegativeIntLiteralNode($1, $2)
+		$$ = ast.NewNegativeIntLiteralNode($1, $2)
 	}
 
 msgReserved : _RESERVED tagRanges ';' {
-        ranges, commas := $2.toNodes()
-        $$ = ast.NewReservedRangesNode($1.ToKeyword(), ranges, commas, $3)
+		ranges, commas := $2.toNodes()
+		$$ = ast.NewReservedRangesNode($1.ToKeyword(), ranges, commas, $3)
 	}
 	| reservedNames
 
 enumReserved : _RESERVED enumRanges ';' {
-        ranges, commas := $2.toNodes()
-        $$ = ast.NewReservedRangesNode($1.ToKeyword(), ranges, commas, $3)
+		ranges, commas := $2.toNodes()
+		$$ = ast.NewReservedRangesNode($1.ToKeyword(), ranges, commas, $3)
 	}
 	| reservedNames
 
 reservedNames : _RESERVED fieldNames ';' {
-        names, commas := $2.toNodes()
-        $$ = ast.NewReservedNamesNode($1.ToKeyword(), names, commas, $3)
+		names, commas := $2.toNodes()
+		$$ = ast.NewReservedNamesNode($1.ToKeyword(), names, commas, $3)
 	}
 
 fieldNames : stringLit {
-        $$ = &nameList{$1.toStringValueNode(), nil, nil}
-    }
-    | stringLit ',' fieldNames {
-        $$ = &nameList{$1.toStringValueNode(), $2, $3}
-    }
+		$$ = &nameList{$1.toStringValueNode(), nil, nil}
+	}
+	| stringLit ',' fieldNames {
+		$$ = &nameList{$1.toStringValueNode(), $2, $3}
+	}
 
 enum : _ENUM name '{' enumDecls '}' {
-        $$ = ast.NewEnumNode($1.ToKeyword(), $2, $3, $4, $5)
+		$$ = ast.NewEnumNode($1.ToKeyword(), $2, $3, $4, $5)
 	}
 
 enumDecls : enumDecls enumDecl {
-        if $2 != nil {
-    		$$ = append($1, $2)
-        } else {
-            $$ = $1
-        }
+		if $2 != nil {
+			$$ = append($1, $2)
+		} else {
+			$$ = $1
+		}
 	}
 	| enumDecl {
-	    if $1 != nil {
-    	    $$ = []ast.EnumElement{$1}
-	    } else {
-	        $$ = nil
-	    }
+		if $1 != nil {
+			$$ = []ast.EnumElement{$1}
+		} else {
+			$$ = nil
+		}
 	}
 	| {
 		$$ = nil
@@ -709,45 +780,45 @@ enumDecl : option {
 		$$ = $1
 	}
 	| ';' {
-	    $$ = ast.NewEmptyDeclNode($1)
+		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
-	    $$ = nil
+		$$ = nil
 	}
 	| error {
-	    $$ = nil
+		$$ = nil
 	}
 
-enumValue : name '=' intLit ';' {
-        $$ = ast.NewEnumValueNode($1, $2, $3, nil, $4)
+enumValue : enumElementName '=' intLit ';' {
+		$$ = ast.NewEnumValueNode($1, $2, $3, nil, $4)
 	}
-	|  name '=' intLit compactOptions ';' {
-        $$ = ast.NewEnumValueNode($1, $2, $3, $4, $5)
+	|  enumElementName '=' intLit compactOptions ';' {
+		$$ = ast.NewEnumValueNode($1, $2, $3, $4, $5)
 	}
 
 message : _MESSAGE name '{' messageDecls '}' {
-        $$ = ast.NewMessageNode($1.ToKeyword(), $2, $3, $4, $5)
+		$$ = ast.NewMessageNode($1.ToKeyword(), $2, $3, $4, $5)
 	}
 
 messageDecls : messageDecls messageDecl {
-        if $2 != nil {
-    		$$ = append($1, $2)
-        } else {
-            $$ = $1
-        }
+		if $2 != nil {
+			$$ = append($1, $2)
+		} else {
+			$$ = $1
+		}
 	}
 	| messageDecl {
-	    if $1 != nil {
-	        $$ = []ast.MessageElement{$1}
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			$$ = []ast.MessageElement{$1}
+		} else {
+			$$ = nil
+		}
 	}
 	| {
 		$$ = nil
 	}
 
-messageDecl : field {
+messageDecl : msgField {
 		$$ = $1
 	}
 	| enum {
@@ -781,35 +852,35 @@ messageDecl : field {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
-	    $$ = nil
+		$$ = nil
 	}
 	| error {
-	    $$ = nil
+		$$ = nil
 	}
 
 extend : _EXTEND typeIdent '{' extendDecls '}' {
-        $$ = ast.NewExtendNode($1.ToKeyword(), $2, $3, $4, $5)
+		$$ = ast.NewExtendNode($1.ToKeyword(), $2, $3, $4, $5)
 	}
 
 extendDecls : extendDecls extendDecl {
-        if $2 != nil {
-    		$$ = append($1, $2)
-        } else {
-            $$ = $1
-        }
+		if $2 != nil {
+			$$ = append($1, $2)
+		} else {
+			$$ = $1
+		}
 	}
 	| extendDecl {
-	    if $1 != nil {
-	        $$ = []ast.ExtendElement{$1}
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			$$ = []ast.ExtendElement{$1}
+		} else {
+			$$ = nil
+		}
 	}
 	| {
 		$$ = nil
 	}
 
-extendDecl : field {
+extendDecl : extField {
 		$$ = $1
 	}
 	| group {
@@ -819,29 +890,29 @@ extendDecl : field {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
-	    $$ = nil
+		$$ = nil
 	}
 	| error {
-	    $$ = nil
+		$$ = nil
 	}
 
 service : _SERVICE name '{' serviceDecls '}' {
-        $$ = ast.NewServiceNode($1.ToKeyword(), $2, $3, $4, $5)
+		$$ = ast.NewServiceNode($1.ToKeyword(), $2, $3, $4, $5)
 	}
 
 serviceDecls : serviceDecls serviceDecl {
-        if $2 != nil {
-    		$$ = append($1, $2)
-        } else {
-            $$ = $1
-        }
+		if $2 != nil {
+			$$ = append($1, $2)
+		} else {
+			$$ = $1
+		}
 	}
 	| serviceDecl {
-	    if $1 != nil {
-	        $$ = []ast.ServiceElement{$1}
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			$$ = []ast.ServiceElement{$1}
+		} else {
+			$$ = nil
+		}
 	}
 	| {
 		$$ = nil
@@ -860,17 +931,17 @@ serviceDecl : option {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
-	    $$ = nil
+		$$ = nil
 	}
 	| error {
-	    $$ = nil
+		$$ = nil
 	}
 
 rpc : _RPC name rpcType _RETURNS rpcType ';' {
-        $$ = ast.NewRPCNode($1.ToKeyword(), $2, $3, $4.ToKeyword(), $5, $6)
+		$$ = ast.NewRPCNode($1.ToKeyword(), $2, $3, $4.ToKeyword(), $5, $6)
 	}
 	| _RPC name rpcType _RETURNS rpcType '{' rpcDecls '}' {
-        $$ = ast.NewRPCNodeWithBody($1.ToKeyword(), $2, $3, $4.ToKeyword(), $5, $6, $7, $8)
+		$$ = ast.NewRPCNodeWithBody($1.ToKeyword(), $2, $3, $4.ToKeyword(), $5, $6, $7, $8)
 	}
 
 rpcType : '(' _STREAM typeIdent ')' {
@@ -881,18 +952,18 @@ rpcType : '(' _STREAM typeIdent ')' {
 	}
 
 rpcDecls : rpcDecls rpcDecl {
-        if $2 != nil {
-    		$$ = append($1, $2)
-        } else {
-            $$ = $1
-        }
+		if $2 != nil {
+			$$ = append($1, $2)
+		} else {
+			$$ = $1
+		}
 	}
 	| rpcDecl {
-	    if $1 != nil {
-	        $$ = []ast.RPCElement{$1}
-        } else {
-            $$ = nil
-        }
+		if $1 != nil {
+			$$ = []ast.RPCElement{$1}
+		} else {
+			$$ = nil
+		}
 	}
 	| {
 		$$ = nil
@@ -905,11 +976,173 @@ rpcDecl : option {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
 	| error ';' {
-	    $$ = nil
+		$$ = nil
 	}
 	| error {
-	    $$ = nil
+		$$ = nil
 	}
+
+// excludes message, enum, oneof, extensions, reserved, extend,
+//   option, optional, required, and repeated
+msgElementName : _NAME
+	| _SYNTAX
+	| _IMPORT
+	| _WEAK
+	| _PUBLIC
+	| _PACKAGE
+	| _TRUE
+	| _FALSE
+	| _INF
+	| _NAN
+	| _DOUBLE
+	| _FLOAT
+	| _INT32
+	| _INT64
+	| _UINT32
+	| _UINT64
+	| _SINT32
+	| _SINT64
+	| _FIXED32
+	| _FIXED64
+	| _SFIXED32
+	| _SFIXED64
+	| _BOOL
+	| _STRING
+	| _BYTES
+	| _GROUP
+	| _MAP
+	| _TO
+	| _MAX
+	| _SERVICE
+	| _RPC
+	| _STREAM
+	| _RETURNS
+
+// excludes optional, required, and repeated
+extElementName : _NAME
+	| _SYNTAX
+	| _IMPORT
+	| _WEAK
+	| _PUBLIC
+	| _PACKAGE
+	| _OPTION
+	| _TRUE
+	| _FALSE
+	| _INF
+	| _NAN
+	| _DOUBLE
+	| _FLOAT
+	| _INT32
+	| _INT64
+	| _UINT32
+	| _UINT64
+	| _SINT32
+	| _SINT64
+	| _FIXED32
+	| _FIXED64
+	| _SFIXED32
+	| _SFIXED64
+	| _BOOL
+	| _STRING
+	| _BYTES
+	| _GROUP
+	| _ONEOF
+	| _MAP
+	| _EXTENSIONS
+	| _TO
+	| _MAX
+	| _RESERVED
+	| _ENUM
+	| _MESSAGE
+	| _EXTEND
+	| _SERVICE
+	| _RPC
+	| _STREAM
+	| _RETURNS
+
+// excludes reserved, option
+enumElementName : _NAME
+	| _SYNTAX
+	| _IMPORT
+	| _WEAK
+	| _PUBLIC
+	| _PACKAGE
+	| _TRUE
+	| _FALSE
+	| _INF
+	| _NAN
+	| _REPEATED
+	| _OPTIONAL
+	| _REQUIRED
+	| _DOUBLE
+	| _FLOAT
+	| _INT32
+	| _INT64
+	| _UINT32
+	| _UINT64
+	| _SINT32
+	| _SINT64
+	| _FIXED32
+	| _FIXED64
+	| _SFIXED32
+	| _SFIXED64
+	| _BOOL
+	| _STRING
+	| _BYTES
+	| _GROUP
+	| _ONEOF
+	| _MAP
+	| _EXTENSIONS
+	| _TO
+	| _MAX
+	| _ENUM
+	| _MESSAGE
+	| _EXTEND
+	| _SERVICE
+	| _RPC
+	| _STREAM
+	| _RETURNS
+
+// excludes option, optional, required, and repeated
+oneofElementName : _NAME
+	| _SYNTAX
+	| _IMPORT
+	| _WEAK
+	| _PUBLIC
+	| _PACKAGE
+	| _TRUE
+	| _FALSE
+	| _INF
+	| _NAN
+	| _DOUBLE
+	| _FLOAT
+	| _INT32
+	| _INT64
+	| _UINT32
+	| _UINT64
+	| _SINT32
+	| _SINT64
+	| _FIXED32
+	| _FIXED64
+	| _SFIXED32
+	| _SFIXED64
+	| _BOOL
+	| _STRING
+	| _BYTES
+	| _GROUP
+	| _ONEOF
+	| _MAP
+	| _EXTENSIONS
+	| _TO
+	| _MAX
+	| _RESERVED
+	| _ENUM
+	| _MESSAGE
+	| _EXTEND
+	| _SERVICE
+	| _RPC
+	| _STREAM
+	| _RETURNS
 
 name : _NAME
 	| _SYNTAX
