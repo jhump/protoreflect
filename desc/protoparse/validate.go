@@ -200,21 +200,22 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 	}
 
 	allowAlias := false
+	var allowAliasOpt *dpb.UninterpretedOption
 	if index, err := findOption(res, scope, ed.Options.GetUninterpretedOption(), "allow_alias"); err != nil {
 		return err
 	} else if index >= 0 {
-		opt := ed.Options.UninterpretedOption[index]
+		allowAliasOpt = ed.Options.UninterpretedOption[index]
 		valid := false
-		if opt.IdentifierValue != nil {
-			if opt.GetIdentifierValue() == "true" {
+		if allowAliasOpt.IdentifierValue != nil {
+			if allowAliasOpt.GetIdentifierValue() == "true" {
 				allowAlias = true
 				valid = true
-			} else if opt.GetIdentifierValue() == "false" {
+			} else if allowAliasOpt.GetIdentifierValue() == "false" {
 				valid = true
 			}
 		}
 		if !valid {
-			optNode := res.getOptionNode(opt)
+			optNode := res.getOptionNode(allowAliasOpt)
 			if err := res.errs.handleErrorWithPos(optNode.GetValue().Start(), "%s: expecting bool value for allow_alias option", scope); err != nil {
 				return err
 			}
@@ -228,17 +229,27 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 		}
 	}
 
-	if !allowAlias {
-		// make sure all value numbers are distinct
-		vals := map[int32]string{}
-		for _, evd := range ed.Value {
-			if existing := vals[evd.GetNumber()]; existing != "" {
+	// check for aliases
+	vals := map[int32]string{}
+	hasAlias := false
+	for _, evd := range ed.Value {
+		existing := vals[evd.GetNumber()]
+		if existing != "" {
+			if allowAlias {
+				hasAlias = true
+			} else {
 				evNode := res.getEnumValueNode(evd)
 				if err := res.errs.handleErrorWithPos(evNode.GetNumber().Start(), "%s: values %s and %s both have the same numeric value %d; use allow_alias option if intentional", scope, existing, evd.GetName(), evd.GetNumber()); err != nil {
 					return err
 				}
 			}
-			vals[evd.GetNumber()] = evd.GetName()
+		}
+		vals[evd.GetNumber()] = evd.GetName()
+	}
+	if allowAlias && !hasAlias {
+		optNode := res.getOptionNode(allowAliasOpt)
+		if err := res.errs.handleErrorWithPos(optNode.GetValue().Start(), "%s: allow_alias is true but no values are aliases", scope); err != nil {
+			return err
 		}
 	}
 
