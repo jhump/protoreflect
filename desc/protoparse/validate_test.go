@@ -151,6 +151,14 @@ func TestBasicValidation(t *testing.T) {
 			succeeds: true,
 		},
 		{
+			contents: `enum Foo { option allow_alias = false; V1 = 1; V2 = 2; }`,
+			succeeds: true,
+		},
+		{
+			contents: `enum Foo { option allow_alias = true; V1 = 1; V2 = 2; }`,
+			errMsg:   `test.proto:1:33: enum Foo: allow_alias is true but no values are aliases`,
+		},
+		{
 			contents: `syntax = "proto3"; enum Foo { V1 = 0; reserved 1 to 20; reserved "V2"; }`,
 			succeeds: true,
 		},

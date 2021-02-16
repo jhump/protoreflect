@@ -85,7 +85,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 		},
 		{
 			// enum options
-			contents: `enum Test { option allow_alias = true; option deprecated = true; option (must.link) = 123.456; ZERO = 0; }`,
+			contents: `enum Test { option allow_alias = true; option deprecated = true; option (must.link) = 123.456; ZERO = 0; ZILCH = 0; }`,
 			uninterpreted: map[string]interface{}{
 				"Test:(must.link)": 123.456,
 			},
