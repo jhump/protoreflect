@@ -325,6 +325,30 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			"foo.proto:1:1: error in file options: some required fields missing: (f).b",
 		},
+		{
+			map[string]string{
+				"foo.proto": "message Foo { option message_set_wire_format = true; extensions 1 to 100; } extend Foo { optional int32 bar = 1; }",
+			},
+			"foo.proto:1:99: messages with message-set wire format cannot contain scalar extensions, only messages",
+		},
+		{
+			map[string]string{
+				"foo.proto": "message Foo { option message_set_wire_format = true; extensions 1 to 100; } extend Foo { optional Foo bar = 1; }",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"foo.proto": "message Foo { extensions 1 to max; } extend Foo { optional int32 bar = 536870912; }",
+			},
+			"foo.proto:1:72: field bar: tag 536870912 is not in valid range for extended type Foo",
+		},
+		{
+			map[string]string{
+				"foo.proto": "message Foo { option message_set_wire_format = true; extensions 1 to max; } extend Foo { optional Foo bar = 536870912; }",
+			},
+			"", // should succeed
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
@@ -339,7 +363,11 @@ func TestLinkerValidation(t *testing.T) {
 			names = append(names, k)
 		}
 		_, err := Parser{Accessor: acc}.ParseFiles(names...)
-		if err == nil {
+		if tc.errMsg == "" {
+			if err != nil {
+				t.Errorf("case %d: expecting no error; instead got error %q", i, err)
+			}
+		} else if err == nil {
 			t.Errorf("case %d: expecting validation error %q; instead got no error", i, tc.errMsg)
 		} else if err.Error() != tc.errMsg {
 			t.Errorf("case %d: expecting validation error %q; instead got: %q", i, tc.errMsg, err)

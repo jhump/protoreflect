@@ -389,9 +389,10 @@ func (r *parseResult) addMessageBody(msgd *dpb.DescriptorProto, body *ast.Messag
 	// now that we have options, we can see if this uses messageset wire format, which
 	// impacts how we validate tag numbers in any fields in the message
 	maxTag := int32(internal.MaxNormalTag)
-	if isMessageSet, err := isMessageSetWireFormat(r, "message "+msgd.GetName(), msgd); err != nil {
+	messageSetOpt, err := isMessageSetWireFormat(r, "message "+msgd.GetName(), msgd)
+	if err != nil {
 		return
-	} else if isMessageSet {
+	} else if messageSetOpt != nil {
 		maxTag = internal.MaxTag // higher limit for messageset wire format
 	}
 
@@ -463,33 +464,44 @@ func (r *parseResult) addMessageBody(msgd *dpb.DescriptorProto, body *ast.Messag
 		}
 	}
 
+	if messageSetOpt != nil {
+		if len(msgd.Field) > 0 {
+			node := r.getFieldNode(msgd.Field[0])
+			_ = r.errs.handleErrorWithPos(node.Start(), "messages with message-set wire format cannot contain non-extension fields")
+		}
+		if len(msgd.ExtensionRange) == 0 {
+			node := r.getOptionNode(messageSetOpt)
+			_ = r.errs.handleErrorWithPos(node.Start(), "messages with message-set wire format must contain at least one extension range")
+		}
+	}
+
 	// process any proto3_optional fields
 	if isProto3 {
 		internal.ProcessProto3OptionalFields(msgd)
 	}
 }
 
-func isMessageSetWireFormat(res *parseResult, scope string, md *dpb.DescriptorProto) (bool, error) {
+func isMessageSetWireFormat(res *parseResult, scope string, md *dpb.DescriptorProto) (*dpb.UninterpretedOption, error) {
 	uo := md.GetOptions().GetUninterpretedOption()
 	index, err := findOption(res, scope, uo, "message_set_wire_format")
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if index == -1 {
-		// no such option, so default to false
-		return false, nil
+		// no such option
+		return nil, nil
 	}
 
 	opt := uo[index]
-	optNode := res.getOptionNode(opt)
 
 	switch opt.GetIdentifierValue() {
 	case "true":
-		return true, nil
+		return opt, nil
 	case "false":
-		return false, nil
+		return nil, nil
 	default:
-		return false, res.errs.handleErrorWithPos(optNode.GetValue().Start(), "%s: expecting bool value for message_set_wire_format option", scope)
+		optNode := res.getOptionNode(opt)
+		return nil, res.errs.handleErrorWithPos(optNode.GetValue().Start(), "%s: expecting bool value for message_set_wire_format option", scope)
 	}
 }
 

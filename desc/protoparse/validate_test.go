@@ -27,12 +27,20 @@ func TestBasicValidation(t *testing.T) {
 			succeeds: true,
 		},
 		{
-			contents: `message Foo { optional double bar = 536870912; option message_set_wire_format = true; }`,
+			contents: `message Foo { oneof bar { group Baz = 1 [deprecated=true] { optional int abc = 1; } } }`,
 			succeeds: true,
 		},
 		{
-			contents: `message Foo { oneof bar { group Baz = 1 [deprecated=true] { optional int abc = 1; } } }`,
+			contents: `message Foo { option message_set_wire_format = true; extensions 1 to 100; }`,
 			succeeds: true,
+		},
+		{
+			contents: `message Foo { optional double bar = 536870912; option message_set_wire_format = true; }`,
+			errMsg:   "test.proto:1:15: messages with message-set wire format cannot contain non-extension fields",
+		},
+		{
+			contents: `message Foo { option message_set_wire_format = true; }`,
+			errMsg:   "test.proto:1:15: messages with message-set wire format must contain at least one extension range",
 		},
 		{
 			contents: `syntax = "proto1";`,
