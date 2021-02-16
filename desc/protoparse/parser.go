@@ -798,46 +798,55 @@ func checkTag(pos *SourcePos, v uint64, maxTag int32) error {
 	return nil
 }
 
-func checkExtensionTagsInFile(fd *desc.FileDescriptor, res *parseResult) error {
+func checkExtensionsInFile(fd *desc.FileDescriptor, res *parseResult) error {
 	for _, fld := range fd.GetExtensions() {
-		if err := checkExtensionTag(fld, res); err != nil {
+		if err := checkExtension(fld, res); err != nil {
 			return err
 		}
 	}
 	for _, md := range fd.GetMessageTypes() {
-		if err := checkExtensionTagsInMessage(md, res); err != nil {
+		if err := checkExtensionsInMessage(md, res); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func checkExtensionTagsInMessage(md *desc.MessageDescriptor, res *parseResult) error {
+func checkExtensionsInMessage(md *desc.MessageDescriptor, res *parseResult) error {
 	for _, fld := range md.GetNestedExtensions() {
-		if err := checkExtensionTag(fld, res); err != nil {
+		if err := checkExtension(fld, res); err != nil {
 			return err
 		}
 	}
 	for _, nmd := range md.GetNestedMessageTypes() {
-		if err := checkExtensionTagsInMessage(nmd, res); err != nil {
+		if err := checkExtensionsInMessage(nmd, res); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func checkExtensionTag(fld *desc.FieldDescriptor, res *parseResult) error {
-	// NB: This is kind of gross that we don't enforce this in validateBasic(). But it would
-	// require doing some minimal linking there (to identify the extendee and locate its
-	// descriptor). To keep the code simpler, we just wait until things are fully linked.
-
-	// In validateBasic() we just made sure these were within bounds for any message. But
-	// now that things are linked, we can check if the extendee is messageset wire format
-	// and, if not, enforce tighter limit.
-	if !fld.GetOwner().GetMessageOptions().GetMessageSetWireFormat() && fld.GetNumber() > internal.MaxNormalTag {
-		pos := res.getFieldNode(fld.AsFieldDescriptorProto()).FieldTag().Start()
-		return errorWithPos(pos, "tag number %d is higher than max allowed tag number (%d)", fld.GetNumber(), internal.MaxNormalTag)
+func checkExtension(fld *desc.FieldDescriptor, res *parseResult) error {
+	// NB: It's a little gross that we don't enforce these in validateBasic().
+	// But requires some minimal linking to resolve the extendee, so we can
+	// interrogate its descriptor.
+	if fld.GetOwner().GetMessageOptions().GetMessageSetWireFormat() {
+		// Message set wire format requires that all extensions be messages
+		// themselves (no scalar extensions)
+		if fld.GetType() != dpb.FieldDescriptorProto_TYPE_MESSAGE {
+			pos := res.getFieldNode(fld.AsFieldDescriptorProto()).FieldType().Start()
+			return errorWithPos(pos, "messages with message-set wire format cannot contain scalar extensions, only messages")
+		}
+	} else {
+		// In validateBasic() we just made sure these were within bounds for any message. But
+		// now that things are linked, we can check if the extendee is messageset wire format
+		// and, if not, enforce tighter limit.
+		if fld.GetNumber() > internal.MaxNormalTag {
+			pos := res.getFieldNode(fld.AsFieldDescriptorProto()).FieldTag().Start()
+			return errorWithPos(pos, "tag number %d is higher than max allowed tag number (%d)", fld.GetNumber(), internal.MaxNormalTag)
+		}
 	}
+
 	return nil
 }
 

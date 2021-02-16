@@ -69,7 +69,7 @@ func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
 		}
 		// we should now have any message_set_wire_format options parsed
 		// and can do further validation on tag ranges
-		if err := checkExtensionTagsInFile(fd, r); err != nil {
+		if err := checkExtensionsInFile(fd, r); err != nil {
 			return nil, err
 		}
 	}
