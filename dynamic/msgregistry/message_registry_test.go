@@ -1,6 +1,7 @@
 package msgregistry
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -59,9 +60,10 @@ func TestMessageRegistry_LookupTypes(t *testing.T) {
 
 	// wrong type
 	_, err = mr.FindMessageTypeByUrl("foo.bar/google.protobuf.FieldDescriptorProto.Type")
-	testutil.Require(t, err != nil && strings.Contains(err.Error(), "wanted message, got enum"))
+	unexpectedType := (*ErrUnexpectedType)(nil)
+	testutil.Require(t, errors.As(err, &unexpectedType))
 	_, err = mr.FindEnumTypeByUrl("foo.bar/google.protobuf.DescriptorProto")
-	testutil.Require(t, err != nil && strings.Contains(err.Error(), "wanted enum, got message"))
+	testutil.Require(t, errors.As(err, &unexpectedType))
 
 	// unmarshal any successfully finds the registered type
 	b, err := proto.Marshal(md.AsProto())
