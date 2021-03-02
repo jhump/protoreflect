@@ -22,6 +22,21 @@ import (
 
 const googleApisDomain = "type.googleapis.com"
 
+// ErrUnexpectedType is returned if the URL that was requested
+// resolved to an enum instead of a message, or vice versa.
+type ErrUnexpectedType struct {
+	URL          string
+	ShouldBeEnum bool
+}
+
+func (e *ErrUnexpectedType) Error() string {
+	msg := "wanted message, got enum"
+	if e.ShouldBeEnum {
+		msg = "wanted enum, got message"
+	}
+	return fmt.Sprintf("type for URL %q is the wrong type: %s", e.URL, msg)
+}
+
 // MessageRegistry is a registry that maps URLs to message types. It allows for marshalling
 // and unmarshalling Any types to and from dynamic messages.
 type MessageRegistry struct {
@@ -165,7 +180,8 @@ func (r *MessageRegistry) addMessageTypesLocked(baseUrl string, msgs []*desc.Mes
 
 // FindMessageTypeByUrl finds a message descriptor for the type at the given URL. It may
 // return nil if the registry is empty and cannot resolve unknown URLs. If an error occurs
-// while resolving the URL, it is returned.
+// while resolving the URL, it is returned. If the resolved type is a enum, ErrUnexpectedType
+// is returned.
 func (r *MessageRegistry) FindMessageTypeByUrl(url string) (*desc.MessageDescriptor, error) {
 	md, err := r.getRegisteredMessageTypeByUrl(url)
 	if err != nil {
@@ -188,8 +204,9 @@ func (r *MessageRegistry) getRegisteredMessageTypeByUrl(url string) (*desc.Messa
 		if m != nil {
 			if md, ok := m.(*desc.MessageDescriptor); ok {
 				return md, nil
-			} else {
-				return nil, fmt.Errorf("type for URL %v is the wrong type: wanted message, got enum", url)
+			}
+			return nil, &ErrUnexpectedType{
+				URL: url,
 			}
 		}
 	}
@@ -207,7 +224,7 @@ func (r *MessageRegistry) getRegisteredMessageTypeByUrl(url string) (*desc.Messa
 
 // FindEnumTypeByUrl finds an enum descriptor for the type at the given URL. It may return nil
 // if the registry is empty and cannot resolve unknown URLs. If an error occurs while resolving
-// the URL, it is returned.
+// the URL, it is returned. If the resolved type is a message, ErrUnexpectedType is returned.
 func (r *MessageRegistry) FindEnumTypeByUrl(url string) (*desc.EnumDescriptor, error) {
 	ed, err := r.getRegisteredEnumTypeByUrl(url)
 	if err != nil {
@@ -236,8 +253,9 @@ func (r *MessageRegistry) getRegisteredEnumTypeByUrl(url string) (*desc.EnumDesc
 	if m != nil {
 		if ed, ok := m.(*desc.EnumDescriptor); ok {
 			return ed, nil
-		} else {
-			return nil, fmt.Errorf("type for URL %v is the wrong type: wanted enum, got message", url)
+		}
+		return nil, &ErrUnexpectedType{
+			URL: url,
 		}
 	}
 	return nil, nil

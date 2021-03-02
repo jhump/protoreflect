@@ -59,9 +59,11 @@ func TestMessageRegistry_LookupTypes(t *testing.T) {
 
 	// wrong type
 	_, err = mr.FindMessageTypeByUrl("foo.bar/google.protobuf.FieldDescriptorProto.Type")
-	testutil.Require(t, err != nil && strings.Contains(err.Error(), "wanted message, got enum"))
+	_, ok := err.(*ErrUnexpectedType)
+	testutil.Require(t, ok)
 	_, err = mr.FindEnumTypeByUrl("foo.bar/google.protobuf.DescriptorProto")
-	testutil.Require(t, err != nil && strings.Contains(err.Error(), "wanted enum, got message"))
+	_, ok = err.(*ErrUnexpectedType)
+	testutil.Require(t, ok)
 
 	// unmarshal any successfully finds the registered type
 	b, err := proto.Marshal(md.AsProto())
