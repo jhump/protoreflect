@@ -482,12 +482,12 @@ func (mb *MessageBuilder) TryAddNestedMessage(nmb *MessageBuilder) error {
 	needToUnlinkFirst := mb.isPresentButNotChild(nmb)
 	if needToUnlinkFirst {
 		Unlink(nmb)
-		mb.addSymbol(nmb)
+		_ = mb.addSymbol(nmb)
 	} else {
 		if err := mb.addSymbol(nmb); err != nil {
 			return err
 		}
-		Unlink(mb)
+		Unlink(nmb)
 	}
 	nmb.setParent(mb)
 	mb.nestedMessages = append(mb.nestedMessages, nmb)
