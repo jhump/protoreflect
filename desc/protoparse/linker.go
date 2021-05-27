@@ -420,7 +420,7 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 		return l.errs.handleErrorWithPos(node.FieldType().Start(), "%s: unknown type %s", scope, fld.GetTypeName())
 	}
 	if dsc == sentinelMissingSymbol {
-		return l.errs.handleErrorWithPos(node.FieldExtendee().Start(), "%s: unknown type %s; resolved to %s which is not defined; consider using a leading dot", scope, fld.GetTypeName(), fqn)
+		return l.errs.handleErrorWithPos(node.FieldType().Start(), "%s: unknown type %s; resolved to %s which is not defined; consider using a leading dot", scope, fld.GetTypeName(), fqn)
 	}
 	switch dsc := dsc.(type) {
 	case *dpb.DescriptorProto:
@@ -602,7 +602,6 @@ func fileScope(fd *dpb.FileDescriptorProto, l *linker) scope {
 			var n1, n string
 			if prefix == "" {
 				// exhausted all prefixes, so it must be in this one
-				prefixMatch = true
 				n1, n = fullName, fullName
 			} else {
 				n = prefix + "." + fullName
@@ -618,7 +617,12 @@ func fileScope(fd *dpb.FileDescriptorProto, l *linker) scope {
 			if d != nil {
 				return n, d, proto3
 			}
-			if prefix == firstName || strings.HasSuffix(prefix, "."+firstName) {
+			if prefixMatch {
+				// we were supposed to find the symbol with this prefix but
+				// didn't, so we need to go ahead and return sentinel value
+				return n, sentinelMissingSymbol, false
+			}
+			if strings.HasSuffix(prefix, "."+firstName) {
 				// the first name matches the end of this prefix, which means
 				// the *next* scope is the match
 				prefixMatch = true
