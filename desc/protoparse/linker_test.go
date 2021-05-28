@@ -61,6 +61,27 @@ func TestProto3Optional(t *testing.T) {
 	checkFiles(t, fds[0], exp, map[string]struct{}{})
 }
 
+func TestProtoCPPStyleNamespace(t *testing.T) {
+	fds, err := Parser{ImportPaths: []string{"../../internal/testprotos/namespace"}}.ParseFiles("namespace/a/a.proto")
+	testutil.Ok(t, err)
+
+	data, err := ioutil.ReadFile("../../internal/testprotos/namespace/namespace_a.protoset")
+	testutil.Ok(t, err)
+	var fdset dpb.FileDescriptorSet
+	err = proto.Unmarshal(data, &fdset)
+	testutil.Ok(t, err)
+
+	exp, err := desc.CreateFileDescriptorFromSet(&fdset)
+	testutil.Ok(t, err)
+	// not comparing source code info
+	exp.AsFileDescriptorProto().SourceCodeInfo = nil
+	for _, dep := range exp.GetDependencies() {
+		dep.AsFileDescriptorProto().SourceCodeInfo = nil
+	}
+
+	checkFiles(t, fds[0], exp, map[string]struct{}{})
+}
+
 func checkFiles(t *testing.T, act, exp *desc.FileDescriptor, checked map[string]struct{}) {
 	if _, ok := checked[act.GetName()]; ok {
 		// already checked

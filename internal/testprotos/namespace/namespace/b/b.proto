@@ -1,0 +1,7 @@
+syntax="proto3";
+
+package namespace.b;
+
+message B {
+    string field = 1;
+}

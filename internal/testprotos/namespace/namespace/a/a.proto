@@ -1,0 +1,9 @@
+syntax="proto3";
+
+import "namespace/b/b.proto";
+
+package namespace.a;
+
+message A {
+    b.B test = 1;
+}
