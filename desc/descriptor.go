@@ -555,25 +555,37 @@ func (fd *FieldDescriptor) resolve(path []int32, scopes []scope) error {
 	}
 	fd.sourceInfoPath = append([]int32(nil), path...) // defensive copy
 	if fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_ENUM {
-		if desc, err := resolve(fd.file, fd.proto.GetTypeName(), scopes); err != nil {
+		desc, err := resolve(fd.file, fd.proto.GetTypeName(), scopes)
+		if err != nil {
 			return err
-		} else {
-			fd.enumType = desc.(*EnumDescriptor)
 		}
+		enumType, ok := desc.(*EnumDescriptor)
+		if !ok {
+			return fmt.Errorf("could not convert desc %s to EnumDescriptor. TypeName: %s", desc, fd.proto.GetTypeName())
+		}
+		fd.enumType = enumType
 	}
 	if fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_MESSAGE || fd.proto.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP {
-		if desc, err := resolve(fd.file, fd.proto.GetTypeName(), scopes); err != nil {
+		desc, err := resolve(fd.file, fd.proto.GetTypeName(), scopes)
+		if err != nil {
 			return err
-		} else {
-			fd.msgType = desc.(*MessageDescriptor)
 		}
+		msgType, ok := desc.(*MessageDescriptor)
+		if !ok {
+			return fmt.Errorf("could not convert desc %s to MessageDescriptor. TypeName: %s", desc, fd.proto.GetTypeName())
+		}
+		fd.msgType = msgType
 	}
 	if fd.proto.GetExtendee() != "" {
-		if desc, err := resolve(fd.file, fd.proto.GetExtendee(), scopes); err != nil {
+		desc, err := resolve(fd.file, fd.proto.GetExtendee(), scopes)
+		if err != nil {
 			return err
-		} else {
-			fd.owner = desc.(*MessageDescriptor)
 		}
+		msgType, ok := desc.(*MessageDescriptor)
+		if !ok {
+			return fmt.Errorf("could not convert desc %s to MessageDescriptor. TypeName: %s", desc, fd.proto.GetTypeName())
+		}
+		fd.owner = msgType
 	}
 	fd.file.registerField(fd)
 	fd.isMap = fd.proto.GetLabel() == dpb.FieldDescriptorProto_LABEL_REPEATED &&
