@@ -1,7 +1,9 @@
-# Use the latest 2.1 version of CircleCI pipeline process engine. See: https://circleci.com/docs/2.0/configuration-reference
-configs:
+shared_configs:
   simple_job_steps: &simple_job_steps
     - checkout
+    #TODO: caching config so we don't accidentally try to re-use
+    #cache across versions of Go...
+
     #- restore_cache:
     #    keys:
     #      - go-mod-v4-{{ checksum "go.sum" }}
@@ -22,14 +24,16 @@ configs:
     #    path: /tmp/test-reports
 
 
+# Use the latest 2.1 version of CircleCI pipeline process engine. See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
 jobs:
   build-1-12-gopath:
-    working_directory: ~/repo
+    working_directory: ~/gopath/github.com/jhump/protoreflect
     docker:
       - image: circleci/golang:1.12
     environment:
       GO111MODULE: "off"
+      PATH: ~/gopath
     steps: *simple_job_steps
 
   build-1-12:
