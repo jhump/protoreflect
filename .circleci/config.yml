@@ -24,7 +24,7 @@ configs:
 
 version: 2.1
 jobs:
-  build-1.12-gopath:
+  build-1-12-gopath:
     working_directory: ~/repo
     docker:
       - image: circleci/golang:1.12
@@ -32,7 +32,7 @@ jobs:
       GO111MODULE: "off"
     steps: *simple_job_steps
 
-  build-1.12:
+  build-1-12:
     working_directory: ~/repo
     docker:
       - image: circleci/golang:1.12
@@ -40,7 +40,7 @@ jobs:
       GO111MODULE: "on"
     steps: *simple_job_steps
 
-  build-1.13:
+  build-1-13:
     working_directory: ~/repo
     docker:
       - image: circleci/golang:1.12
@@ -67,19 +67,19 @@ jobs:
     #- store_test_results:
     #    path: /tmp/test-reports
 
-  build-1.14:
+  build-1-14:
     working_directory: ~/repo
     docker:
       - image: circleci/golang:1.14
     steps: *simple_job_steps
 
-  build-1.15:
+  build-1-15:
     working_directory: ~/repo
     docker:
       - image: circleci/golang:1.15
     steps: *simple_job_steps
 
-  build-1.16:
+  build-1-16:
     working_directory: ~/repo
     docker:
       - image: circleci/golang:1.16
