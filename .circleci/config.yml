@@ -33,7 +33,7 @@ jobs:
       - image: circleci/golang:1.12
     environment:
       GO111MODULE: "off"
-      PATH: ~/gopath
+      GOPATH: ~/gopath
     steps: *simple_job_steps
 
   build-1-12:
@@ -93,8 +93,8 @@ workflows:
   pr-build-test:
     jobs:
       - build-1-12-gopath
-      - build-1-12
-      - build-1-13
-      - build-1-14
-      - build-1-15
-      - build-1-16
+#      - build-1-12
+#      - build-1-13
+#      - build-1-14
+#      - build-1-15
+#      - build-1-16
