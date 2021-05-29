@@ -91,8 +91,10 @@ func TestLinkerValidation(t *testing.T) {
 	}{
 		{
 			map[string]string{
-				"foo.proto":  `syntax = "proto3"; package namespace.a; import "foo2.proto"; message Foo{ b.Bar b = 1; }`,
+				"foo.proto":  `syntax = "proto3"; package namespace.a; import "foo2.proto"; import "foo3.proto"; import "foo4.proto"; message Foo{ b.Bar a = 1; b.Baz b = 2; b.Buzz c = 3; }`,
 				"foo2.proto": `syntax = "proto3"; package namespace.b; message Bar{}`,
+				"foo3.proto": `syntax = "proto3"; package namespace.b; message Baz{}`,
+				"foo4.proto": `syntax = "proto3"; package namespace.b; message Buzz{}`,
 			},
 			"", // should succeed
 		},

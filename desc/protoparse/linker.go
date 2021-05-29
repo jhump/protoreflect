@@ -333,7 +333,7 @@ func (l *linker) resolveEnumTypes(r *parseResult, fd *dpb.FileDescriptorProto, p
 
 func (l *linker) resolveMessageTypes(r *parseResult, fd *dpb.FileDescriptorProto, prefix string, md *dpb.DescriptorProto, scopes []scope) error {
 	fqn := prefix + md.GetName()
-	scope := messageScope(fqn, isProto3(fd), l.descriptorPool[fd], l.packageNamespaces[fd])
+	scope := messageScope(fqn, isProto3(fd), l, fd)
 	scopes = append(scopes, scope)
 	prefix = fqn + "."
 
@@ -565,7 +565,7 @@ opts:
 func (l *linker) resolve(fd *dpb.FileDescriptorProto, name string, onlyTypes bool, scopes []scope) (fqn string, element proto.Message, proto3 bool) {
 	if strings.HasPrefix(name, ".") {
 		// already fully-qualified
-		d, proto3 := l.findSymbol(fd, name[1:], name[1:], false, map[*dpb.FileDescriptorProto]struct{}{})
+		d, proto3 := l.findSymbol(fd, name[1:], false, map[*dpb.FileDescriptorProto]struct{}{})
 		if d != nil {
 			return name[1:], d, proto3
 		}
@@ -616,6 +616,9 @@ func fileScope(fd *dpb.FileDescriptorProto, l *linker) scope {
 	// the same package as this file or a "parent" package (in protobuf,
 	// packages are a hierarchy like C++ namespaces)
 	prefixes := internal.CreatePrefixList(fd.GetPackage())
+	querySymbol := func(n string) (d proto.Message, isProto3 bool) {
+		return l.findSymbol(fd, n, false, map[*dpb.FileDescriptorProto]struct{}{})
+	}
 	return func(firstName, fullName string) (string, proto.Message, bool) {
 		for _, prefix := range prefixes {
 			var n1, n string
@@ -626,7 +629,7 @@ func fileScope(fd *dpb.FileDescriptorProto, l *linker) scope {
 				n = prefix + "." + fullName
 				n1 = prefix + "." + firstName
 			}
-			d, proto3 := l.findSymbol(fd, n1, n, false, map[*dpb.FileDescriptorProto]struct{}{})
+			d, proto3 := findSymbolRelative(n1, n, querySymbol)
 			if d != nil {
 				return n, d, proto3
 			}
@@ -635,11 +638,14 @@ func fileScope(fd *dpb.FileDescriptorProto, l *linker) scope {
 	}
 }
 
-func messageScope(messageName string, proto3 bool, filePool map[string]proto.Message, packages map[string]struct{}) scope {
+func messageScope(messageName string, proto3 bool, l *linker, fd *dpb.FileDescriptorProto) scope {
+	querySymbol := func(n string) (d proto.Message, isProto3 bool) {
+		return l.findSymbolInFile(n, fd), false
+	}
 	return func(firstName, fullName string) (string, proto.Message, bool) {
 		n1 := messageName + "." + firstName
 		n := messageName + "." + fullName
-		d := findSymbolInPool(n1, n, filePool, packages)
+		d, _ := findSymbolRelative(n1, n, querySymbol)
 		if d != nil {
 			return n, d, proto3
 		}
@@ -647,30 +653,38 @@ func messageScope(messageName string, proto3 bool, filePool map[string]proto.Mes
 	}
 }
 
-func findSymbolInPool(firstName, fullName string, pool map[string]proto.Message, pkgs map[string]struct{}) proto.Message {
-	d, ok := pool[firstName]
-	if !ok {
-		_, ok := pkgs[firstName]
-		if !ok {
-			return nil
-		}
-		// this sentinel means the name is a valid namespace but
-		// does not refer to a descriptor
-		d = sentinelMissingSymbol
+func findSymbolRelative(firstName, fullName string, query func(name string) (d proto.Message, isProto3 bool)) (d proto.Message, isProto3 bool) {
+	d, proto3 := query(firstName)
+	if d == nil {
+		return nil, false
 	}
 	if firstName == fullName {
-		return d
+		return d, proto3
 	}
 	if !isAggregateDescriptor(d) {
 		// can't possibly find the rest of full name if
 		// the first name indicated a leaf descriptor
-		return nil
+		return nil, false
 	}
-	d, ok = pool[fullName]
-	if !ok {
+	d, proto3 = query(fullName)
+	if d == nil {
+		return sentinelMissingSymbol, false
+	}
+	return d, proto3
+}
+
+func (l *linker) findSymbolInFile(name string, fd *dpb.FileDescriptorProto) proto.Message {
+	d, ok := l.descriptorPool[fd][name]
+	if ok {
+		return d
+	}
+	_, ok = l.packageNamespaces[fd][name]
+	if ok {
+		// this sentinel means the name is a valid namespace but
+		// does not refer to a descriptor
 		return sentinelMissingSymbol
 	}
-	return d
+	return nil
 }
 
 func isAggregateDescriptor(m proto.Message) bool {
@@ -694,13 +708,13 @@ func isAggregateDescriptor(m proto.Message) bool {
 // definitively does not exist".
 var sentinelMissingSymbol = (*dpb.DescriptorProto)(nil)
 
-func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, firstName, fullName string, public bool, checked map[*dpb.FileDescriptorProto]struct{}) (element proto.Message, proto3 bool) {
+func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, name string, public bool, checked map[*dpb.FileDescriptorProto]struct{}) (element proto.Message, proto3 bool) {
 	if _, ok := checked[fd]; ok {
 		// already checked this one
 		return nil, false
 	}
 	checked[fd] = struct{}{}
-	d := findSymbolInPool(firstName, fullName, l.descriptorPool[fd], l.packageNamespaces[fd])
+	d := l.findSymbolInFile(name, fd)
 	if d != nil {
 		return d, isProto3(fd)
 	}
@@ -715,7 +729,7 @@ func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, firstName, fullName str
 				// we'll catch this error later
 				continue
 			}
-			if d, proto3 := l.findSymbol(depres.fd, firstName, fullName, true, checked); d != nil {
+			if d, proto3 := l.findSymbol(depres.fd, name, true, checked); d != nil {
 				return d, proto3
 			}
 		}
@@ -726,7 +740,7 @@ func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, firstName, fullName str
 				// we'll catch this error later
 				continue
 			}
-			if d, proto3 := l.findSymbol(depres.fd, firstName, fullName, true, checked); d != nil {
+			if d, proto3 := l.findSymbol(depres.fd, name, true, checked); d != nil {
 				return d, proto3
 			}
 		}
