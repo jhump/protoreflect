@@ -91,6 +91,13 @@ func TestLinkerValidation(t *testing.T) {
 	}{
 		{
 			map[string]string{
+				"foo.proto":  `syntax = "proto3"; package namespace.a; import "foo2.proto"; message Foo{ b.Bar b = 1; }`,
+				"foo2.proto": `syntax = "proto3"; package namespace.b; message Bar{}`,
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
 				"foo.proto": "import \"foo2.proto\"; message fubar{}",
 			},
 			`foo.proto:1:8: file not found: foo2.proto`,
