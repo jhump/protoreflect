@@ -213,7 +213,10 @@ func addEnumToPool(r *parseResult, pool map[string]proto.Message, errs *errorHan
 		return err
 	}
 	for _, evd := range ed.Value {
-		vfqn := fqn + "." + evd.GetName()
+		// protobuf name-scoping rules for enum values follow C++ scoping rules:
+		// the enum value name is a symbol in the *parent* scope (the one
+		// enclosing the enum).
+		vfqn := prefix + evd.GetName()
 		if err := addToPool(r, pool, errs, vfqn, evd); err != nil {
 			return err
 		}
@@ -238,7 +241,16 @@ func addServiceToPool(r *parseResult, pool map[string]proto.Message, errs *error
 func addToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, fqn string, dsc proto.Message) error {
 	if d, ok := pool[fqn]; ok {
 		node := r.nodes[dsc]
-		if err := errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s", fqn, descriptorType(d)); err != nil {
+		_, additionIsEnumVal := dsc.(*dpb.EnumValueDescriptorProto)
+		_, existingIsEnumVal := d.(*dpb.EnumValueDescriptorProto)
+		// because of weird scoping for enum values, provide more context in error message
+		// if this conflict is with an enum value
+		var suffix string
+		if additionIsEnumVal || existingIsEnumVal {
+			suffix = "; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum"
+		}
+		// TODO: also include the source location for the conflicting symbol
+		if err := errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s%s", fqn, descriptorType(d), suffix); err != nil {
 			return err
 		}
 	}
