@@ -113,6 +113,12 @@ func TestLinkerValidation(t *testing.T) {
 		},
 		{
 			map[string]string{
+				"foo.proto": "enum foo { bar = 1; baz = 2; } enum fu { bar = 1; baz = 2; }",
+			},
+			`foo.proto:1:42: duplicate symbol bar: already defined as enum value; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum`,
+		},
+		{
+			map[string]string{
 				"foo.proto": "message foo {} enum foo { V = 0; }",
 			},
 			"foo.proto:1:16: duplicate symbol foo: already defined as message",

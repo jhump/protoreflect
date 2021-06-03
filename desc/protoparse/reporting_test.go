@@ -104,7 +104,7 @@ func TestErrorReporting(t *testing.T) {
 					`,
 			},
 			expectedErrs: []string{
-				"test.proto:8:49: duplicate symbol Bar.BAZ: already defined as enum value",
+				"test.proto:8:49: duplicate symbol BAZ: already defined as enum value; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum",
 				"test.proto:10:41: duplicate symbol Bar: already defined as enum",
 				"test.proto:12:49: duplicate symbol Bar.Foo: already defined as method",
 				"test.proto:12:58: method Bar.Foo: unknown request type Frob",
