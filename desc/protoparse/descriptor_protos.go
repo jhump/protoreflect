@@ -13,24 +13,25 @@ import (
 	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
 
-func (r *parseResult) createFileDescriptor(filename string, file *ast.FileNode) {
+func (r *parseResult) createFileDescriptor(filename string, file *ast.FileNode, setProto2SyntaxIfSpecified bool) {
 	fd := &dpb.FileDescriptorProto{Name: proto.String(filename)}
 	r.fd = fd
 	r.putFileNode(fd, file)
 
 	isProto3 := false
 	if file.Syntax != nil {
-		if file.Syntax.Syntax.AsString() == "proto3" {
+		switch syntaxString := file.Syntax.Syntax.AsString(); syntaxString {
+		case "proto2":
+			if setProto2SyntaxIfSpecified {
+				fd.Syntax = proto.String(syntaxString)
+			}
+		case "proto3":
 			isProto3 = true
-		} else if file.Syntax.Syntax.AsString() != "proto2" {
-			if r.errs.handleErrorWithPos(file.Syntax.Syntax.Start(), `syntax value must be "proto2" or "proto3"`) != nil {
+			fd.Syntax = proto.String(syntaxString)
+		default:
+			if r.errs.handleErrorWithPos(file.Syntax.Syntax.Start(), `syntax value must be "proto2" or "proto3" but was %q`, syntaxString) != nil {
 				return
 			}
-		}
-
-		// proto2 is the default, so no need to set unless proto3
-		if isProto3 {
-			fd.Syntax = proto.String(file.Syntax.Syntax.AsString())
 		}
 	} else {
 		r.errs.warn(file.Start(), ErrNoSyntax)

@@ -154,6 +154,21 @@ type Parser struct {
 	// requires resolving enum names, which requires linking.)
 	InterpretOptionsInUnlinkedFiles bool
 
+	// SetProto2SyntaxIfSpecified will explicitly set the syntax on outputted
+	// FileDescriptorProtos if the syntax is specified as "proto2" in the file.
+	//
+	// The protoc compiler only sets the syntax field of a FileDescriptorProto if the
+	// syntax is "proto3". If the syntax is unset or "proto2", protoc will leave the
+	// FileDescriptorProto syntax field unset. With this option specified, if a file
+	// has an explicit syntax = "proto2"; line, then the FileDescriptorProto will
+	// have the syntax field populated with "proto2", however if no syntax is
+	// specified, the field will be left unset.
+	//
+	// Differentiating between unset and set is useful for users of this library
+	// such as linters, however for backwards compatibility, and maximum matching
+	// of protoc FileDescriptorSets by default, this is left as an option.
+	SetProto2SyntaxIfSpecified bool
+
 	// A custom reporter of syntax and link errors. If not specified, the
 	// default reporter just returns the reported error, which causes parsing
 	// to abort after encountering a single error.
@@ -220,7 +235,7 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 		createDescriptorProtos: true,
 	}
 	errs := newErrorHandler(p.ErrorReporter, p.WarningReporter)
-	parseProtoFiles(accessor, filenames, errs, results, lookupImport)
+	parseProtoFiles(accessor, filenames, errs, results, lookupImport, p.SetProto2SyntaxIfSpecified)
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
@@ -297,7 +312,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 		validate:               p.ValidateUnlinkedFiles,
 		createDescriptorProtos: true,
 	}
-	parseProtoFiles(accessor, filenames, errs, results, lookupImport)
+	parseProtoFiles(accessor, filenames, errs, results, lookupImport, p.SetProto2SyntaxIfSpecified)
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
@@ -357,7 +372,7 @@ func (p Parser) ParseToAST(filenames ...string) ([]*ast.FileNode, error) {
 
 	protos := map[string]*parseResult{}
 	errs := newErrorHandler(p.ErrorReporter, p.WarningReporter)
-	parseProtoFiles(accessor, filenames, errs, &parseResults{resultsByFilename: protos}, lookupImport)
+	parseProtoFiles(accessor, filenames, errs, &parseResults{resultsByFilename: protos}, lookupImport, p.SetProto2SyntaxIfSpecified)
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
@@ -495,16 +510,16 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	return revisedProtos
 }
 
-func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, parsed *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error)) {
+func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, parsed *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error), setProto2SyntaxIfSpecified bool) {
 	for _, name := range filenames {
-		parseProtoFile(acc, name, nil, errs, parsed, lookupImport)
+		parseProtoFile(acc, name, nil, errs, parsed, lookupImport, setProto2SyntaxIfSpecified)
 		if errs.err != nil {
 			return
 		}
 	}
 }
 
-func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, results *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error)) {
+func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, results *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error), setProto2SyntaxIfSpecified bool) {
 	if results.has(filename) {
 		return
 	}
@@ -523,7 +538,7 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 				// closing need not fail this operation
 				_ = in.Close()
 			}()
-			result = parseProto(filename, in, errs, results.validate, results.createDescriptorProtos)
+			result = parseProto(filename, in, errs, results.validate, results.createDescriptorProtos, setProto2SyntaxIfSpecified)
 		}()
 	} else if d, lookupErr := lookupImport(filename); lookupErr == nil {
 		// This is a user-provided descriptor, which is acting similarly to a
@@ -571,7 +586,7 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 		if !ok {
 			// no AST for this file? use imports in descriptor
 			for _, dep := range fd.Dependency {
-				parseProtoFile(acc, dep, decl.Start(), errs, results, lookupImport)
+				parseProtoFile(acc, dep, decl.Start(), errs, results, lookupImport, setProto2SyntaxIfSpecified)
 				if errs.getError() != nil {
 					return // abort
 				}
@@ -581,7 +596,7 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 		// we have an AST; use it so we can report import location in errors
 		for _, decl := range fnode.Decls {
 			if dep, ok := decl.(*ast.ImportNode); ok {
-				parseProtoFile(acc, dep.Name.AsString(), dep.Name.Start(), errs, results, lookupImport)
+				parseProtoFile(acc, dep.Name.AsString(), dep.Name.Start(), errs, results, lookupImport, setProto2SyntaxIfSpecified)
 				if errs.getError() != nil {
 					return // abort
 				}
@@ -629,6 +644,9 @@ type parseResult struct {
 	// a map of uninterpreted option AST nodes to their relative path
 	// in the resulting options message
 	interpretedOptions map[*ast.OptionNode][]int32
+
+	// copied from Parser
+	setProto2SyntaxIfSpecified bool
 }
 
 func (r *parseResult) getFileNode(f *dpb.FileDescriptorProto) ast.FileDeclNode {
@@ -753,7 +771,7 @@ func (r *parseResult) putMethodNode(m *dpb.MethodDescriptorProto, n *ast.RPCNode
 	r.nodes[m] = n
 }
 
-func parseProto(filename string, r io.Reader, errs *errorHandler, validate, createProtos bool) *parseResult {
+func parseProto(filename string, r io.Reader, errs *errorHandler, validate, createProtos bool, setProto2SyntaxIfSpecified bool) *parseResult {
 	beforeErrs := errs.errsReported
 	lx := newLexer(r, filename, errs)
 	protoParse(lx)
@@ -766,7 +784,7 @@ func parseProto(filename string, r io.Reader, errs *errorHandler, validate, crea
 		lx.res.FinalComments = lx.eof.LeadingComments()
 		lx.res.FinalWhitespace = lx.eof.LeadingWhitespace()
 	}
-	res := createParseResult(filename, lx.res, errs, createProtos)
+	res := createParseResult(filename, lx.res, errs, createProtos, setProto2SyntaxIfSpecified)
 	if validate && errs.err == nil {
 		validateBasic(res, errs.errsReported > beforeErrs)
 	}
@@ -774,7 +792,7 @@ func parseProto(filename string, r io.Reader, errs *errorHandler, validate, crea
 	return res
 }
 
-func createParseResult(filename string, file *ast.FileNode, errs *errorHandler, createProtos bool) *parseResult {
+func createParseResult(filename string, file *ast.FileNode, errs *errorHandler, createProtos bool, setProto2SyntaxIfSpecified bool) *parseResult {
 	res := &parseResult{
 		errs:               errs,
 		root:               file,
@@ -782,7 +800,7 @@ func createParseResult(filename string, file *ast.FileNode, errs *errorHandler, 
 		interpretedOptions: map[*ast.OptionNode][]int32{},
 	}
 	if createProtos {
-		res.createFileDescriptor(filename, file)
+		res.createFileDescriptor(filename, file, setProto2SyntaxIfSpecified)
 	}
 	return res
 }
