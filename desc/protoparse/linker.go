@@ -21,6 +21,7 @@ type linker struct {
 	descriptorPool    map[*dpb.FileDescriptorProto]map[string]proto.Message
 	packageNamespaces map[*dpb.FileDescriptorProto]map[string]struct{}
 	extensions        map[string]map[int32]string
+	usedImports       map[*dpb.FileDescriptorProto]map[string]struct{}
 }
 
 func newLinker(files *parseResults, errs *errorHandler) *linker {
@@ -65,7 +66,7 @@ func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
 	// options that remain.
 	for _, r := range l.files {
 		fd := linked[r.fd.GetName()]
-		if err := interpretFileOptions(r, richFileDescriptorish{FileDescriptor: fd}); err != nil {
+		if err := interpretFileOptions(l, r, richFileDescriptorish{FileDescriptor: fd}); err != nil {
 			return nil, err
 		}
 		// we should now have any message_set_wire_format options parsed
@@ -288,6 +289,7 @@ func descriptorType(m proto.Message) string {
 
 func (l *linker) resolveReferences() error {
 	l.extensions = map[string]map[int32]string{}
+	l.usedImports = map[*dpb.FileDescriptorProto]map[string]struct{}{}
 	for _, filename := range l.filenames {
 		r := l.files[filename]
 		fd := r.fd
@@ -577,7 +579,7 @@ opts:
 func (l *linker) resolve(fd *dpb.FileDescriptorProto, name string, onlyTypes bool, scopes []scope) (fqn string, element proto.Message, proto3 bool) {
 	if strings.HasPrefix(name, ".") {
 		// already fully-qualified
-		d, proto3 := l.findSymbol(fd, name[1:], false, map[*dpb.FileDescriptorProto]struct{}{})
+		d, proto3 := l.findSymbol(fd, name[1:])
 		if d != nil {
 			return name[1:], d, proto3
 		}
@@ -629,7 +631,7 @@ func fileScope(fd *dpb.FileDescriptorProto, l *linker) scope {
 	// packages are a hierarchy like C++ namespaces)
 	prefixes := internal.CreatePrefixList(fd.GetPackage())
 	querySymbol := func(n string) (d proto.Message, isProto3 bool) {
-		return l.findSymbol(fd, n, false, map[*dpb.FileDescriptorProto]struct{}{})
+		return l.findSymbol(fd, n)
 	}
 	return func(firstName, fullName string) (string, proto.Message, bool) {
 		for _, prefix := range prefixes {
@@ -699,6 +701,15 @@ func (l *linker) findSymbolInFile(name string, fd *dpb.FileDescriptorProto) prot
 	return nil
 }
 
+func (l *linker) markUsed(entryPoint, used *dpb.FileDescriptorProto) {
+	importsForFile := l.usedImports[entryPoint]
+	if importsForFile == nil {
+		importsForFile = map[string]struct{}{}
+		l.usedImports[entryPoint] = importsForFile
+	}
+	importsForFile[used.GetName()] = struct{}{}
+}
+
 func isAggregateDescriptor(m proto.Message) bool {
 	if m == sentinelMissingSymbol {
 		// this indicates the name matched a package, not a
@@ -720,7 +731,11 @@ func isAggregateDescriptor(m proto.Message) bool {
 // definitively does not exist".
 var sentinelMissingSymbol = (*dpb.DescriptorProto)(nil)
 
-func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, name string, public bool, checked map[*dpb.FileDescriptorProto]struct{}) (element proto.Message, proto3 bool) {
+func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, name string) (element proto.Message, proto3 bool) {
+	return l.findSymbolRecursive(fd, fd, name, false, map[*dpb.FileDescriptorProto]struct{}{})
+}
+
+func (l *linker) findSymbolRecursive(entryPoint, fd *dpb.FileDescriptorProto, name string, public bool, checked map[*dpb.FileDescriptorProto]struct{}) (element proto.Message, proto3 bool) {
 	if _, ok := checked[fd]; ok {
 		// already checked this one
 		return nil, false
@@ -741,7 +756,8 @@ func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, name string, public boo
 				// we'll catch this error later
 				continue
 			}
-			if d, proto3 := l.findSymbol(depres.fd, name, true, checked); d != nil {
+			if d, proto3 := l.findSymbolRecursive(entryPoint, depres.fd, name, true, checked); d != nil {
+				l.markUsed(entryPoint, depres.fd)
 				return d, proto3
 			}
 		}
@@ -752,7 +768,8 @@ func (l *linker) findSymbol(fd *dpb.FileDescriptorProto, name string, public boo
 				// we'll catch this error later
 				continue
 			}
-			if d, proto3 := l.findSymbol(depres.fd, name, true, checked); d != nil {
+			if d, proto3 := l.findSymbolRecursive(entryPoint, depres.fd, name, true, checked); d != nil {
+				l.markUsed(entryPoint, depres.fd)
 				return d, proto3
 			}
 		}
@@ -854,4 +871,42 @@ func (l *linker) linkFile(name string, rootImportLoc *SourcePos, seen []string, 
 	}
 	linked[name] = lfd
 	return lfd, nil
+}
+
+func (l *linker) checkForUnusedImports(filename string) {
+	r := l.files[filename]
+	usedImports := l.usedImports[r.fd]
+	node := r.nodes[r.fd]
+	fileNode, _ := node.(*ast.FileNode)
+	for i, dep := range r.fd.Dependency {
+		if _, ok := usedImports[dep]; !ok {
+			isPublic := false
+			// it's fine if it's a public import
+			for _, j := range r.fd.PublicDependency {
+				if i == int(j) {
+					isPublic = true
+					break
+				}
+			}
+			if isPublic {
+				break
+			}
+			var pos *SourcePos
+			if fileNode != nil {
+				for _, decl := range fileNode.Decls {
+					imp, ok := decl.(*ast.ImportNode)
+					if !ok {
+						continue
+					}
+					if imp.Name.AsString() == dep {
+						pos = imp.Start()
+					}
+				}
+			}
+			if pos == nil {
+				pos = ast.UnknownPos(r.fd.GetName())
+			}
+			r.errs.warn(pos, errUnusedImport(dep))
+		}
+	}
 }
