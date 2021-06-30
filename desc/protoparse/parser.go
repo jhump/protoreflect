@@ -117,19 +117,27 @@ type Parser struct {
 	// For example, in order to automatically look up compiled Go protos that
 	// have been imported and be able to use them as imports, set this to
 	// desc.LoadFileDescriptor.
+	//
+	// Deprecated: Use FileProviders and the FileDescriptorFileProvider constructor instead.
 	LookupImport func(string) (*desc.FileDescriptor, error)
 
 	// LookupImportProto has the same functionality as LookupImport, however it returns
 	// a FileDescriptorProto instead of a FileDescriptor.
 	//
 	// It is an error to set both LookupImport and LookupImportProto.
+	//
+	// Deprecated: Use FileProviders and the FileDescriptorProtoFileProvider constructor instead.
 	LookupImportProto func(string) (*dpb.FileDescriptorProto, error)
 
 	// Used to create a reader for a given filename, when loading proto source
 	// file contents. If unset, os.Open is used. If ImportPaths is also empty
 	// then relative paths are will be relative to the process's current working
 	// directory.
+	//
+	// Deprecated: Use FileProviders and the ReadCloserFileProvider constructor instead.
 	Accessor FileAccessor
+
+	FileProviders []FileProvider
 
 	// If true, the resulting file descriptors will retain source code info,
 	// that maps elements to their location in the source files as well as
@@ -183,34 +191,11 @@ type Parser struct {
 // error it returns. If syntax or link errors are encountered but the configured
 // ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) {
-	accessor := p.Accessor
-	if accessor == nil {
-		accessor = func(name string) (io.ReadCloser, error) {
-			return os.Open(name)
-		}
-	}
-	paths := p.ImportPaths
-	if len(paths) > 0 {
-		acc := accessor
-		accessor = func(name string) (io.ReadCloser, error) {
-			var ret error
-			for _, path := range paths {
-				f, err := acc(filepath.Join(path, name))
-				if err != nil {
-					if ret == nil {
-						ret = err
-					}
-					continue
-				}
-				return f, nil
-			}
-			return nil, ret
-		}
-	}
-	lookupImport, err := p.getLookupImport()
+	fileProviders, err := p.getFileProviders()
 	if err != nil {
 		return nil, err
 	}
+	p.modifyFileProvidersForImportPaths(fileProviders)
 
 	protos := map[string]*parseResult{}
 	results := &parseResults{
@@ -220,7 +205,7 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 		createDescriptorProtos: true,
 	}
 	errs := newErrorHandler(p.ErrorReporter, p.WarningReporter)
-	parseProtoFiles(accessor, filenames, errs, results, lookupImport)
+	parseProtoFiles(fileProviders, filenames, errs, results)
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
@@ -284,13 +269,7 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 // error it returns. If syntax errors are encountered but the configured
 // ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescriptorProto, error) {
-	accessor := p.Accessor
-	if accessor == nil {
-		accessor = func(name string) (io.ReadCloser, error) {
-			return os.Open(name)
-		}
-	}
-	lookupImport, err := p.getLookupImport()
+	fileProviders, err := p.getFileProviders()
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +281,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 		validate:               p.ValidateUnlinkedFiles,
 		createDescriptorProtos: true,
 	}
-	parseProtoFiles(accessor, filenames, errs, results, lookupImport)
+	parseProtoFiles(fileProviders, filenames, errs, results)
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
@@ -349,20 +328,14 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 // error it returns. If syntax errors are encountered but the configured
 // ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseToAST(filenames ...string) ([]*ast.FileNode, error) {
-	accessor := p.Accessor
-	if accessor == nil {
-		accessor = func(name string) (io.ReadCloser, error) {
-			return os.Open(name)
-		}
-	}
-	lookupImport, err := p.getLookupImport()
+	fileProviders, err := p.getFileProviders()
 	if err != nil {
 		return nil, err
 	}
 
 	protos := map[string]*parseResult{}
 	errs := newErrorHandler(p.ErrorReporter, p.WarningReporter)
-	parseProtoFiles(accessor, filenames, errs, &parseResults{resultsByFilename: protos}, lookupImport)
+	parseProtoFiles(fileProviders, filenames, errs, &parseResults{resultsByFilename: protos})
 	if err := errs.getError(); err != nil {
 		return nil, err
 	}
@@ -373,6 +346,77 @@ func (p Parser) ParseToAST(filenames ...string) ([]*ast.FileNode, error) {
 	return ret, nil
 }
 
+// getFileProviders gets the FileProviders based on FileProviders, Accessor, LookupImport, LookupImport Proto.
+func (p Parser) getFileProviders() ([]FileProvider, error) {
+	// If the new FileProviders is set, none of the deprecated options can be set.
+	if len(p.FileProviders) > 0 {
+		if p.Accessor != nil {
+			return nil, ErrFileProvidersAndAccessorSet
+		}
+		if p.LookupImport != nil {
+			return nil, ErrFileProvidersAndLookupImportSet
+		}
+		if p.LookupImportProto != nil {
+			return nil, ErrFileProvidersAndLookupImportProtoSet
+		}
+		return p.FileProviders, nil
+	}
+
+	// Otherwise, we are in old logic land.
+	// In this case, LookupImport and LookupImportProto cannot both be set, and
+	// Accessor takes precedence over LookupImport
+	fileAccessor := p.Accessor
+	if fileAccessor == nil {
+		fileAccessor = func(name string) (io.ReadCloser, error) {
+			return os.Open(name)
+		}
+	}
+	fileProviders := []FileProvider{
+		ReadCloserFileProvider(fileAccessor),
+	}
+	lookupImport, err := p.getLookupImport()
+	if err != nil {
+		return nil, err
+	}
+	if lookupImport != nil {
+		fileProviders = append(
+			fileProviders,
+			FileDescriptorProtoFileProvider(lookupImport),
+		)
+	}
+	return fileProviders, nil
+}
+
+func (p Parser) modifyFileProvidersForImportPaths(fileProviders []FileProvider) {
+	paths := p.ImportPaths
+	if len(paths) == 0 {
+		return
+	}
+	for _, fileProvider := range fileProviders {
+		if readCloserFileProvider, ok := fileProvider.(readCloserFileProvider); ok {
+			old := readCloserFileProvider.f
+			readCloserFileProvider.f = func(name string) (io.ReadCloser, error) {
+				var ret error
+				for _, path := range paths {
+					file, err := old(filepath.Join(path, name))
+					if err != nil {
+						if ret == nil {
+							ret = err
+						}
+						continue
+					}
+					return file, nil
+				}
+				return nil, ret
+			}
+		}
+	}
+}
+
+// getLookupImport gets the values from LookupImport and LookupImportProto.
+//
+// Note that these are deprecated in favor of FileProviders.
+// May return nil.
 func (p Parser) getLookupImport() (func(string) (*dpb.FileDescriptorProto, error), error) {
 	if p.LookupImport != nil && p.LookupImportProto != nil {
 		return nil, ErrLookupImportAndProtoSet
@@ -381,13 +425,7 @@ func (p Parser) getLookupImport() (func(string) (*dpb.FileDescriptorProto, error
 		return p.LookupImportProto, nil
 	}
 	if p.LookupImport != nil {
-		return func(path string) (*dpb.FileDescriptorProto, error) {
-			value, err := p.LookupImport(path)
-			if value != nil {
-				return value.AsFileDescriptorProto(), err
-			}
-			return nil, err
-		}, nil
+		return fileDescriptorFuncToFileDescriptorProtoFunc(p.LookupImport), nil
 	}
 	return nil, nil
 }
@@ -500,67 +538,49 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	return revisedProtos
 }
 
-func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, parsed *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error)) {
+func parseProtoFiles(fileProviders []FileProvider, filenames []string, errs *errorHandler, parsed *parseResults) {
 	for _, name := range filenames {
-		parseProtoFile(acc, name, nil, errs, parsed, lookupImport)
+		parseProtoFile(fileProviders, name, nil, errs, parsed)
 		if errs.err != nil {
 			return
 		}
 	}
 }
 
-func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, results *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error)) {
+func parseProtoFile(fileProviders []FileProvider, filename string, importLoc *SourcePos, errs *errorHandler, results *parseResults) {
 	if results.has(filename) {
 		return
 	}
-	if lookupImport == nil {
-		lookupImport = func(string) (*dpb.FileDescriptorProto, error) {
-			return nil, errors.New("no import lookup function")
-		}
-	}
-	in, err := acc(filename)
-	var result *parseResult
-	if err == nil {
-		// try to parse the bytes accessed
-		func() {
-			defer func() {
-				// if we've already parsed contents, an error
-				// closing need not fail this operation
-				_ = in.Close()
-			}()
-			result = parseProto(filename, in, errs, results.validate, results.createDescriptorProtos)
-		}()
-	} else if d, lookupErr := lookupImport(filename); lookupErr == nil {
-		// This is a user-provided descriptor, which is acting similarly to a
-		// well-known import.
-		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
-	} else if d, ok := standardImports[filename]; ok {
-		// it's a well-known import
-		// (we clone it to make sure we're not sharing state with other
-		//  parsers, which could result in unsafe races if multiple
-		//  parsers are trying to access it concurrently)
-		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
-	} else {
-		if !strings.Contains(err.Error(), filename) {
-			// an error message that doesn't indicate the file is awful!
-			// this cannot be %w as this is not compatible with go <= 1.13
-			err = errorWithFilename{
-				underlying: err,
-				filename:   filename,
+	result, err := getParseResultForFileProviders(fileProviders, filename, errs, results)
+	if err != nil {
+		if d, ok := standardImports[filename]; ok {
+			// it's a well-known import
+			// (we clone it to make sure we're not sharing state with other
+			//  parsers, which could result in unsafe races if multiple
+			//  parsers are trying to access it concurrently)
+			result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
+		} else {
+			if !strings.Contains(err.Error(), filename) {
+				// an error message that doesn't indicate the file is awful!
+				// this cannot be %w as this is not compatible with go <= 1.13
+				err = errorWithFilename{
+					underlying: err,
+					filename:   filename,
+				}
 			}
-		}
-		// The top-level loop in parseProtoFiles calls this with nil for the top-level files
-		// importLoc is only for imports, otherwise we do not want to return a ErrorWithSourcePos
-		// ErrorWithSourcePos should always have a non-nil SourcePos
-		if importLoc != nil {
-			// associate the error with the import line
-			err = ErrorWithSourcePos{
-				Pos:        importLoc,
-				Underlying: err,
+			// The top-level loop in parseProtoFiles calls this with nil for the top-level files
+			// importLoc is only for imports, otherwise we do not want to return a ErrorWithSourcePos
+			// ErrorWithSourcePos should always have a non-nil SourcePos
+			if importLoc != nil {
+				// associate the error with the import line
+				err = ErrorWithSourcePos{
+					Pos:        importLoc,
+					Underlying: err,
+				}
 			}
+			_ = errs.handleError(err)
+			return
 		}
-		_ = errs.handleError(err)
-		return
 	}
 
 	results.add(filename, result)
@@ -576,7 +596,7 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 		if !ok {
 			// no AST for this file? use imports in descriptor
 			for _, dep := range fd.Dependency {
-				parseProtoFile(acc, dep, decl.Start(), errs, results, lookupImport)
+				parseProtoFile(fileProviders, dep, decl.Start(), errs, results)
 				if errs.getError() != nil {
 					return // abort
 				}
@@ -586,12 +606,60 @@ func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, err
 		// we have an AST; use it so we can report import location in errors
 		for _, decl := range fnode.Decls {
 			if dep, ok := decl.(*ast.ImportNode); ok {
-				parseProtoFile(acc, dep.Name.AsString(), dep.Name.Start(), errs, results, lookupImport)
+				parseProtoFile(fileProviders, dep.Name.AsString(), dep.Name.Start(), errs, results)
 				if errs.getError() != nil {
 					return // abort
 				}
 			}
 		}
+	}
+}
+
+func getParseResultForFileProviders(fileProviders []FileProvider, filename string, errs *errorHandler, results *parseResults) (*parseResult, error) {
+	if len(fileProviders) == 0 {
+		// this is a setup error from getFileProviders if this happens
+		// this should not happen
+		return nil, errors.New("empty FileProviders")
+	}
+	// we replicate the old logic where once we cascade from Accessor to LookupImport, we will
+	// end up returning the error from the Accessor in the end, so this is equivalent to using
+	// the error from the firstAccessor
+	firstResult, firstErr := getParseResultForFileProvider(fileProviders[0], filename, errs, results)
+	if firstErr == nil {
+		return firstResult, nil
+	}
+	for _, fileProvider := range fileProviders[1:] {
+		result, err := getParseResultForFileProvider(fileProvider, filename, errs, results)
+		if err == nil {
+			return result, nil
+		}
+	}
+	return nil, firstErr
+}
+
+func getParseResultForFileProvider(fileProvider FileProvider, filename string, errs *errorHandler, results *parseResults) (*parseResult, error) {
+	switch t := fileProvider.(type) {
+	case readCloserFileProvider:
+		readCloser, err := t.f(filename)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			// if we've already parsed contents, an error
+			// closing need not fail this operation
+			_ = readCloser.Close()
+		}()
+		return parseProto(filename, readCloser, errs, results.validate, results.createDescriptorProtos), nil
+	case fileDescriptorProtoFileProvider:
+		fileDescriptorProto, err := t.f(filename)
+		if err != nil {
+			return nil, err
+		}
+		// This is a user-provided descriptor, which is acting similarly to a
+		// well-known import.
+		return &parseResult{fd: proto.Clone(fileDescriptorProto).(*dpb.FileDescriptorProto)}, nil
+	default:
+		return nil, fmt.Errorf("unknown FileProvider type: %T", t)
 	}
 }
 

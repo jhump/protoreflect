@@ -19,6 +19,15 @@ var ErrNoSyntax = errors.New("no syntax specified; defaulting to proto2 syntax")
 // ErrLookupImportAndProtoSet is the error returned if both LookupImport and LookupImportProto are set.
 var ErrLookupImportAndProtoSet = errors.New("both LookupImport and LookupImportProto set")
 
+// ErrFileProvidersAndAccessorSet is the error returned if both FileProviders and Accessor is set.
+var ErrFileProvidersAndAccessorSet = errors.New("both FileProviders and Accessor set")
+
+// ErrFileProvidersAndLookupImportSet is the error returned if both FileProviders and LookupImport is set.
+var ErrFileProvidersAndLookupImportSet = errors.New("both FileProviders and LookupImport set")
+
+// ErrFileProvidersAndLookupImportProtoSet is the error returned if both FileProviders and LookupImportProto is set.
+var ErrFileProvidersAndLookupImportProtoSet = errors.New("both FileProviders and LookupImportProto set")
+
 // ErrorReporter is responsible for reporting the given error. If the reporter
 // returns a non-nil error, parsing/linking will abort with that error. If the
 // reporter returns nil, parsing will continue, allowing the parser to try to
