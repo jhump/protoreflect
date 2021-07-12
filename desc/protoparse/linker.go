@@ -385,6 +385,13 @@ func (l *linker) resolveMessageTypes(r *parseResult, fd *dpb.FileDescriptorProto
 			}
 		}
 	}
+	for _, of := range md.OneofDecl {
+		if of.Options != nil {
+			if err := l.resolveOptions(r, fd, "oneof", fqn, proto.MessageName(of.Options), of.Options.UninterpretedOption, scopes); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
