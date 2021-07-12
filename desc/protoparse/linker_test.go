@@ -182,6 +182,44 @@ func TestLinkerValidation(t *testing.T) {
 		},
 		{
 			map[string]string{
+				"foo.proto": `
+					syntax = "proto2";
+					package foo;
+					import "google/protobuf/descriptor.proto";
+					extend google.protobuf.FileOptions           { optional string fil_foo = 12000; }
+					extend google.protobuf.MessageOptions        { optional string msg_foo = 12000; }
+					extend google.protobuf.FieldOptions          { optional string fld_foo = 12000 [(fld_foo) = "extension"]; }
+					extend google.protobuf.OneofOptions          { optional string oof_foo = 12000; }
+					extend google.protobuf.EnumOptions           { optional string enm_foo = 12000; }
+					extend google.protobuf.EnumValueOptions      { optional string env_foo = 12000; }
+					extend google.protobuf.ExtensionRangeOptions { optional string ext_foo = 12000; }
+					extend google.protobuf.ServiceOptions        { optional string svc_foo = 12000; }
+					extend google.protobuf.MethodOptions         { optional string mtd_foo = 12000; }
+					option (fil_foo) = "file";
+					message Bar {
+						option (msg_foo) = "message";
+						oneof foo {
+							option (oof_foo) = "oneof";
+							string bar = 1 [(fld_foo) = "field"];
+						}
+						extensions 100 to 200 [(ext_foo) = "extensionrange"];
+					}
+					enum Baz {
+						option (enm_foo) = "enum";
+						ZERO = 0 [(env_foo) = "enumvalue"];
+					}
+					service FooService {
+						option (svc_foo) = "service";
+						rpc Bar(Bar) returns (Bar) {
+							option (mtd_foo) = "method";
+						}
+					}
+					`,
+			},
+			"", // should success
+		},
+		{
+			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ repeated string a = 1 [default = \"abc\"]; }",
 			},
 			"foo.proto:1:56: field fu.baz.foobar.a: default value cannot be set because field is repeated",
