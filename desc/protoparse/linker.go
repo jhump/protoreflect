@@ -372,6 +372,14 @@ func (l *linker) resolveMessageTypes(r *parseResult, fd *dpb.FileDescriptorProto
 			return err
 		}
 	}
+	for _, ood := range md.OneofDecl {
+		if ood.Options != nil {
+			ooName := fmt.Sprintf("%s.%s", fqn, ood.GetName())
+			if err := l.resolveOptions(r, fd, "oneof", ooName, proto.MessageName(ood.Options), ood.Options.UninterpretedOption, scopes); err != nil {
+				return err
+			}
+		}
+	}
 	for _, fld := range md.Extension {
 		if err := l.resolveFieldTypes(r, fd, prefix, fld, scopes); err != nil {
 			return err
