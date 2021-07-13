@@ -232,7 +232,7 @@ func TestParseFilesMessageComments(t *testing.T) {
 			break
 		}
 	}
-	testutil.Eq(t, expected, comments)
+	testutil.Eq(t, []byte(expected), []byte(comments))
 }
 
 func TestParseFilesWithImportsNoImportPath(t *testing.T) {
