@@ -61,11 +61,6 @@ func (rr *runeReader) endMark() string {
 	return m
 }
 
-func lexError(l protoLexer, pos *SourcePos, err string) {
-	pl := l.(*protoLex)
-	_ = pl.errs.handleErrorWithPos(pos, err)
-}
-
 type protoLex struct {
 	filename string
 	input    *runeReader
@@ -382,6 +377,10 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			l.input.unreadRune(cn)
 		}
 
+		if c > 255 {
+			l.setError(lval, errors.New("invalid character"))
+			return _ERROR
+		}
 		l.setRune(lval, c)
 		return int(c)
 	}

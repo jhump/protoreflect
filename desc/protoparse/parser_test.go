@@ -3,6 +3,7 @@ package protoparse
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -33,6 +34,24 @@ func TestEmptyParse(t *testing.T) {
 	testutil.Eq(t, 0, len(fd[0].GetEnumTypes()))
 	testutil.Eq(t, 0, len(fd[0].GetExtensions()))
 	testutil.Eq(t, 0, len(fd[0].GetServices()))
+}
+
+func TestJunkParse(t *testing.T) {
+	// inputs that have been found in the past to cause panics by oss-fuzz
+	inputs := map[string]string{
+		"case-34232": `'';`,
+		"case-34238": `.`,
+	}
+	for name, input := range inputs {
+		protoName := fmt.Sprintf("%s.proto", name)
+		p := Parser{
+			Accessor: FileContentsFromMap(map[string]string{protoName: input}),
+		}
+		_, err := p.ParseFiles(protoName)
+		// we expect this to error... but we don't want it to panic
+		testutil.Nok(t, err, "junk input should have returned error")
+		t.Logf("error from parse: %v", err)
+	}
 }
 
 func TestSimpleParse(t *testing.T) {
