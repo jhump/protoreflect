@@ -221,7 +221,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 
 		l.offset += n
 		l.adjustPos(c)
-		if strings.ContainsRune("\n\r\t ", c) {
+		if strings.ContainsRune("\n\r\t\f\v ", c) {
 			l.ws = append(l.ws, c)
 			continue
 		}
