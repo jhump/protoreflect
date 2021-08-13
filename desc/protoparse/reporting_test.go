@@ -98,17 +98,17 @@ func TestErrorReporting(t *testing.T) {
 						BAZ = 2;
 					}
 					service Bar {
-						rpc Foo (Foo) returns (Foo);
-						rpc Foo (Frob) returns (Nitz);
+						rpc Foobar (Foo) returns (Foo);
+						rpc Foobar (Frob) returns (Nitz);
 					}
 					`,
 			},
 			expectedErrs: []string{
 				"test.proto:8:49: duplicate symbol BAZ: already defined as enum value; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum",
 				"test.proto:10:41: duplicate symbol Bar: already defined as enum",
-				"test.proto:12:49: duplicate symbol Bar.Foo: already defined as method",
-				"test.proto:12:58: method Bar.Foo: unknown request type Frob",
-				"test.proto:12:73: method Bar.Foo: unknown response type Nitz",
+				"test.proto:12:49: duplicate symbol Bar.Foobar: already defined as method",
+				"test.proto:12:61: method Bar.Foobar: unknown request type Frob",
+				"test.proto:12:76: method Bar.Foobar: unknown response type Nitz",
 			},
 		},
 		{
