@@ -168,6 +168,18 @@ func TestLinkerValidation(t *testing.T) {
 		},
 		{
 			map[string]string{
+				"foo.proto": "message foo{} message bar{} service foobar{ rpc foo(foo) returns (bar); }",
+			},
+			"foo.proto:1:53: method foobar.foo: invalid request type: foobar.foo is a method, not a message",
+		},
+		{
+			map[string]string{
+				"foo.proto": "message foo{} message bar{} service foobar{ rpc foo(bar) returns (foo); }",
+			},
+			"foo.proto:1:67: method foobar.foo: invalid response type: foobar.foo is a method, not a message",
+		},
+		{
+			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ extensions 1; } extend foobar { optional string a = 2; }",
 			},
 			"foo.proto:1:85: field fu.baz.a: tag 2 is not in valid range for extended type fu.baz.foobar",
@@ -196,7 +208,7 @@ func TestLinkerValidation(t *testing.T) {
 					extend google.protobuf.ServiceOptions        { optional string svc_foo = 12000; }
 					extend google.protobuf.MethodOptions         { optional string mtd_foo = 12000; }
 					option (fil_foo) = "file";
-					message Bar {
+					message Foo {
 						option (msg_foo) = "message";
 						oneof foo {
 							option (oof_foo) = "oneof";
@@ -210,7 +222,7 @@ func TestLinkerValidation(t *testing.T) {
 					}
 					service FooService {
 						option (svc_foo) = "service";
-						rpc Bar(Bar) returns (Bar) {
+						rpc Bar(Foo) returns (Foo) {
 							option (mtd_foo) = "method";
 						}
 					}
