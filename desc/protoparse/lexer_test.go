@@ -11,20 +11,20 @@ import (
 
 func TestLexer(t *testing.T) {
 	l := newTestLexer(strings.NewReader(`
-	// comment
+// comment 
 
 	/*
-	 * block comment
-	 */ /* inline comment */
+	 * block comment
+	 */ /* inlinecomment */
 
 	int32  "\032\x16\n\rfoobar\"zap"		'another\tstring\'s\t'
-foo
+foo
 
 	// another comment
 	// more and more...
 
-	service rpc message
-	.type
+	service rpc message
+	.type
 	.f.q.n
 	name
 	f.q.n
@@ -75,7 +75,7 @@ foo
 	/* another comment followed by some final whitespace*/
 
 	
-	`))
+	`))
 
 	var prev ast.Node
 	var sym protoSymType
@@ -87,7 +87,7 @@ foo
 		comments   []string
 		trailCount int
 	}{
-		{t: _INT32, line: 8, col: 9, span: 5, v: "int32", comments: []string{"// comment\n", "/*\n\t * block comment\n\t */", "/* inline comment */"}},
+		{t: _INT32, line: 8, col: 9, span: 5, v: "int32", comments: []string{"// comment \f\v\n", "/*\n\t * block comment\f\v\n\t */", "/* inline\f\vcomment */"}},
 		{t: _STRING_LIT, line: 8, col: 16, span: 25, v: "\032\x16\n\rfoobar\"zap"},
 		{t: _STRING_LIT, line: 8, col: 57, span: 22, v: "another\tstring's\t"},
 		{t: _NAME, line: 9, col: 1, span: 3, v: "foo"},
@@ -211,7 +211,7 @@ foo
 	testutil.Eq(t, 2, len(finalComments), "wrong number of final remaining comments")
 	testutil.Eq(t, "// comment attached to no tokens (upcoming token is EOF!)\n", finalComments[0].Text, "incorrect final comment text")
 	testutil.Eq(t, "/* another comment followed by some final whitespace*/", finalComments[1].Text, "incorrect final comment text")
-	testutil.Eq(t, "\n\n\t\n\t", l.eof.LeadingWhitespace(), "incorrect final whitespace")
+	testutil.Eq(t, "\n\n\t\n\t\f\v", l.eof.LeadingWhitespace(), "incorrect final whitespace")
 }
 
 func TestLexerErrors(t *testing.T) {
