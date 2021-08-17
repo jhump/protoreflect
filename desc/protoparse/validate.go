@@ -95,6 +95,10 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	rsvd := make(tagRanges, len(md.ReservedRange))
 	for i, r := range md.ReservedRange {
 		n := res.getMessageReservedRangeNode(r)
+		err := validateRangeSpaceBeforeTo(res, scope, n)
+		if err != nil {
+			return err
+		}
 		rsvd[i] = tagRange{start: r.GetStart(), end: r.GetEnd(), node: n}
 
 	}
@@ -111,6 +115,10 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	exts := make(tagRanges, len(md.ExtensionRange))
 	for i, r := range md.ExtensionRange {
 		n := res.getExtensionRangeNode(r)
+		err := validateRangeSpaceBeforeTo(res, scope, n)
+		if err != nil {
+			return err
+		}
 		exts[i] = tagRange{start: r.GetStart(), end: r.GetEnd(), node: n}
 	}
 	sort.Sort(exts)
@@ -182,6 +190,22 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 		}
 	}
 
+	return nil
+}
+
+// validateRangeSpaceBeforeTo returns an error for inputs like "1to 10"
+func validateRangeSpaceBeforeTo(res *parseResult, scope string, node ast.RangeDeclNode) error {
+	rangeNode, ok := node.(*ast.RangeNode)
+	if !ok {
+		return nil
+	}
+	if rangeNode.To == nil {
+		return nil
+	}
+	whitespace := rangeNode.To.LeadingWhitespace()
+	if whitespace == "" {
+		return res.errs.handleErrorWithPos(rangeNode.To.Start(), "%s: need space between number and identifier", scope)
+	}
 	return nil
 }
 
@@ -257,6 +281,10 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 	rsvd := make(tagRanges, len(ed.ReservedRange))
 	for i, r := range ed.ReservedRange {
 		n := res.getEnumReservedRangeNode(r)
+		err := validateRangeSpaceBeforeTo(res, scope, n)
+		if err != nil {
+			return err
+		}
 		rsvd[i] = tagRange{start: r.GetStart(), end: r.GetEnd(), node: n}
 	}
 	sort.Sort(rsvd)

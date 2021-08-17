@@ -171,6 +171,10 @@ func TestBasicValidation(t *testing.T) {
 			succeeds: true,
 		},
 		{
+			contents: `syntax = "proto3"; enum Foo { V1 = 0; reserved 1to 20; reserved "V2"; }`,
+			errMsg:   `test.proto:1:49: enum Foo: need space between number and identifier`,
+		},
+		{
 			contents: `enum Foo { V1 = 1; reserved 1 to 20; reserved "V2"; }`,
 			errMsg:   `test.proto:1:17: enum Foo: value V1 is using number 1 which is in reserved range 1 to 20`,
 		},
@@ -203,8 +207,16 @@ func TestBasicValidation(t *testing.T) {
 			errMsg:   `test.proto:1:33: message Foo: reserved ranges overlap: 1 to 10 and 10 to 12`,
 		},
 		{
+			contents: `message Foo { reserved 1to 10; }`,
+			errMsg:   `test.proto:1:25: message Foo: need space between number and identifier`,
+		},
+		{
 			contents: `message Foo { extensions 1 to 10, 10 to 12; }`,
 			errMsg:   `test.proto:1:35: message Foo: extension ranges overlap: 1 to 10 and 10 to 12`,
+		},
+		{
+			contents: `message Foo { extensions 1to 10; }`,
+			errMsg:   `test.proto:1:27: message Foo: need space between number and identifier`,
 		},
 		{
 			contents: `message Foo { reserved 1 to 10; extensions 10 to 12; }`,
