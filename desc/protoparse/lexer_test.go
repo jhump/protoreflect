@@ -53,9 +53,9 @@ foo
 	syntax = "proto2";
 
 	// some strange cases
-	1.543g12 /* trailing line comment */
+	1.543 g12 /* trailing line comment */
 	000.000
-	0.1234.5678.
+	0.1234 .5678 .
 	12e12
 
 	Random_identifier_with_numbers_0123456789_and_letters...
@@ -69,6 +69,8 @@ foo
 
 	// this is an attached leading comment
 	foo
+
+	1.23e+20+20
 	// a trailing comment for last element
 
 	// comment attached to no tokens (upcoming token is EOF!)
@@ -143,17 +145,20 @@ foo
 		{t: _STRING_LIT, line: 41, col: 18, span: 8, v: "proto2"},
 		{t: ';', line: 41, col: 26, span: 1, v: nil},
 		{t: _FLOAT_LIT, line: 44, col: 9, span: 5, v: 1.543, comments: []string{"// some strange cases\n"}},
-		{t: _NAME, line: 44, col: 14, span: 3, v: "g12"},
+		{t: _NAME, line: 44, col: 15, span: 3, v: "g12"},
 		{t: _FLOAT_LIT, line: 45, col: 9, span: 7, v: 0.0, comments: []string{"/* trailing line comment */"}, trailCount: 1},
 		{t: _FLOAT_LIT, line: 46, col: 9, span: 6, v: 0.1234},
-		{t: _FLOAT_LIT, line: 46, col: 15, span: 5, v: 0.5678},
-		{t: '.', line: 46, col: 20, span: 1, v: nil},
+		{t: _FLOAT_LIT, line: 46, col: 16, span: 5, v: 0.5678},
+		{t: '.', line: 46, col: 22, span: 1, v: nil},
 		{t: _FLOAT_LIT, line: 47, col: 9, span: 5, v: 12e12},
 		{t: _NAME, line: 49, col: 9, span: 53, v: "Random_identifier_with_numbers_0123456789_and_letters"},
 		{t: '.', line: 49, col: 62, span: 1, v: nil},
 		{t: '.', line: 49, col: 63, span: 1, v: nil},
 		{t: '.', line: 49, col: 64, span: 1, v: nil},
 		{t: _NAME, line: 59, col: 9, span: 3, v: "foo", comments: []string{"// this is a trailing comment\n", "// that spans multiple lines\n", "// over two in fact!\n", "/*\n\t * this is a detached comment\n\t * with lots of extra words and stuff...\n\t */", "// this is an attached leading comment\n"}, trailCount: 3},
+		{t: _FLOAT_LIT, line: 61, col: 9, span: 8, v: 1.23e+20},
+		{t: '+', line: 61, col: 17, span: 1, v: nil},
+		{t: _INT_LIT, line: 61, col: 18, span: 2, v: uint64(20)},
 	}
 
 	for i, exp := range expected {
@@ -176,17 +181,19 @@ foo
 		case _FLOAT_LIT:
 			n = sym.f
 			val = sym.f.Val
+		case _ERROR:
+			val = sym.err
 		default:
 			n = sym.b
 			val = nil
 		}
-		testutil.Eq(t, exp.t, tok, "case %d: wrong token type (case %v)", i, exp.v)
+		testutil.Eq(t, exp.t, tok, "case %d: wrong token type (expecting value %v, got %v)", i, exp.v, val)
 		testutil.Eq(t, exp.v, val, "case %d: wrong token value", i)
 		testutil.Eq(t, exp.line, n.Start().Line, "case %d: wrong line number", i)
-		testutil.Eq(t, exp.col, n.Start().Col, "case %d: wrong column number", i)
+		testutil.Eq(t, exp.col, n.Start().Col, "case %d: wrong column number (on line %d)", i, exp.line)
 		testutil.Eq(t, exp.line, n.End().Line, "case %d: wrong end line number", i)
 		testutil.Eq(t, exp.col+exp.span, n.End().Col, "case %d: wrong end column number", i)
-		if exp.trailCount > 0 {
+		if prev != nil {
 			testutil.Eq(t, exp.trailCount, len(prev.TrailingComments()), "case %d: wrong number of trailing comments", i)
 		}
 		testutil.Eq(t, len(exp.comments)-exp.trailCount, len(n.LeadingComments()), "case %d: wrong number of comments", i)
@@ -228,6 +235,13 @@ func TestLexerErrors(t *testing.T) {
 		{str: `"foobar\U00110000foo"`, errMsg: "unicode escape is out of range"},
 		{str: "'foobar\nbaz'", errMsg: "encountered end-of-line"},
 		{str: "'foobar\000baz'", errMsg: "null character ('\\0') not allowed"},
+		{str: `1.543g12`, errMsg: "invalid syntax"},
+		{str: `0.1234.5678.`, errMsg: "invalid syntax"},
+		{str: `0x987.345aaf`, errMsg: "invalid syntax"},
+		{str: `0.987.345`, errMsg: "invalid syntax"},
+		{str: `0.987e34e-20`, errMsg: "invalid syntax"},
+		{str: `0.987e-345e20`, errMsg: "invalid syntax"},
+		{str: `.987to123`, errMsg: "invalid syntax"},
 		{str: `/* foobar`, errMsg: "unexpected EOF"},
 	}
 	for i, tc := range testCases {
@@ -237,6 +251,7 @@ func TestLexerErrors(t *testing.T) {
 		testutil.Eq(t, _ERROR, tok)
 		testutil.Require(t, sym.err != nil)
 		testutil.Require(t, strings.Contains(sym.err.Error(), tc.errMsg), "case %d: expected message to contain %q but does not: %q", i, tc.errMsg, sym.err.Error())
+		t.Logf("case %d: %v", i, sym.err)
 	}
 }
 
