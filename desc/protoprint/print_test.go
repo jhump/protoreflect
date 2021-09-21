@@ -27,6 +27,38 @@ const (
 	testFilesDirectory = "testfiles"
 )
 
+func reverseByName(a, b Element) bool {
+	// custom sort that is practically the *reverse* of default sort
+	// order, though things like fields/extensions/enum values are
+	// sorted by name (descending) instead of by number
+
+	if a.Kind() != b.Kind() {
+		return a.Kind() > b.Kind()
+	}
+	switch a.Kind() {
+	case KindExtension:
+		if a.Extendee() != b.Extendee() {
+			return a.Extendee() > b.Extendee()
+		}
+	case KindOption:
+		if a.IsCustomOption() != b.IsCustomOption() {
+			return a.IsCustomOption()
+		}
+	}
+	if a.Name() != b.Name() {
+		return a.Name() > b.Name()
+	}
+	if a.Number() != b.Number() {
+		return a.Number() > b.Number()
+	}
+	aStart, aEnd := a.NumberRange()
+	bStart, bEnd := b.NumberRange()
+	if aStart != bStart {
+		return aStart > bStart
+	}
+	return aEnd > bEnd
+}
+
 func TestPrinter(t *testing.T) {
 	prs := map[string]*Printer{
 		"default":                             {},
@@ -37,6 +69,7 @@ func TestPrinter(t *testing.T) {
 		"multiline-style-comments":            {Indent: "\t", PreferMultiLineStyleComments: true},
 		"sorted":                              {Indent: "   ", SortElements: true, OmitDetachedComments: true},
 		"sorted-AND-multiline-style-comments": {PreferMultiLineStyleComments: true, SortElements: true},
+		"custom-sort":                         {CustomSortFunction: reverseByName},
 	}
 
 	// create descriptors to print
