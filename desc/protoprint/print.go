@@ -59,6 +59,17 @@ type Printer struct {
 	// standard options before custom ones.
 	SortElements bool
 
+	// The "less" function used to sort elements when printing. It is given two
+	// elements, a and b, and should return true if a is "less than" b. In this
+	// case, "less than" means that element a should appear earlier in the file
+	// than element b.
+	//
+	// If this field is nil, no custom sorting is done and the SortElements
+	// field is consulted to decide how to order the output. If this field is
+	// non-nil, the SortElements field is ignored and this function is called to
+	// order elements.
+	CustomSortFunction func(a, b Element) bool
+
 	// The indentation used. Any characters other than spaces or tabs will be
 	// replaced with spaces. If unset/empty, two spaces will be used.
 	Indent string
@@ -617,7 +628,9 @@ func (p *Printer) computeExtensions(sourceInfo internal.SourceInfoMap, exts []*d
 }
 
 func (p *Printer) sort(elements elementAddrs, sourceInfo internal.SourceInfoMap, path []int32) {
-	if p.SortElements {
+	if p.CustomSortFunction != nil {
+		sort.Stable(customSortOrder{elementAddrs: elements, less: p.CustomSortFunction})
+	} else if p.SortElements {
 		// canonical sorted order
 		sort.Stable(elements)
 	} else {
@@ -1726,12 +1739,6 @@ func (p *Printer) extractOptions(dsc desc.Descriptor, opts proto.Message, mf *dy
 							}
 							e = ev
 						}
-						var name string
-						if fld.IsExtension() {
-							name = fmt.Sprintf("(%s)", p.qualifyName(pkg, scope, fld.GetFullyQualifiedName()))
-						} else {
-							name = fld.GetName()
-						}
 						opts = append(opts, option{name: name, val: e})
 					}
 				case map[interface{}]interface{}:
@@ -1825,7 +1832,6 @@ func optionsAsElementAddrs(optionsTag int32, order int, opts map[int32][]option)
 	for tag := range opts {
 		optAddrs = append(optAddrs, elementAddr{elementType: optionsTag, elementIndex: int(tag), order: order})
 	}
-	sort.Sort(optionsByName{addrs: optAddrs, opts: opts})
 	return optAddrs
 }
 
@@ -2162,19 +2168,15 @@ func (a elementSrcOrder) Less(i, j int) bool {
 	return false
 }
 
-type optionsByName struct {
-	addrs []elementAddr
-	opts  map[int32][]option
+type customSortOrder struct {
+	elementAddrs
+	less func(a, b Element) bool
 }
 
-func (o optionsByName) Len() int {
-	return len(o.addrs)
-}
-
-func (o optionsByName) Less(i, j int) bool {
-	oi := o.opts[int32(o.addrs[i].elementIndex)]
-	oj := o.opts[int32(o.addrs[j].elementIndex)]
-	return optionLess(oi, oj)
+func (cso customSortOrder) Less(i, j int) bool {
+	ei := asElement(cso.at(cso.addrs[i]))
+	ej := asElement(cso.at(cso.addrs[j]))
+	return cso.less(ei, ej)
 }
 
 func optionLess(i, j []option) bool {
@@ -2186,10 +2188,6 @@ func optionLess(i, j []option) bool {
 		return false
 	}
 	return ni < nj
-}
-
-func (o optionsByName) Swap(i, j int) {
-	o.addrs[i], o.addrs[j] = o.addrs[j], o.addrs[i]
 }
 
 func (p *Printer) printElement(isDecriptor bool, si *descriptor.SourceCodeInfo_Location, w *writer, indent int, el func(*writer)) {

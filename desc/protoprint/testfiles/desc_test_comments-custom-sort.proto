@@ -1,0 +1,144 @@
+// This is the first detached comment for the syntax.
+
+// This is a second detached comment.
+
+// This is a third.
+
+// Syntax comment...
+syntax = "proto2"; // Syntax trailer.
+
+extend Request {
+  // ... and a comment for guid2
+  optional uint64 guid2 = 124;
+
+  // comment for guid1
+  optional uint64 guid1 = 123;
+}
+
+// Service comment
+service RpcService {
+  rpc UnaryRpc ( Request ) returns ( google.protobuf.Empty ) {
+    option (testprotos.mtfubard) = 123.456000;
+
+    option (testprotos.mtfubar) = 12.340000;
+
+    option deprecated = true;
+  }
+
+  // Method comment
+  rpc StreamingRpc ( stream Request ) returns ( Request );
+
+  option (testprotos.sfubare) = VALUE;
+
+  // option that sets field
+  option (testprotos.sfubar) = { id:100 name:"bob"  };
+
+  option deprecated = false; // DEPRECATED!
+}
+
+// Multiple white space lines (like above) cannot
+// be preserved...
+
+// We need a request for our RPC service below.
+message Request {
+  reserved "foo", "baz", "bar";
+
+  reserved 30 to 50, 10 to 20;
+
+  extensions 201 to 250 [(testprotos.exfubarb) = "\000\001\002\003\004\005\006\007", (testprotos.exfubar) = "splat!"];
+
+  extensions 100 to 200;
+
+  enum MarioCharacters {
+    WARIO = 5;
+
+    WALUIGI = 6;
+
+    SNIFIT = -101;
+
+    SHY_GUY = 7 [(testprotos.evfubarsf) = 10101];
+
+    PEACH = 3;
+
+    MARIO = 1 [(testprotos.evfubars) = -314, (testprotos.evfubar) = 278];
+
+    MAGIKOOPA = 8;
+
+    LUIGI = 2 [(testprotos.evfubaruf) = 100, (testprotos.evfubaru) = 200];
+
+    KAMEK = 8;
+
+    HEY_HO = 7;
+
+    BOWSER = 4;
+
+    option (testprotos.efubars) = -321;
+
+    option (testprotos.efubar) = 123;
+
+    // allow_alias comments!
+    option allow_alias = true;
+  }
+
+  // can be these or those
+  oneof xyz {
+    int32 those = 7;
+
+    string these = 6;
+  }
+
+  // can be this or that
+  oneof abc {
+    string this = 4;
+
+    int32 that = 5;
+  }
+
+  // map field
+  map<string, string> things = 8;
+
+  // some detached comments
+
+  // some detached comments
+
+  // Another field comment
+
+  // label comment
+  optional string name = 2 [default = "fubar"];
+
+  // A field comment
+  repeated int32 ids = 1 [(testprotos.ffubarb) = "xyz", (testprotos.ffubar) = "abc", packed = true, json_name = "|foo|"]; // field trailer #1...
+
+  // Group comment
+  optional group Extras = 3 {
+    // Leading comment...
+    optional string str = 3; // Trailing comment...
+
+    optional float flt = 2;
+
+    optional double dbl = 1;
+
+    // this is a custom option
+    option (testprotos.mfubar) = false;
+
+    option no_standard_descriptor_accessor = false;
+  }
+
+  // lead mfubar
+  option (testprotos.mfubar) = true; // trailing mfubar
+
+  option deprecated = true; // deprecated!
+}
+
+message AnEmptyMessage {
+}
+
+// option comments FTW!!!
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
+import public "google/protobuf/empty.proto";
+
+import "desc_test_options.proto";
+
+// And now the package declaration
+package foo.bar;
