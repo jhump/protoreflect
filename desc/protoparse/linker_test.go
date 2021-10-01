@@ -420,6 +420,98 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			"foo.proto:1:95: field com.google.Foo.str: unknown type google.protobuf.StringValue; resolved to com.google.protobuf.StringValue which is not defined; consider using a leading dot",
 		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo {\n" +
+					"  optional group Bar = 1 { optional string name = 1; }\n" +
+					"}\n" +
+					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
+					"message Baz { option (foo).bar.name = \"abc\"; }\n",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo {\n" +
+					"  optional group Bar = 1 { optional string name = 1; }\n" +
+					"}\n" +
+					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
+					"message Baz { option (foo).Bar.name = \"abc\"; }\n",
+			},
+			"foo.proto:7:28: message Baz: option (foo).Bar.name: field Bar of Foo does not exist",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"extend google.protobuf.MessageOptions {\n" +
+					"  optional group Foo = 10001 { optional string name = 1; }\n" +
+					"}\n" +
+					"message Bar { option (foo).name = \"abc\"; }\n",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"extend google.protobuf.MessageOptions {\n" +
+					"  optional group Foo = 10001 { optional string name = 1; }\n" +
+					"}\n" +
+					"message Bar { option (Foo).name = \"abc\"; }\n",
+			},
+			"foo.proto:6:22: message Bar: invalid extension: Foo is a message, not an extension",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo {\n" +
+					"  optional group Bar = 1 { optional string name = 1; }\n" +
+					"}\n" +
+					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
+					"message Baz { option (foo) = { Bar< name: \"abc\" > }; }\n",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo {\n" +
+					"  optional group Bar = 1 { optional string name = 1; }\n" +
+					"}\n" +
+					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
+					"message Baz { option (foo) = { bar< name: \"abc\" > }; }\n",
+			},
+			"foo.proto:7:30: message Baz: option (foo): field bar not found (did you mean the group named Bar?)",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { extensions 1 to 10; }\n" +
+					"extend Foo { optional group Bar = 10 { optional string name = 1; } }\n" +
+					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
+					"message Baz { option (foo) = { [bar]< name: \"abc\" > }; }\n",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { extensions 1 to 10; }\n" +
+					"extend Foo { optional group Bar = 10 { optional string name = 1; } }\n" +
+					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
+					"message Baz { option (foo) = { [Bar]< name: \"abc\" > }; }\n",
+			},
+			"foo.proto:6:30: message Baz: option (foo): field Bar not found",
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {

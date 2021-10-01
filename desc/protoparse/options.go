@@ -1069,7 +1069,7 @@ func interpretField(res *parseResult, mc *messageContext, element descriptorish,
 	if len(opt.GetName()) > nameIndex+1 {
 		nextnm := opt.GetName()[nameIndex+1]
 		nextnode := res.getOptionNamePartNode(nextnm)
-		if fld.GetType() != dpb.FieldDescriptorProto_TYPE_MESSAGE {
+		if fld.GetType() != dpb.FieldDescriptorProto_TYPE_MESSAGE && fld.GetType() != dpb.FieldDescriptorProto_TYPE_GROUP {
 			return nil, res.errs.handleErrorWithPos(nextnode.Start(),
 				"%vcannot set field %s because %s is not a message",
 				mc, nextnm.GetNamePart(), nm.GetNamePart())
@@ -1339,6 +1339,23 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 					}
 				} else {
 					ffld = fmd.FindFieldByName(a.Name.Value())
+					// Groups are indicated in the text format by the group name (which is
+					// camel-case), NOT the field name (which is lower-case).
+					// ...but only regular fields, not extensions that are groups...
+					if ffld != nil && ffld.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP && ffld.GetMessageType().GetName() != a.Name.Value() {
+						// this is kind of silly to fail here, but this mimics protoc behavior
+						return nil, errorWithPos(val.Start(), "%vfield %s not found (did you mean the group named %s?)", mc, a.Name.Value(), ffld.GetMessageType().GetName())
+					}
+					if ffld == nil {
+						// could be a group name
+						for _, fd := range fmd.GetFields() {
+							if fd.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP && fd.GetMessageType().GetName() == a.Name.Value() {
+								// found it!
+								ffld = fd
+								break
+							}
+						}
+					}
 				}
 				if ffld == nil {
 					return nil, errorWithPos(val.Start(), "%vfield %s not found", mc, string(a.Name.Name.AsIdentifier()))
