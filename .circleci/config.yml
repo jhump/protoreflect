@@ -10,14 +10,6 @@ shared_configs:
 # Use the latest 2.1 version of CircleCI pipeline process engine. See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
 jobs:
-  build-1-12:
-    working_directory: ~/repo
-    docker:
-      - image: circleci/golang:1.12
-    environment:
-      GO111MODULE: "on"
-    steps: *simple_job_steps
-
   build-1-13:
     working_directory: ~/repo
     docker:
@@ -34,8 +26,12 @@ jobs:
     working_directory: ~/repo
     docker:
       - image: circleci/golang:1.15
-    environment:
-      GO111MODULE: "on"
+    steps: *simple_job_steps
+
+  build-1-16:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/golang:1.16
     steps:
       - checkout
       - restore_cache:
@@ -57,17 +53,17 @@ jobs:
     #- store_test_results:
     #    path: /tmp/test-reports
 
-  build-1-16:
+  build-1-17:
     working_directory: ~/repo
     docker:
-      - image: circleci/golang:1.16
+      - image: circleci/golang:1.17
     steps: *simple_job_steps
 
 workflows:
   pr-build-test:
     jobs:
-      - build-1-12
       - build-1-13
       - build-1-14
       - build-1-15
       - build-1-16
+      - build-1-17
