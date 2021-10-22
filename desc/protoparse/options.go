@@ -1165,6 +1165,17 @@ func setOptionField(res *parseResult, mc *messageContext, dm *dynamic.Message, f
 	if err != nil {
 		return err
 	}
+
+	if ood := fld.GetOneOf(); ood != nil {
+		existingFld, _, err := dm.TryGetOneOfField(ood)
+		if err != nil {
+			return errorWithPos(name.Start(), "%verror querying value: %s", mc, err)
+		}
+		if existingFld != nil && existingFld.GetNumber() != fld.GetNumber() {
+			return errorWithPos(name.Start(), "%voneof %q already has field %q set", mc, ood.GetName(), fieldName(existingFld))
+		}
+	}
+
 	if fld.IsRepeated() {
 		err = dm.TryAddRepeatedField(fld, v)
 	} else {
