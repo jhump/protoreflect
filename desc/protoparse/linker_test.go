@@ -512,6 +512,29 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			"foo.proto:6:30: message Baz: option (foo): field Bar not found",
 		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { oneof bar { string baz = 1; string buzz = 2; } }\n" +
+					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
+					"message Baz { option (foo) = { baz: \"abc\" buzz: \"xyz\" }; }\n",
+			},
+			`foo.proto:5:43: message Baz: option (foo): oneof "bar" already has field "baz" set`,
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { oneof bar { string baz = 1; string buzz = 2; } }\n" +
+					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (foo).baz = \"abc\";\n" +
+					"  option (foo).buzz = \"xyz\";\n" +
+					"}",
+			},
+			`foo.proto:7:16: message Baz: option (foo).buzz: oneof "bar" already has field "baz" set`,
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
