@@ -535,6 +535,32 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			`foo.proto:7:16: message Baz: option (foo).buzz: oneof "bar" already has field "baz" set`,
 		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { oneof bar { google.protobuf.DescriptorProto baz = 1; google.protobuf.DescriptorProto buzz = 2; } }\n" +
+					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (foo).baz.name = \"abc\";\n" +
+					"  option (foo).buzz.name = \"xyz\";\n" +
+					"}",
+			},
+			`foo.proto:7:16: message Baz: option (foo).buzz.name: oneof "bar" already has field "baz" set`,
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { oneof bar { google.protobuf.DescriptorProto baz = 1; google.protobuf.DescriptorProto buzz = 2; } }\n" +
+					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (foo).baz.options.(foo).baz.name = \"abc\";\n" +
+					"  option (foo).baz.options.(foo).buzz.name = \"xyz\";\n" +
+					"}",
+			},
+			`foo.proto:7:34: message Baz: option (foo).baz.options.(foo).buzz.name: oneof "bar" already has field "baz" set`,
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
