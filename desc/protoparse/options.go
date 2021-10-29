@@ -1086,6 +1086,15 @@ func interpretField(res *parseResult, mc *messageContext, element descriptorish,
 			v, err = dm.TryGetField(fld)
 			fdm, _ = v.(*dynamic.Message)
 		} else {
+			if ood := fld.GetOneOf(); ood != nil {
+				existingFld, _, err := dm.TryGetOneOfField(ood)
+				if err != nil {
+					return nil, res.errs.handleErrorWithPos(node.Start(), "%verror querying value: %s", mc, err)
+				}
+				if existingFld != nil && existingFld.GetNumber() != fld.GetNumber() {
+					return nil, res.errs.handleErrorWithPos(node.Start(), "%voneof %q already has field %q set", mc, ood.GetName(), fieldName(existingFld))
+				}
+			}
 			fdm = dynamic.NewMessage(fld.GetMessageType())
 			err = dm.TrySetField(fld, fdm)
 		}
