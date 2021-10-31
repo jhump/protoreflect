@@ -2,6 +2,7 @@ package protoparse
 
 import (
 	"io"
+	"math"
 	"strings"
 	"testing"
 
@@ -56,7 +57,7 @@ foo
 	1.543 g12 /* trailing line comment */
 	000.000
 	0.1234 .5678 .
-	12e12
+	12e12 1.2345e123412341234
 
 	Random_identifier_with_numbers_0123456789_and_letters...
 	// this is a trailing comment
@@ -151,6 +152,7 @@ foo
 		{t: _FLOAT_LIT, line: 46, col: 16, span: 5, v: 0.5678},
 		{t: '.', line: 46, col: 22, span: 1, v: nil},
 		{t: _FLOAT_LIT, line: 47, col: 9, span: 5, v: 12e12},
+		{t: _FLOAT_LIT, line: 47, col: 15, span: 19, v: math.Inf(1)},
 		{t: _NAME, line: 49, col: 9, span: 53, v: "Random_identifier_with_numbers_0123456789_and_letters"},
 		{t: '.', line: 49, col: 62, span: 1, v: nil},
 		{t: '.', line: 49, col: 63, span: 1, v: nil},
@@ -242,6 +244,9 @@ func TestLexerErrors(t *testing.T) {
 		{str: `0.987e34e-20`, errMsg: "invalid syntax"},
 		{str: `0.987e-345e20`, errMsg: "invalid syntax"},
 		{str: `.987to123`, errMsg: "invalid syntax"},
+		{str: `0b0111`, errMsg: "invalid syntax"},
+		{str: `0o765432`, errMsg: "invalid syntax"},
+		{str: `1_000_000`, errMsg: "invalid syntax"},
 		{str: `/* foobar`, errMsg: "unexpected EOF"},
 	}
 	for i, tc := range testCases {
