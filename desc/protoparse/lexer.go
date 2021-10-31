@@ -370,6 +370,14 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 }
 
 func parseFloat(token string) (float64, error) {
+	// strconv.ParseFloat allows _ to separate digits, but protobuf does not
+	if strings.ContainsRune(token, '_') {
+		return 0, &strconv.NumError{
+			Func: "parseFloat",
+			Num:  token,
+			Err:  strconv.ErrSyntax,
+		}
+	}
 	f, err := strconv.ParseFloat(token, 64)
 	if err == nil {
 		return f, nil
