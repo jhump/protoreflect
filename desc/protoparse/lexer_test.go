@@ -247,6 +247,8 @@ func TestLexerErrors(t *testing.T) {
 		{str: `0b0111`, errMsg: "invalid syntax"},
 		{str: `0o765432`, errMsg: "invalid syntax"},
 		{str: `1_000_000`, errMsg: "invalid syntax"},
+		{str: `1_000.000_001e6`, errMsg: "invalid syntax"},
+		{str: `0X1F_FFP-16`, errMsg: "invalid syntax"},
 		{str: `/* foobar`, errMsg: "unexpected EOF"},
 	}
 	for i, tc := range testCases {
