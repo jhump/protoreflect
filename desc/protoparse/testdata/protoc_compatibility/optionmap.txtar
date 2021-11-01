@@ -1,0 +1,19 @@
+-- .proto --
+syntax = "proto3";
+package foo;
+import "google/protobuf/descriptor.proto";
+
+message MyOption {
+  message Foo {}
+  map<string, Foo> my_map = 1;
+}
+
+extend google.protobuf.FileOptions {
+  MyOption my_option = 9999;
+}
+
+option (my_option) = {
+  my_map: [
+    {key: "a"}
+  ]
+};

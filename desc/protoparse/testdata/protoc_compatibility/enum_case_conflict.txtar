@@ -1,0 +1,9 @@
+-- a.proto --
+syntax = "proto3";
+
+package a;
+
+enum Success {
+  SUCCESS_UNSPECIFIED = 0;
+  SUCCESS_unspecified = 1;
+}

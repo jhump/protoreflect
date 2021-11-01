@@ -1,0 +1,8 @@
+-- a.proto --
+syntax = "proto3";
+
+package a;
+-- one/a.proto --
+syntax = "proto3";
+
+package a;

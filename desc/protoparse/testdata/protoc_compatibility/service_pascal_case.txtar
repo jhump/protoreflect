@@ -1,0 +1,12 @@
+-- a.proto --
+syntax = "proto3";
+
+package a;
+
+service Success {}
+service SuccessTwo {}
+service SuccessFOOThree {}
+service fail {}
+service failTwo {}
+service fail_three {}
+service Fail_four {}

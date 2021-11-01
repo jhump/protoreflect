@@ -1,0 +1,349 @@
+package protoparse
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"golang.org/x/tools/txtar"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/testing/protocmp"
+	"google.golang.org/protobuf/types/descriptorpb"
+)
+
+var knownIssueMatchers = []*regexp.Regexp{
+
+	// https://github.com/jhump/protoreflect/issues/358
+	regexp.MustCompile(`The JSON camel-case name of field "[^"]+" conflicts with field "[^"]+". This is not allowed in proto3.`),
+
+	// https://github.com/jhump/protoreflect/issues/439
+	regexp.MustCompile(`Enum name [^\s]+ has the same name as [^\s]+ if you ignore case and strip out the enum name prefix`),
+
+	// https://github.com/jhump/protoreflect/issues/440
+	regexp.MustCompile(`(Extension|Reserved) numbers must be positive integers.`),
+
+	// https://github.com/jhump/protoreflect/issues/442
+	regexp.MustCompile(`Invalid control characters encountered in text.`),
+}
+
+type compareParseWithProtocOpts struct {
+	// exclude source_code_info from the diff
+	ignoreSourceCodeInfo bool
+
+	// exclude protoreflect.RawFields from the diff
+	ignoreRawFields bool
+
+	// if any of these patterns match the diff or a protoc or protoparse error, the test will be ignored.
+	knownIssueMatchers []*regexp.Regexp
+
+	// use this as a temp directory when running protoc
+	tmpDir string
+}
+
+func matchesAny(matchers []*regexp.Regexp, val string) bool {
+	for _, re := range matchers {
+		if re.MatchString(val) {
+			return true
+		}
+	}
+	return false
+}
+
+func compareParseWithProtoc(
+	protocBin string,
+	files map[string]string,
+	opts *compareParseWithProtocOpts,
+) (diff string, ok bool, retErr error) {
+	if opts == nil {
+		opts = &compareParseWithProtocOpts{}
+	}
+	tmpDir := opts.tmpDir
+	var err error
+	if tmpDir == "" {
+		tmpDir, err = ioutil.TempDir("", "")
+		if err != nil {
+			return "", false, err
+		}
+		defer func() {
+			cleanupErr := os.RemoveAll(tmpDir)
+			if retErr == nil {
+				retErr = cleanupErr
+			}
+		}()
+	}
+
+	protocFileDescriptors, err := getProtocFileDescriptors(protocBin, tmpDir, files)
+	protocErr := ProtocErr(err)
+	// nothing good can happen from here if err isn't a protoc error
+	if err != nil && protocErr == nil {
+		return "", false, err
+	}
+
+	if protocErr != nil && matchesAny(opts.knownIssueMatchers, protocErr.Error()) {
+		return "", false, nil
+	}
+
+	protoreflectFileDescriptors, reflectErr := getProtoreflectFileDescriptors(files)
+	if reflectErr != nil {
+		if matchesAny(opts.knownIssueMatchers, reflectErr.Error()) {
+			return "", false, nil
+		}
+		if protocErr == nil {
+			return fmt.Sprintf("protoreflect error: %v", reflectErr), false, nil
+		}
+	}
+	if protocErr != nil && reflectErr == nil {
+		return fmt.Sprintf("protoc error: %v", protocErr), false, nil
+	}
+
+	// if they both errored then we are done here
+	if protocErr != nil {
+		return "", false, nil
+	}
+
+	cmpOptions := []cmp.Option{
+		protocmp.Transform(),
+		cmpopts.SortSlices(func(a, b *descriptorpb.FileDescriptorProto) bool {
+			return a.GetName() < b.GetName()
+		}),
+	}
+
+	if opts.ignoreSourceCodeInfo {
+		cmpOptions = append(cmpOptions, protocmp.IgnoreFields(&descriptorpb.FileDescriptorProto{}, "source_code_info"))
+	}
+
+	if opts.ignoreRawFields {
+		cmpOptions = append(cmpOptions, cmpopts.IgnoreTypes(protoreflect.RawFields{}))
+	}
+
+	diff = cmp.Diff(protocFileDescriptors, protoreflectFileDescriptors, cmpOptions...)
+	if diff == "" {
+		return diff, true, nil
+	}
+	if matchesAny(opts.knownIssueMatchers, diff) {
+		return "", false, nil
+	}
+	return diff, false, nil
+}
+
+func getProtoreflectFileDescriptors(files map[string]string) ([]*descriptorpb.FileDescriptorProto, error) {
+	parser := Parser{
+		Accessor:              FileContentsFromMap(files),
+		IncludeSourceCodeInfo: true,
+	}
+	filenames := make([]string, 0, len(files))
+	for filename := range files {
+		filenames = append(filenames, filename)
+	}
+	descriptors, err := parser.ParseFiles(filenames...)
+	if err != nil {
+		return nil, err
+	}
+	fileDescriptorProtos := make([]*descriptorpb.FileDescriptorProto, len(descriptors))
+	for i, descriptor := range descriptors {
+		fileDescriptorProtos[i] = descriptor.AsFileDescriptorProto()
+	}
+	return fileDescriptorProtos, nil
+}
+
+// getProtocBin gets the path to protoc either from the PROTOC_BIN environment variable or PATH. Returns "" if not found.
+func getProtocBin() string {
+	protocBin := os.Getenv("PROTOC_BIN")
+	if protocBin != "" {
+		return protocBin
+	}
+	path, err := exec.LookPath("protoc")
+	if err != nil {
+		return ""
+	}
+	return path
+}
+
+// ProtocErr returns the inner error from protoc if err is a wrapped protoc error
+func ProtocErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	wrapper := &protocErrWrapper{}
+	if !errors.As(err, &wrapper) {
+		return nil
+	}
+	return wrapper.err
+}
+
+// getProtocFileDescriptors returns file descriptors generated by running protoc on the .proto files in the given
+// filesystem. When the returned error is from protoc itself, then IsProtocErr(err) will return true and  ProtocErr(err)
+// will return the underlying error.
+func getProtocFileDescriptors(protocBin, tmpDir string, filesystem map[string]string) (_ []*descriptorpb.FileDescriptorProto, retErr error) {
+	filePaths := make([]string, 0, len(filesystem))
+	for filename := range filesystem {
+		filePaths = append(filePaths, filename)
+	}
+	srcDir := filepath.Join(tmpDir, "src")
+	outDir := filepath.Join(tmpDir, "out")
+	err := os.MkdirAll(srcDir, 0700)
+	if err != nil {
+		return nil, err
+	}
+	err = os.MkdirAll(outDir, 0700)
+	if err != nil {
+		return nil, err
+	}
+	err = writeFilesToDestDir(filesystem, srcDir)
+	if err != nil {
+		return nil, err
+	}
+	protocData, protocErr, err := runProtoc(context.Background(), runProtocOpts{
+		protocBinPath: protocBin,
+		outDirPath:    outDir,
+		srcDirPath:    srcDir,
+		filePaths:     filePaths,
+		env: map[string]string{
+			"PATH": os.Getenv("PATH"),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if protocErr != nil {
+		return nil, &protocErrWrapper{err: protocErr}
+	}
+	var req descriptorpb.FileDescriptorSet
+	err = proto.Unmarshal(protocData, &req)
+	if err != nil {
+		return nil, err
+	}
+	return req.GetFile(), nil
+}
+
+func writeFilesToDestDir(files map[string]string, destDir string) error {
+	filesExist := false
+	for filename, content := range files {
+		filesExist = true
+
+		filename = filepath.FromSlash(filename)
+		dirPath := filepath.Dir(filename)
+		var err error
+		if dirPath != "" {
+			err = os.MkdirAll(filepath.Join(destDir, dirPath), 0700)
+			if err != nil {
+				return err
+			}
+		}
+		err = ioutil.WriteFile(filepath.Join(destDir, filename), []byte(content), 0600)
+		if err != nil {
+			return err
+		}
+	}
+	// Consider it invalid test data when there are no files
+	if !filesExist {
+		return fmt.Errorf("no files")
+	}
+	return nil
+}
+
+type runProtocOpts struct {
+	outDirPath    string
+	srcDirPath    string
+	filePaths     []string
+	protocBinPath string
+	pluginPath    string
+	env           map[string]string
+}
+
+func runProtoc(ctx context.Context, opts runProtocOpts) (protocData []byte, protocErr error, _ error) {
+	protocOut := filepath.Join(opts.outDirPath, "protoc")
+	err := os.MkdirAll(protocOut, 0700)
+	if err != nil {
+		return nil, nil, err
+	}
+	protocBinPath := opts.protocBinPath
+	protocIncludePath, err := filepath.Abs(filepath.Join(filepath.Dir(protocBinPath), "..", "include"))
+	if err != nil {
+		return nil, nil, err
+	}
+	args := []string{"--include_source_info"}
+	if opts.pluginPath != "" {
+		args = append(args, fmt.Sprintf("--plugin=%s", opts.pluginPath))
+	}
+	args = append(args, "-I", protocIncludePath, "-I", opts.srcDirPath)
+	args = append(args, fmt.Sprintf("--descriptor_set_out=%s", filepath.Join(protocOut, "request.raw")))
+	args = append(args, opts.filePaths...)
+
+	stderr := bytes.NewBuffer(nil)
+	cmd := exec.CommandContext(ctx, protocBinPath, args...)
+	for key, value := range opts.env {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
+	}
+	cmd.Stderr = stderr
+	cmd.Stdout = stderr
+
+	err = cmd.Run()
+	if err != nil {
+		return nil, fmt.Errorf("%s returned error: %v %v", protocBinPath, err, stderr.String()), nil
+	}
+	protocData, err = ioutil.ReadFile(filepath.Join(protocOut, "request.raw"))
+	return protocData, nil, err
+}
+
+type protocErrWrapper struct {
+	err error
+}
+
+func (p *protocErrWrapper) Error() string {
+	return p.err.Error()
+}
+
+// txtarMap converts contents of a txtar file to a map. Does not allow case-insensitive duplicates.
+func txtarMap(txtarContent []byte) (map[string]string, error) {
+	archive, err := txtarParse(txtarContent)
+	if err != nil {
+		return nil, err
+	}
+	duplicate := make(map[string]bool, len(archive.Files))
+	mp := make(map[string]string, len(archive.Files))
+	for _, file := range archive.Files {
+		dupName := strings.ToLower(file.Name)
+		if duplicate[dupName] {
+			return nil, fmt.Errorf("duplicate file: %s", dupName)
+		}
+		duplicate[dupName] = true
+		mp[file.Name] = string(file.Data)
+	}
+	return mp, nil
+}
+
+// txtarParse is a wrapper around txtar.Parse that will turn panics into errors.
+// This is necessary because of an issue where txtar.Parse can panic on invalid data. Because data is generated by the
+// fuzzer, it will occasionally generate data that causes this panic.
+// See https://github.com/golang/go/issues/47193
+func txtarParse(data []byte) (_ *txtar.Archive, retErr error) {
+	defer func() {
+		if p := recover(); p != nil {
+			retErr = fmt.Errorf("panic from txtar.Parse: %v", p)
+		}
+	}()
+	return txtar.Parse(data), nil
+}
+
+var validProtoFilename = regexp.MustCompile(`^([[:word:]][[:word:]/-]*)?\.proto$`)
+
+func cleanProtoFilename(filename string) (string, error) {
+	filename = filepath.ToSlash(filepath.Clean(filepath.FromSlash(filename)))
+	if strings.HasPrefix(filename, "/") ||
+		strings.HasPrefix(filename, "..") ||
+		!validProtoFilename.MatchString(filename) {
+		return "", fmt.Errorf("bad filename: %s", filename)
+	}
+	return filename, nil
+}

@@ -88,3 +88,18 @@ testcover:
 		fi \
 	done
 
+bin/go-fuzz:
+	GOBIN=$(CURDIR)/bin go install github.com/dvyukov/go-fuzz/go-fuzz
+
+bin/go-fuzz-build:
+	GOBIN=$(CURDIR)/bin go install github.com/dvyukov/go-fuzz/go-fuzz-build
+
+bin/fuzz-protoreflect.zip: bin/go-fuzz-build go.* desc desc/**/* dynamic internal
+	bin/go-fuzz-build -o $@ ./desc/protoparse
+
+.PHONY: fuzz
+
+fuzz: bin/go-fuzz bin/fuzz-protoreflect.zip
+	@mkdir -p tmp/fuzz/workdir/corpus
+	@cp desc/protoparse/testdata/protoc_compatibility/* tmp/fuzz/workdir/corpus
+	bin/go-fuzz -bin bin/fuzz-protoreflect.zip -workdir tmp/fuzz/workdir -func FuzzProtocCompatibility $(GO_FUZZ_ARGS)

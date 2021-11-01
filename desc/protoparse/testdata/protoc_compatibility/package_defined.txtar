@@ -1,0 +1,5 @@
+-- a/no_package.proto --
+syntax = "proto3";
+
+-- no_package.proto --
+syntax = "proto3";

@@ -1,0 +1,14 @@
+-- a.proto --
+syntax = "proto3";
+
+package a;
+-- no_package.proto --
+syntax = "proto3";
+-- one/c.proto --
+syntax = "proto3";
+
+package c;
+-- one/d.proto --
+syntax = "proto3";
+
+package d;

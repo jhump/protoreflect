@@ -1,0 +1,58 @@
+-- 0.proto --
+syntax = "proto3";
+
+package a.v1;
+
+option go_package = "av1";
+
+// ServiceDefinition is a service definition.
+service ServiceDefinition {
+  // Method does a thing.
+  rpc Method(MethodRequest) returns (MethodResponse) {}
+  rpc OtherMethod(MethodRequest) returns (MethodResponse);
+}
+
+message MethodRequest {
+  // field is a protobuf message field
+  string field = 1 [
+    json_name = "foo"
+  ];
+}
+
+message MethodResponse {
+  // field is a protobuf message field
+  string field = 1;
+}
+-- 1.proto --
+syntax = "proto3";
+
+package b.v1;
+
+import "google/protobuf/timestamp.proto";
+import "2.proto";
+
+option go_package = "bv1";
+
+message OtherMessage {
+  bytes other_field = 1 [
+    (c.v1.foo) = "bar"
+  ];
+  google.protobuf.Timestamp time_field = 2 [
+    (c.v1.foo) = "baz"
+  ];
+}
+
+enum EnumType {
+  ENUM_TYPE_UNSPECIFIED = 0;
+  ENUM_TYPE_ONE = 1;
+}
+-- 2.proto --
+syntax = "proto2";
+
+package c.v1;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  optional string foo = 50001;
+}

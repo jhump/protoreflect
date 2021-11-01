@@ -1,0 +1,16 @@
+-- a/a.proto --
+// comment
+
+package a;
+-- a/a2.proto --
+// comment
+
+syntax = "proto2";
+
+package a;
+-- a/a3.proto --
+// comment
+
+syntax = "proto3";
+
+package a;

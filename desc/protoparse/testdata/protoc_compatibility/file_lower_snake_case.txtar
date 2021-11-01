@@ -1,0 +1,36 @@
+-- 1.proto --
+syntax = "proto3";
+
+package a;
+-- B.proto --
+syntax = "proto3";
+
+package a.b;
+-- Foo.proto --
+syntax = "proto3";
+
+package a.b;
+-- a.proto --
+syntax = "proto3";
+
+package a.b;
+-- aBc.proto --
+syntax = "proto3";
+
+package a.b;
+-- ab.proto --
+syntax = "proto3";
+
+package a.b;
+-- ab_c.proto --
+syntax = "proto3";
+
+package a.b;
+-- ab_c_.proto --
+syntax = "proto3";
+
+package a.b;
+-- fooBar.proto --
+syntax = "proto3";
+
+package a.b;

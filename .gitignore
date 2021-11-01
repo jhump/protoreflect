@@ -1,2 +1,4 @@
 internal/testprotos/protoc
 coverage.out
+/bin/
+/tmp/

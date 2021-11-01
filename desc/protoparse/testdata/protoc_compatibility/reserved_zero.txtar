@@ -1,0 +1,5 @@
+-- 0.proto --
+syntax = "proto3";
+message t{
+  reserved 0 to 10;
+}

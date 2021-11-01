@@ -1,0 +1,7 @@
+-- a.proto --
+syntax="proto2";
+
+message Test{
+required string f=1;
+extensions 10to max;
+}

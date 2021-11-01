@@ -1,0 +1,8 @@
+-- a.proto --
+syntax="proto3";
+package a;
+
+message v{
+	int32 ab=1;
+	int32 a_b=2;
+}
