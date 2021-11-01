@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+
+
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
+package testprotos;
+
+message SimpleValue {
+    google.protobuf.Value list = 1;
+}
