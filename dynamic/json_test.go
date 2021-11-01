@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -350,6 +351,24 @@ func TestUnmarshalJSONAllowUnknownFields(t *testing.T) {
 	bar := dm.GetFieldByNumber(2)
 	testutil.Eq(t, []int32{1}, foo)
 	testutil.Eq(t, "bedazzle", bar)
+}
+
+func TestUnmarshalJSONValueFromList(t *testing.T) {
+	js := `{"list":[1,2,3]}`
+	md, err := desc.LoadMessageDescriptorForMessage((*testprotos.SimpleValue)(nil))
+	testutil.Ok(t, err)
+	dm := NewMessage(md)
+	testutil.Ok(t, err)
+	unmarshaler := &jsonpb.Unmarshaler{}
+	err = dm.UnmarshalJSONPB(unmarshaler, []byte(js))
+	testutil.Ok(t, err)
+	msg := reflect.New(reflect.TypeOf(&testprotos.SimpleValue{}).Elem()).Interface().(proto.Message)
+	err = unmarshaler.Unmarshal(strings.NewReader(js), msg)
+	testutil.Ok(t, err)
+	dm2 := NewMessage(md)
+	err = dm2.ConvertFrom(msg)
+	testutil.Ok(t, err)
+	testutil.Ceq(t, dm2, dm, eqpm)
 }
 
 func TestJSONWellKnownType(t *testing.T) {
