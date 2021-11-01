@@ -224,19 +224,19 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `message Foo { reserved 1 to 5000000000; }`,
-			errMsg:   `test.proto:1:29: range end 5000000000 is out of range: should be between 0 and 536870911`,
+			errMsg:   `test.proto:1:29: range end 5000000000 is out of range: should be between 1 and 536870911`,
 		},
 		{
 			contents: `message Foo { extensions 3000000000; }`,
-			errMsg:   `test.proto:1:26: range start 3000000000 is out of range: should be between 0 and 536870911`,
+			errMsg:   `test.proto:1:26: range start 3000000000 is out of range: should be between 1 and 536870911`,
 		},
 		{
 			contents: `message Foo { extensions 3000000000 to 3000000001; }`,
-			errMsg:   `test.proto:1:26: range start 3000000000 is out of range: should be between 0 and 536870911`,
+			errMsg:   `test.proto:1:26: range start 3000000000 is out of range: should be between 1 and 536870911`,
 		},
 		{
 			contents: `message Foo { extensions 100 to 3000000000; }`,
-			errMsg:   `test.proto:1:33: range end 3000000000 is out of range: should be between 0 and 536870911`,
+			errMsg:   `test.proto:1:33: range end 3000000000 is out of range: should be between 1 and 536870911`,
 		},
 		{
 			contents: `message Foo { reserved "foo", "foo"; }`,
