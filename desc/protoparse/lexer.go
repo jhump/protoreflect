@@ -360,7 +360,11 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			l.input.unreadRune(cn)
 		}
 
-		if c > 255 {
+		if c < 32 || c == 127 {
+			l.setError(lval, errors.New("invalid control character"))
+			return _ERROR
+		}
+		if !strings.ContainsRune(";,.:=-+(){}[]<>", c) {
 			l.setError(lval, errors.New("invalid character"))
 			return _ERROR
 		}

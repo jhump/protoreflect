@@ -250,6 +250,15 @@ func TestLexerErrors(t *testing.T) {
 		{str: `1_000.000_001e6`, errMsg: "invalid syntax"},
 		{str: `0X1F_FFP-16`, errMsg: "invalid syntax"},
 		{str: `/* foobar`, errMsg: "unexpected EOF"},
+		{str: "\x00", errMsg: "invalid control character"},
+		{str: "\x03", errMsg: "invalid control character"},
+		{str: "\x1B", errMsg: "invalid control character"},
+		{str: "\x7F", errMsg: "invalid control character"},
+		{str: "#", errMsg: "invalid character"},
+		{str: "?", errMsg: "invalid character"},
+		{str: "^", errMsg: "invalid character"},
+		{str: "\uAAAA", errMsg: "invalid character"},
+		{str: "\U0010FFFF", errMsg: "invalid character"},
 	}
 	for i, tc := range testCases {
 		l := newTestLexer(strings.NewReader(tc.str))
