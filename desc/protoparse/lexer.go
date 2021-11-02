@@ -360,7 +360,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			l.input.unreadRune(cn)
 		}
 
-		if c < 32 {
+		if c < 32 || c == 127 {
 			l.setError(lval, errors.New("invalid control character"))
 			return _ERROR
 		}
