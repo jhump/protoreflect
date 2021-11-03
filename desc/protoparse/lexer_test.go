@@ -259,6 +259,8 @@ func TestLexerErrors(t *testing.T) {
 		{str: "^", errMsg: "invalid character"},
 		{str: "\uAAAA", errMsg: "invalid character"},
 		{str: "\U0010FFFF", errMsg: "invalid character"},
+		{str: "// foo \x00", errMsg: "invalid control character"},
+		{str: "/* foo \x00", errMsg: "invalid control character"},
 	}
 	for i, tc := range testCases {
 		l := newTestLexer(strings.NewReader(tc.str))

@@ -335,7 +335,10 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			}
 			if cn == '/' {
 				l.adjustPos(cn)
-				hitNewline := l.skipToEndOfLineComment()
+				hitNewline, hasErr := l.skipToEndOfLineComment(lval)
+				if hasErr {
+					return _ERROR
+				}
 				comment := l.newComment()
 				comment.PosRange.End.Col++
 				if hitNewline {
@@ -349,12 +352,15 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			}
 			if cn == '*' {
 				l.adjustPos(cn)
-				if ok := l.skipToEndOfBlockComment(); !ok {
+				ok, hasErr := l.skipToEndOfBlockComment(lval)
+				if hasErr {
+					return _ERROR
+				}
+				if !ok {
 					l.setError(lval, errors.New("block comment never terminates, unexpected EOF"))
 					return _ERROR
-				} else {
-					l.comments = append(l.comments, l.newComment())
 				}
+				l.comments = append(l.comments, l.newComment())
 				continue
 			}
 			l.input.unreadRune(cn)
@@ -747,34 +753,42 @@ func (l *protoLex) readStringLiteral(quote rune) (string, error) {
 	return buf.String(), nil
 }
 
-func (l *protoLex) skipToEndOfLineComment() bool {
+func (l *protoLex) skipToEndOfLineComment(lval *protoSymType) (ok, hasErr bool) {
 	for {
 		c, _, err := l.input.readRune()
 		if err != nil {
-			return false
+			return false, false
 		}
-		if c == '\n' {
-			return true
+		switch c {
+		case '\n':
+			return true, false
+		case 0:
+			l.setError(lval, errors.New("invalid control character"))
+			return false, true
 		}
 		l.adjustPos(c)
 	}
 }
 
-func (l *protoLex) skipToEndOfBlockComment() bool {
+func (l *protoLex) skipToEndOfBlockComment(lval *protoSymType) (ok, hasErr bool) {
 	for {
 		c, _, err := l.input.readRune()
 		if err != nil {
-			return false
+			return false, false
+		}
+		if c == 0 {
+			l.setError(lval, errors.New("invalid control character"))
+			return false, true
 		}
 		l.adjustPos(c)
 		if c == '*' {
 			c, _, err := l.input.readRune()
 			if err != nil {
-				return false
+				return false, false
 			}
 			if c == '/' {
 				l.adjustPos(c)
-				return true
+				return true, false
 			}
 			l.input.unreadRune(c)
 		}
