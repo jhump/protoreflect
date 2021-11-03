@@ -71,6 +71,7 @@ errcheck:
 .PHONY: test
 test:
 	go test -cover -race ./...
+	# TODO: also test with "-tags purego"
 
 .PHONY: generate
 generate:
