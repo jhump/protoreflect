@@ -366,6 +366,22 @@ func TestBasicValidation(t *testing.T) {
 			contents: `0.0`,
 			errMsg:   `test.proto:1:1: syntax error: unexpected float literal`,
 		},
+		{
+			contents: `option (opt) = {m: [{key: "a",value: {}}]};`,
+			succeeds: true,
+		},
+		{
+			contents: `option (opt) = {m [{key: "a",value: {}}]};`,
+			succeeds: true,
+		},
+		{
+			contents: `option (opt) = {m: []};`,
+			succeeds: true,
+		},
+		{
+			contents: `option (opt) = {m []};`,
+			succeeds: true,
+		},
 	}
 
 	for i, tc := range testCases {
