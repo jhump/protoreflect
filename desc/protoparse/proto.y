@@ -405,14 +405,14 @@ aggFieldEntry : aggName ':' scalarConstant {
 		}
 	}
 	| aggName '[' constantList ']' {
-			if $1 != nil {
-				vals, commas := $3.toNodes()
-				val := ast.NewArrayLiteralNode($2, vals, commas, $4)
-				$$ = ast.NewMessageFieldNode($1, nil, val)
-			} else {
-				$$ = nil
-			}
+		if $1 != nil {
+			vals, commas := $3.toNodes()
+			val := ast.NewArrayLiteralNode($2, vals, commas, $4)
+			$$ = ast.NewMessageFieldNode($1, nil, val)
+		} else {
+			$$ = nil
 		}
+	}
 	| aggName ':' '[' constantList ']' {
 		if $1 != nil {
 			vals, commas := $4.toNodes()
