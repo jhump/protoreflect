@@ -388,10 +388,27 @@ aggFieldEntry : aggName ':' scalarConstant {
 			$$ = nil
 		}
 	}
+	| aggName '[' ']' {
+		if $1 != nil {
+			val := ast.NewArrayLiteralNode($2, nil, nil, $3)
+			$$ = ast.NewMessageFieldNode($1, nil, val)
+		} else {
+			$$ = nil
+		}
+	}
 	| aggName ':' '[' ']' {
 		if $1 != nil {
 			val := ast.NewArrayLiteralNode($3, nil, nil, $4)
 			$$ = ast.NewMessageFieldNode($1, $2, val)
+		} else {
+			$$ = nil
+		}
+	}
+	| aggName '[' constantList ']' {
+		if $1 != nil {
+			vals, commas := $3.toNodes()
+			val := ast.NewArrayLiteralNode($2, vals, commas, $4)
+			$$ = ast.NewMessageFieldNode($1, nil, val)
 		} else {
 			$$ = nil
 		}
