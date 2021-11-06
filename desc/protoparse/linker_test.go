@@ -537,6 +537,35 @@ func TestLinkerValidation(t *testing.T) {
 		},
 		{
 			map[string]string{
+				"a.proto": "syntax = \"proto3\";\n" +
+					"message m{\n" +
+					"  oneof z{\n" +
+					"    int64 z=1;\n" +
+					"  }\n" +
+					"}",
+			},
+			`a.proto:4:5: duplicate symbol m.z: already defined as oneof`,
+		},
+		{
+			map[string]string{
+				"a.proto": "syntax=\"proto3\";\nmessage m{\n" +
+					"  string z = 1;\n" +
+					"  oneof z{int64 b=2;}\n" +
+					"}",
+			},
+			`a.proto:3:3: duplicate symbol m.z: already defined as oneof`,
+		},
+		{
+			map[string]string{
+				"a.proto": "syntax=\"proto3\";\nmessage m{\n" +
+					"  oneof z{int64 a=1;}\n" +
+					"  oneof z{int64 b=2;}\n" +
+					"}",
+			},
+			`a.proto:4:3: duplicate symbol m.z: already defined as oneof`,
+		},
+		{
+			map[string]string{
 				"foo.proto": "syntax = \"proto3\";\n" +
 					"import \"google/protobuf/descriptor.proto\";\n" +
 					"message Foo { oneof bar { google.protobuf.DescriptorProto baz = 1; google.protobuf.DescriptorProto buzz = 2; } }\n" +
