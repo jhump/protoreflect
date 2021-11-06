@@ -561,6 +561,17 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			`foo.proto:7:34: message Baz: option (foo).baz.options.(foo).buzz.name: oneof "bar" already has field "baz" set`,
 		},
+		{
+			map[string]string{
+				"a.proto": `syntax = "proto3";
+
+import "google/protobuf/descriptor.proto";
+import "google/protobuf/descriptor.proto";
+
+`,
+			},
+			`a.proto: import "google/protobuf/descriptor.proto" was listed twice`,
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
