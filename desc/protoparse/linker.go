@@ -180,6 +180,11 @@ func addMessageToPool(r *parseResult, pool map[string]proto.Message, errs *error
 		return err
 	}
 	prefix = fqn + "."
+	for _, ood := range md.OneofDecl {
+		if err := addOneofToPool(r, pool, errs, prefix, ood); err != nil {
+			return err
+		}
+	}
 	for _, fld := range md.Field {
 		if err := addFieldToPool(r, pool, errs, prefix, fld); err != nil {
 			return err
@@ -206,6 +211,11 @@ func addMessageToPool(r *parseResult, pool map[string]proto.Message, errs *error
 func addFieldToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, prefix string, fld *dpb.FieldDescriptorProto) error {
 	fqn := prefix + fld.GetName()
 	return addToPool(r, pool, errs, fqn, fld)
+}
+
+func addOneofToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, prefix string, ood *dpb.OneofDescriptorProto) error {
+	fqn := prefix + ood.GetName()
+	return addToPool(r, pool, errs, fqn, ood)
 }
 
 func addEnumToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler, prefix string, ed *dpb.EnumDescriptorProto) error {
@@ -281,6 +291,8 @@ func descriptorType(m proto.Message) string {
 		return "method"
 	case *dpb.FileDescriptorProto:
 		return "file"
+	case *dpb.OneofDescriptorProto:
+		return "oneof"
 	default:
 		// shouldn't be possible
 		return fmt.Sprintf("%T", m)
