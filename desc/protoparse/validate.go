@@ -48,9 +48,8 @@ func validateImports(res *parseResult) error {
 		}
 
 		name := imp.Name.AsString()
-		seenPos := imports[name]
-		if seenPos != nil {
-			return res.errs.handleErrorWithPos(imp.Start(), `%q was already imported at %v`, name, seenPos)
+		if imports[name] != nil {
+			return res.errs.handleErrorWithPos(imp.Start(), `%q was already imported at %v`, name, imports[name])
 		}
 		imports[name] = imp.Start()
 	}
