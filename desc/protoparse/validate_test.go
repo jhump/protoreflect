@@ -384,7 +384,7 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `syntax = "proto3"; import "google/protobuf/descriptor.proto"; import "google/protobuf/descriptor.proto";`,
-			errMsg: `test.proto:1:63: "google/protobuf/descriptor.proto" was already imported at test.proto:1:20`,
+			errMsg:   `test.proto:1:63: "google/protobuf/descriptor.proto" was already imported at test.proto:1:20`,
 		},
 	}
 
