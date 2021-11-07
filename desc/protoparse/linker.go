@@ -118,13 +118,6 @@ func (l *linker) createDescriptorPool() error {
 				return err
 			}
 		}
-		dependencies := make(map[string]struct{}, len(fd.Dependency))
-		for _, dependency := range fd.Dependency {
-			if _, ok := dependencies[dependency]; ok {
-				return fmt.Errorf("%s: import %q was listed twice", filename, dependency)
-			}
-			dependencies[dependency] = struct{}{}
-		}
 	}
 	// try putting everything into a single pool, to ensure there are no duplicates
 	// across files (e.g. same symbol, but declared in two different files)
