@@ -38,8 +38,10 @@ func validateBasic(res *parseResult, containsErrors bool) {
 }
 
 func validateImports(res *parseResult) error {
-	node := res.nodes[res.fd]
-	fileNode, _ := node.(*ast.FileNode)
+	fileNode := res.root
+	if fileNode == nil {
+		return nil
+	}
 	imports := make(map[string]*ast.SourcePos, len(fileNode.Decls))
 	for _, decl := range fileNode.Decls {
 		imp, ok := decl.(*ast.ImportNode)
