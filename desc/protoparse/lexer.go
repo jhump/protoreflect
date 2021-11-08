@@ -289,7 +289,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			}
 			// integer! (decimal or octal)
 			base := 10
-			if token[0] == '0' && len(token) > 1 && token[1] >= '0' && token[1] <= '7' {
+			if token[0] == '0' {
 				base = 8
 			}
 			ui, err := strconv.ParseUint(token, base, 64)

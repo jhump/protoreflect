@@ -261,6 +261,8 @@ func TestLexerErrors(t *testing.T) {
 		{str: "\U0010FFFF", errMsg: "invalid character"},
 		{str: "// foo \x00", errMsg: "invalid control character"},
 		{str: "/* foo \x00", errMsg: "invalid control character"},
+		{str: "09", errMsg: "invalid syntax in octal integer value: 09"},
+		{str: "0f", errMsg: "invalid syntax in octal integer value: 0f"},
 	}
 	for i, tc := range testCases {
 		l := newTestLexer(strings.NewReader(tc.str))
