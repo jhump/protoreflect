@@ -382,6 +382,10 @@ func TestBasicValidation(t *testing.T) {
 			contents: `option (opt) = {m []};`,
 			succeeds: true,
 		},
+		{
+			contents: `syntax = "proto3"; import "google/protobuf/descriptor.proto"; import "google/protobuf/descriptor.proto";`,
+			errMsg:   `test.proto:1:63: "google/protobuf/descriptor.proto" was already imported at test.proto:1:20`,
+		},
 	}
 
 	for i, tc := range testCases {
