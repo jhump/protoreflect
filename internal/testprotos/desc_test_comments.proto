@@ -53,6 +53,8 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 
 	// Group comment
 	optional group /* group name */ Extras = 3 {
+		// trailer for Extras
+
 		// this is a custom option
 		option (testprotos.mfubar) = false;
 
@@ -67,7 +69,8 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 	}
 
 	enum MarioCharacters // "super"!
-	{
+	{ // trailer for enum
+
 		// allow_alias comments!
 		option allow_alias = true;
 
@@ -91,6 +94,8 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 
 	// can be this or that
 	oneof abc {
+		// trailer for oneof abc
+
 		string this = 4;
 		int32 that = 5;
 	}
@@ -103,6 +108,7 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 	// map field
 	map<string, string> things = 8;
 }
+
 // And next we'll need some extensions...
 
 extend
@@ -110,17 +116,22 @@ extend
 Request
 // extendee trailer
 {
+	// trailer for extend block
+
 	// comment for guid1
 	optional uint64 guid1 = 123;
 	// ... and a comment for guid2
 	optional uint64 guid2 = 124;
 }
-// extend trailer...
+// after extend block
 
-message /* name leading comment */ AnEmptyMessage /* name trailing comment */ {}
+message /* name leading comment */ AnEmptyMessage /* name trailing comment */ { /* trailer for AnEmptyMessage */ }
 
 // Service comment
 service /* service name */ RpcService {
+	// service trailer
+	// that spans multiple lines
+
 	// option that sets field
 	option(testprotos.sfubar).id= 100;
 	// another option that sets field
@@ -131,14 +142,14 @@ service /* service name */ RpcService {
 
 	// Method comment
 	rpc /* rpc name */ StreamingRpc /* comment A */ (/* comment B */stream /* comment C */ Request)
-		returns /* comment D */ (/*comment E */ Request ) /* comment F */ ;
+		returns /* comment D */ (/*comment E */ Request ) /* comment F */ ; // compact method trailer
 
-	rpc UnaryRpc (Request) returns (google.protobuf.Empty) {
+	rpc UnaryRpc (Request) returns (google.protobuf.Empty) { // trailer for method
 		option deprecated = true;
 		option (testprotos.mtfubar) = 12.34;
 		option (testprotos.mtfubard) = 123.456;
 	}
 }
-// service trailer
+// another comment after service
 
 // Detached comment after all elements cannot be preserved...

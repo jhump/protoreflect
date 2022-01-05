@@ -54,6 +54,8 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   // Group comment
   optional group Extras = 3 {
+    // trailer for Extras
+
     // this is a custom option
     option (testprotos.mfubar) = false;
 
@@ -68,6 +70,8 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
   }
 
   enum MarioCharacters /* "super"! */ {
+    // trailer for enum
+
     // allow_alias comments!
     option allow_alias = true;
 
@@ -100,6 +104,8 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   // can be this or that
   oneof abc {
+    // trailer for oneof abc
+
     string this = 4;
 
     int32 that = 5;
@@ -115,22 +121,29 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
   // map field
   map<string, string> things = 8;
 }
+
 // And next we'll need some extensions...
 
 extend /* extendee comment */ Request /* extendee trailer */ {
+  // trailer for extend block
+
   // comment for guid1
   optional uint64 guid1 = 123;
 
   // ... and a comment for guid2
   optional uint64 guid2 = 124;
 }
-// extend trailer...
 
 message /* name leading comment */ AnEmptyMessage /* name trailing comment */ {
+  // trailer for AnEmptyMessage
+
 }
 
 // Service comment
 service /* service name */ RpcService {
+  // service trailer
+  // that spans multiple lines
+
   // option that sets field
   option (testprotos.sfubar) = { id:100 name:"bob"  };
 
@@ -139,9 +152,11 @@ service /* service name */ RpcService {
   option (testprotos.sfubare) = VALUE;
 
   // Method comment
-  rpc /* rpc name */ StreamingRpc /* comment A */ ( /* comment C */ stream Request ) returns ( /*comment E */ Request );
+  rpc /* rpc name */ StreamingRpc /* comment A */ ( /* comment C */ stream Request ) returns ( /*comment E */ Request ); // compact method trailer
 
   rpc UnaryRpc ( Request ) returns ( google.protobuf.Empty ) {
+    // trailer for method
+
     option deprecated = true;
 
     option (testprotos.mtfubar) = 12.340000;
@@ -149,7 +164,6 @@ service /* service name */ RpcService {
     option (testprotos.mtfubard) = 123.456000;
   }
 }
-// service trailer
 -------- foo.bar.Request (*desc.MessageDescriptor) --------
 // Multiple white space lines (like above) cannot
 // be preserved...
@@ -187,6 +201,8 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   // Group comment
   optional group Extras = 3 {
+    // trailer for Extras
+
     // this is a custom option
     option (testprotos.mfubar) = false;
 
@@ -201,6 +217,8 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
   }
 
   enum MarioCharacters /* "super"! */ {
+    // trailer for enum
+
     // allow_alias comments!
     option allow_alias = true;
 
@@ -233,6 +251,8 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   // can be this or that
   oneof abc {
+    // trailer for oneof abc
+
     string this = 4;
 
     int32 that = 5;
@@ -248,7 +268,6 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
   // map field
   map<string, string> things = 8;
 }
-// And next we'll need some extensions...
 -------- foo.bar.Request.ids (*desc.FieldDescriptor) --------
 // A field comment
 repeated int32 ids = /* detached tag */ /* tag numero uno */ 1 /*
@@ -268,6 +287,8 @@ optional /* type comment */ string /* name comment */ name = 2 [/* default lead 
 -------- foo.bar.Request.extras (*desc.FieldDescriptor) --------
 // Group comment
 optional group Extras = 3 {
+  // trailer for Extras
+
   // this is a custom option
   option (testprotos.mfubar) = false;
 
@@ -306,6 +327,8 @@ oneof xyz {
 -------- foo.bar.Request.Extras (*desc.MessageDescriptor) --------
 // Group comment
 message /* group name */ Extras {
+  // trailer for Extras
+
   // this is a custom option
   option (testprotos.mfubar) = false;
 
@@ -339,6 +362,8 @@ optional string key = 1;
 optional string value = 2;
 -------- foo.bar.Request.MarioCharacters (*desc.EnumDescriptor) --------
 enum MarioCharacters /* "super"! */ {
+  // trailer for enum
+
   // allow_alias comments!
   option allow_alias = true;
 
@@ -392,6 +417,8 @@ KAMEK = 8;
 SNIFIT = -101;
 -------- foo.bar.AnEmptyMessage (*desc.MessageDescriptor) --------
 message /* name leading comment */ AnEmptyMessage /* name trailing comment */ {
+  // trailer for AnEmptyMessage
+
 }
 -------- foo.bar.guid1 (*desc.FieldDescriptor) --------
 extend /* extendee comment */ Request /* extendee trailer */ {
@@ -406,6 +433,9 @@ extend Request {
 -------- foo.bar.RpcService (*desc.ServiceDescriptor) --------
 // Service comment
 service /* service name */ RpcService {
+  // service trailer
+  // that spans multiple lines
+
   // option that sets field
   option (testprotos.sfubar) = { id:100 name:"bob"  };
 
@@ -414,9 +444,11 @@ service /* service name */ RpcService {
   option (testprotos.sfubare) = VALUE;
 
   // Method comment
-  rpc /* rpc name */ StreamingRpc /* comment A */ ( /* comment C */ stream Request ) returns ( /*comment E */ Request );
+  rpc /* rpc name */ StreamingRpc /* comment A */ ( /* comment C */ stream Request ) returns ( /*comment E */ Request ); // compact method trailer
 
   rpc UnaryRpc ( Request ) returns ( google.protobuf.Empty ) {
+    // trailer for method
+
     option deprecated = true;
 
     option (testprotos.mtfubar) = 12.340000;
@@ -424,12 +456,13 @@ service /* service name */ RpcService {
     option (testprotos.mtfubard) = 123.456000;
   }
 }
-// service trailer
 -------- foo.bar.RpcService.StreamingRpc (*desc.MethodDescriptor) --------
 // Method comment
-rpc /* rpc name */ StreamingRpc /* comment A */ ( /* comment C */ stream Request ) returns ( /*comment E */ Request );
+rpc /* rpc name */ StreamingRpc /* comment A */ ( /* comment C */ stream Request ) returns ( /*comment E */ Request ); // compact method trailer
 -------- foo.bar.RpcService.UnaryRpc (*desc.MethodDescriptor) --------
 rpc UnaryRpc ( Request ) returns ( google.protobuf.Empty ) {
+  // trailer for method
+
   option deprecated = true;
 
   option (testprotos.mtfubar) = 12.340000;
