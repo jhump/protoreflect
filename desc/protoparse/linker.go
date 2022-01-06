@@ -930,7 +930,7 @@ func (l *linker) checkForUnusedImports(filename string) {
 			if pos == nil {
 				pos = ast.UnknownPos(r.fd.GetName())
 			}
-			r.errs.warn(pos, errUnusedImport(dep))
+			l.errs.warn(pos, errUnusedImport(dep))
 		}
 	}
 }
