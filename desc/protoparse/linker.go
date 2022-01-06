@@ -145,7 +145,7 @@ func (l *linker) createDescriptorPool() error {
 					file1, file2 = file2, file1
 					desc1, desc2 = desc2, desc1
 				}
-				node := l.files[file2].nodes[desc2]
+				node := l.files[file2].getNode(desc2)
 				if err := l.errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s in %q", k, descriptorType(desc1), file1); err != nil {
 					return err
 				}

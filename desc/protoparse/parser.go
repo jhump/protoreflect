@@ -706,6 +706,13 @@ func (r *parseResult) getMethodNode(m *dpb.MethodDescriptorProto) ast.RPCDeclNod
 	return r.nodes[m].(ast.RPCDeclNode)
 }
 
+func (r *parseResult) getNode(m proto.Message) ast.Node {
+	if r.nodes == nil {
+		return ast.NewNoSourceNode(r.fd.GetName())
+	}
+	return r.nodes[m]
+}
+
 func (r *parseResult) putFileNode(f *dpb.FileDescriptorProto, n *ast.FileNode) {
 	r.nodes[f] = n
 }
