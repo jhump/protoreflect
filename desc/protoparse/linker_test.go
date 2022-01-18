@@ -156,6 +156,17 @@ func TestLinkerValidation(t *testing.T) {
 		},
 		{
 			map[string]string{
+				"foo.proto": `
+					syntax = "proto3";
+					import "google/protobuf/descriptor.proto";
+					package google.protobuf;
+					message DescriptorProto { }
+				`,
+			},
+			`google/protobuf/descriptor.proto: duplicate symbol google.protobuf.DescriptorProto: already defined as message in "foo.proto"`,
+		},
+		{
+			map[string]string{
 				"foo.proto": "package fu.baz; extend foobar { optional string a = 1; }",
 			},
 			"foo.proto:1:24: unknown extendee type foobar",
