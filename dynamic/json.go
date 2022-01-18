@@ -368,7 +368,7 @@ func marshalKnownFieldMapEntryJSON(b *indentBuffer, mk interface{}, vfd *desc.Fi
 	default:
 		return fmt.Errorf("invalid map key value: %v (%v)", mk, rk.Type())
 	}
-	err := writeString(b, strkey)
+	err := writeJsonString(b, strkey)
 	if err != nil {
 		return err
 	}
