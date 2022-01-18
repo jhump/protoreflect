@@ -155,7 +155,7 @@ var mapKeyFieldsMsg = &testprotos.MapKeyFields{
 	P: map[uint64]string{22: "foo", 23: "bar", 24: "baz"},
 	Q: map[int32]string{25: "foo", 26: "bar", 27: "baz"},
 	R: map[int64]string{28: "foo", 29: "bar", 30: "baz"},
-	S: map[string]string{"a": "foo", "b": "bar", "c": "baz"},
+	S: map[string]string{"a": "foo", "b": "bar", "❤": "baz"},
 	T: map[bool]string{true: "foo", false: "bar"},
 }
 
