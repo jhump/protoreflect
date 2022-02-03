@@ -7,7 +7,11 @@
 // Syntax comment...
 syntax = "proto2"; // Syntax trailer.
 
+// And next we'll need some extensions...
+
 extend Request {
+  // trailer for extend block
+
   // ... and a comment for guid2
   optional uint64 guid2 = 124;
 
@@ -17,7 +21,12 @@ extend Request {
 
 // Service comment
 service RpcService {
+  // service trailer
+  // that spans multiple lines
+
   rpc UnaryRpc ( Request ) returns ( google.protobuf.Empty ) {
+    // trailer for method
+
     option (testprotos.mtfubard) = 123.456000;
 
     option (testprotos.mtfubar) = 12.340000;
@@ -26,7 +35,7 @@ service RpcService {
   }
 
   // Method comment
-  rpc StreamingRpc ( stream Request ) returns ( Request );
+  rpc StreamingRpc ( stream Request ) returns ( Request ); // compact method trailer
 
   option (testprotos.sfubare) = VALUE;
 
@@ -50,6 +59,8 @@ message Request {
   extensions 100 to 200;
 
   enum MarioCharacters {
+    // trailer for enum
+
     WARIO = 5;
 
     WALUIGI = 6;
@@ -89,6 +100,8 @@ message Request {
 
   // can be this or that
   oneof abc {
+    // trailer for oneof abc
+
     string this = 4;
 
     int32 that = 5;
@@ -111,6 +124,8 @@ message Request {
 
   // Group comment
   optional group Extras = 3 {
+    // trailer for Extras
+
     // Leading comment...
     optional string str = 3; // Trailing comment...
 

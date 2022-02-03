@@ -111,6 +111,8 @@ message Request {
   map<string, string> things = 8;
 }
 
+// And next we'll need some extensions...
+
 extend Request {
   // comment for guid1
   optional uint64 guid1 = 123;

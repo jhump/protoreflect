@@ -29,6 +29,8 @@ message Request {
 
    // Group comment
    optional group Extras = 3 {
+      // trailer for Extras
+
       option no_standard_descriptor_accessor = false;
 
       // this is a custom option
@@ -44,6 +46,8 @@ message Request {
 
    // can be this or that
    oneof abc {
+      // trailer for oneof abc
+
       string this = 4;
 
       int32 that = 5;
@@ -60,6 +64,8 @@ message Request {
    map<string, string> things = 8;
 
    enum MarioCharacters {
+      // trailer for enum
+
       // allow_alias comments!
       option allow_alias = true;
 
@@ -101,6 +107,9 @@ message Request {
 
 // Service comment
 service RpcService {
+   // service trailer
+   // that spans multiple lines
+
    option deprecated = false; // DEPRECATED!
 
    // option that sets field
@@ -109,9 +118,11 @@ service RpcService {
    option (testprotos.sfubare) = VALUE;
 
    // Method comment
-   rpc StreamingRpc ( stream Request ) returns ( Request );
+   rpc StreamingRpc ( stream Request ) returns ( Request ); // compact method trailer
 
    rpc UnaryRpc ( Request ) returns ( google.protobuf.Empty ) {
+      // trailer for method
+
       option deprecated = true;
 
       option (testprotos.mtfubar) = 12.340000;
@@ -121,6 +132,8 @@ service RpcService {
 }
 
 extend Request {
+   // trailer for extend block
+
    // comment for guid1
    optional uint64 guid1 = 123;
 

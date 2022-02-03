@@ -49,6 +49,8 @@ message Request {
 
   // Group comment
   optional group Extras = 3 {
+    // trailer for Extras
+
     // this is a custom option
     option (testprotos.mfubar) = false;
 
@@ -63,6 +65,8 @@ message Request {
   }
 
   enum MarioCharacters {
+    // trailer for enum
+
     // allow_alias comments!
     option allow_alias = true;
 
@@ -95,6 +99,8 @@ message Request {
 
   // can be this or that
   oneof abc {
+    // trailer for oneof abc
+
     string this = 4;
 
     int32 that = 5;
@@ -111,7 +117,11 @@ message Request {
   map<string, string> things = 8;
 }
 
+// And next we'll need some extensions...
+
 extend Request {
+  // trailer for extend block
+
   // comment for guid1
   optional uint64 guid1 = 123;
 
@@ -124,6 +134,9 @@ message AnEmptyMessage {
 
 // Service comment
 service RpcService {
+  // service trailer
+  // that spans multiple lines
+
   // option that sets field
   option (testprotos.sfubar) = { id:100 name:"bob"  };
 
@@ -132,9 +145,11 @@ service RpcService {
   option (testprotos.sfubare) = VALUE;
 
   // Method comment
-  rpc StreamingRpc ( stream Request ) returns ( Request );
+  rpc StreamingRpc ( stream Request ) returns ( Request ); // compact method trailer
 
   rpc UnaryRpc ( Request ) returns ( google.protobuf.Empty ) {
+    // trailer for method
+
     option deprecated = true;
 
     option (testprotos.mtfubar) = 12.340000;
