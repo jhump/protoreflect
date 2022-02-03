@@ -601,6 +601,65 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			`foo.proto:7:34: message Baz: option (foo).baz.options.(foo).buzz.name: oneof "bar" already has field "baz" set`,
 		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"enum Foo { true = 0; false = 1; t = 2; f = 3; True = 4; False = 5; inf = 6; nan = 7; }\n" +
+					"extend google.protobuf.MessageOptions { repeated Foo foo = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (foo) = true; option (foo) = false;\n" +
+					"  option (foo) = t; option (foo) = f;\n" +
+					"  option (foo) = True; option (foo) = False;\n" +
+					"  option (foo) = inf; option (foo) = nan;\n" +
+					"}\n",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"extend google.protobuf.MessageOptions { repeated bool foo = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (foo) = true; option (foo) = false;\n" +
+					"  option (foo) = t; option (foo) = f;\n" +
+					"  option (foo) = True; option (foo) = False;\n" +
+					"}\n",
+			},
+			"foo.proto:6:18: message Baz: option (foo): expecting bool, got identifier",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { repeated bool b = 1; }\n" +
+					"extend google.protobuf.MessageOptions { Foo foo = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (foo) = {\n" +
+					"    b: t     b: f\n" +
+					"    b: true  b: false\n" +
+					"    b: True  b: False\n" +
+					"  };\n" +
+					"}\n",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { extensions 1 to 10; }\n" +
+					"extend Foo { optional bool b = 10; }\n" +
+					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (foo) = {\n" +
+					"    [.b]: true\n" +
+					"  };\n" +
+					"}\n",
+			},
+			"foo.proto:8:6: syntax error: unexpected '.'",
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {

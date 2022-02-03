@@ -279,13 +279,7 @@ scalarConstant : stringLit {
 	}
 	| numLit
 	| name {
-		if $1.Val == "true" || $1.Val == "false" {
-			$$ = ast.NewBoolLiteralNode($1.ToKeyword())
-		} else if $1.Val == "inf" || $1.Val == "nan" {
-			$$ = ast.NewSpecialFloatLiteralNode($1.ToKeyword())
-		} else {
-			$$ = $1
-		}
+        $$ = $1
 	}
 
 numLit : _FLOAT_LIT {
@@ -467,8 +461,8 @@ aggFieldEntry : aggName ':' scalarConstant {
 aggName : name {
 		$$ = ast.NewFieldReferenceNode($1)
 	}
-	| '[' typeIdent ']' {
-		$$ = ast.NewExtensionFieldReferenceNode($1, $2, $3)
+	| '[' ident ']' {
+		$$ = ast.NewExtensionFieldReferenceNode($1, $2.toIdentValueNode(nil), $3)
 	}
 	| '[' error ']' {
 		$$ = nil

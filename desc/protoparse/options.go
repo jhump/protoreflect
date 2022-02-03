@@ -858,7 +858,7 @@ func processDefaultOption(res *parseResult, scope string, fld fldDescriptorish, 
 		elementType: descriptorType(fld.AsProto()),
 		option:      opt,
 	}
-	v, err := fieldValue(res, mc, fld, val, true)
+	v, err := fieldValue(res, mc, fld, val, true, false)
 	if err != nil {
 		return -1, res.errs.handleError(err)
 	}
@@ -1106,7 +1106,7 @@ func interpretField(res *parseResult, mc *messageContext, element descriptorish,
 	}
 
 	optNode := res.getOptionNode(opt)
-	if err := setOptionField(res, mc, dm, fld, node, optNode.GetValue()); err != nil {
+	if err := setOptionField(res, mc, dm, fld, node, optNode.GetValue(), false); err != nil {
 		return nil, res.errs.handleError(err)
 	}
 	if fld.IsRepeated() {
@@ -1148,7 +1148,7 @@ func findExtension(fd fileDescriptorish, name string, public bool, checked map[f
 	return nil
 }
 
-func setOptionField(res *parseResult, mc *messageContext, dm *dynamic.Message, fld *desc.FieldDescriptor, name ast.Node, val ast.ValueNode) error {
+func setOptionField(res *parseResult, mc *messageContext, dm *dynamic.Message, fld *desc.FieldDescriptor, name ast.Node, val ast.ValueNode, insideMsgLiteral bool) error {
 	v := val.Value()
 	if sl, ok := v.([]ast.ValueNode); ok {
 		// handle slices a little differently than the others
@@ -1161,7 +1161,7 @@ func setOptionField(res *parseResult, mc *messageContext, dm *dynamic.Message, f
 		}()
 		for index, item := range sl {
 			mc.optAggPath = fmt.Sprintf("%s[%d]", origPath, index)
-			if v, err := fieldValue(res, mc, richFldDescriptorish{FieldDescriptor: fld}, item, false); err != nil {
+			if v, err := fieldValue(res, mc, richFldDescriptorish{FieldDescriptor: fld}, item, false, insideMsgLiteral); err != nil {
 				return err
 			} else if err = dm.TryAddRepeatedField(fld, v); err != nil {
 				return errorWithPos(val.Start(), "%verror setting value: %s", mc, err)
@@ -1170,7 +1170,7 @@ func setOptionField(res *parseResult, mc *messageContext, dm *dynamic.Message, f
 		return nil
 	}
 
-	v, err := fieldValue(res, mc, richFldDescriptorish{FieldDescriptor: fld}, val, false)
+	v, err := fieldValue(res, mc, richFldDescriptorish{FieldDescriptor: fld}, val, false, insideMsgLiteral)
 	if err != nil {
 		return err
 	}
@@ -1315,7 +1315,7 @@ func valueKind(val interface{}) string {
 	}
 }
 
-func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val ast.ValueNode, enumAsString bool) (interface{}, error) {
+func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val ast.ValueNode, enumAsString, insideMsgLiteral bool) (interface{}, error) {
 	v := val.Value()
 	t := fld.AsFieldDescriptorProto().GetType()
 	switch t {
@@ -1380,7 +1380,7 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 				if ffld == nil {
 					return nil, errorWithPos(val.Start(), "%vfield %s not found", mc, string(a.Name.Name.AsIdentifier()))
 				}
-				if err := setOptionField(res, mc, fdm, ffld, a.Name, a.Val); err != nil {
+				if err := setOptionField(res, mc, fdm, ffld, a.Name, a.Val, true); err != nil {
 					return nil, err
 				}
 			}
@@ -1390,6 +1390,26 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 	case dpb.FieldDescriptorProto_TYPE_BOOL:
 		if b, ok := v.(bool); ok {
 			return b, nil
+		}
+		if id, ok := v.(ast.Identifier); ok {
+			if insideMsgLiteral {
+				// inside a message literal, values use the protobuf text format,
+				// which is lenient in that it accepts "t" and "f" or "True" and "False"
+				switch id {
+				case "t", "true", "True":
+					return true, nil
+				case "f", "false", "False":
+					return false, nil
+				}
+			} else {
+				// options with simple scalar values (no message literal) are stricter
+				switch id {
+				case "true":
+					return true, nil
+				case "false":
+					return false, nil
+				}
+			}
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting bool, got %s", mc, valueKind(v))
 	case dpb.FieldDescriptorProto_TYPE_BYTES:
@@ -1453,6 +1473,14 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting uint64, got %s", mc, valueKind(v))
 	case dpb.FieldDescriptorProto_TYPE_DOUBLE:
+		if id, ok := v.(ast.Identifier); ok {
+			switch id {
+			case "inf":
+				return math.Inf(1), nil
+			case "nan":
+				return math.NaN(), nil
+			}
+		}
 		if d, ok := v.(float64); ok {
 			return d, nil
 		}
@@ -1464,6 +1492,14 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting double, got %s", mc, valueKind(v))
 	case dpb.FieldDescriptorProto_TYPE_FLOAT:
+		if id, ok := v.(ast.Identifier); ok {
+			switch id {
+			case "inf":
+				return float32(math.Inf(1)), nil
+			case "nan":
+				return float32(math.NaN()), nil
+			}
+		}
 		if d, ok := v.(float64); ok {
 			if (d > math.MaxFloat32 || d < -math.MaxFloat32) && !math.IsInf(d, 1) && !math.IsInf(d, -1) && !math.IsNaN(d) {
 				return nil, errorWithPos(val.Start(), "%vvalue %f is out of range for float", mc, d)
