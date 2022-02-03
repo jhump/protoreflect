@@ -461,8 +461,8 @@ aggFieldEntry : aggName ':' scalarConstant {
 aggName : name {
 		$$ = ast.NewFieldReferenceNode($1)
 	}
-	| '[' typeIdent ']' {
-		$$ = ast.NewExtensionFieldReferenceNode($1, $2, $3)
+	| '[' ident ']' {
+		$$ = ast.NewExtensionFieldReferenceNode($1, $2.toIdentValueNode(nil), $3)
 	}
 	| '[' error ']' {
 		$$ = nil

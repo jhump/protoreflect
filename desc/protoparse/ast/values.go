@@ -531,8 +531,9 @@ type MessageFieldNode struct {
 	compositeNode
 	Name *FieldReferenceNode
 	// Sep represents the ':' separator between the name and value. If
-	// the value is a message literal (and thus starts with '<' or '{'),
-	// then the separator is optional, and thus may be nil.
+	// the value is a message literal (and thus starts with '<' or '{')
+	// or an array literal (starting with '[') then the separator is
+	// optional, and thus may be nil.
 	Sep *RuneNode
 	Val ValueNode
 }
