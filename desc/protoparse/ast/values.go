@@ -366,6 +366,11 @@ func (n *SignedFloatLiteralNode) AsFloat() float64 {
 }
 
 // BoolLiteralNode represents a boolean literal.
+//
+// Deprecated: The AST uses IdentNode for boolean literals, where the
+// identifier value is "true" or "false". This is required because an
+// identifier "true" is not necessarily a boolean value as it could also
+// be an enum value named "true" (ditto for "false").
 type BoolLiteralNode struct {
 	*KeywordNode
 	Val bool

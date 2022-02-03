@@ -601,6 +601,34 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			`foo.proto:7:34: message Baz: option (foo).baz.options.(foo).buzz.name: oneof "bar" already has field "baz" set`,
 		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"enum Foo { true = 0; false = 1; t = 2; f = 3; True = 4; False = 5; inf = 6; nan = 7; }\n" +
+					"extend google.protobuf.MessageOptions { repeated Foo foo = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (foo) = true; option (foo) = false;\n" +
+					"  option (foo) = t; option (foo) = f;\n" +
+					"  option (foo) = True; option (foo) = False;\n" +
+					"  option (foo) = inf; option (foo) = nan;\n" +
+					"}\n",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"extend google.protobuf.MessageOptions { repeated bool foo = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (foo) = true; option (foo) = false;\n" +
+					"  option (foo) = t; option (foo) = f;\n" +
+					"  option (foo) = True; option (foo) = False;\n" +
+					"}\n",
+			},
+			"", // should succeed
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {

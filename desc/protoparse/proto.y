@@ -279,13 +279,7 @@ scalarConstant : stringLit {
 	}
 	| numLit
 	| name {
-		if $1.Val == "true" || $1.Val == "false" {
-			$$ = ast.NewBoolLiteralNode($1.ToKeyword())
-		} else if $1.Val == "inf" || $1.Val == "nan" {
-			$$ = ast.NewSpecialFloatLiteralNode($1.ToKeyword())
-		} else {
-			$$ = $1
-		}
+        $$ = $1
 	}
 
 numLit : _FLOAT_LIT {

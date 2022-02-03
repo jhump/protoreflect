@@ -1391,6 +1391,14 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 		if b, ok := v.(bool); ok {
 			return b, nil
 		}
+		if id, ok := v.(ast.Identifier); ok {
+			switch id {
+			case "t", "true", "True":
+				return true, nil
+			case "f", "false", "False":
+				return false, nil
+			}
+		}
 		return nil, errorWithPos(val.Start(), "%vexpecting bool, got %s", mc, valueKind(v))
 	case dpb.FieldDescriptorProto_TYPE_BYTES:
 		if str, ok := v.(string); ok {
@@ -1453,6 +1461,14 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting uint64, got %s", mc, valueKind(v))
 	case dpb.FieldDescriptorProto_TYPE_DOUBLE:
+		if id, ok := v.(ast.Identifier); ok {
+			switch id {
+			case "inf":
+				return math.Inf(1), nil
+			case "nan":
+				return math.NaN(), nil
+			}
+		}
 		if d, ok := v.(float64); ok {
 			return d, nil
 		}
@@ -1464,6 +1480,14 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting double, got %s", mc, valueKind(v))
 	case dpb.FieldDescriptorProto_TYPE_FLOAT:
+		if id, ok := v.(ast.Identifier); ok {
+			switch id {
+			case "inf":
+				return float32(math.Inf(1)), nil
+			case "nan":
+				return float32(math.NaN()), nil
+			}
+		}
 		if d, ok := v.(float64); ok {
 			if (d > math.MaxFloat32 || d < -math.MaxFloat32) && !math.IsInf(d, 1) && !math.IsInf(d, -1) && !math.IsNaN(d) {
 				return nil, errorWithPos(val.Start(), "%vvalue %f is out of range for float", mc, d)
