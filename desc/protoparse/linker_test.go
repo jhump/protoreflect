@@ -627,6 +627,22 @@ func TestLinkerValidation(t *testing.T) {
 					"  option (foo) = True; option (foo) = False;\n" +
 					"}\n",
 			},
+			"foo.proto:6:18: message Baz: option (foo): expecting bool, got identifier",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { repeated bool b = 1; }\n" +
+					"extend google.protobuf.MessageOptions { Foo foo = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (foo) = {\n" +
+					"    b: t     b: f\n" +
+					"    b: true  b: false\n" +
+					"    b: True  b: False\n" +
+					"  };\n" +
+					"}\n",
+			},
 			"", // should succeed
 		},
 	}
