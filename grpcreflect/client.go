@@ -264,7 +264,6 @@ func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest, e
 	// smarter and make sure to grab one by name instead of just grabbing the
 	// first one.
 	var fds []*dpb.FileDescriptorProto
-	var result *desc.FileDescriptor
 	for _, fdBytes := range fdResp.FileDescriptorProto {
 		fd := &dpb.FileDescriptorProto{}
 		if err = proto.Unmarshal(fdBytes, fd); err != nil {
@@ -277,12 +276,6 @@ func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest, e
 		}
 
 		cr.cacheMu.Lock()
-		// see if this file was created and cached concurrently
-		if result == nil {
-			if d, ok := cr.filesByName[fd.GetName()]; ok {
-				result = d
-			}
-		}
 		// store in cache of raw descriptor protos, but don't overwrite existing protos
 		if existingFd, ok := cr.protosByName[fd.GetName()]; ok {
 			fd = existingFd
@@ -292,10 +285,6 @@ func (cr *Client) getAndCacheFileDescriptors(req *rpb.ServerReflectionRequest, e
 		cr.cacheMu.Unlock()
 
 		fds = append(fds, fd)
-	}
-
-	if result != nil {
-		return result, nil
 	}
 
 	// find the right result from the files returned
