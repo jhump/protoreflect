@@ -1348,10 +1348,15 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 				}
 				var ffld *desc.FieldDescriptor
 				if a.Name.IsExtension() {
-					n := string(a.Name.Name.AsIdentifier())
+					n := res.optionQualifiedNames[a.Name.Name]
+					if n == "" {
+						// this should not be possible!
+						n = string(a.Name.Name.AsIdentifier())
+					}
 					ffld = findExtension(mc.file, n, false, map[fileDescriptorish]struct{}{})
 					if ffld == nil {
 						// may need to qualify with package name
+						// (this should not be necessary!)
 						pkg := mc.file.GetPackage()
 						if pkg != "" {
 							ffld = findExtension(mc.file, pkg+"."+n, false, map[fileDescriptorish]struct{}{})

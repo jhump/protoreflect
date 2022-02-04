@@ -521,7 +521,7 @@ func TestLinkerValidation(t *testing.T) {
 					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
 					"message Baz { option (foo) = { [Bar]< name: \"abc\" > }; }\n",
 			},
-			"foo.proto:6:30: message Baz: option (foo): field Bar not found",
+			"foo.proto:6:33: message Baz: option (foo): invalid extension: Bar is a message, not an extension",
 		},
 		{
 			map[string]string{
@@ -559,12 +559,129 @@ func TestLinkerValidation(t *testing.T) {
 		},
 		{
 			map[string]string{
-				"a.proto": "syntax=\"proto3\";\nmessage m{\n" +
+				"a.proto": "syntax=\"proto3\";\n" +
+					"message m{\n" +
 					"  string z = 1;\n" +
 					"  oneof z{int64 b=2;}\n" +
 					"}",
 			},
 			`a.proto:3:3: duplicate symbol m.z: already defined as oneof`,
+		},
+		{
+			map[string]string{
+				"test.proto": "syntax=\"proto2\";\n" +
+					"package foo.bar;\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message a { extensions 1 to 100; }\n" +
+					"extend google.protobuf.MessageOptions { optional a msga = 10000; }\n" +
+					"message b {\n" +
+					"  message c {\n" +
+					"    extend a { repeated int32 i = 1; repeated float f = 2; }\n" +
+					"  }\n" +
+					"  option (msga) = {\n" +
+					"    [foo.bar.b.c.i]: 123\n" +
+					"    [bar.b.c.i]: 234\n" +
+					"    [b.c.i]: 345\n" +
+					"  };\n" +
+					"  option (msga).(foo.bar.b.c.f) = 1.23;\n" +
+					"  option (msga).(bar.b.c.f) = 2.34;\n" +
+					"  option (msga).(b.c.f) = 3.45;\n" +
+					"}",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"test.proto": "syntax=\"proto2\";\n" +
+					"package foo.bar;\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message a { extensions 1 to 100; }\n" +
+					"message b { extensions 1 to 100; }\n" +
+					"extend google.protobuf.MessageOptions { optional a msga = 10000; }\n" +
+					"message c {\n" +
+					"  extend a { optional b b = 1; }\n" +
+					"  extend b { repeated int32 i = 1; repeated float f = 2; }\n" +
+					"  option (msga) = {\n" +
+					"    [foo.bar.c.b] {\n" +
+					"      [foo.bar.c.i]: 123\n" +
+					"      [bar.c.i]: 234\n" +
+					"      [c.i]: 345\n" +
+					"    }\n" +
+					"  };\n" +
+					"  option (msga).(foo.bar.c.b).(foo.bar.c.f) = 1.23;\n" +
+					"  option (msga).(foo.bar.c.b).(bar.c.f) = 2.34;\n" +
+					"  option (msga).(foo.bar.c.b).(c.f) = 3.45;\n" +
+					"}",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"test.proto": "syntax=\"proto2\";\n" +
+					"package foo.bar;\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message a { extensions 1 to 100; }\n" +
+					"extend google.protobuf.MessageOptions { optional a msga = 10000; }\n" +
+					"message b {\n" +
+					"  message c {\n" +
+					"    extend a { repeated int32 i = 1; repeated float f = 2; }\n" +
+					"  }\n" +
+					"  option (msga) = {\n" +
+					"    [c.i]: 456\n" +
+					"  };\n" +
+					"}",
+			},
+			"test.proto:11:6: message foo.bar.b: option (foo.bar.msga): unknown extension c.i",
+		},
+		{
+			map[string]string{
+				"test.proto": "syntax=\"proto2\";\n" +
+					"package foo.bar;\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message a { extensions 1 to 100; }\n" +
+					"extend google.protobuf.MessageOptions { optional a msga = 10000; }\n" +
+					"message b {\n" +
+					"  message c {\n" +
+					"    extend a { repeated int32 i = 1; repeated float f = 2; }\n" +
+					"  }\n" +
+					"  option (msga) = {\n" +
+					"    [i]: 567\n" +
+					"  };\n" +
+					"}",
+			},
+			"test.proto:11:6: message foo.bar.b: option (foo.bar.msga): unknown extension i",
+		},
+		{
+			map[string]string{
+				"test.proto": "syntax=\"proto2\";\n" +
+					"package foo.bar;\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message a { extensions 1 to 100; }\n" +
+					"extend google.protobuf.MessageOptions { optional a msga = 10000; }\n" +
+					"message b {\n" +
+					"  message c {\n" +
+					"    extend a { repeated int32 i = 1; repeated float f = 2; }\n" +
+					"  }\n" +
+					"  option (msga).(c.f) = 4.56;\n" +
+					"}",
+			},
+			"test.proto:10:17: message foo.bar.b: unknown extension c.f",
+		},
+		{
+			map[string]string{
+				"test.proto": "syntax=\"proto2\";\n" +
+					"package foo.bar;\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message a { extensions 1 to 100; }\n" +
+					"extend google.protobuf.MessageOptions { optional a msga = 10000; }\n" +
+					"message b {\n" +
+					"  message c {\n" +
+					"    extend a { repeated int32 i = 1; repeated float f = 2; }\n" +
+					"  }\n" +
+					"  option (msga).(f) = 5.67;\n" +
+					"}",
+			},
+			"test.proto:10:17: message foo.bar.b: unknown extension f",
 		},
 		{
 			map[string]string{

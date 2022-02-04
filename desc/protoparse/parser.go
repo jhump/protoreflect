@@ -634,6 +634,12 @@ type parseResult struct {
 	// a map of uninterpreted option AST nodes to their relative path
 	// in the resulting options message
 	interpretedOptions map[*ast.OptionNode][]int32
+
+	// a map of AST nodes that represent identifiers in ast.FieldReferenceNodes
+	// to their fully-qualified name. The identifiers are for field names in
+	// message literals (in option values) that are extension fields. These names
+	// are resolved during linking and stored here, to be used to interpret options.
+	optionQualifiedNames map[ast.IdentValueNode]string
 }
 
 func (r *parseResult) getFileNode(f *dpb.FileDescriptorProto) ast.FileDeclNode {
@@ -788,10 +794,11 @@ func parseProto(filename string, r io.Reader, errs *errorHandler, validate, crea
 
 func createParseResult(filename string, file *ast.FileNode, errs *errorHandler, createProtos bool) *parseResult {
 	res := &parseResult{
-		errs:               errs,
-		root:               file,
-		nodes:              map[proto.Message]ast.Node{},
-		interpretedOptions: map[*ast.OptionNode][]int32{},
+		errs:                 errs,
+		root:                 file,
+		nodes:                map[proto.Message]ast.Node{},
+		interpretedOptions:   map[*ast.OptionNode][]int32{},
+		optionQualifiedNames: map[ast.IdentValueNode]string{},
 	}
 	if createProtos {
 		res.createFileDescriptor(filename, file)
