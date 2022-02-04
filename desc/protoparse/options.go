@@ -1044,7 +1044,7 @@ func interpretField(res *parseResult, mc *messageContext, element descriptorish,
 		if extName[0] == '.' {
 			extName = extName[1:] /* skip leading dot */
 		}
-		fld = findExtension(element.GetFile(), extName, false, map[fileDescriptorish]struct{}{})
+		fld = findExtension(element.GetFile(), extName)
 		if fld == nil {
 			return nil, res.errs.handleErrorWithPos(node.Start(),
 				"%vunrecognized extension %s of %s",
@@ -1115,31 +1115,44 @@ func interpretField(res *parseResult, mc *messageContext, element descriptorish,
 	return path, nil
 }
 
-func findExtension(fd fileDescriptorish, name string, public bool, checked map[fileDescriptorish]struct{}) *desc.FieldDescriptor {
+func findExtension(fd fileDescriptorish, name string) *desc.FieldDescriptor {
+	d := findSymbol(fd, name, false, map[fileDescriptorish]struct{}{})
+	if fld, ok := d.(*desc.FieldDescriptor); ok {
+		return fld
+	}
+	return nil
+}
+
+func findMessage(fd fileDescriptorish, name string) *desc.MessageDescriptor {
+	d := findSymbol(fd, name, false, map[fileDescriptorish]struct{}{})
+	if md, ok := d.(*desc.MessageDescriptor); ok {
+		return md
+	}
+	return nil
+}
+
+func findSymbol(fd fileDescriptorish, name string, public bool, checked map[fileDescriptorish]struct{}) desc.Descriptor {
 	if _, ok := checked[fd]; ok {
 		return nil
 	}
 	checked[fd] = struct{}{}
 	d := fd.FindSymbol(name)
 	if d != nil {
-		if fld, ok := d.(*desc.FieldDescriptor); ok {
-			return fld
-		}
-		return nil
+		return d
 	}
 
 	// When public = false, we are searching only directly imported symbols. But we
 	// also need to search transitive public imports due to semantics of public imports.
 	if public {
 		for _, dep := range fd.GetPublicDependencies() {
-			d := findExtension(dep, name, true, checked)
+			d := findSymbol(dep, name, true, checked)
 			if d != nil {
 				return d
 			}
 		}
 	} else {
 		for _, dep := range fd.GetDependencies() {
-			d := findExtension(dep, name, true, checked)
+			d := findSymbol(dep, name, true, checked)
 			if d != nil {
 				return d
 			}
@@ -1335,61 +1348,7 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 	case dpb.FieldDescriptorProto_TYPE_MESSAGE, dpb.FieldDescriptorProto_TYPE_GROUP:
 		if aggs, ok := v.([]*ast.MessageFieldNode); ok {
 			fmd := fld.GetMessageType()
-			fdm := dynamic.NewMessage(fmd)
-			origPath := mc.optAggPath
-			defer func() {
-				mc.optAggPath = origPath
-			}()
-			for _, a := range aggs {
-				if origPath == "" {
-					mc.optAggPath = a.Name.Value()
-				} else {
-					mc.optAggPath = origPath + "." + a.Name.Value()
-				}
-				var ffld *desc.FieldDescriptor
-				if a.Name.IsExtension() {
-					n := res.optionQualifiedNames[a.Name.Name]
-					if n == "" {
-						// this should not be possible!
-						n = string(a.Name.Name.AsIdentifier())
-					}
-					ffld = findExtension(mc.file, n, false, map[fileDescriptorish]struct{}{})
-					if ffld == nil {
-						// may need to qualify with package name
-						// (this should not be necessary!)
-						pkg := mc.file.GetPackage()
-						if pkg != "" {
-							ffld = findExtension(mc.file, pkg+"."+n, false, map[fileDescriptorish]struct{}{})
-						}
-					}
-				} else {
-					ffld = fmd.FindFieldByName(a.Name.Value())
-					// Groups are indicated in the text format by the group name (which is
-					// camel-case), NOT the field name (which is lower-case).
-					// ...but only regular fields, not extensions that are groups...
-					if ffld != nil && ffld.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP && ffld.GetMessageType().GetName() != a.Name.Value() {
-						// this is kind of silly to fail here, but this mimics protoc behavior
-						return nil, errorWithPos(val.Start(), "%vfield %s not found (did you mean the group named %s?)", mc, a.Name.Value(), ffld.GetMessageType().GetName())
-					}
-					if ffld == nil {
-						// could be a group name
-						for _, fd := range fmd.GetFields() {
-							if fd.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP && fd.GetMessageType().GetName() == a.Name.Value() {
-								// found it!
-								ffld = fd
-								break
-							}
-						}
-					}
-				}
-				if ffld == nil {
-					return nil, errorWithPos(val.Start(), "%vfield %s not found", mc, string(a.Name.Name.AsIdentifier()))
-				}
-				if err := setOptionField(res, mc, fdm, ffld, a.Name, a.Val, true); err != nil {
-					return nil, err
-				}
-			}
-			return fdm, nil
+			return messageLiteralValue(res, mc, aggs, fmd)
 		}
 		return nil, errorWithPos(val.Start(), "%vexpecting message, got %s", mc, valueKind(v))
 	case dpb.FieldDescriptorProto_TYPE_BOOL:
@@ -1521,4 +1480,98 @@ func fieldValue(res *parseResult, mc *messageContext, fld fldDescriptorish, val 
 	default:
 		return nil, errorWithPos(val.Start(), "%vunrecognized field type: %s", mc, t)
 	}
+}
+
+func messageLiteralValue(res *parseResult, mc *messageContext, val []*ast.MessageFieldNode, fmd *desc.MessageDescriptor) (*dynamic.Message, error) {
+	fdm := dynamic.NewMessage(fmd)
+	origPath := mc.optAggPath
+	defer func() {
+		mc.optAggPath = origPath
+	}()
+	for _, fldNode := range val {
+		if origPath == "" {
+			mc.optAggPath = fldNode.Name.Value()
+		} else {
+			mc.optAggPath = origPath + "." + fldNode.Name.Value()
+		}
+
+		if fldNode.Name.IsAnyTypeReference() {
+			if fmd.GetFullyQualifiedName() == "google.protobuf.Any" {
+				// TODO: Support other URLs dynamically -- the caller of protoparse
+				// should be able to provide fldNode custom resolver that can resolve type
+				// URLs into message descriptors. The default resolver would be
+				// implemented as below, only accepting  "type.googleapis.com" and
+				// "type.googleprod.com" as hosts/prefixes and using the compiled
+				// file's transitive closure to find the named message.
+				urlPrefix := fldNode.Name.UrlPrefix.AsIdentifier()
+				msgName := fldNode.Name.Name.AsIdentifier()
+				fullUrl := fmt.Sprintf("%s/%s", urlPrefix, msgName)
+				if urlPrefix != "type.googleapis.com" && urlPrefix != "type.googleprod.com" {
+					return nil, errorWithPos(fldNode.Name.UrlPrefix.Start(), "%vcould not resolve type reference %s", mc, fullUrl)
+				}
+				anyFields, ok := fldNode.Val.Value().([]*ast.MessageFieldNode)
+				if !ok {
+					return nil, errorWithPos(fldNode.Val.Start(), "%vtype references for google.protobuf.Any must have message literal value", mc)
+				}
+				anyMd := findMessage(mc.file, string(msgName))
+				if anyMd == nil {
+					return nil, errorWithPos(fldNode.Name.UrlPrefix.Start(), "%vcould not resolve type reference %s", mc, fullUrl)
+				}
+				// parse the message value
+				msgVal, err := messageLiteralValue(res, mc, anyFields, anyMd)
+				if err != nil {
+					return nil, err
+				}
+
+				// Any is defined with two fields:
+				//   string type_url = 1
+				//   bytes value = 2
+				if err := fdm.TrySetFieldByNumber(1, fullUrl); err != nil {
+					return nil, errorWithPos(fldNode.Name.Start(), "%vfailed to set type_url string field on Any: %w", mc, err)
+				}
+				b, err := msgVal.MarshalDeterministic()
+				if err != nil {
+					return nil, errorWithPos(fldNode.Val.Start(), "%vfailed to serialize message value: %w", mc, err)
+				}
+				if err := fdm.TrySetFieldByNumber(2, b); err != nil {
+					return nil, errorWithPos(fldNode.Name.Start(), "%vfailed to set value bytes field on Any: %w", mc, err)
+				}
+			} else {
+				return nil, errorWithPos(fldNode.Name.UrlPrefix.Start(), "%vtype references are only allowed for google.protobuf.Any, but this type is %s", mc, fmd.GetFullyQualifiedName())
+			}
+		} else {
+			var ffld *desc.FieldDescriptor
+			if fldNode.Name.IsExtension() {
+				if n := res.optionQualifiedNames[fldNode.Name.Name]; n != "" {
+					ffld = findExtension(mc.file, n)
+				}
+			} else {
+				ffld = fmd.FindFieldByName(fldNode.Name.Value())
+				// Groups are indicated in the text format by the group name (which is
+				// camel-case), NOT the field name (which is lower-case).
+				// ...but only regular fields, not extensions that are groups...
+				if ffld != nil && ffld.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP && ffld.GetMessageType().GetName() != fldNode.Name.Value() {
+					// this is kind of silly to fail here, but this mimics protoc behavior
+					return nil, errorWithPos(fldNode.Start(), "%vfield %s not found (did you mean the group named %s?)", mc, fldNode.Name.Value(), ffld.GetMessageType().GetName())
+				}
+				if ffld == nil {
+					// could be fldNode group name
+					for _, fd := range fmd.GetFields() {
+						if fd.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP && fd.GetMessageType().GetName() == fldNode.Name.Value() {
+							// found it!
+							ffld = fd
+							break
+						}
+					}
+				}
+			}
+			if ffld == nil {
+				return nil, errorWithPos(fldNode.Name.Name.Start(), "%vfield %s not found", mc, string(fldNode.Name.Name.AsIdentifier()))
+			}
+			if err := setOptionField(res, mc, fdm, ffld, fldNode.Name, fldNode.Val, true); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return fdm, nil
 }

@@ -499,7 +499,7 @@ func TestLinkerValidation(t *testing.T) {
 					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
 					"message Baz { option (foo) = { bar< name: \"abc\" > }; }\n",
 			},
-			"foo.proto:7:30: message Baz: option (foo): field bar not found (did you mean the group named Bar?)",
+			"foo.proto:7:32: message Baz: option (foo): field bar not found (did you mean the group named Bar?)",
 		},
 		{
 			map[string]string{
@@ -776,6 +776,97 @@ func TestLinkerValidation(t *testing.T) {
 					"}\n",
 			},
 			"foo.proto:8:6: syntax error: unexpected '.'",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"package foo.bar;\n" +
+					"import \"google/protobuf/any.proto\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { string a = 1; int32 b = 2; }\n" +
+					"extend google.protobuf.MessageOptions { optional google.protobuf.Any any = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (any) = {\n" +
+					"    [type.googleapis.com/foo.bar.Foo] <\n" +
+					"      a: \"abc\"\n" +
+					"      b: 123\n" +
+					"    >\n" +
+					"  };\n" +
+					"}\n",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"package foo.bar;\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { string a = 1; int32 b = 2; }\n" +
+					"extend google.protobuf.MessageOptions { optional Foo f = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (f) = {\n" +
+					"    [type.googleapis.com/foo.bar.Foo] <\n" +
+					"      a: \"abc\"\n" +
+					"      b: 123\n" +
+					"    >\n" +
+					"  };\n" +
+					"}\n",
+			},
+			"foo.proto:8:6: message foo.bar.Baz: option (foo.bar.f): type references are only allowed for google.protobuf.Any, but this type is foo.bar.Foo",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"package foo.bar;\n" +
+					"import \"google/protobuf/any.proto\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { string a = 1; int32 b = 2; }\n" +
+					"extend google.protobuf.MessageOptions { optional google.protobuf.Any any = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (any) = {\n" +
+					"    [types.custom.io/foo.bar.Foo] <\n" +
+					"      a: \"abc\"\n" +
+					"      b: 123\n" +
+					"    >\n" +
+					"  };\n" +
+					"}\n",
+			},
+			"foo.proto:9:6: message foo.bar.Baz: option (foo.bar.any): could not resolve type reference types.custom.io/foo.bar.Foo",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"package foo.bar;\n" +
+					"import \"google/protobuf/any.proto\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { string a = 1; int32 b = 2; }\n" +
+					"extend google.protobuf.MessageOptions { optional google.protobuf.Any any = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (any) = {\n" +
+					"    [type.googleapis.com/foo.bar.Foo]: 123\n" +
+					"  };\n" +
+					"}\n",
+			},
+			"foo.proto:9:40: message foo.bar.Baz: option (foo.bar.any): type references for google.protobuf.Any must have message literal value",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"package foo.bar;\n" +
+					"import \"google/protobuf/any.proto\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo { string a = 1; int32 b = 2; }\n" +
+					"extend google.protobuf.MessageOptions { optional google.protobuf.Any any = 10001; }\n" +
+					"message Baz {\n" +
+					"  option (any) = {\n" +
+					"    [type.googleapis.com/Foo] <\n" +
+					"      a: \"abc\"\n" +
+					"      b: 123\n" +
+					"    >\n" +
+					"  };\n" +
+					"}\n",
+			},
+			"foo.proto:9:6: message foo.bar.Baz: option (foo.bar.any): could not resolve type reference type.googleapis.com/Foo",
 		},
 	}
 	for i, tc := range testCases {
