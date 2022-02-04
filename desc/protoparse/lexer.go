@@ -370,7 +370,7 @@ func (l *protoLex) Lex(lval *protoSymType) int {
 			l.setError(lval, errors.New("invalid control character"))
 			return _ERROR
 		}
-		if !strings.ContainsRune(";,.:=-+(){}[]<>", c) {
+		if !strings.ContainsRune(";,.:=-+(){}[]<>/", c) {
 			l.setError(lval, errors.New("invalid character"))
 			return _ERROR
 		}
