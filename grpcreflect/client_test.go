@@ -1,12 +1,15 @@
 package grpcreflect
 
 import (
+	"encoding/base64"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sort"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	_ "github.com/golang/protobuf/protoc-gen-go/plugin"
 	_ "github.com/golang/protobuf/ptypes/empty"
@@ -16,9 +19,11 @@ import (
 	_ "google.golang.org/genproto/protobuf/ptype"
 	_ "google.golang.org/genproto/protobuf/source_context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 
+	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal"
 	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
@@ -238,4 +243,127 @@ func TestRecover(t *testing.T) {
 	_, err = client.ListServices()
 	testutil.Ok(t, err)
 	testutil.Eq(t, true, client.stream != nil && client.stream != stream)
+}
+
+func TestMultipleFiles(t *testing.T) {
+	svr := grpc.NewServer()
+	rpb.RegisterServerReflectionServer(svr, testReflectionServer{})
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	testutil.Ok(t, err, "failed to listen")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		defer cancel()
+		if err := svr.Serve(l); err != nil {
+			t.Logf("serve returned error: %v", err)
+		}
+	}()
+	time.Sleep(100 * time.Millisecond) // give server a chance to start
+	testutil.Ok(t, ctx.Err(), "failed to start server")
+	defer func() {
+		svr.Stop()
+	}()
+
+	dialCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	cc, err := grpc.DialContext(dialCtx, l.Addr().String(), grpc.WithInsecure(), grpc.WithBlock())
+	testutil.Ok(t, err, "failed ot dial %v", l.Addr().String())
+	cl := rpb.NewServerReflectionClient(cc)
+
+	client := NewClient(ctx, cl)
+	defer client.Reset()
+	svcs, err := client.ListServices()
+	testutil.Ok(t, err, "failed to list services")
+	for _, svc := range svcs {
+		fd, err := client.FileContainingSymbol(svc)
+		testutil.Ok(t, err, "failed to file for service %v", svc)
+		sd := fd.FindSymbol(svc)
+		_, ok := sd.(*desc.ServiceDescriptor)
+		testutil.Require(t, ok, "symbol for %s is not a service descriptor, instead is %T", svc, sd)
+	}
+}
+
+type testReflectionServer struct{}
+
+func (t testReflectionServer) ServerReflectionInfo(server rpb.ServerReflection_ServerReflectionInfoServer) error {
+	const svcA_file = "ChdzYW5kYm94L3NlcnZpY2VfQS5wcm90bxIHc2FuZGJveCIWCghSZXF1ZXN0QRIKCgJpZBgBIAEoBSIYCglSZXNwb25zZUESCwoDc3RyGAEgASgJMj0KCVNlcnZpY2VfQRIwCgdFeGVjdXRlEhEuc2FuZGJveC5SZXF1ZXN0QRoSLnNhbmRib3guUmVzcG9uc2VBYgZwcm90bzM="
+	const svcB_file = "ChdzYW5kYm94L1NlcnZpY2VfQi5wcm90bxIHc2FuZGJveCIWCghSZXF1ZXN0QhIKCgJpZBgBIAEoBSIYCglSZXNwb25zZUISCwoDc3RyGAEgASgJMj0KCVNlcnZpY2VfQhIwCgdFeGVjdXRlEhEuc2FuZGJveC5SZXF1ZXN0QhoSLnNhbmRib3guUmVzcG9uc2VCYgZwcm90bzM="
+
+	for {
+		req, err := server.Recv()
+		if err == io.EOF {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		var resp rpb.ServerReflectionResponse
+		resp.OriginalRequest = req
+		switch req := req.MessageRequest.(type) {
+		case *rpb.ServerReflectionRequest_FileByFilename:
+			switch req.FileByFilename {
+			case "sandbox/service_A.proto":
+				resp.MessageResponse = msgResponseForFiles(svcA_file)
+			case "sandbox/service_B.proto":
+				resp.MessageResponse = msgResponseForFiles(svcB_file)
+			default:
+				resp.MessageResponse = &rpb.ServerReflectionResponse_ErrorResponse{
+					ErrorResponse: &rpb.ErrorResponse{
+						ErrorCode:    int32(codes.NotFound),
+						ErrorMessage: "not found",
+					},
+				}
+			}
+		case *rpb.ServerReflectionRequest_FileContainingSymbol:
+			switch req.FileContainingSymbol {
+			case "sandbox.Service_A":
+				resp.MessageResponse = msgResponseForFiles(svcA_file)
+			case "sandbox.Service_B":
+				// HERE is where we return two files instead of one
+				resp.MessageResponse = msgResponseForFiles(svcA_file, svcB_file)
+			default:
+				resp.MessageResponse = &rpb.ServerReflectionResponse_ErrorResponse{
+					ErrorResponse: &rpb.ErrorResponse{
+						ErrorCode:    int32(codes.NotFound),
+						ErrorMessage: "not found",
+					},
+				}
+			}
+		case *rpb.ServerReflectionRequest_ListServices:
+			resp.MessageResponse = &rpb.ServerReflectionResponse_ListServicesResponse{
+				ListServicesResponse: &rpb.ListServiceResponse{
+					Service: []*rpb.ServiceResponse{
+						{Name: "sandbox.Service_A"},
+						{Name: "sandbox.Service_B"},
+					},
+				},
+			}
+		default:
+			resp.MessageResponse = &rpb.ServerReflectionResponse_ErrorResponse{
+				ErrorResponse: &rpb.ErrorResponse{
+					ErrorCode:    int32(codes.NotFound),
+					ErrorMessage: "not found",
+				},
+			}
+		}
+		if err := server.Send(&resp); err != nil {
+			return err
+		}
+	}
+}
+
+func msgResponseForFiles(files ...string) *rpb.ServerReflectionResponse_FileDescriptorResponse {
+	descs := make([][]byte, len(files))
+	for i, f := range files {
+		b, err := base64.StdEncoding.DecodeString(f)
+		if err != nil {
+			panic(err)
+		}
+		descs[i] = b
+	}
+	return &rpb.ServerReflectionResponse_FileDescriptorResponse{
+		FileDescriptorResponse: &rpb.FileDescriptorResponse{
+			FileDescriptorProto: descs,
+		},
+	}
 }
