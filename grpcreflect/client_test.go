@@ -265,8 +265,8 @@ func TestMultipleFiles(t *testing.T) {
 		svr.Stop()
 	}()
 
-	dialCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
+	dialCtx, dialCancel := context.WithTimeout(ctx, 3*time.Second)
+	defer dialCancel()
 	cc, err := grpc.DialContext(dialCtx, l.Addr().String(), grpc.WithInsecure(), grpc.WithBlock())
 	testutil.Ok(t, err, "failed ot dial %v", l.Addr().String())
 	cl := rpb.NewServerReflectionClient(cc)
