@@ -415,6 +415,12 @@ func TestLinkerValidation(t *testing.T) {
 		},
 		{
 			map[string]string{
+				"foo.proto": "message Foo { option message_set_wire_format = true; extensions 1 to 100; } extend Foo { repeated Foo bar = 1; }",
+			},
+			"foo.proto:1:90: messages with message-set wire format cannot contain repeated extensions, only optional",
+		},
+		{
+			map[string]string{
 				"foo.proto": "message Foo { extensions 1 to max; } extend Foo { optional int32 bar = 536870912; }",
 			},
 			"foo.proto:1:72: field bar: tag 536870912 is not in valid range for extended type Foo",
