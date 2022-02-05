@@ -696,7 +696,7 @@ func interpretFileOptions(l *linker, r *parseResult, fd fileDescriptorish) error
 		}
 	}
 	for _, fld := range fd.GetExtensions() {
-		if err := interpretFieldOptions(l, r, fld); err != nil {
+		if err := interpretFieldOptions(l, r, fld, true); err != nil {
 			return err
 		}
 	}
@@ -740,7 +740,7 @@ func interpretMessageOptions(l *linker, r *parseResult, md msgDescriptorish) err
 		}
 	}
 	for _, fld := range md.GetFields() {
-		if err := interpretFieldOptions(l, r, fld); err != nil {
+		if err := interpretFieldOptions(l, r, fld, false); err != nil {
 			return err
 		}
 	}
@@ -755,7 +755,7 @@ func interpretMessageOptions(l *linker, r *parseResult, md msgDescriptorish) err
 		}
 	}
 	for _, fld := range md.GetNestedExtensions() {
-		if err := interpretFieldOptions(l, r, fld); err != nil {
+		if err := interpretFieldOptions(l, r, fld, true); err != nil {
 			return err
 		}
 	}
@@ -782,7 +782,7 @@ func interpretMessageOptions(l *linker, r *parseResult, md msgDescriptorish) err
 	return nil
 }
 
-func interpretFieldOptions(l *linker, r *parseResult, fld fldDescriptorish) error {
+func interpretFieldOptions(l *linker, r *parseResult, fld fldDescriptorish, isExtension bool) error {
 	opts := fld.GetFieldOptions()
 	if len(opts.GetUninterpretedOption()) > 0 {
 		uo := opts.UninterpretedOption
@@ -802,6 +802,10 @@ func interpretFieldOptions(l *linker, r *parseResult, fld fldDescriptorish) erro
 			uo = removeOption(uo, index)
 			if opt.StringValue == nil {
 				if err := r.errs.handleErrorWithPos(optNode.GetValue().Start(), "%s: expecting string value for json_name option", scope); err != nil {
+					return err
+				}
+			} else if isExtension {
+				if err := r.errs.handleErrorWithPos(optNode.GetName().Start(), "%s: option json_name is not allowed on extensions", scope); err != nil {
 					return err
 				}
 			} else {
