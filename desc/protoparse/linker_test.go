@@ -868,6 +868,16 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			"foo.proto:9:6: message foo.bar.Baz: option (foo.bar.any): could not resolve type reference type.googleapis.com/Foo",
 		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"extend google.protobuf.MessageOptions {\n" +
+					"  string foobar = 10001 [json_name=\"FooBar\"];\n" +
+					"}\n",
+			},
+			"foo.proto:4:26: field foobar: option json_name is not allowed on extensions",
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
