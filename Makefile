@@ -36,13 +36,13 @@ vet:
 # staticheck in a way that ignores the errors in that generated code
 .PHONY: staticcheck
 staticcheck:
-	@GO111MODULE=on go install honnef.co/go/tools/cmd/staticcheck
+	@GO111MODULE=on go install honnef.co/go/tools/cmd/staticcheck@v0.0.1-2020.1.4
 	staticcheck ./...
 
 # same remarks as for staticcheck: we ignore errors in generated proto.y.go
 .PHONY: ineffassign
 ineffassign:
-	@GO111MODULE=on go install github.com/gordonklaus/ineffassign
+	@GO111MODULE=on go install github.com/gordonklaus/ineffassign@v0.0.0-20200309095847-7953dde2c7bf
 	@echo ineffassign . --ignore desc/protoparse/proto.y.go
 	@ineffassign -n $$(find . -type d | grep -v 'desc/protoparse')
 	@output="$$(ineffassign ./desc/protoparse | grep -v 'protoDollar' || true)" ; \
@@ -53,7 +53,7 @@ ineffassign:
 
 .PHONY: predeclared
 predeclared:
-	@GO111MODULE=on go install github.com/nishanths/predeclared
+	@GO111MODULE=on go install github.com/nishanths/predeclared@v0.0.0-20200524104333-86fad755b4d3
 	predeclared ./...
 
 # Intentionally omitted from CI, but target here for ad-hoc reports.
@@ -75,7 +75,7 @@ test:
 
 .PHONY: generate
 generate:
-	@GO111MODULE=on go install golang.org/x/tools/cmd/goyacc
+	@GO111MODULE=on go install golang.org/x/tools/cmd/goyacc@v0.0.0-20200717024301-6ddee64345a6
 	go generate ./...
 
 .PHONY: testcover

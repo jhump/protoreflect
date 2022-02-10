@@ -59,6 +59,21 @@ jobs:
       - image: circleci/golang:1.17
     steps: *simple_job_steps
 
+  build-1-17-u:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/golang:1.17
+    steps:
+      - checkout
+      - run:
+          name: Update depdendencies
+          command: |
+            go get -u ./...
+      - run:
+          name: Run tests
+          command: |
+            make deps test
+
 workflows:
   pr-build-test:
     jobs:
@@ -67,3 +82,4 @@ workflows:
       - build-1-15
       - build-1-16
       - build-1-17
+      - build-1-17-u

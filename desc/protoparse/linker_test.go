@@ -1,6 +1,7 @@
 package protoparse
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -41,22 +42,40 @@ func TestMultiFileLink(t *testing.T) {
 }
 
 func TestProto3Optional(t *testing.T) {
-	fds, err := Parser{ImportPaths: []string{"../../internal/testprotos"}}.ParseFiles("proto3_optional/desc_test_proto3_optional.proto")
-	testutil.Ok(t, err)
-
 	data, err := ioutil.ReadFile("../../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset")
 	testutil.Ok(t, err)
 	var fdset dpb.FileDescriptorSet
 	err = proto.Unmarshal(data, &fdset)
 	testutil.Ok(t, err)
 
+	var descriptorProto *dpb.FileDescriptorProto
+	for _, fd := range fdset.File {
+		// not comparing source code info
+		fd.SourceCodeInfo = nil
+
+		// we want to use the same descriptor.proto as in protoset, so we don't have to
+		// worry about this test breaking when updating to newer versions of the Go
+		// descriptor package (which may have a different version of descriptor.proto
+		// compiled in).
+		if fd.GetName() == "google/protobuf/descriptor.proto" {
+			descriptorProto = fd
+		}
+	}
+	testutil.Require(t, descriptorProto != nil, "failed to find google/protobuf/descriptor.proto in protoset")
+
 	exp, err := desc.CreateFileDescriptorFromSet(&fdset)
 	testutil.Ok(t, err)
-	// not comparing source code info
-	exp.AsFileDescriptorProto().SourceCodeInfo = nil
-	for _, dep := range exp.GetDependencies() {
-		dep.AsFileDescriptorProto().SourceCodeInfo = nil
-	}
+
+	fds, err := Parser{
+		ImportPaths: []string{"../../internal/testprotos"},
+		LookupImportProto: func(name string) (*dpb.FileDescriptorProto, error) {
+			if name == "google/protobuf/descriptor.proto" {
+				return descriptorProto, nil
+			}
+			return nil, errors.New("not found")
+		},
+	}.ParseFiles("proto3_optional/desc_test_proto3_optional.proto")
+	testutil.Ok(t, err)
 
 	checkFiles(t, fds[0], exp, map[string]struct{}{})
 }
