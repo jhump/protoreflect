@@ -36,9 +36,9 @@ message Test {
       extend Test {
         optional string _garblez = 100;
       }
-      option (rept) = { foo:"goo" [foo.bar.Test.Nested._NestedNested._garblez]:"boo"  };
+      option (rept) = { foo:"goo" [foo.bar.Test.Nested._NestedNested._garblez]:"boo" };
       message NestedNestedNested {
-        option (rept) = { foo:"hoo" [foo.bar.Test.Nested._NestedNested._garblez]:"spoo"  };
+        option (rept) = { foo:"hoo" [foo.bar.Test.Nested._NestedNested._garblez]:"spoo" };
         optional Test Test = 1;
       }
     }
@@ -100,7 +100,7 @@ message Another {
       name: "s"
     >
   };
-  option (rept) = { foo:"def"  };
+  option (rept) = { foo:"def" };
   option (eee) = V1;
   option (a) = {
     test: <
@@ -162,10 +162,10 @@ extend google.protobuf.MethodOptions {
 }
 service TestTestService {
   rpc UserAuth ( Test ) returns ( Test ) {
-    option (validator) = { authenticated:true permission:<action:LOGIN entity:"client" >  };
+    option (validator) = { authenticated:true permission:<action:LOGIN entity:"client" > };
   }
   rpc Get ( Test ) returns ( Test ) {
-    option (validator) = { authenticated:true permission:<action:READ entity:"user" >  };
+    option (validator) = { authenticated:true permission:<action:READ entity:"user" > };
   }
 }
 message Rule {

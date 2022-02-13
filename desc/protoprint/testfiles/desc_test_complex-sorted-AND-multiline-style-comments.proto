@@ -85,7 +85,7 @@ message Another {
       name: "s"
     >
   };
-  option (rept) = { foo:"def"  };
+  option (rept) = { foo:"def" };
 
   optional Test test = 1;
 
