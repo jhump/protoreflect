@@ -1417,14 +1417,14 @@ func (p *Printer) printMethod(mtd *desc.MethodDescriptor, mf *dynamic.MessageFac
 			elements := elementAddrs{dsc: mtd, opts: opts}
 			elements.addrs = optionsAsElementAddrs(internal.Method_optionsTag, 0, opts)
 			p.sort(elements, sourceInfo, path)
-			path = append(path, internal.Method_optionsTag)
 
-			for i, addr := range elements.addrs {
+			for i, el := range elements.addrs {
 				if i > 0 {
 					p.newLine(w)
 				}
-				o := elements.at(addr).([]option)
-				p.printOptionsLong(o, w, sourceInfo, path, indent)
+				o := elements.at(el).([]option)
+				childPath := append(path, el.elementType, int32(el.elementIndex))
+				p.printOptionsLong(o, w, sourceInfo, childPath, indent)
 			}
 
 			p.indent(w, indent-1)

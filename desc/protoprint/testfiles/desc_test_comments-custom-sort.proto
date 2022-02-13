@@ -31,6 +31,7 @@ service RpcService {
 
     option (testprotos.mtfubar) = 12.340000;
 
+    // this RPC is deprecated!
     option deprecated = true;
   }
 
@@ -96,6 +97,9 @@ message Request {
     int32 those = 7;
 
     string these = 6;
+
+    // whoops?
+    option (testprotos.oofubar) = "whoops!";
   }
 
   // can be this or that
