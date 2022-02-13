@@ -480,7 +480,7 @@ message Another {
       name: "s"
     >
   };
-  option (rept) = { foo:"def"  };
+  option (rept) = { foo:"def" };
 
   option (map_vals) = {
     vals: <

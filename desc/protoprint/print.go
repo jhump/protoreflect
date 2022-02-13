@@ -1676,7 +1676,7 @@ func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent
 			Compact:   true,
 			ExpandAny: true,
 		}
-		str := m.Text(optVal)
+		str := strings.TrimSuffix(m.Text(optVal), " ")
 		fieldCount := strings.Count(str, ":")
 		nestedCount := strings.Count(str, "{") + strings.Count(str, "<")
 		if fieldCount <= 1 && nestedCount == 0 {

@@ -160,7 +160,7 @@ service RpcService {
   // that spans multiple lines
 
   // option that sets field
-  option (testprotos.sfubar) = { id:100 name:"bob"  };
+  option (testprotos.sfubar) = { id:100 name:"bob" };
 
   option deprecated = false;
   // DEPRECATED!
