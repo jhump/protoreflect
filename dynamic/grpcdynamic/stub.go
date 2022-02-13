@@ -4,11 +4,11 @@
 package grpcdynamic
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	"github.com/golang/protobuf/proto"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 

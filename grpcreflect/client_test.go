@@ -1,6 +1,7 @@
 package grpcreflect
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -13,7 +14,6 @@ import (
 
 	_ "github.com/golang/protobuf/protoc-gen-go/plugin"
 	_ "github.com/golang/protobuf/ptypes/empty"
-	"golang.org/x/net/context"
 	_ "google.golang.org/genproto/protobuf/api"
 	_ "google.golang.org/genproto/protobuf/field_mask"
 	_ "google.golang.org/genproto/protobuf/ptype"
