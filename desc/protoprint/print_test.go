@@ -62,7 +62,7 @@ func reverseByName(a, b Element) bool {
 func TestPrinter(t *testing.T) {
 	prs := map[string]*Printer{
 		"default":                             {},
-		"compact":                             {Compact: true},
+		"compact":                             {Compact: true, ShortOptionsExpansionThresholdCount: 5, ShortOptionsExpansionThresholdLength: 100, MessageLiteralExpansionThresholdLength: 80},
 		"no-trailing-comments":                {OmitComments: CommentsTrailing},
 		"trailing-on-next-line":               {TrailingCommentsOnSeparateLine: true},
 		"only-doc-comments":                   {OmitComments: CommentsNonDoc},

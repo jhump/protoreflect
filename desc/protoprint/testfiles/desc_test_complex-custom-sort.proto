@@ -98,11 +98,23 @@ extend google.protobuf.ExtensionRangeOptions {
 
 service TestTestService {
   rpc UserAuth ( Test ) returns ( Test ) {
-    option (validator) = { authenticated:true permission:<action:LOGIN entity:"client" >  };
+    option (validator) = {
+      authenticated: true
+      permission: <
+        action: LOGIN
+        entity: "client"
+      >
+    };
   }
 
   rpc Get ( Test ) returns ( Test ) {
-    option (validator) = { authenticated:true permission:<action:READ entity:"user" >  };
+    option (validator) = {
+      authenticated: true
+      permission: <
+        action: READ
+        entity: "user"
+      >
+    };
   }
 }
 
@@ -172,10 +184,16 @@ message Test {
       message NestedNestedNested {
         optional Test Test = 1;
 
-        option (rept) = { foo:"hoo" [foo.bar.Test.Nested._NestedNested._garblez]:"spoo"  };
+        option (rept) = {
+          foo: "hoo"
+          [foo.bar.Test.Nested._NestedNested._garblez]: "spoo"
+        };
       }
 
-      option (rept) = { foo:"goo" [foo.bar.Test.Nested._NestedNested._garblez]:"boo"  };
+      option (rept) = {
+        foo: "goo"
+        [foo.bar.Test.Nested._NestedNested._garblez]: "boo"
+      };
 
       option (fooblez) = 10101;
     }
@@ -328,13 +346,98 @@ message KeywordCollisions {
 }
 
 message KeywordCollisionOptions {
-  optional string name = 2 [(boom) = { syntax:true import:true public:true weak:true package:true string:"string" bytes:"bytes" int32:32 int64:64 uint32:3200 uint64:6400 sint32:-32 sint64:-64 fixed32:3232 fixed64:6464 sfixed32:-3232 sfixed64:-6464 bool:true float:3.14 double:3.14159 optional:true repeated:true required:true message:true enum:true service:true rpc:true option:true extend:true extensions:true reserved:true to:true true:111 false:-111 default:222  }];
+  optional string name = 2 [
+    (boom) = {
+      syntax: true
+      import: true
+      public: true
+      weak: true
+      package: true
+      string: "string"
+      bytes: "bytes"
+      int32: 32
+      int64: 64
+      uint32: 3200
+      uint64: 6400
+      sint32: -32
+      sint64: -64
+      fixed32: 3232
+      fixed64: 6464
+      sfixed32: -3232
+      sfixed64: -6464
+      bool: true
+      float: 3.14
+      double: 3.14159
+      optional: true
+      repeated: true
+      required: true
+      message: true
+      enum: true
+      service: true
+      rpc: true
+      option: true
+      extend: true
+      extensions: true
+      reserved: true
+      to: true
+      true: 111
+      false: -111
+      default: 222
+    }
+  ];
 
-  optional uint64 id = 1 [(weak) = true, (uint64) = 6400, (uint32) = 3200, (true) = 111, (to) = true, (syntax) = true, (string) = "string", (sint64) = -64, (sint32) = -32, (sfixed64) = -6464, (sfixed32) = -3232, (service) = true, (rpc) = true, (reserved) = true, (required) = true, (repeated) = true, (public) = true, (package) = true, (optional) = true, (option) = true, (message) = true, (int64) = 64, (int32) = 32, (import) = true, (float) = 3.140000, (fixed64) = 6464, (fixed32) = 3232, (false) = -111, (extensions) = true, (extend) = true, (enum) = true, (double) = 3.141590, (default) = 222, (bytes) = "bytes", (bool) = true];
+  optional uint64 id = 1 [
+    (weak) = true,
+    (uint64) = 6400,
+    (uint32) = 3200,
+    (true) = 111,
+    (to) = true,
+    (syntax) = true,
+    (string) = "string",
+    (sint64) = -64,
+    (sint32) = -32,
+    (sfixed64) = -6464,
+    (sfixed32) = -3232,
+    (service) = true,
+    (rpc) = true,
+    (reserved) = true,
+    (required) = true,
+    (repeated) = true,
+    (public) = true,
+    (package) = true,
+    (optional) = true,
+    (option) = true,
+    (message) = true,
+    (int64) = 64,
+    (int32) = 32,
+    (import) = true,
+    (float) = 3.140000,
+    (fixed64) = 6464,
+    (fixed32) = 3232,
+    (false) = -111,
+    (extensions) = true,
+    (extend) = true,
+    (enum) = true,
+    (double) = 3.141590,
+    (default) = 222,
+    (bytes) = "bytes",
+    (bool) = true
+  ];
 }
 
 message IsAuthorizedReq {
-  repeated string subjects = 1 [(rules) = { repeated:<min_items:1 items:<string:<pattern:"^(?:(?:team:(?:local|ldap))|user):[[:alnum:]_-]+$" > > >  }];
+  repeated string subjects = 1 [
+    (rules) = {
+      repeated: <
+        min_items: 1
+        items: <
+          string: <
+            pattern: "^(?:(?:team:(?:local|ldap))|user):[[:alnum:]_-]+$"
+          >
+        >
+      >
+    }
+  ];
 }
 
 message Another {
@@ -342,15 +445,85 @@ message Another {
 
   optional Test.Nested._NestedNested.EEE fff = 2 [default = V1];
 
-  option (rept) = { foo:"abc" array:1 array:2 array:3 s:<name:"foo" id:123 > r:<name:"f" > r:<name:"s" > r:<id:456 >  };
-  option (rept) = { foo:"def" array:3 array:2 array:1 s:<name:"bar" id:321 > r:<name:"g" > r:<name:"s" >  };
+  option (rept) = {
+    foo: "abc"
+    array: 1
+    array: 2
+    array: 3
+    s: <
+      name: "foo"
+      id: 123
+    >
+    r: <
+      name: "f"
+    >
+    r: <
+      name: "s"
+    >
+    r: <
+      id: 456
+    >
+  };
+  option (rept) = {
+    foo: "def"
+    array: 3
+    array: 2
+    array: 1
+    s: <
+      name: "bar"
+      id: 321
+    >
+    r: <
+      name: "g"
+    >
+    r: <
+      name: "s"
+    >
+  };
   option (rept) = { foo:"def"  };
 
-  option (map_vals) = { vals:<key:"" value:<> > vals:<key:"bar" value:<name:"baz" > > vals:<key:"foo" value:<> >  }; // no key, no value
+  option (map_vals) = {
+    vals: <
+      key: ""
+      value: <
+      >
+    >
+    vals: <
+      key: "bar"
+      value: <
+        name: "baz"
+      >
+    >
+    vals: <
+      key: "foo"
+      value: <
+      >
+    >
+  }; // no key, no value
 
   option (eee) = V1;
 
-  option (a) = { test:<foo:"m&m" array:1 array:2 s:<name:"yolo" id:98765 > m:<key:"bar" value:200 > m:<key:"foo" value:100 > [foo.bar.Test.Nested._NestedNested._garblez]:"whoah!" > fff:OK  };
+  option (a) = {
+    test: <
+      foo: "m&m"
+      array: 1
+      array: 2
+      s: <
+        name: "yolo"
+        id: 98765
+      >
+      m: <
+        key: "bar"
+        value: 200
+      >
+      m: <
+        key: "foo"
+        value: 100
+      >
+      [foo.bar.Test.Nested._NestedNested._garblez]: "whoah!"
+    >
+    fff: OK
+  };
 }
 
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";

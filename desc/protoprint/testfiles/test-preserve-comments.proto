@@ -29,7 +29,14 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
        * tag trailer
        * that spans multiple lines...
        * more than two.
-       */ [packed = true /* packed! */, json_name = "|foo|" /* custom JSON! */, (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"]; // field trailer #1...
+       */ [
+    packed = true,
+    // packed!
+    json_name = "|foo|",
+    // custom JSON!
+    (testprotos.ffubar) = "abc",
+    (testprotos.ffubarb) = "xyz"
+  ]; // field trailer #1...
 
   // lead mfubar
   option (testprotos.mfubar) = true; // trailing mfubar
@@ -41,11 +48,17 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
   // Another field comment
 
   // label comment
-  optional /* type comment */ string /* name comment */ name = 2 [/* default lead */ default = "fubar" /* default trail */];
+  optional /* type comment */ string /* name comment */ name = 2 [
+    // default lead
+    default = "fubar" // default trail
+  ];
 
   extensions 100 to 200;
 
-  extensions 201 to 250 [(testprotos.exfubarb) = "\000\001\002\003\004\005\006\007", (testprotos.exfubar) = "splat!"];
+  extensions 201 to 250 [
+    (testprotos.exfubarb) = "\000\001\002\003\004\005\006\007",
+    (testprotos.exfubar) = "splat!"
+  ];
 
   reserved 10 to 20, 30 to 50;
 
@@ -74,9 +87,15 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
     // allow_alias comments!
     option allow_alias = true;
 
-    MARIO = 1 [(testprotos.evfubars) = -314, (testprotos.evfubar) = 278];
+    MARIO = 1 [
+      (testprotos.evfubars) = -314,
+      (testprotos.evfubar) = 278
+    ];
 
-    LUIGI = 2 [(testprotos.evfubaruf) = 100, (testprotos.evfubaru) = 200];
+    LUIGI = 2 [
+      (testprotos.evfubaruf) = 100,
+      (testprotos.evfubaru) = 200
+    ];
 
     PEACH = 3;
 

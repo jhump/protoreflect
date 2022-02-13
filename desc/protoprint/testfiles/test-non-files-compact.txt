@@ -11,7 +11,12 @@ message Request {
   option deprecated = true;
   option (.testprotos.mfubar) = true;
   // A field comment
-  repeated int32 ids = 1 [json_name = "|foo|", packed = true, (.testprotos.ffubar) = "abc", (.testprotos.ffubarb) = "xyz"];
+  repeated int32 ids = 1 [
+    json_name = "|foo|",
+    packed = true,
+    (.testprotos.ffubar) = "abc",
+    (.testprotos.ffubarb) = "xyz"
+  ];
   // label comment
   optional string name = 2 [default = "fubar"];
   // Group comment
@@ -41,8 +46,14 @@ message Request {
     option (.testprotos.efubar) = 123;
     option (.testprotos.efubars) = -321;
     SNIFIT = -101;
-    MARIO = 1 [(.testprotos.evfubar) = 278, (.testprotos.evfubars) = -314];
-    LUIGI = 2 [(.testprotos.evfubaru) = 200, (.testprotos.evfubaruf) = 100];
+    MARIO = 1 [
+      (.testprotos.evfubar) = 278,
+      (.testprotos.evfubars) = -314
+    ];
+    LUIGI = 2 [
+      (.testprotos.evfubaru) = 200,
+      (.testprotos.evfubaruf) = 100
+    ];
     PEACH = 3;
     BOWSER = 4;
     WARIO = 5;
@@ -53,7 +64,10 @@ message Request {
     MAGIKOOPA = 8;
   }
   extensions 100 to 200;
-  extensions 201 to 250 [(.testprotos.exfubar) = "splat!", (.testprotos.exfubarb) = "\000\001\002\003\004\005\006\007"];
+  extensions 201 to 250 [
+    (.testprotos.exfubar) = "splat!",
+    (.testprotos.exfubarb) = "\000\001\002\003\004\005\006\007"
+  ];
   reserved 10 to 20, 30 to 50;
   reserved "bar", "baz", "foo";
 }
@@ -82,7 +96,12 @@ message Request {
   option deprecated = true;
   option (.testprotos.mfubar) = true;
   // A field comment
-  repeated int32 ids = 1 [json_name = "|foo|", packed = true, (.testprotos.ffubar) = "abc", (.testprotos.ffubarb) = "xyz"];
+  repeated int32 ids = 1 [
+    json_name = "|foo|",
+    packed = true,
+    (.testprotos.ffubar) = "abc",
+    (.testprotos.ffubarb) = "xyz"
+  ];
   // label comment
   optional string name = 2 [default = "fubar"];
   // Group comment
@@ -112,8 +131,14 @@ message Request {
     option (.testprotos.efubar) = 123;
     option (.testprotos.efubars) = -321;
     SNIFIT = -101;
-    MARIO = 1 [(.testprotos.evfubar) = 278, (.testprotos.evfubars) = -314];
-    LUIGI = 2 [(.testprotos.evfubaru) = 200, (.testprotos.evfubaruf) = 100];
+    MARIO = 1 [
+      (.testprotos.evfubar) = 278,
+      (.testprotos.evfubars) = -314
+    ];
+    LUIGI = 2 [
+      (.testprotos.evfubaru) = 200,
+      (.testprotos.evfubaruf) = 100
+    ];
     PEACH = 3;
     BOWSER = 4;
     WARIO = 5;
@@ -124,13 +149,21 @@ message Request {
     MAGIKOOPA = 8;
   }
   extensions 100 to 200;
-  extensions 201 to 250 [(.testprotos.exfubar) = "splat!", (.testprotos.exfubarb) = "\000\001\002\003\004\005\006\007"];
+  extensions 201 to 250 [
+    (.testprotos.exfubar) = "splat!",
+    (.testprotos.exfubarb) = "\000\001\002\003\004\005\006\007"
+  ];
   reserved 10 to 20, 30 to 50;
   reserved "bar", "baz", "foo";
 }
 -------- foo.bar.Request.ids (*desc.FieldDescriptor) --------
 // A field comment
-repeated int32 ids = 1 [json_name = "|foo|", packed = true, (.testprotos.ffubar) = "abc", (.testprotos.ffubarb) = "xyz"];
+repeated int32 ids = 1 [
+  json_name = "|foo|",
+  packed = true,
+  (.testprotos.ffubar) = "abc",
+  (.testprotos.ffubarb) = "xyz"
+];
 -------- foo.bar.Request.name (*desc.FieldDescriptor) --------
 // label comment
 optional string name = 2 [default = "fubar"];
@@ -199,8 +232,14 @@ enum MarioCharacters {
   option (.testprotos.efubar) = 123;
   option (.testprotos.efubars) = -321;
   SNIFIT = -101;
-  MARIO = 1 [(.testprotos.evfubar) = 278, (.testprotos.evfubars) = -314];
-  LUIGI = 2 [(.testprotos.evfubaru) = 200, (.testprotos.evfubaruf) = 100];
+  MARIO = 1 [
+    (.testprotos.evfubar) = 278,
+    (.testprotos.evfubars) = -314
+  ];
+  LUIGI = 2 [
+    (.testprotos.evfubaru) = 200,
+    (.testprotos.evfubaruf) = 100
+  ];
   PEACH = 3;
   BOWSER = 4;
   WARIO = 5;
@@ -211,9 +250,15 @@ enum MarioCharacters {
   MAGIKOOPA = 8;
 }
 -------- foo.bar.Request.MarioCharacters.MARIO (*desc.EnumValueDescriptor) --------
-MARIO = 1 [(.testprotos.evfubar) = 278, (.testprotos.evfubars) = -314];
+MARIO = 1 [
+  (.testprotos.evfubar) = 278,
+  (.testprotos.evfubars) = -314
+];
 -------- foo.bar.Request.MarioCharacters.LUIGI (*desc.EnumValueDescriptor) --------
-LUIGI = 2 [(.testprotos.evfubaru) = 200, (.testprotos.evfubaruf) = 100];
+LUIGI = 2 [
+  (.testprotos.evfubaru) = 200,
+  (.testprotos.evfubaruf) = 100
+];
 -------- foo.bar.Request.MarioCharacters.PEACH (*desc.EnumValueDescriptor) --------
 PEACH = 3;
 -------- foo.bar.Request.MarioCharacters.BOWSER (*desc.EnumValueDescriptor) --------
