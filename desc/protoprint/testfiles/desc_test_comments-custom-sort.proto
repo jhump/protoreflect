@@ -55,7 +55,10 @@ message Request {
 
   reserved 30 to 50, 10 to 20;
 
-  extensions 201 to 250 [(testprotos.exfubarb) = "\000\001\002\003\004\005\006\007", (testprotos.exfubar) = "splat!"];
+  extensions 201 to 250 [
+    (testprotos.exfubarb) = "\000\001\002\003\004\005\006\007",
+    (testprotos.exfubar) = "splat!"
+  ];
 
   extensions 100 to 200;
 
@@ -72,11 +75,17 @@ message Request {
 
     PEACH = 3;
 
-    MARIO = 1 [(testprotos.evfubars) = -314, (testprotos.evfubar) = 278];
+    MARIO = 1 [
+      (testprotos.evfubars) = -314,
+      (testprotos.evfubar) = 278
+    ];
 
     MAGIKOOPA = 8;
 
-    LUIGI = 2 [(testprotos.evfubaruf) = 100, (testprotos.evfubaru) = 200];
+    LUIGI = 2 [
+      (testprotos.evfubaruf) = 100,
+      (testprotos.evfubaru) = 200
+    ];
 
     KAMEK = 8;
 
@@ -124,7 +133,12 @@ message Request {
   optional string name = 2 [default = "fubar"];
 
   // A field comment
-  repeated int32 ids = 1 [(testprotos.ffubarb) = "xyz", (testprotos.ffubar) = "abc", packed = true, json_name = "|foo|"]; // field trailer #1...
+  repeated int32 ids = 1 [
+    (testprotos.ffubarb) = "xyz",
+    (testprotos.ffubar) = "abc",
+    packed = true,
+    json_name = "|foo|"
+  ]; // field trailer #1...
 
   // Group comment
   optional group Extras = 3 {

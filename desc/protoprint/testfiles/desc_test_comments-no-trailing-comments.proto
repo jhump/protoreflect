@@ -25,7 +25,12 @@ message Request {
   option deprecated = true;
 
   // A field comment
-  repeated int32 ids = 1 [packed = true, json_name = "|foo|", (testprotos.ffubar) = "abc", (testprotos.ffubarb) = "xyz"];
+  repeated int32 ids = 1 [
+    packed = true,
+    json_name = "|foo|",
+    (testprotos.ffubar) = "abc",
+    (testprotos.ffubarb) = "xyz"
+  ];
 
   // lead mfubar
   option (testprotos.mfubar) = true;
@@ -41,7 +46,10 @@ message Request {
 
   extensions 100 to 200;
 
-  extensions 201 to 250 [(testprotos.exfubarb) = "\000\001\002\003\004\005\006\007", (testprotos.exfubar) = "splat!"];
+  extensions 201 to 250 [
+    (testprotos.exfubarb) = "\000\001\002\003\004\005\006\007",
+    (testprotos.exfubar) = "splat!"
+  ];
 
   reserved 10 to 20, 30 to 50;
 
@@ -66,9 +74,15 @@ message Request {
     // allow_alias comments!
     option allow_alias = true;
 
-    MARIO = 1 [(testprotos.evfubars) = -314, (testprotos.evfubar) = 278];
+    MARIO = 1 [
+      (testprotos.evfubars) = -314,
+      (testprotos.evfubar) = 278
+    ];
 
-    LUIGI = 2 [(testprotos.evfubaruf) = 100, (testprotos.evfubaru) = 200];
+    LUIGI = 2 [
+      (testprotos.evfubaruf) = 100,
+      (testprotos.evfubaru) = 200
+    ];
 
     PEACH = 3;
 
