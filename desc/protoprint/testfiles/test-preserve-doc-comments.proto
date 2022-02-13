@@ -81,6 +81,8 @@ message Request {
 
   // can be these or those
   oneof xyz {
+    option (testprotos.oofubar) = "whoops!";
+
     string these = 6;
 
     int32 those = 7;

@@ -112,6 +112,9 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   // can be these or those
   oneof xyz {
+    // whoops?
+    option (testprotos.oofubar) = "whoops!";
+
     string these = 6;
 
     int32 those = 7;
@@ -156,6 +159,7 @@ service /* service name */ RpcService {
   rpc UnaryRpc ( Request ) returns ( google.protobuf.Empty ) {
     // trailer for method
 
+    // this RPC is deprecated!
     option deprecated = true;
 
     option (testprotos.mtfubar) = 12.340000;
