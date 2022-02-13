@@ -4,11 +4,11 @@
 package grpcdynamic
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	"github.com/golang/protobuf/proto"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -74,6 +74,7 @@ func (s Stub) InvokeRpcServerStream(ctx context.Context, method *desc.MethodDesc
 		ClientStreams: method.IsClientStreaming(),
 	}
 	if cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...); err != nil {
+		cancel()
 		return nil, err
 	} else {
 		err = cs.SendMsg(request)
@@ -86,6 +87,11 @@ func (s Stub) InvokeRpcServerStream(ctx context.Context, method *desc.MethodDesc
 			cancel()
 			return nil, err
 		}
+		go func() {
+			// when the new stream is finished, also cleanup the parent context
+			<-cs.Context().Done()
+			cancel()
+		}()
 		return &ServerStream{cs, method.GetOutputType(), s.mf}, nil
 	}
 }
@@ -103,8 +109,14 @@ func (s Stub) InvokeRpcClientStream(ctx context.Context, method *desc.MethodDesc
 		ClientStreams: method.IsClientStreaming(),
 	}
 	if cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...); err != nil {
+		cancel()
 		return nil, err
 	} else {
+		go func() {
+			// when the new stream is finished, also cleanup the parent context
+			<-cs.Context().Done()
+			cancel()
+		}()
 		return &ClientStream{cs, method, s.mf, cancel}, nil
 	}
 }

@@ -1,6 +1,7 @@
 package grpcdynamic
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -8,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	"github.com/jhump/protoreflect/desc"

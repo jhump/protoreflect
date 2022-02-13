@@ -2,6 +2,7 @@ package msgregistry
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"golang.org/x/net/context"
 	"google.golang.org/genproto/protobuf/ptype"
 	"google.golang.org/genproto/protobuf/source_context"
 

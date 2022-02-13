@@ -1,10 +1,10 @@
 package testutil
 
 import (
+	"context"
 	"io"
 
 	grpc_testing "github.com/jhump/protoreflect/internal/testprotos/grpc"
-	"golang.org/x/net/context"
 )
 
 // TestService is a very simple test service that just echos back request payloads
