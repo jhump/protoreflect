@@ -4,7 +4,7 @@ set -e
 
 cd $(dirname $0)
 
-PROTOC_VERSION="3.12.0"
+PROTOC_VERSION="3.19.0"
 PROTOC_OS="$(uname -s)"
 PROTOC_ARCH="$(uname -m)"
 case "${PROTOC_OS}" in

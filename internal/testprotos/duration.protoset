@@ -1,7 +1,7 @@
 
-ó
+û
 google/protobuf/duration.protogoogle.protobuf":
 Duration
 seconds (Rseconds
-nanos (RnanosB|
-com.google.protobufBDurationProtoPZ*github.com/golang/protobuf/ptypes/durationø¢GPBªGoogle.Protobuf.WellKnownTypesbproto3
+nanos (RnanosBƒ
+com.google.protobufBDurationProtoPZ1google.golang.org/protobuf/types/known/durationpbø¢GPBªGoogle.Protobuf.WellKnownTypesbproto3
