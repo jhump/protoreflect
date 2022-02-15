@@ -31,13 +31,14 @@ if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc ${PROTOC_VERSION}" ]]; 
 fi
 
 go install github.com/golang/protobuf/protoc-gen-go 
+go install github.com/jhump/protoreflect/desc/sourceinfo/cmd/protoc-gen-gosrcinfo
 
 # Output directory will effectively be GOPATH/src.
 outdir="../../../../.."
-${PROTOC} "--go_out=plugins=grpc:$outdir" -I. *.proto
-${PROTOC} "--go_out=plugins=grpc:$outdir" -I. nopkg/*.proto
-${PROTOC} "--go_out=plugins=grpc:$outdir" -I. pkg/*.proto
-${PROTOC} "--go_out=plugins=grpc:$outdir" -I. grpc/*.proto
+${PROTOC} "--go_out=plugins=grpc:$outdir" "--gosrcinfo_out=debug:$outdir" -I. *.proto
+${PROTOC} "--go_out=plugins=grpc:$outdir" "--gosrcinfo_out=debug:$outdir" -I. nopkg/*.proto
+${PROTOC} "--go_out=plugins=grpc:$outdir" "--gosrcinfo_out=debug:$outdir" -I. pkg/*.proto
+${PROTOC} "--go_out=plugins=grpc:$outdir" "--gosrcinfo_out=debug:$outdir" -I. grpc/*.proto
 
 # And make descriptor set (with source info) for several files
 ${PROTOC} --descriptor_set_out=./desc_test1.protoset --include_source_info --include_imports -I. desc_test1.proto
