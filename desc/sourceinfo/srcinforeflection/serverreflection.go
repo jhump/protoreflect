@@ -5,17 +5,19 @@
 package srcinforeflection
 
 import (
-	"github.com/golang/protobuf/proto"
-	"github.com/jhump/protoreflect/desc/sourceinfo"
+	"io"
+	"sort"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
-	"io"
-	"sort"
+
+	"github.com/jhump/protoreflect/desc/sourceinfo"
 )
 
 // NB: This was forked from the implementation in google.golang.org/grpc/reflection.

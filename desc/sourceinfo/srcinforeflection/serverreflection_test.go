@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
+	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
@@ -43,7 +43,7 @@ func TestReflectionService(t *testing.T) {
 		_ = cc.Close()
 	}()
 
-	stub := grpc_reflection_v1alpha.NewServerReflectionClient(cc)
+	stub := rpb.NewServerReflectionClient(cc)
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 	cli := grpcreflect.NewClient(ctx, stub)

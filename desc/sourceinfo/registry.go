@@ -1,3 +1,21 @@
+// Package sourceinfo provides the ability to register and query source code info
+// for file descriptors that are compiled into the binary. This data is registered
+// by code generated from the protoc-gen-gosrcinfo plugin.
+//
+// The standard descriptors bundled into the compiled binary are stripped of source
+// code info, to reduce binary size and reduce runtime memory footprint. However,
+// the source code info can be very handy and worth the size cost when used with
+// gRPC services and the server reflection service. Without source code info, the
+// descriptors that a client downloads from the reflection service have no comments.
+// But the presence of comments, and the ability to show them to humans, can greatly
+// improve the utility of user agents that use the reflection service.
+//
+// So, by using the protoc-gen-gosrcinfo plugin and this package, we can recover the
+// source code info and comments that were otherwise stripped by protoc-gen-go.
+//
+// Also see the "github.com/jhump/protoreflect/desc/srcinfo/srcinforeflection" package
+// for an implementation of the gRPC server reflection service that uses this package
+// return descriptors with source code info.
 package sourceinfo
 
 import (
@@ -11,6 +29,11 @@ import (
 )
 
 var (
+	// GlobalFiles is a registry of descriptors that include source code info, if the
+	// file they belong to were processed with protoc-gen-gosrcinfo.
+	//
+	// If is mean to serve as a drop-in alternative to protoregistry.GlobalFiles that
+	// can include source code info in the returned descriptors.
 	GlobalFiles protodesc.Resolver = registry{}
 
 	mu               sync.RWMutex
@@ -18,12 +41,20 @@ var (
 	fileDescriptors  = map[protoreflect.FileDescriptor]protoreflect.FileDescriptor{}
 )
 
+// RegisterSourceInfo registers the given source code info for the file descriptor
+// with the given path/name.
+//
+// This is automatically used from generated code if using the protoc-gen-gosrcinfo
+// plugin.
 func RegisterSourceInfo(file string, srcInfo *descriptorpb.SourceCodeInfo) {
 	mu.Lock()
 	defer mu.Unlock()
 	sourceInfoByFile[file] = srcInfo
 }
 
+// SourceInfoForFile queries for any registered source code info for the file
+// descriptor with the given path/name. It returns nil if no source code info
+// was registered.
 func SourceInfoForFile(file string) *descriptorpb.SourceCodeInfo {
 	mu.RLock()
 	defer mu.RUnlock()

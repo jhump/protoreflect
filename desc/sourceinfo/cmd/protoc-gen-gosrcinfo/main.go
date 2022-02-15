@@ -1,3 +1,6 @@
+// Command protoc-gen-gosrcinfo is a protoc plugin. It emits Go code, into files
+// named "<file>.pb.srcinfo.go". These source files include source code info for
+// processed proto files and register that info with the srcinfo package.
 package main
 
 import (
