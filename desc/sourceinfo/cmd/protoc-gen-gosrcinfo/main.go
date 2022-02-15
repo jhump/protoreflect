@@ -13,6 +13,7 @@ import (
 	"github.com/jhump/gopoet"
 	"github.com/jhump/goprotoc/plugins"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/pluginpb"
 
 	"github.com/jhump/protoreflect/desc"
 )
@@ -22,6 +23,7 @@ func main() {
 }
 
 func genSourceInfo(req *plugins.CodeGenRequest, resp *plugins.CodeGenResponse) error {
+	resp.SupportsFeatures(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL)
 	args, err := parseArgs(req.Args)
 	if err != nil {
 		return err
