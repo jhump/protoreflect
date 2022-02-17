@@ -5,7 +5,7 @@ package testprotos
 
 import "github.com/jhump/protoreflect/desc/sourceinfo"
 import "google.golang.org/protobuf/proto"
-import descriptorpb "google.golang.org/protobuf/types/descriptorpb"
+import "google.golang.org/protobuf/types/descriptorpb"
 
 var srcInfo_desc_test_comments = []byte{
 	0x0a, 0x07, 0x12, 0x05, 0x07, 0x00, 0x9b, 0x01, 0x01, 0x0a, 0xa1, 0x01, 0x0a, 0x01, 0x0c, 0x12,
