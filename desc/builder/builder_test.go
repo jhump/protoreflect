@@ -540,8 +540,9 @@ func roundTripFile(t *testing.T, fd *desc.FileDescriptor) {
 	fdp.PublicDependency = nil
 	fdp.WeakDependency = nil
 
-	// Remove source code info that the builder generated since the original
-	// has none.
+	// Remove source code info: what the builder generates is not expected to
+	// match the original source.
+	fdp.SourceCodeInfo = nil
 	roundTripped.AsFileDescriptorProto().SourceCodeInfo = nil
 
 	// Finally, sort the imports. That way they match the built result (which

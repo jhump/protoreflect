@@ -2,6 +2,12 @@
 // that includes source code info, if the protoc-gen-gosrcinfo plugin was used
 // for the files that contain the descriptors being served. This allows for
 // sending comment information to dynamic/reflective clients.
+//
+// NOTE: This package is EXPERIMENTAL! It may not see the light of day in an
+// actual release. Instead, the hope is that the core gRPC reflection package
+// can be updated in a way to more easily accommodate customizations, such as
+// the caller wanting to use sourceinfo.GlobalFiles as the source of descriptors.
+// Related: https://github.com/grpc/grpc-go/pull/5197
 package srcinforeflection
 
 import (

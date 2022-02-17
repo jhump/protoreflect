@@ -5,7 +5,7 @@ package pkg
 
 import "github.com/jhump/protoreflect/desc/sourceinfo"
 import "google.golang.org/protobuf/proto"
-import descriptorpb "google.golang.org/protobuf/types/descriptorpb"
+import "google.golang.org/protobuf/types/descriptorpb"
 
 var srcInfo_pkg_desc_test_pkg = []byte{
 	0x0a, 0x06, 0x12, 0x04, 0x00, 0x00, 0x14, 0x01, 0x0a, 0x08, 0x0a, 0x01, 0x0c, 0x12, 0x03, 0x00,

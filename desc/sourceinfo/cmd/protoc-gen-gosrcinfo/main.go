@@ -6,13 +6,11 @@ package main
 import (
 	"fmt"
 	"path"
-	"reflect"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/jhump/gopoet"
 	"github.com/jhump/goprotoc/plugins"
-	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/pluginpb"
 
 	"github.com/jhump/protoreflect/desc"
@@ -61,8 +59,6 @@ func genSourceInfo(req *plugins.CodeGenRequest, resp *plugins.CodeGenResponse) e
 	return nil
 }
 
-var typeOfSourceInfo = reflect.TypeOf((*descriptorpb.SourceCodeInfo)(nil)).Elem()
-
 func generateSourceInfo(fd *desc.FileDescriptor, names *plugins.GoNames, resp *plugins.CodeGenResponse, args codeGenArgs) error {
 	si := fd.AsFileDescriptorProto().GetSourceCodeInfo()
 	if len(si.GetLocation()) == 0 {
@@ -80,7 +76,7 @@ func generateSourceInfo(fd *desc.FileDescriptor, names *plugins.GoNames, resp *p
 		return fmt.Errorf("failed to serialize source code info: %w", err)
 	}
 
-	srcCodeInfo := f.EnsureTypeImported(gopoet.TypeNameForReflectType(typeOfSourceInfo))
+	descpbPkg := f.RegisterImport("google.golang.org/protobuf/types/descriptorpb", "descriptorpb")
 	srcInfoPkg := f.RegisterImport("github.com/jhump/protoreflect/desc/sourceinfo", "sourceinfo")
 	protoPkg := f.RegisterImport("google.golang.org/protobuf/proto", "proto")
 
@@ -104,7 +100,7 @@ func generateSourceInfo(fd *desc.FileDescriptor, names *plugins.GoNames, resp *p
 	initBlock.Println("}")
 	f.AddVar(gopoet.NewVar(varName).SetInitializer(&initBlock))
 	f.AddElement(gopoet.NewFunc("init").
-		Printlnf("var si %s", srcCodeInfo).
+		Printlnf("var si %sSourceCodeInfo", descpbPkg).
 		Printlnf("if err := %sUnmarshal(%s, &si); err != nil {", protoPkg, varName).
 		Println("    panic(err)").
 		Println("}").

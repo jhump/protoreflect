@@ -87,6 +87,9 @@ func checkFiles(t *testing.T, act, exp *desc.FileDescriptor, checked map[string]
 	}
 	checked[act.GetName()] = struct{}{}
 
+	// remove any source code info from expected value, since actual won't have any
+	exp.AsFileDescriptorProto().SourceCodeInfo = nil
+
 	testutil.Require(t, proto.Equal(exp.AsFileDescriptorProto(), act.AsProto()), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(exp.AsProto()), toString(act.AsProto()))
 
 	for i, dep := range act.GetDependencies() {

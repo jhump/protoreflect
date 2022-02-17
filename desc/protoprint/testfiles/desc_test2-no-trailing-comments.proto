@@ -1,5 +1,7 @@
 syntax = "proto2";
 
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
 package testprotos;
 
 import "desc_test1.proto";
@@ -7,8 +9,6 @@ import "desc_test1.proto";
 import "pkg/desc_test_pkg.proto";
 
 import "nopkg/desc_test_nopkg.proto";
-
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 message Frobnitz {
   optional TestMessage a = 1;
