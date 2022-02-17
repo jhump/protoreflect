@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
+	"github.com/jhump/protoreflect/desc/sourceinfo"
 	"github.com/jhump/protoreflect/internal"
 )
 
@@ -44,6 +45,7 @@ func loadFileDescriptorLocked(file string, r *ImportResolver) (*FileDescriptor, 
 	if err != nil {
 		return nil, err
 	}
+	fd.SourceCodeInfo = sourceinfo.SourceInfoForFile(file)
 
 	f, err = toFileDescriptorLocked(fd, r)
 	if err != nil {
