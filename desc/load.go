@@ -45,7 +45,6 @@ func loadFileDescriptorLocked(file string, r *ImportResolver) (*FileDescriptor, 
 	if err != nil {
 		return nil, err
 	}
-	fd.SourceCodeInfo = sourceinfo.SourceInfoForFile(file)
 
 	f, err = toFileDescriptorLocked(fd, r)
 	if err != nil {
@@ -56,6 +55,7 @@ func loadFileDescriptorLocked(file string, r *ImportResolver) (*FileDescriptor, 
 }
 
 func toFileDescriptorLocked(fd *dpb.FileDescriptorProto, r *ImportResolver) (*FileDescriptor, error) {
+	fd.SourceCodeInfo = sourceinfo.SourceInfoForFile(fd.GetName())
 	deps := make([]*FileDescriptor, len(fd.GetDependency()))
 	for i, dep := range fd.GetDependency() {
 		resolvedDep := r.ResolveImport(fd.GetName(), dep)

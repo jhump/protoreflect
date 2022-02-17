@@ -2045,6 +2045,9 @@ func TestGetDescriptor(t *testing.T) {
 		testutil.Eq(t, expectedPath, actualPath, "%s: descriptor paths are not the same", testCase.name)
 
 		actualFd, err := internal.DecodeFileDescriptor("TestMessage", actualBytes)
+		// desc.LoadMessageDescriptorForMessage above can incorporate source code info that will
+		// not be present when directly calling generated messages's Descriptor method
+		actualFd.SourceCodeInfo = nil
 		testutil.Ok(t, err, "%s: failed to decode descriptor from bytes", testCase.name)
 		expectedFd, err := internal.DecodeFileDescriptor("TestMessage", expectedBytes)
 		testutil.Ok(t, err, "%s: failed to decode descriptor from bytes", testCase.name)
