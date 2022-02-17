@@ -498,3 +498,11 @@ func (m methodDescriptor) Input() protoreflect.MessageDescriptor {
 func (m methodDescriptor) Output() protoreflect.MessageDescriptor {
 	return messageDescriptor{m.MethodDescriptor.Output()}
 }
+
+type extensionType struct {
+	protoreflect.ExtensionType
+}
+
+func (e extensionType) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {
+	return extensionDescriptor{e.ExtensionType.TypeDescriptor()}
+}
