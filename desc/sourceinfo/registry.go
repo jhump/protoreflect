@@ -12,10 +12,6 @@
 //
 // So, by using the protoc-gen-gosrcinfo plugin and this package, we can recover the
 // source code info and comments that were otherwise stripped by protoc-gen-go.
-//
-// Also see the "github.com/jhump/protoreflect/desc/srcinfo/srcinforeflection" package
-// for an implementation of the gRPC server reflection service that uses this package
-// return descriptors with source code info.
 package sourceinfo
 
 import (
@@ -34,12 +30,18 @@ var (
 	//
 	// If is mean to serve as a drop-in alternative to protoregistry.GlobalFiles that
 	// can include source code info in the returned descriptors.
-	GlobalFiles protodesc.Resolver = registry{}
+	GlobalFiles Resolver = registry{}
 
 	mu               sync.RWMutex
 	sourceInfoByFile = map[string]*descriptorpb.SourceCodeInfo{}
 	fileDescriptors  = map[protoreflect.FileDescriptor]protoreflect.FileDescriptor{}
 )
+
+type Resolver interface {
+	protodesc.Resolver
+	protoregistry.ExtensionTypeResolver
+	RangeExtensionsByMessage(message protoreflect.FullName, f func(protoreflect.ExtensionType) bool)
+}
 
 // RegisterSourceInfo registers the given source code info for the file descriptor
 // with the given path/name.
@@ -137,4 +139,26 @@ func (r registry) FindDescriptorByName(name protoreflect.FullName) (protoreflect
 	default:
 		return nil, fmt.Errorf("unrecognized descriptor type: %T", d)
 	}
+}
+
+func (r registry) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
+	xt, err := protoregistry.GlobalTypes.FindExtensionByName(field)
+	if err != nil {
+		return nil, err
+	}
+	return extensionType{xt}, nil
+}
+
+func (r registry) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
+	xt, err := protoregistry.GlobalTypes.FindExtensionByNumber(message, field)
+	if err != nil {
+		return nil, err
+	}
+	return extensionType{xt}, nil
+}
+
+func (r registry) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionType) bool) {
+	protoregistry.GlobalTypes.RangeExtensionsByMessage(message, func(xt protoreflect.ExtensionType) bool {
+		return fn(extensionType{xt})
+	})
 }
