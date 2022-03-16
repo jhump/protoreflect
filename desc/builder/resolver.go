@@ -329,90 +329,90 @@ func (r *dependencyResolver) resolveType(root Builder, seen []Builder, typeBuild
 
 func (r *dependencyResolver) resolveTypesInFileOptions(root Builder, deps *dependencies, fb *FileBuilder) error {
 	for _, mb := range fb.messages {
-		if err := r.resolveTypesInMessageOptions(root, deps, mb); err != nil {
+		if err := r.resolveTypesInMessageOptions(root, fb.origExts, deps, mb); err != nil {
 			return err
 		}
 	}
 	for _, eb := range fb.enums {
-		if err := r.resolveTypesInEnumOptions(root, deps, eb); err != nil {
+		if err := r.resolveTypesInEnumOptions(root, fb.origExts, deps, eb); err != nil {
 			return err
 		}
 	}
 	for _, exb := range fb.extensions {
-		if err := r.resolveTypesInOptions(root, deps, exb.Options); err != nil {
+		if err := r.resolveTypesInOptions(root, fb.origExts, deps, exb.Options); err != nil {
 			return err
 		}
 	}
 	for _, sb := range fb.services {
 		for _, mtb := range sb.methods {
-			if err := r.resolveTypesInOptions(root, deps, mtb.Options); err != nil {
+			if err := r.resolveTypesInOptions(root, fb.origExts, deps, mtb.Options); err != nil {
 				return err
 			}
 		}
-		if err := r.resolveTypesInOptions(root, deps, sb.Options); err != nil {
+		if err := r.resolveTypesInOptions(root, fb.origExts, deps, sb.Options); err != nil {
 			return err
 		}
 	}
-	return r.resolveTypesInOptions(root, deps, fb.Options)
+	return r.resolveTypesInOptions(root, fb.origExts, deps, fb.Options)
 }
 
-func (r *dependencyResolver) resolveTypesInMessageOptions(root Builder, deps *dependencies, mb *MessageBuilder) error {
+func (r *dependencyResolver) resolveTypesInMessageOptions(root Builder, fileExts *dynamic.ExtensionRegistry, deps *dependencies, mb *MessageBuilder) error {
 	for _, b := range mb.fieldsAndOneOfs {
 		if flb, ok := b.(*FieldBuilder); ok {
-			if err := r.resolveTypesInOptions(root, deps, flb.Options); err != nil {
+			if err := r.resolveTypesInOptions(root, fileExts, deps, flb.Options); err != nil {
 				return err
 			}
 		} else {
 			oob := b.(*OneOfBuilder)
 			for _, flb := range oob.choices {
-				if err := r.resolveTypesInOptions(root, deps, flb.Options); err != nil {
+				if err := r.resolveTypesInOptions(root, fileExts, deps, flb.Options); err != nil {
 					return err
 				}
 			}
-			if err := r.resolveTypesInOptions(root, deps, oob.Options); err != nil {
+			if err := r.resolveTypesInOptions(root, fileExts, deps, oob.Options); err != nil {
 				return err
 			}
 		}
 	}
 	for _, extr := range mb.ExtensionRanges {
-		if err := r.resolveTypesInOptions(root, deps, extr.Options); err != nil {
+		if err := r.resolveTypesInOptions(root, fileExts, deps, extr.Options); err != nil {
 			return err
 		}
 	}
 	for _, eb := range mb.nestedEnums {
-		if err := r.resolveTypesInEnumOptions(root, deps, eb); err != nil {
+		if err := r.resolveTypesInEnumOptions(root, fileExts, deps, eb); err != nil {
 			return err
 		}
 	}
 	for _, nmb := range mb.nestedMessages {
-		if err := r.resolveTypesInMessageOptions(root, deps, nmb); err != nil {
+		if err := r.resolveTypesInMessageOptions(root, fileExts, deps, nmb); err != nil {
 			return err
 		}
 	}
 	for _, exb := range mb.nestedExtensions {
-		if err := r.resolveTypesInOptions(root, deps, exb.Options); err != nil {
+		if err := r.resolveTypesInOptions(root, fileExts, deps, exb.Options); err != nil {
 			return err
 		}
 	}
-	if err := r.resolveTypesInOptions(root, deps, mb.Options); err != nil {
+	if err := r.resolveTypesInOptions(root, fileExts, deps, mb.Options); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *dependencyResolver) resolveTypesInEnumOptions(root Builder, deps *dependencies, eb *EnumBuilder) error {
+func (r *dependencyResolver) resolveTypesInEnumOptions(root Builder, fileExts *dynamic.ExtensionRegistry, deps *dependencies, eb *EnumBuilder) error {
 	for _, evb := range eb.values {
-		if err := r.resolveTypesInOptions(root, deps, evb.Options); err != nil {
+		if err := r.resolveTypesInOptions(root, fileExts, deps, evb.Options); err != nil {
 			return err
 		}
 	}
-	if err := r.resolveTypesInOptions(root, deps, eb.Options); err != nil {
+	if err := r.resolveTypesInOptions(root, fileExts, deps, eb.Options); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *dependencyResolver) resolveTypesInOptions(root Builder, deps *dependencies, opts proto.Message) error {
+func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts *dynamic.ExtensionRegistry, deps *dependencies, opts proto.Message) error {
 	// nothing to see if opts is nil
 	if opts == nil {
 		return nil
@@ -427,6 +427,7 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, deps *dependenc
 	if err != nil {
 		return err
 	}
+
 	for _, ed := range extdescs {
 		// see if known dependencies have this option
 		extd := deps.exts.FindExtension(msgName, ed.Field)
@@ -444,7 +445,19 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, deps *dependenc
 		if extd != nil {
 			// extension registry recognized it!
 			deps.add(extd.GetFile())
-		} else if ed.Filename != "" {
+			continue
+		}
+		// see if given file extensions knows about it
+		if fileExts != nil {
+			extd = fileExts.FindExtension(msgName, ed.Field)
+			if extd != nil {
+				// file extensions recognized it!
+				deps.add(extd.GetFile())
+				continue
+			}
+		}
+
+		if ed.Filename != "" {
 			// if filename is filled in, then this extension is a known
 			// extension (registered in proto package)
 			fd, err := desc.LoadFileDescriptor(ed.Filename)
@@ -452,7 +465,11 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, deps *dependenc
 				return err
 			}
 			deps.add(fd)
-		} else if r.opts.RequireInterpretedOptions {
+			continue
+
+		}
+
+		if r.opts.RequireInterpretedOptions {
 			// we require options to be interpreted but are not able to!
 			return fmt.Errorf("could not interpret custom option for %s, tag %d", msgName, ed.Field)
 		}

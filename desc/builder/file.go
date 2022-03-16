@@ -11,6 +11,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
+	"github.com/jhump/protoreflect/dynamic"
 )
 
 var uniqueFileCounter uint64
@@ -59,6 +60,7 @@ type FileBuilder struct {
 	services   []*ServiceBuilder
 	symbols    map[string]Builder
 
+	origExts        *dynamic.ExtensionRegistry
 	explicitDeps    map[*FileBuilder]struct{}
 	explicitImports map[*desc.FileDescriptor]struct{}
 }
@@ -98,6 +100,7 @@ func FromFile(fd *desc.FileDescriptor) (*FileBuilder, error) {
 	// add imports explicitly
 	for _, dep := range fd.GetDependencies() {
 		fb.AddImportedDependency(dep)
+		fb.addExtensionsFromImport(dep)
 	}
 
 	localMessages := map[*desc.MessageDescriptor]*MessageBuilder{}
@@ -564,6 +567,18 @@ func (fb *FileBuilder) TryAddService(sb *ServiceBuilder) error {
 	return nil
 }
 
+func (fb *FileBuilder) addExtensionsFromImport(dep *desc.FileDescriptor) {
+	if fb.origExts == nil {
+		fb.origExts = &dynamic.ExtensionRegistry{}
+	}
+	fb.origExts.AddExtensionsFromFile(dep)
+	// we also add any extensions from this dependency's "public" imports since
+	// they are also visible to the importing file
+	for _, publicDep := range dep.GetPublicDependencies() {
+		fb.addExtensionsFromImport(publicDep)
+	}
+}
+
 // AddDependency adds the given file as an explicit import. Normally,
 // dependencies can be inferred during the build process by finding the files
 // for all referenced types (such as message and enum types used in this file).
@@ -571,7 +586,7 @@ func (fb *FileBuilder) TryAddService(sb *ServiceBuilder) error {
 // to be interpretable. And they aren't known unless an explicit import is added
 // for the file that contains the custom options.
 //
-// Knowledge of custom options can also be provided by using BuildOptions with
+// Knowledge of custom options can also be provided by using BuilderOptions with
 // an ExtensionRegistry, when building the file.
 func (fb *FileBuilder) AddDependency(dep *FileBuilder) *FileBuilder {
 	if fb.explicitDeps == nil {
@@ -588,13 +603,34 @@ func (fb *FileBuilder) AddDependency(dep *FileBuilder) *FileBuilder {
 // to be interpretable. And they aren't known unless an explicit import is added
 // for the file that contains the custom options.
 //
-// Knowledge of custom options can also be provided by using BuildOptions with
+// Knowledge of custom options can also be provided by using BuilderOptions with
 // an ExtensionRegistry, when building the file.
 func (fb *FileBuilder) AddImportedDependency(dep *desc.FileDescriptor) *FileBuilder {
 	if fb.explicitImports == nil {
 		fb.explicitImports = map[*desc.FileDescriptor]struct{}{}
 	}
 	fb.explicitImports[dep] = struct{}{}
+	return fb
+}
+
+// PruneUnusedDependencies removes all imports that are not actually used in the
+// file. Note that this undoes any calls to AddDependency or AddImportedDependency
+// which means that custom options may be missing from the resulting built
+// descriptor unless BuilderOptions are used that include an ExtensionRegistry with
+// knowledge of all custom options.
+//
+// When FromFile is used to create a FileBuilder from an existing descriptor, all
+// imports are usually preserved in any subsequent built descriptor. But this method
+// can be used to remove imports from the original file, like if mutations are made
+// to the file's contents such that not all imports are needed anymore. When FromFile
+// is used, any custom options present in the original descriptor will be correctly
+// retained. If the file is mutated such that new custom options are added to the file,
+// they may be missing unless AddImportedDependency is called after pruning OR
+// BuilderOptions are used that include an ExtensionRegistry with knowledge of the
+// new custom options.
+func (fb *FileBuilder) PruneUnusedDependencies() *FileBuilder {
+	fb.explicitImports = nil
+	fb.explicitDeps = nil
 	return fb
 }
 
