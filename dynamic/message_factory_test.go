@@ -66,6 +66,12 @@ func TestKnownTypeRegistry_WithDefaults(t *testing.T) {
 	checkKnownTypes(t, ktr, (*descriptor.DescriptorProto)(nil), (*descriptor.FileDescriptorProto)(nil), (*testprotos.TestMessage)(nil))
 }
 
+func TestKnownTypeRegistry_WithDefaults_MapEntry(t *testing.T) {
+	ktr := NewKnownTypeRegistryWithDefaults()
+	msgType := ktr.GetKnownType("testprotos.MapKeyFields.SEntry")
+	testutil.Require(t, msgType == nil, "should not be a known type for map entry but got %v", msgType)
+}
+
 func checkKnownTypes(t *testing.T, ktr *KnownTypeRegistry, knownTypes ...proto.Message) {
 	for _, kt := range knownTypes {
 		md, err := desc.LoadMessageDescriptorForMessage(kt)
