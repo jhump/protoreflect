@@ -1422,3 +1422,54 @@ func clone(t *testing.T, fb *FileBuilder) *FileBuilder {
 	testutil.Ok(t, err)
 	return fb
 }
+
+func TestPruneDependencies(t *testing.T) {
+	msgOpts := &dpb.MessageOptions{}
+	msgOptsDesc, err := desc.LoadMessageDescriptorForMessage(msgOpts)
+	testutil.Ok(t, err)
+	extDesc, err := NewExtensionImported("foo", 20001, FieldTypeString(), msgOptsDesc).Build()
+	testutil.Ok(t, err)
+
+	dm := dynamic.NewMessage(msgOptsDesc)
+	dm.SetField(extDesc, "bar")
+	err = dm.ConvertTo(msgOpts)
+	testutil.Ok(t, err)
+
+	emptyDesc, err := desc.LoadMessageDescriptorForMessage(&empty.Empty{})
+	testutil.Ok(t, err)
+
+	// we have to explicitly import the file for the custom option
+	fileB := NewFile("").AddImportedDependency(extDesc.GetFile())
+	msgB := NewMessage("Foo").
+		AddField(NewField("a", FieldTypeImportedMessage(emptyDesc))).
+		SetOptions(msgOpts)
+	fileDesc, err := fileB.AddMessage(msgB).Build()
+	testutil.Ok(t, err)
+
+	// The file for msgDesc should have two imports: one for the custom option and
+	//   one for empty.proto.
+	testutil.Eq(t, 2, len(fileDesc.GetDependencies()))
+	testutil.Eq(t, "google/protobuf/empty.proto", fileDesc.GetDependencies()[0].GetName())
+	testutil.Eq(t, extDesc.GetFile().GetName(), fileDesc.GetDependencies()[1].GetName())
+
+	// If we now remove the message's field, both imports are still there even
+	// though the import for empty.proto is now unused.
+	fileB, err = FromFile(fileDesc)
+	testutil.Ok(t, err)
+	fileB.GetMessage("Foo").RemoveField("a")
+	newFileDesc, err := fileB.Build()
+	testutil.Ok(t, err)
+	testutil.Eq(t, 2, len(newFileDesc.GetDependencies()))
+	testutil.Eq(t, "google/protobuf/empty.proto", newFileDesc.GetDependencies()[0].GetName())
+	testutil.Eq(t, extDesc.GetFile().GetName(), newFileDesc.GetDependencies()[1].GetName())
+
+	// But if we prune unused dependencies, we'll see the import for empty.proto
+	// gone. The other import for the custom option should be preserved.
+	fileB, err = FromFile(fileDesc)
+	testutil.Ok(t, err)
+	fileB.GetMessage("Foo").RemoveField("a")
+	newFileDesc, err = fileB.PruneUnusedDependencies().Build()
+	testutil.Ok(t, err)
+	testutil.Eq(t, 1, len(newFileDesc.GetDependencies()))
+	testutil.Eq(t, extDesc.GetFile().GetName(), newFileDesc.GetDependencies()[0].GetName())
+}
