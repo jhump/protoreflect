@@ -739,7 +739,7 @@ func (r *parseResult) putFieldNode(f *dpb.FieldDescriptorProto, n ast.FieldDeclN
 	r.nodes[f] = n
 }
 
-func (r *parseResult) putOneOfNode(o *dpb.OneofDescriptorProto, n *ast.OneOfNode) {
+func (r *parseResult) putOneOfNode(o *dpb.OneofDescriptorProto, n ast.OneOfDeclNode) {
 	r.nodes[o] = n
 }
 

@@ -477,7 +477,14 @@ func (r *parseResult) addMessageBody(msgd *dpb.DescriptorProto, body *ast.Messag
 
 	// process any proto3_optional fields
 	if isProto3 {
-		internal.ProcessProto3OptionalFields(msgd)
+		callback := func(fd *dpb.FieldDescriptorProto, ood *dpb.OneofDescriptorProto) {
+			node, ok := r.getFieldNode(fd).(*ast.FieldNode)
+			if ok {
+				r.putOneOfNode(ood, ast.NewSyntheticOneOf(node))
+			}
+			// TODO: the !ok case should really never happen... log an error?
+		}
+		internal.ProcessProto3OptionalFields(msgd, callback)
 	}
 }
 
