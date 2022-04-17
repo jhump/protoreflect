@@ -819,7 +819,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInf
 	}
 
 	if mb.GetFile().IsProto3 {
-		internal.ProcessProto3OptionalFields(md)
+		internal.ProcessProto3OptionalFields(md, nil)
 	}
 
 	return md, nil

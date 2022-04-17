@@ -1033,3 +1033,50 @@ message ReferencesFooOption {
 		t.Errorf("expecting validation error %q; instead got: %q", errs[0].Error(), errMsg)
 	}
 }
+
+func TestSyntheticOneOfCollisions(t *testing.T) {
+	input := map[string]string{
+		"foo1.proto": "syntax = \"proto3\";\n" +
+			"message Foo {\n" +
+			"  optional string bar = 1;\n" +
+			"}\n",
+		"foo2.proto": "syntax = \"proto3\";\n" +
+			"message Foo {\n" +
+			"  optional string bar = 1;\n" +
+			"}\n",
+	}
+	acc := func(filename string) (io.ReadCloser, error) {
+		f, ok := input[filename]
+		if !ok {
+			return nil, fmt.Errorf("file not found: %s", filename)
+		}
+		return ioutil.NopCloser(strings.NewReader(f)), nil
+	}
+
+	var errs []error
+	errReporter := func(errorWithPos ErrorWithPos) error {
+		errs = append(errs, errorWithPos)
+		// need to return nil to accumulate all errors so we can report synthetic
+		// oneof collision; otherwise, the link will fail after the first collision
+		// and we'll never test the synthetic oneofs
+		return nil
+	}
+
+	_, err := Parser{
+		Accessor:      acc,
+		ErrorReporter: errReporter,
+	}.ParseFiles("foo1.proto", "foo2.proto")
+
+	testutil.Eq(t, ErrInvalidSource, err)
+
+	expected := []string{
+		`foo2.proto:2:1: duplicate symbol Foo: already defined as message in "foo1.proto"`,
+		`foo2.proto:3:3: duplicate symbol Foo._bar: already defined as oneof in "foo1.proto"`,
+		`foo2.proto:3:3: duplicate symbol Foo.bar: already defined as field in "foo1.proto"`,
+	}
+	var actual []string
+	for _, err := range errs {
+		actual = append(actual, err.Error())
+	}
+	testutil.Eq(t, actual, expected)
+}

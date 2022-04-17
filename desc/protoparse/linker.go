@@ -146,6 +146,12 @@ func (l *linker) createDescriptorPool() error {
 					desc1, desc2 = desc2, desc1
 				}
 				node := l.files[file2].getNode(desc2)
+				if node == nil {
+					// TODO: this should never happen, but in case there is a bug where
+					// we get back a nil node, we'd rather fail to report line+column
+					// info than panic with a nil dereference below
+					node = ast.NewNoSourceNode(file2)
+				}
 				if err := l.errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s in %q", k, descriptorType(desc1), file1); err != nil {
 					return err
 				}
