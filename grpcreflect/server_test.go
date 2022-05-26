@@ -5,17 +5,17 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/jhump/protoreflect/internal/testprotos"
+	testprotosgrpc "github.com/jhump/protoreflect/internal/testprotos/grpc"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
 type testService struct {
-	testprotos.TestServiceServer
+	testprotosgrpc.TestServiceServer
 }
 
 func TestLoadServiceDescriptors(t *testing.T) {
 	s := grpc.NewServer()
-	testprotos.RegisterTestServiceServer(s, testService{})
+	testprotosgrpc.RegisterTestServiceServer(s, testService{})
 	sds, err := LoadServiceDescriptors(s)
 	testutil.Ok(t, err)
 	testutil.Eq(t, 1, len(sds))
@@ -39,7 +39,7 @@ func TestLoadServiceDescriptors(t *testing.T) {
 }
 
 func TestLoadServiceDescriptor(t *testing.T) {
-	sd, err := LoadServiceDescriptor(testprotos.TestService_ServiceDesc)
+	sd, err := LoadServiceDescriptor(testprotosgrpc.TestService_ServiceDesc)
 	testutil.Ok(t, err)
 
 	cases := []struct{ method, request, response string }{

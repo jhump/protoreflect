@@ -25,7 +25,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal"
-	"github.com/jhump/protoreflect/internal/testprotos"
+	testprotosgrpc "github.com/jhump/protoreflect/internal/testprotos/grpc"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 	}()
 
 	svr := grpc.NewServer()
-	testprotos.RegisterTestServiceServer(svr, testService{})
+	testprotosgrpc.RegisterTestServiceServer(svr, testService{})
 	reflection.Register(svr)
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
