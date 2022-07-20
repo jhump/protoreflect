@@ -35,6 +35,7 @@ go install github.com/jhump/protoreflect/desc/sourceinfo/cmd/protoc-gen-gosrcinf
 
 # Output directory will effectively be GOPATH/src.
 outdir="../../../../.."
+# TODO: use new protoc-gen-go and protoc-gen-go_grpc plugins
 ${PROTOC} "--go_out=plugins=grpc:$outdir" "--gosrcinfo_out=debug:$outdir" -I. *.proto
 ${PROTOC} "--go_out=plugins=grpc:$outdir" "--gosrcinfo_out=debug:$outdir" -I. nopkg/*.proto
 ${PROTOC} "--go_out=plugins=grpc:$outdir" "--gosrcinfo_out=debug:$outdir" -I. pkg/*.proto

@@ -36,13 +36,13 @@ vet:
 # staticheck in a way that ignores the errors in that generated code
 .PHONY: staticcheck
 staticcheck:
-	@GO111MODULE=on go install honnef.co/go/tools/cmd/staticcheck@v0.0.1-2020.1.4
+	@go install honnef.co/go/tools/cmd/staticcheck@v0.0.1-2020.1.4
 	staticcheck ./...
 
 # same remarks as for staticcheck: we ignore errors in generated proto.y.go
 .PHONY: ineffassign
 ineffassign:
-	@GO111MODULE=on go install github.com/gordonklaus/ineffassign@v0.0.0-20200309095847-7953dde2c7bf
+	@go install github.com/gordonklaus/ineffassign@v0.0.0-20200309095847-7953dde2c7bf
 	@echo ineffassign . --ignore desc/protoparse/proto.y.go
 	@ineffassign -n $$(find . -type d | grep -v 'desc/protoparse')
 	@output="$$(ineffassign ./desc/protoparse | grep -v 'protoDollar' || true)" ; \
@@ -53,19 +53,19 @@ ineffassign:
 
 .PHONY: predeclared
 predeclared:
-	@GO111MODULE=on go install github.com/nishanths/predeclared@v0.0.0-20200524104333-86fad755b4d3
+	@go install github.com/nishanths/predeclared@v0.0.0-20200524104333-86fad755b4d3
 	predeclared ./...
 
 # Intentionally omitted from CI, but target here for ad-hoc reports.
 .PHONY: golint
 golint:
-	@GO111MODULE=on go install golang.org/x/lint/golint
+	@go install golang.org/x/lint/golint
 	golint -min_confidence 0.9 -set_exit_status ./...
 
 # Intentionally omitted from CI, but target here for ad-hoc reports.
 .PHONY: errcheck
 errcheck:
-	@GO111MODULE=on go install github.com/kisielk/errcheck
+	@go install github.com/kisielk/errcheck
 	errcheck ./...
 
 .PHONY: test
@@ -75,7 +75,8 @@ test:
 
 .PHONY: generate
 generate:
-	@GO111MODULE=on go install golang.org/x/tools/cmd/goyacc@v0.0.0-20200717024301-6ddee64345a6
+	@go install golang.org/x/tools/cmd/goyacc@v0.0.0-20200717024301-6ddee64345a6
+	@go install github.com/golang/protobuf/protoc-gen-go
 	go generate ./...
 
 .PHONY: testcover
