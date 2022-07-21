@@ -4,15 +4,19 @@ import (
 	"context"
 	"io"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	grpc_testing "github.com/jhump/protoreflect/internal/testprotos/grpc"
 )
 
 // TestService is a very simple test service that just echos back request payloads
-type TestService struct{}
+type TestService struct {
+	grpc_testing.UnimplementedTestServiceServer
+}
 
 // EmptyCall satisfies the grpc_testing.TestServiceServer interface. It always succeeds.
-func (TestService) EmptyCall(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
-	return &grpc_testing.Empty{}, nil
+func (TestService) EmptyCall(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
 }
 
 // UnaryCall satisfies the grpc_testing.TestServiceServer interface. It always succeeds, echoing

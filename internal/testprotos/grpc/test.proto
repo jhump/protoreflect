@@ -1,3 +1,7 @@
+// This file was copied from github.com/grpc/grpc-go/interop/grpc_testing.
+// This fork exists because the original source is unstable and has been
+// moved/refactored and broken clients.
+
 // Copyright 2017 gRPC authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +26,7 @@ option go_package = "github.com/jhump/protoreflect/internal/testprotos/grpc";
 
 package grpc.testing;
 
-message Empty {}
+import "google/protobuf/empty.proto";
 
 // The type of payload that should be returned.
 enum PayloadType {
@@ -171,7 +175,7 @@ message StreamingOutputCallResponse {
 // performance with various types of payload.
 service TestService {
   // One empty request followed by one empty response.
-  rpc EmptyCall(Empty) returns (Empty);
+  rpc EmptyCall(google.protobuf.Empty) returns (google.protobuf.Empty);
 
   // One request followed by one response.
   // The server returns the client payload as-is.
@@ -205,7 +209,7 @@ service TestService {
 // that case.
 service UnimplementedService {
   // A call that no server should implement
-  rpc UnimplementedCall(grpc.testing.Empty) returns (grpc.testing.Empty);
+  rpc UnimplementedCall(google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
 message LoadBalancerStatsRequest {

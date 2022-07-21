@@ -53,7 +53,7 @@ ineffassign:
 
 .PHONY: predeclared
 predeclared:
-	@go install github.com/nishanths/predeclared@v0.0.0-20200524104333-86fad755b4d3
+	@go install github.com/nishanths/predeclared@v0.2.2
 	predeclared ./...
 
 # Intentionally omitted from CI, but target here for ad-hoc reports.
@@ -76,7 +76,6 @@ test:
 .PHONY: generate
 generate:
 	@go install golang.org/x/tools/cmd/goyacc@v0.0.0-20200717024301-6ddee64345a6
-	@go install github.com/golang/protobuf/protoc-gen-go
 	go generate ./...
 
 .PHONY: testcover

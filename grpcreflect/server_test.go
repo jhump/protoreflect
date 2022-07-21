@@ -5,27 +5,27 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/jhump/protoreflect/internal/testprotos"
+	testprotosgrpc "github.com/jhump/protoreflect/internal/testprotos/grpc"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
 type testService struct {
-	testprotos.TestServiceServer
+	testprotosgrpc.DummyServiceServer
 }
 
 func TestLoadServiceDescriptors(t *testing.T) {
 	s := grpc.NewServer()
-	testprotos.RegisterTestServiceServer(s, testService{})
+	testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 	sds, err := LoadServiceDescriptors(s)
 	testutil.Ok(t, err)
 	testutil.Eq(t, 1, len(sds))
-	sd := sds["testprotos.TestService"]
+	sd := sds["testprotos.DummyService"]
 
 	cases := []struct{ method, request, response string }{
-		{"DoSomething", "testprotos.TestRequest", "jhump.protoreflect.desc.Bar"},
-		{"DoSomethingElse", "testprotos.TestMessage", "testprotos.TestResponse"},
+		{"DoSomething", "testprotos.DummyRequest", "jhump.protoreflect.desc.Bar"},
+		{"DoSomethingElse", "testprotos.TestMessage", "testprotos.DummyResponse"},
 		{"DoSomethingAgain", "jhump.protoreflect.desc.Bar", "testprotos.AnotherTestMessage"},
-		{"DoSomethingForever", "testprotos.TestRequest", "testprotos.TestResponse"},
+		{"DoSomethingForever", "testprotos.DummyRequest", "testprotos.DummyResponse"},
 	}
 
 	testutil.Eq(t, len(cases), len(sd.GetMethods()))
@@ -39,14 +39,14 @@ func TestLoadServiceDescriptors(t *testing.T) {
 }
 
 func TestLoadServiceDescriptor(t *testing.T) {
-	sd, err := LoadServiceDescriptor(testprotos.TestService_ServiceDesc)
+	sd, err := LoadServiceDescriptor(&testprotosgrpc.DummyService_ServiceDesc)
 	testutil.Ok(t, err)
 
 	cases := []struct{ method, request, response string }{
-		{"DoSomething", "testprotos.TestRequest", "jhump.protoreflect.desc.Bar"},
-		{"DoSomethingElse", "testprotos.TestMessage", "testprotos.TestResponse"},
+		{"DoSomething", "testprotos.DummyRequest", "jhump.protoreflect.desc.Bar"},
+		{"DoSomethingElse", "testprotos.TestMessage", "testprotos.DummyResponse"},
 		{"DoSomethingAgain", "jhump.protoreflect.desc.Bar", "testprotos.AnotherTestMessage"},
-		{"DoSomethingForever", "testprotos.TestRequest", "testprotos.TestResponse"},
+		{"DoSomethingForever", "testprotos.DummyRequest", "testprotos.DummyResponse"},
 	}
 
 	testutil.Eq(t, len(cases), len(sd.GetMethods()))
