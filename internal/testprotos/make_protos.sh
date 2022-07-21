@@ -30,7 +30,8 @@ if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc ${PROTOC_VERSION}" ]]; 
   cd ./protoc && unzip protoc.zip && cd ..
 fi
 
-go install github.com/golang/protobuf/protoc-gen-go
+go install google.golang.org/protobuf/cmd/protoc-gen-go
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0
 go install github.com/jhump/protoreflect/desc/sourceinfo/cmd/protoc-gen-gosrcinfo
 
 # Output directory will effectively be GOPATH/src.
@@ -38,7 +39,7 @@ outdir="."
 ${PROTOC} "--go_out=paths=source_relative:$outdir" "--gosrcinfo_out=paths=source_relative,debug:$outdir" -I. *.proto
 ${PROTOC} "--go_out=paths=source_relative:$outdir" "--gosrcinfo_out=paths=source_relative,debug:$outdir" -I. nopkg/*.proto
 ${PROTOC} "--go_out=paths=source_relative:$outdir" "--gosrcinfo_out=paths=source_relative,debug:$outdir" -I. pkg/*.proto
-${PROTOC} "--go_out=paths=source_relative,plugins=grpc:$outdir" "--gosrcinfo_out=paths=source_relative,debug:$outdir" -I. grpc/*.proto
+${PROTOC} "--go_out=paths=source_relative:$outdir" "--go-grpc_out=paths=source_relative:$outdir" "--gosrcinfo_out=paths=source_relative,debug:$outdir" -I. grpc/*.proto
 
 # And make descriptor set (with source info) for several files
 ${PROTOC} --descriptor_set_out=./desc_test1.protoset --include_source_info --include_imports -I. desc_test1.proto

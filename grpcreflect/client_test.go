@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 	}()
 
 	svr := grpc.NewServer()
-	testprotosgrpc.RegisterTestServiceServer(svr, testService{})
+	testprotosgrpc.RegisterDummyServiceServer(svr, testService{})
 	reflection.Register(svr)
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -203,7 +203,7 @@ func TestListServices(t *testing.T) {
 	testutil.Ok(t, err)
 
 	sort.Strings(s)
-	testutil.Eq(t, []string{"grpc.reflection.v1alpha.ServerReflection", "testprotos.TestService"}, s)
+	testutil.Eq(t, []string{"grpc.reflection.v1alpha.ServerReflection", "testprotos.DummyService"}, s)
 }
 
 func TestReset(t *testing.T) {
