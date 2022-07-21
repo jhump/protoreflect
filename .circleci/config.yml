@@ -11,31 +11,51 @@ shared_configs:
 version: 2.1
 
 orbs:
-  win: circleci/windows@2.2.0
+  win: circleci/windows@4.1.1
 
 jobs:
   build-1-13:
     working_directory: ~/repo
     docker:
-      - image: circleci/golang:1.13
+      - image: cimg/go:1.13
     steps: *simple_job_steps
 
   build-1-14:
     working_directory: ~/repo
     docker:
-      - image: circleci/golang:1.14
+      - image: cimg/go:1.14
     steps: *simple_job_steps
 
   build-1-15:
     working_directory: ~/repo
     docker:
-      - image: circleci/golang:1.15
+      - image: cimg/go:1.15
     steps: *simple_job_steps
 
   build-1-16:
     working_directory: ~/repo
     docker:
-      - image: circleci/golang:1.16
+      - image: cimg/go:1.16
+    steps: *simple_job_steps
+
+  build-1-17:
+    working_directory: ~/repo
+    docker:
+      - image: cimg/go:1.17
+    steps: *simple_job_steps
+
+  build-windows:  # as of Feb 2022, Go 1.17
+    executor:
+      name: win/default
+    steps:
+      - run: git config --global core.autocrlf false
+      - checkout
+      - run: go test ./...
+
+  build-1-18:
+    working_directory: ~/repo
+    docker:
+      - image: cimg/go:1.18
     steps:
       - checkout
       - restore_cache:
@@ -57,24 +77,10 @@ jobs:
     #- store_test_results:
     #    path: /tmp/test-reports
 
-  build-1-16-windows:
-    executor:
-      name: win/default
-    steps:
-      - run: git config --global core.autocrlf false
-      - checkout
-      - run: go test ./...
-
-  build-1-17:
+  build-1-18-u:
     working_directory: ~/repo
     docker:
-      - image: circleci/golang:1.17
-    steps: *simple_job_steps
-
-  build-1-17-u:
-    working_directory: ~/repo
-    docker:
-      - image: circleci/golang:1.17
+      - image: cimg/go:1.18
     steps:
       - checkout
       - run:
@@ -93,6 +99,7 @@ workflows:
       - build-1-14
       - build-1-15
       - build-1-16
-      - build-1-16-windows
       - build-1-17
-      - build-1-17-u
+      - build-windows
+      - build-1-18
+      - build-1-18-u
