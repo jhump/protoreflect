@@ -152,7 +152,7 @@ func (l *linker) createDescriptorPool() error {
 					// info than panic with a nil dereference below
 					node = ast.NewNoSourceNode(file2)
 				}
-				if err := l.errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s in %q", k, descriptorType(desc1), file1); err != nil {
+				if err := l.errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s in %q", k, descriptorTypeWithArticle(desc1), file1); err != nil {
 					return err
 				}
 			}
@@ -267,7 +267,7 @@ func addToPool(r *parseResult, pool map[string]proto.Message, errs *errorHandler
 			suffix = "; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum"
 		}
 		// TODO: also include the source location for the conflicting symbol
-		if err := errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s%s", fqn, descriptorType(d), suffix); err != nil {
+		if err := errs.handleErrorWithPos(node.Start(), "duplicate symbol %s: already defined as %s%s", fqn, descriptorTypeWithArticle(d), suffix); err != nil {
 			return err
 		}
 	}
@@ -302,6 +302,36 @@ func descriptorType(m proto.Message) string {
 	default:
 		// shouldn't be possible
 		return fmt.Sprintf("%T", m)
+	}
+}
+
+func descriptorTypeWithArticle(m proto.Message) string {
+	switch m := m.(type) {
+	case *dpb.DescriptorProto:
+		return "a message"
+	case *dpb.DescriptorProto_ExtensionRange:
+		return "an extension range"
+	case *dpb.FieldDescriptorProto:
+		if m.GetExtendee() == "" {
+			return "a field"
+		} else {
+			return "an extension"
+		}
+	case *dpb.EnumDescriptorProto:
+		return "an enum"
+	case *dpb.EnumValueDescriptorProto:
+		return "an enum value"
+	case *dpb.ServiceDescriptorProto:
+		return "a service"
+	case *dpb.MethodDescriptorProto:
+		return "a method"
+	case *dpb.FileDescriptorProto:
+		return "a file"
+	case *dpb.OneofDescriptorProto:
+		return "a oneof"
+	default:
+		// shouldn't be possible
+		return fmt.Sprintf("a %T", m)
 	}
 }
 
@@ -369,7 +399,7 @@ func (l *linker) resolveMessageTypes(r *parseResult, fd *dpb.FileDescriptorProto
 	// Strangely, when protoc resolves extension names, it uses the *enclosing* scope
 	// instead of the message's scope. So if the message contains an extension named "i",
 	// an option cannot refer to it as simply "i" but must qualify it (at a minimum "Msg.i").
-	// So we don't add this messages scope to our scopes slice until *after* we do options.
+	// So we don't add this message's scope to our scopes slice until *after* we do options.
 	if md.Options != nil {
 		if err := l.resolveOptions(r, fd, "message", fqn, md.Options.UninterpretedOption, scopes); err != nil {
 			return err
@@ -435,8 +465,7 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 		}
 		extd, ok := dsc.(*dpb.DescriptorProto)
 		if !ok {
-			otherType := descriptorType(dsc)
-			return l.errs.handleErrorWithPos(node.FieldExtendee().Start(), "extendee is invalid: %s is a %s, not a message", fqn, otherType)
+			return l.errs.handleErrorWithPos(node.FieldExtendee().Start(), "extendee is invalid: %s is %s, not a message", fqn, descriptorTypeWithArticle(dsc))
 		}
 		fld.Extendee = proto.String("." + fqn)
 		// make sure the tag number is in range
@@ -503,8 +532,7 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 		// the type was tentatively unset, but now we know it's actually an enum
 		fld.Type = dpb.FieldDescriptorProto_TYPE_ENUM.Enum()
 	default:
-		otherType := descriptorType(dsc)
-		return l.errs.handleErrorWithPos(node.FieldType().Start(), "%s: invalid type: %s is a %s, not a message or enum", scope, fqn, otherType)
+		return l.errs.handleErrorWithPos(node.FieldType().Start(), "%s: invalid type: %s is %s, not a message or enum", scope, fqn, descriptorTypeWithArticle(dsc))
 	}
 	return nil
 }
@@ -539,8 +567,7 @@ func (l *linker) resolveServiceTypes(r *parseResult, fd *dpb.FileDescriptorProto
 				return err
 			}
 		} else if _, ok := dsc.(*dpb.DescriptorProto); !ok {
-			otherType := descriptorType(dsc)
-			if err := l.errs.handleErrorWithPos(node.GetInputType().Start(), "%s: invalid request type: %s is a %s, not a message", scope, fqn, otherType); err != nil {
+			if err := l.errs.handleErrorWithPos(node.GetInputType().Start(), "%s: invalid request type: %s is %s, not a message", scope, fqn, descriptorTypeWithArticle(dsc)); err != nil {
 				return err
 			}
 		} else {
@@ -558,8 +585,7 @@ func (l *linker) resolveServiceTypes(r *parseResult, fd *dpb.FileDescriptorProto
 				return err
 			}
 		} else if _, ok := dsc.(*dpb.DescriptorProto); !ok {
-			otherType := descriptorType(dsc)
-			if err := l.errs.handleErrorWithPos(node.GetOutputType().Start(), "%s: invalid response type: %s is a %s, not a message", scope, fqn, otherType); err != nil {
+			if err := l.errs.handleErrorWithPos(node.GetOutputType().Start(), "%s: invalid response type: %s is %s, not a message", scope, fqn, descriptorTypeWithArticle(dsc)); err != nil {
 				return err
 			}
 		} else {
@@ -663,8 +689,7 @@ func (l *linker) resolveExtensionName(name string, fd *dpb.FileDescriptorProto, 
 		return "", fmt.Errorf("unknown extension %s; resolved to %s which is not defined; consider using a leading dot", name, fqn)
 	}
 	if ext, ok := dsc.(*dpb.FieldDescriptorProto); !ok {
-		otherType := descriptorType(dsc)
-		return "", fmt.Errorf("invalid extension: %s is a %s, not an extension", name, otherType)
+		return "", fmt.Errorf("invalid extension: %s is %s, not an extension", name, descriptorTypeWithArticle(dsc))
 	} else if ext.GetExtendee() == "" {
 		return "", fmt.Errorf("invalid extension: %s is a field but not an extension", name)
 	}
@@ -693,7 +718,13 @@ func (l *linker) resolve(fd *dpb.FileDescriptorProto, name string, onlyTypes boo
 	for i := len(scopes) - 1; i >= 0; i-- {
 		fqn, d, proto3 := scopes[i](firstName, name)
 		if d != nil {
-			if !onlyTypes || isType(d) {
+			// In `protoc`, it will skip a match of the wrong type and move on
+			// to the next scope, but only if the reference is unqualified. So
+			// we mirror that behavior here. When we skip and move on, we go
+			// ahead and save the match of the wrong type so we can at least use
+			// it to construct a better error in the event that we don't find
+			// any match of the right type.
+			if !onlyTypes || isType(d) || firstName != name {
 				return fqn, d, proto3
 			} else if bestGuess == nil {
 				bestGuess = d
