@@ -137,26 +137,26 @@ func TestLinkerValidation(t *testing.T) {
 			map[string]string{
 				"foo.proto": "enum foo { bar = 1; baz = 2; } enum fu { bar = 1; baz = 2; }",
 			},
-			`foo.proto:1:42: duplicate symbol bar: already defined as enum value; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum`,
+			`foo.proto:1:42: duplicate symbol bar: already defined as an enum value; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum`,
 		},
 		{
 			map[string]string{
 				"foo.proto": "message foo {} enum foo { V = 0; }",
 			},
-			"foo.proto:1:16: duplicate symbol foo: already defined as message",
+			"foo.proto:1:16: duplicate symbol foo: already defined as a message",
 		},
 		{
 			map[string]string{
 				"foo.proto": "message foo { optional string a = 1; optional string a = 2; }",
 			},
-			"foo.proto:1:38: duplicate symbol foo.a: already defined as field",
+			"foo.proto:1:38: duplicate symbol foo.a: already defined as a field",
 		},
 		{
 			map[string]string{
 				"foo.proto":  "message foo {}",
 				"foo2.proto": "enum foo { V = 0; }",
 			},
-			"foo2.proto:1:1: duplicate symbol foo: already defined as message in \"foo.proto\"",
+			"foo2.proto:1:1: duplicate symbol foo: already defined as a message in \"foo.proto\"",
 		},
 		{
 			map[string]string{
@@ -185,7 +185,7 @@ func TestLinkerValidation(t *testing.T) {
 					message DescriptorProto { }
 				`,
 			},
-			`google/protobuf/descriptor.proto: duplicate symbol google.protobuf.DescriptorProto: already defined as message in "foo.proto"`,
+			`google/protobuf/descriptor.proto: duplicate symbol google.protobuf.DescriptorProto: already defined as a message in "foo.proto"`,
 		},
 		{
 			map[string]string{
@@ -583,7 +583,7 @@ func TestLinkerValidation(t *testing.T) {
 					"  }\n" +
 					"}",
 			},
-			`a.proto:4:5: duplicate symbol m.z: already defined as oneof`,
+			`a.proto:4:5: duplicate symbol m.z: already defined as a oneof`,
 		},
 		{
 			map[string]string{
@@ -593,7 +593,7 @@ func TestLinkerValidation(t *testing.T) {
 					"  oneof z{int64 b=2;}\n" +
 					"}",
 			},
-			`a.proto:3:3: duplicate symbol m.z: already defined as oneof`,
+			`a.proto:3:3: duplicate symbol m.z: already defined as a oneof`,
 		},
 		{
 			map[string]string{
@@ -718,7 +718,7 @@ func TestLinkerValidation(t *testing.T) {
 					"  oneof z{int64 b=2;}\n" +
 					"}",
 			},
-			`a.proto:4:3: duplicate symbol m.z: already defined as oneof`,
+			`a.proto:4:3: duplicate symbol m.z: already defined as a oneof`,
 		},
 		{
 			map[string]string{
@@ -906,6 +906,84 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			"foo.proto:4:26: field foobar: option json_name is not allowed on extensions",
 		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"package foo.foo;\n" +
+					"import \"other.proto\";\n" +
+					"service Foo { rpc Bar (Baz) returns (Baz); }\n" +
+					"message Baz {\n" +
+					"  foo.Foo.Bar f = 1;\n" +
+					"}\n",
+				"other.proto": "syntax = \"proto3\";\n" +
+					"package foo;\n" +
+					"message Foo {\n" +
+					"  enum Bar { ZED = 0; }\n" +
+					"}\n",
+			},
+			"foo.proto:6:3: field foo.foo.Baz.f: invalid type: foo.foo.Foo.Bar is a method, not a message or enum",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"message Foo {\n" +
+					"  enum Bar { ZED = 0; }\n" +
+					"  message Foo {\n" +
+					"    extend google.protobuf.MessageOptions {\n" +
+					"      string Bar = 30000;\n" +
+					"    }\n" +
+					"    Foo.Bar f = 1;\n" +
+					"  }\n" +
+					"}\n",
+			},
+			"foo.proto:9:5: field Foo.Foo.f: invalid type: Foo.Foo.Bar is an extension, not a message or enum",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"extend google.protobuf.ServiceOptions {\n" +
+					"  string Bar = 30000;\n" +
+					"}\n" +
+					"message Empty {}\n" +
+					"service Foo {\n" +
+					"  option (Bar) = \"blah\";\n" +
+					"  rpc Bar (Empty) returns (Empty);\n" +
+					"}\n",
+			},
+			"", // should succeed
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"extend google.protobuf.MethodOptions {\n" +
+					"  string Bar = 30000;\n" +
+					"}\n" +
+					"message Empty {}\n" +
+					"service Foo {\n" +
+					"  rpc Bar (Empty) returns (Empty) { option (Bar) = \"blah\"; }\n" +
+					"}\n",
+			},
+			"foo.proto:8:44: method Foo.Bar: invalid extension: Bar is a method, not an extension",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/descriptor.proto\";\n" +
+					"enum Bar { ZED = 0; }\n" +
+					"message Foo {\n" +
+					"  extend google.protobuf.MessageOptions {\n" +
+					"    string Bar = 30000;\n" +
+					"  }\n" +
+					"  message Foo {\n" +
+					"    Bar f = 1;\n" +
+					"  }\n" +
+					"}\n",
+			},
+			"", // should succeed
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
@@ -1070,9 +1148,9 @@ func TestSyntheticOneOfCollisions(t *testing.T) {
 	testutil.Eq(t, ErrInvalidSource, err)
 
 	expected := []string{
-		`foo2.proto:2:1: duplicate symbol Foo: already defined as message in "foo1.proto"`,
-		`foo2.proto:3:3: duplicate symbol Foo._bar: already defined as oneof in "foo1.proto"`,
-		`foo2.proto:3:3: duplicate symbol Foo.bar: already defined as field in "foo1.proto"`,
+		`foo2.proto:2:1: duplicate symbol Foo: already defined as a message in "foo1.proto"`,
+		`foo2.proto:3:3: duplicate symbol Foo._bar: already defined as a oneof in "foo1.proto"`,
+		`foo2.proto:3:3: duplicate symbol Foo.bar: already defined as a field in "foo1.proto"`,
 	}
 	var actual []string
 	for _, err := range errs {
