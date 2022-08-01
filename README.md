@@ -12,6 +12,18 @@ RPC services.
 [![GoDoc](https://godoc.org/github.com/jhump/protoreflect?status.svg)](https://godoc.org/github.com/jhump/protoreflect)
 
 ----
+
+### ⚠️ Note
+
+This repo was built to work with the original "V1" API of the Protobuf runtime for Go: `github.com/golang/protobuf`.
+
+Since the creation of this repo, a new runtime for Go has been release, a "V2" of the API in `google.golang.org/protobuf`. Most protobuf users have likely upgraded to that newer runtime and thus likely encounter some interop issues using this repo. In the meantime, you can often work around these issues using the [`proto.MessageV1`](https://pkg.go.dev/github.com/golang/protobuf/proto#MessageV1) and [`proto.MessageV2`](https://pkg.go.dev/github.com/golang/protobuf/proto#MessageV2) converter functions (both are defined in the V1 `proto` package).
+
+We eventually want this repo to have much better interop with the V2 API. Here are the current goals:
+1. _By EOY 2022_: Update the `desc.Descriptor` type in this repo to be a _wrapper_ around the `protoreflect.Descriptor` types in the V2 API. Also provide simple conversion functions to go from one to the other. This will likely resolve most of the issues that people encounter.
+2. _H1 2023_: Create a new V2 of this whole repo. The V2 protobuf API now includes support for [descriptors](https://pkg.go.dev/google.golang.org/protobuf/reflect/protoreflect) and [dynamic messages](https://pkg.go.dev/google.golang.org/protobuf/types/dynamicpb), and it also exposes numerous low-level aspects like the [binary wire format](https://pkg.go.dev/google.golang.org/protobuf/encoding/protowire). So a _lot_ of what's in this repo is no longer necessary. But some features still are, such as the `desc/builder`, `desc/protoprint`, `dynamic/grpcdynamic`, `dynamic/msgregistry`, and `grpcreflect` packages. These will remain in the V2 form of the repo (though possibly rearranged a little). Noticeably absent from the list above is `desc/protoparse`, whose V2 API will be in a brand new module named `protocompile`. It will be a much improved API, provide better performance, and directly use the reflection APIs in the v2 Protobuf runtime.
+
+----
 ## Descriptors: The Language Model of Protocol Buffers
 
 ```go
