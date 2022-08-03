@@ -3,6 +3,7 @@ package protoprint
 import (
 	"bytes"
 	"fmt"
+	"google.golang.org/protobuf/encoding/prototext"
 	"io"
 	"math"
 	"os"
@@ -1667,16 +1668,15 @@ func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent
 		// TODO: alternate approach so we can apply p.ForceFullyQualifiedNames
 		// inside the resulting value?
 
+		optValV2 := proto.MessageV2(optVal)
+
 		if indent < 0 {
 			// if printing inline, always use compact form
-			fmt.Fprintf(w, "{ %s }", proto.CompactTextString(optVal))
+			fmt.Fprintf(w, "{ %s }", prototext.Format(optValV2))
 			return
 		}
-		m := proto.TextMarshaler{
-			Compact:   true,
-			ExpandAny: true,
-		}
-		str := strings.TrimSuffix(m.Text(optVal), " ")
+		mOpts := prototext.MarshalOptions{}
+		str := strings.TrimSuffix(mOpts.Format(optValV2), " ")
 		fieldCount := strings.Count(str, ":")
 		nestedCount := strings.Count(str, "{") + strings.Count(str, "<")
 		if fieldCount <= 1 && nestedCount == 0 {
@@ -1695,8 +1695,8 @@ func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent
 		}
 
 		// multi-line form
-		m.Compact = false
-		str = m.Text(optVal)
+		mOpts.Multiline = true
+		str = mOpts.Format(optValV2)
 		fmt.Fprintln(w, "{")
 		p.indentMessageLiteral(w, indent+1, str)
 		p.indent(w, indent)
