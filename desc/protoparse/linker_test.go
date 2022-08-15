@@ -984,6 +984,28 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			"", // should succeed
 		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"message Foo {\n" +
+					"  map<string,string> bar = 1;\n" +
+					"}\n" +
+					"message Baz {\n" +
+					"  Foo.BarEntry e = 1;\n" +
+					"}\n",
+			},
+			"foo.proto:6:3: field Baz.e: Foo.BarEntry is a synthetic map entry and may not be referenced explicitly",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"import \"google/protobuf/struct.proto\";\n" +
+					"message Foo {\n" +
+					"  google.protobuf.Struct.FieldsEntry e = 1;\n" +
+					"}\n",
+			},
+			"foo.proto:4:3: field Foo.e: google.protobuf.Struct.FieldsEntry is a synthetic map entry and may not be referenced explicitly",
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
