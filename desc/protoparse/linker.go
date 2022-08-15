@@ -3,6 +3,7 @@ package protoparse
 import (
 	"bytes"
 	"fmt"
+	"google.golang.org/protobuf/types/descriptorpb"
 	"sort"
 	"strings"
 
@@ -518,6 +519,24 @@ func (l *linker) resolveFieldTypes(r *parseResult, fd *dpb.FileDescriptorProto, 
 	}
 	switch dsc := dsc.(type) {
 	case *dpb.DescriptorProto:
+		if dsc.GetOptions().GetMapEntry() {
+			isValid := false
+			switch node.(type) {
+			case *ast.MapFieldNode:
+				// We have an AST for this file and can see this field is from a map declaration
+				isValid = true
+			case ast.NoSourceNode:
+				// We don't have an AST for the file (it came from a provided descriptor). So we
+				// need to validate that it's not an illegal reference. To be valid, the field
+				// must be repeated and the entry type must be nested in the same enclosing
+				// message as the field.
+				expectFqn := prefix + dsc.GetName()
+				isValid = expectFqn == fqn && fld.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED
+			}
+			if !isValid {
+				return l.errs.handleErrorWithPos(node.FieldType().Start(), "%s: %s is a synthetic map entry and may not be referenced explicitly", scope, fqn)
+			}
+		}
 		fld.TypeName = proto.String("." + fqn)
 		// if type was tentatively unset, we now know it's actually a message
 		if fld.Type == nil {
