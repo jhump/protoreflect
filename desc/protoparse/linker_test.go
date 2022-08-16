@@ -1006,6 +1006,115 @@ func TestLinkerValidation(t *testing.T) {
 			},
 			"foo.proto:4:3: field Foo.e: google.protobuf.Struct.FieldsEntry is a synthetic map entry and may not be referenced explicitly",
 		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"message Foo {\n" +
+					"  string foo = 1;\n" +
+					"  string bar = 2 [json_name=\"foo\"];\n" +
+					"}\n",
+			},
+			"foo.proto:4:3: field Foo.bar: custom JSON name \"foo\" conflicts with default JSON name of field foo, defined at foo.proto:3:3",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"message Foo {\n" +
+					"  string foo = 1 [json_name=\"foo_bar\"];\n" +
+					"  string bar = 2 [json_name=\"Foo_Bar\"];\n" +
+					"}\n",
+			},
+			"foo.proto:4:3: field Foo.bar: custom JSON name \"Foo_Bar\" conflicts with custom JSON name \"foo_bar\" of field foo, defined at foo.proto:3:3",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"message Foo {\n" +
+					"  string fooBar = 1;\n" +
+					"  string foo_bar = 2;\n" +
+					"}\n",
+			},
+			"foo.proto:4:3: field Foo.foo_bar: default JSON name \"fooBar\" conflicts with default JSON name of field fooBar, defined at foo.proto:3:3",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"message Foo {\n" +
+					"  string fooBar = 1;\n" +
+					"  string foo_bar = 2 [json_name=\"fuber\"];\n" +
+					"}\n",
+			},
+			"foo.proto:4:3: field Foo.foo_bar: default JSON name \"fooBar\" conflicts with default JSON name of field fooBar, defined at foo.proto:3:3",
+		}, {
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"message Foo {\n" +
+					"  string fooBar = 1;\n" +
+					"  string FOO_BAR = 2;\n" +
+					"}\n",
+			},
+			"foo.proto:4:3: field Foo.FOO_BAR: default JSON name \"FOOBAR\" conflicts with default JSON name \"fooBar\" of field fooBar, defined at foo.proto:3:3",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"message Foo {\n" +
+					"  string fooBar = 1;\n" +
+					"  string __foo_bar = 2;\n" +
+					"}\n",
+			},
+			"foo.proto:4:3: field Foo.__foo_bar: default JSON name \"FooBar\" conflicts with default JSON name \"fooBar\" of field fooBar, defined at foo.proto:3:3",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"message Foo {\n" +
+					"  optional string foo = 1 [json_name=\"foo_bar\"];\n" +
+					"  optional string bar = 2 [json_name=\"Foo_Bar\"];\n" +
+					"}\n",
+			},
+			"foo.proto:4:3: field Foo.bar: custom JSON name \"Foo_Bar\" conflicts with custom JSON name \"foo_bar\" of field foo, defined at foo.proto:3:3",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"message Foo {\n" +
+					"  optional string fooBar = 1;\n" +
+					"  optional string foo_bar = 2;\n" +
+					"}\n",
+			},
+			"", // should succeed: only check default JSON names in proto3
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"message Foo {\n" +
+					"  optional string fooBar = 1 [json_name=\"fooBar\"];\n" +
+					"  optional string foo_bar = 2 [json_name=\"fooBar\"];\n" +
+					"}\n",
+			},
+			"foo.proto:4:3: field Foo.foo_bar: custom JSON name \"fooBar\" conflicts with custom JSON name of field fooBar, defined at foo.proto:3:3",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"message Foo {\n" +
+					"  optional string fooBar = 1;\n" +
+					"  optional string FOO_BAR = 2;\n" +
+					"}\n",
+			},
+			"", // should succeed: only check default JSON names in proto3
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
+					"message Foo {\n" +
+					"  optional string fooBar = 1;\n" +
+					"  optional string __foo_bar = 2;\n" +
+					"}\n",
+			},
+			"", // should succeed: only check default JSON names in proto3
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
@@ -1179,4 +1288,66 @@ func TestSyntheticOneOfCollisions(t *testing.T) {
 		actual = append(actual, err.Error())
 	}
 	testutil.Eq(t, actual, expected)
+}
+
+func TestCustomJSONNameWarnings(t *testing.T) {
+	testCases := []struct {
+		source  string
+		warning string
+	}{
+		{
+			source: "syntax = \"proto2\";\n" +
+				"message Foo {\n" +
+				"  optional string foo = 1;\n" +
+				"  optional string bar = 2 [json_name=\"foo\"];\n" +
+				"}\n",
+			warning: "test.proto:4:3: field Foo.bar: custom JSON name \"foo\" conflicts with default JSON name of field foo, defined at test.proto:3:3",
+		},
+		{
+			source: "syntax = \"proto2\";\n" +
+				"message Foo {\n" +
+				"  optional string foo_bar = 1;\n" +
+				"  optional string fooBar = 2;\n" +
+				"}\n",
+			warning: "test.proto:4:3: field Foo.fooBar: default JSON name \"fooBar\" conflicts with default JSON name of field foo_bar, defined at test.proto:3:3",
+		},
+		{
+			source: "syntax = \"proto2\";\n" +
+				"message Foo {\n" +
+				"  optional string foo_bar = 1;\n" +
+				"  optional string fooBar = 2;\n" +
+				"}\n",
+			warning: "test.proto:4:3: field Foo.fooBar: default JSON name \"fooBar\" conflicts with default JSON name of field foo_bar, defined at test.proto:3:3",
+		},
+	}
+	for i, tc := range testCases {
+		acc := func(filename string) (io.ReadCloser, error) {
+			if filename == "test.proto" {
+				return ioutil.NopCloser(strings.NewReader(tc.source)), nil
+			}
+			return nil, fmt.Errorf("file not found: %s", filename)
+		}
+		var warnings []string
+		warnFunc := func(err ErrorWithPos) {
+			warnings = append(warnings, err.Error())
+		}
+		_, err := Parser{Accessor: acc, WarningReporter: warnFunc}.ParseFiles("test.proto")
+		if err != nil {
+			t.Errorf("case %d: expecting no error; instead got error %q", i, err)
+		}
+		if tc.warning == "" && len(warnings) > 0 {
+			t.Errorf("case %d: expecting no warnings; instead got: %v", i, warnings)
+		} else {
+			found := false
+			for _, w := range warnings {
+				if w == tc.warning {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("case %d: expecting warning %q; instead got: %v", i, tc.warning, warnings)
+			}
+		}
+	}
 }

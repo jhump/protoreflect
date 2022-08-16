@@ -75,6 +75,10 @@ func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
 		if err := l.checkExtensionsInFile(fd, r); err != nil {
 			return nil, err
 		}
+		// and final check for json name configuration
+		if err := l.checkJsonNamesInFile(fd, r); err != nil {
+			return nil, err
+		}
 	}
 
 	// When Parser calls linkFiles, it does not check errs again, and it expects that linkFiles
@@ -1051,7 +1055,7 @@ func (l *linker) checkForUnusedImports(filename string) {
 			if pos == nil {
 				pos = ast.UnknownPos(r.fd.GetName())
 			}
-			l.errs.warn(pos, errUnusedImport(dep))
+			l.errs.warnWithPos(pos, errUnusedImport(dep))
 		}
 	}
 }
@@ -1110,4 +1114,101 @@ func (l *linker) checkExtension(fld *desc.FieldDescriptor, res *parseResult) err
 	}
 
 	return nil
+}
+
+func (l *linker) checkJsonNamesInFile(fd *desc.FileDescriptor, res *parseResult) error {
+	for _, md := range fd.GetMessageTypes() {
+		if err := l.checkJsonNamesInMessage(md, res); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *linker) checkJsonNamesInMessage(md *desc.MessageDescriptor, res *parseResult) error {
+	if err := checkJsonNames(md, res, false); err != nil {
+		return err
+	}
+	if err := checkJsonNames(md, res, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func checkJsonNames(md *desc.MessageDescriptor, res *parseResult, useCustom bool) error {
+	type seenName struct {
+		source *dpb.FieldDescriptorProto
+		// field's original JSON nane (which can differ in case from map key)
+		orig string
+		// true if orig is a custom JSON name (vs. the field's default JSON name)
+		custom bool
+	}
+	seen := map[string]seenName{}
+
+	for _, fd := range md.GetFields() {
+		scope := "field " + md.GetName() + "." + fd.GetName()
+		defaultName := internal.JsonName(fd.GetName())
+		name := defaultName
+		custom := false
+		if useCustom {
+			n := fd.GetJSONName()
+			if n != defaultName || hasCustomJsonName(res, fd) {
+				name = n
+				custom = true
+			}
+		}
+		lcaseName := strings.ToLower(name)
+		if existing, ok := seen[lcaseName]; ok {
+			// When useCustom is true, we'll only report an issue when a conflict is
+			// due to a custom name. That way, we don't double report conflicts on
+			// non-custom names.
+			if !useCustom || custom || existing.custom {
+				fldNode := res.getFieldNode(fd.AsFieldDescriptorProto())
+				customStr, srcCustomStr := "custom", "custom"
+				if !custom {
+					customStr = "default"
+				}
+				if !existing.custom {
+					srcCustomStr = "default"
+				}
+				otherName := ""
+				if name != existing.orig {
+					otherName = fmt.Sprintf(" %q", existing.orig)
+				}
+				conflictErr := errorWithPos(fldNode.Start(), "%s: %s JSON name %q conflicts with %s JSON name%s of field %s, defined at %v",
+					scope, customStr, name, srcCustomStr, otherName, existing.source.GetName(), res.getFieldNode(existing.source).Start())
+
+				// Since proto2 did not originally have default JSON names, we report conflicts involving
+				// default names as just warnings.
+				if !md.IsProto3() && (!custom || !existing.custom) {
+					res.errs.warn(conflictErr)
+				} else if err := res.errs.handleError(conflictErr); err != nil {
+					return err
+				}
+			}
+		} else {
+			seen[lcaseName] = seenName{orig: name, source: fd.AsFieldDescriptorProto(), custom: custom}
+		}
+	}
+	return nil
+}
+
+func hasCustomJsonName(res *parseResult, fd *desc.FieldDescriptor) bool {
+	// if we have the AST, we can more precisely determine if there was a custom
+	// JSON named defined, even if it is explicitly configured to tbe the same
+	// as the default JSON name for the field.
+	fdProto := fd.AsFieldDescriptorProto()
+	opts := res.getFieldNode(fdProto).GetOptions()
+	if opts == nil {
+		return false
+	}
+	for _, opt := range opts.Options {
+		if len(opt.Name.Parts) == 1 &&
+			opt.Name.Parts[0].Name.AsIdentifier() == "json_name" &&
+			!opt.Name.Parts[0].IsExtension() {
+			// found it
+			return true
+		}
+	}
+	return false
 }
