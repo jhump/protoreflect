@@ -750,7 +750,7 @@ func TestLinkerValidation(t *testing.T) {
 			map[string]string{
 				"foo.proto": "syntax = \"proto3\";\n" +
 					"import \"google/protobuf/descriptor.proto\";\n" +
-					"enum Foo { true = 0; false = 1; t = 2; f = 3; True = 4; False = 5; inf = 6; nan = 7; }\n" +
+					"enum Foo { option allow_alias = true; true = 0; false = 1; True = 0; False = 1; t = 2; f = 3; inf = 4; nan = 5; }\n" +
 					"extend google.protobuf.MessageOptions { repeated Foo foo = 10001; }\n" +
 					"message Baz {\n" +
 					"  option (foo) = true; option (foo) = false;\n" +
@@ -1019,6 +1019,17 @@ func TestLinkerValidation(t *testing.T) {
 		{
 			map[string]string{
 				"foo.proto": "syntax = \"proto3\";\n" +
+					"message Blah {\n" +
+					"  message Foo {\n" +
+					"    string foo = 1;\n" +
+					"    string bar = 2 [json_name=\"foo\"];\n" +
+					"  }\n" +
+					"}\n",
+			},
+			"foo.proto:5:5: field Foo.bar: custom JSON name \"foo\" conflicts with default JSON name of field foo, defined at foo.proto:4:5",
+		}, {
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
 					"message Foo {\n" +
 					"  string foo = 1 [json_name=\"foo_bar\"];\n" +
 					"  string bar = 2 [json_name=\"Foo_Bar\"];\n" +
@@ -1078,6 +1089,18 @@ func TestLinkerValidation(t *testing.T) {
 		{
 			map[string]string{
 				"foo.proto": "syntax = \"proto2\";\n" +
+					"message Blah {\n" +
+					"  message Foo {\n" +
+					"    optional string foo = 1 [json_name=\"foo_bar\"];\n" +
+					"    optional string bar = 2 [json_name=\"Foo_Bar\"];\n" +
+					"  }\n" +
+					"}\n",
+			},
+			"foo.proto:5:5: field Foo.bar: custom JSON name \"Foo_Bar\" conflicts with custom JSON name \"foo_bar\" of field foo, defined at foo.proto:4:5",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto2\";\n" +
 					"message Foo {\n" +
 					"  optional string fooBar = 1;\n" +
 					"  optional string foo_bar = 2;\n" +
@@ -1114,6 +1137,48 @@ func TestLinkerValidation(t *testing.T) {
 					"}\n",
 			},
 			"", // should succeed: only check default JSON names in proto3
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"enum Foo {\n" +
+					"  true = 0;\n" +
+					"  TRUE = 1;\n" +
+					"}\n",
+			},
+			"foo.proto:4:3: enum value Foo.TRUE: camel-case name (with optional enum name prefix removed) \"TRUE\" conflicts with camel-case name \"true\" of enum value true, defined at foo.proto:3:3",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"message Blah {\n" +
+					"  enum Foo {\n" +
+					"    true = 0;\n" +
+					"    TRUE = 1;\n" +
+					"  }\n" +
+					"}\n",
+			},
+			"foo.proto:5:5: enum value Foo.TRUE: camel-case name (with optional enum name prefix removed) \"TRUE\" conflicts with camel-case name \"true\" of enum value true, defined at foo.proto:4:5",
+		}, {
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"enum Foo {\n" +
+					"  BAR_BAZ = 0;\n" +
+					"  FooBarBaz = 1;\n" +
+					"}\n",
+			},
+			"foo.proto:4:3: enum value Foo.FooBarBaz: camel-case name (with optional enum name prefix removed) \"BarBaz\" conflicts with camel-case name \"BARBAZ\" of enum value BAR_BAZ, defined at foo.proto:3:3",
+		},
+		{
+			map[string]string{
+				"foo.proto": "syntax = \"proto3\";\n" +
+					"enum Foo {\n" +
+					"  option allow_alias = true;\n" +
+					"  BAR_BAZ = 0;\n" +
+					"  FooBarBaz = 0;\n" +
+					"}\n",
+			},
+			"", // should succeed: not a conflict if both values have same number
 		},
 	}
 	for i, tc := range testCases {
@@ -1319,6 +1384,85 @@ func TestCustomJSONNameWarnings(t *testing.T) {
 				"}\n",
 			warning: "test.proto:4:3: field Foo.fooBar: default JSON name \"fooBar\" conflicts with default JSON name of field foo_bar, defined at test.proto:3:3",
 		},
+		// in nested message
+		{
+			source: "syntax = \"proto2\";\n" +
+				"message Blah { message Foo {\n" +
+				"  optional string foo = 1;\n" +
+				"  optional string bar = 2 [json_name=\"foo\"];\n" +
+				"} }\n",
+			warning: "test.proto:4:3: field Foo.bar: custom JSON name \"foo\" conflicts with default JSON name of field foo, defined at test.proto:3:3",
+		},
+		{
+			source: "syntax = \"proto2\";\n" +
+				"message Blah { message Foo {\n" +
+				"  optional string foo_bar = 1;\n" +
+				"  optional string fooBar = 2;\n" +
+				"} }\n",
+			warning: "test.proto:4:3: field Foo.fooBar: default JSON name \"fooBar\" conflicts with default JSON name of field foo_bar, defined at test.proto:3:3",
+		},
+		{
+			source: "syntax = \"proto2\";\n" +
+				"message Blah { message Foo {\n" +
+				"  optional string foo_bar = 1;\n" +
+				"  optional string fooBar = 2;\n" +
+				"} }\n",
+			warning: "test.proto:4:3: field Foo.fooBar: default JSON name \"fooBar\" conflicts with default JSON name of field foo_bar, defined at test.proto:3:3",
+		},
+		// enum values
+		{
+			source: "syntax = \"proto2\";\n" +
+				"enum Foo {\n" +
+				"  true = 0;\n" +
+				"  TRUE = 1;\n" +
+				"}\n",
+			warning: "test.proto:4:3: enum value Foo.TRUE: camel-case name (with optional enum name prefix removed) \"TRUE\" conflicts with camel-case name \"true\" of enum value true, defined at test.proto:3:3",
+		},
+		{
+			source: "syntax = \"proto2\";\n" +
+				"enum Foo {\n" +
+				"  fooBarBaz = 0;\n" +
+				"  _FOO__BAR_BAZ = 1;\n" +
+				"}\n",
+			warning: "test.proto:4:3: enum value Foo._FOO__BAR_BAZ: camel-case name (with optional enum name prefix removed) \"BARBAZ\" conflicts with camel-case name \"BarBaz\" of enum value fooBarBaz, defined at test.proto:3:3",
+		},
+		{
+			source: "syntax = \"proto2\";\n" +
+				"enum Foo {\n" +
+				"  option allow_alias = true;\n" +
+				"  BarBaz = 0;\n" +
+				"  BAR_BAZ = 0;\n" +
+				"  FOO_BAR_BAZ = 0;\n" +
+				"}\n",
+			warning: "",
+		},
+		// in nested message
+		{
+			source: "syntax = \"proto2\";\n" +
+				"message Blah { enum Foo {\n" +
+				"  true = 0;\n" +
+				"  TRUE = 1;\n" +
+				"} }\n",
+			warning: "test.proto:4:3: enum value Foo.TRUE: camel-case name (with optional enum name prefix removed) \"TRUE\" conflicts with camel-case name \"true\" of enum value true, defined at test.proto:3:3",
+		},
+		{
+			source: "syntax = \"proto2\";\n" +
+				"message Blah { enum Foo {\n" +
+				"  fooBarBaz = 0;\n" +
+				"  _FOO__BAR_BAZ = 1;\n" +
+				"} }\n",
+			warning: "test.proto:4:3: enum value Foo._FOO__BAR_BAZ: camel-case name (with optional enum name prefix removed) \"BARBAZ\" conflicts with camel-case name \"BarBaz\" of enum value fooBarBaz, defined at test.proto:3:3",
+		},
+		{
+			source: "syntax = \"proto2\";\n" +
+				"message Blah { enum Foo {\n" +
+				"  option allow_alias = true;\n" +
+				"  BarBaz = 0;\n" +
+				"  BAR_BAZ = 0;\n" +
+				"  FOO_BAR_BAZ = 0;\n" +
+				"} }\n",
+			warning: "",
+		},
 	}
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
@@ -1337,7 +1481,7 @@ func TestCustomJSONNameWarnings(t *testing.T) {
 		}
 		if tc.warning == "" && len(warnings) > 0 {
 			t.Errorf("case %d: expecting no warnings; instead got: %v", i, warnings)
-		} else {
+		} else if tc.warning != "" {
 			found := false
 			for _, w := range warnings {
 				if w == tc.warning {

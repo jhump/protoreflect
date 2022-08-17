@@ -75,7 +75,7 @@ func (l *linker) linkFiles() (map[string]*desc.FileDescriptor, error) {
 		if err := l.checkExtensionsInFile(fd, r); err != nil {
 			return nil, err
 		}
-		// and final check for json name configuration
+		// and final check for json name conflicts
 		if err := l.checkJsonNamesInFile(fd, r); err != nil {
 			return nil, err
 		}
@@ -1122,28 +1122,85 @@ func (l *linker) checkJsonNamesInFile(fd *desc.FileDescriptor, res *parseResult)
 			return err
 		}
 	}
+	for _, ed := range fd.GetEnumTypes() {
+		if err := l.checkJsonNamesInEnum(ed, res); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 func (l *linker) checkJsonNamesInMessage(md *desc.MessageDescriptor, res *parseResult) error {
-	if err := checkJsonNames(md, res, false); err != nil {
+	if err := checkFieldJsonNames(md, res, false); err != nil {
 		return err
 	}
-	if err := checkJsonNames(md, res, true); err != nil {
+	if err := checkFieldJsonNames(md, res, true); err != nil {
 		return err
+	}
+
+	for _, nmd := range md.GetNestedMessageTypes() {
+		if err := l.checkJsonNamesInMessage(nmd, res); err != nil {
+			return err
+		}
+	}
+	for _, ed := range md.GetNestedEnumTypes() {
+		if err := l.checkJsonNamesInEnum(ed, res); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func checkJsonNames(md *desc.MessageDescriptor, res *parseResult, useCustom bool) error {
-	type seenName struct {
+func (l *linker) checkJsonNamesInEnum(ed *desc.EnumDescriptor, res *parseResult) error {
+	type jsonName struct {
+		source *dpb.EnumValueDescriptorProto
+		// enum's camel-case name (which can differ in case from map key)
+		orig string
+	}
+	seen := map[string]jsonName{}
+	for _, evd := range ed.GetValues() {
+		scope := "enum value " + ed.GetName() + "." + evd.GetName()
+
+		ccName := internal.JsonName(evd.GetName())
+		lcaseEnumName := strings.ToLower(ed.GetName())
+		lcaseName := strings.TrimPrefix(strings.ToLower(ccName), lcaseEnumName)
+		if len(lcaseName) != len(ccName) {
+			// it had a prefix of enum name; also strip from mixed-case string
+			ccName = ccName[len(lcaseEnumName):]
+		}
+		if existing, ok := seen[lcaseName]; ok && evd.GetNumber() != existing.source.GetNumber() {
+			fldNode := res.getEnumValueNode(evd.AsEnumValueDescriptorProto())
+			existingNode := res.getEnumValueNode(existing.source)
+			isProto3 := ed.GetFile().IsProto3()
+			otherName := ""
+			if ccName != existing.orig {
+				otherName = fmt.Sprintf(" %q", existing.orig)
+			}
+			conflictErr := errorWithPos(fldNode.Start(), "%s: camel-case name (with optional enum name prefix removed) %q conflicts with camel-case name%s of enum value %s, defined at %v",
+				scope, ccName, otherName, existing.source.GetName(), existingNode.Start())
+
+			// Since proto2 did not originally have a JSON format, we report conflicts as just warnings
+			if !isProto3 {
+				res.errs.warn(conflictErr)
+			} else if err := res.errs.handleError(conflictErr); err != nil {
+				return err
+			}
+		} else {
+			seen[lcaseName] = jsonName{source: evd.AsEnumValueDescriptorProto(), orig: ccName}
+		}
+	}
+	return nil
+}
+
+func checkFieldJsonNames(md *desc.MessageDescriptor, res *parseResult, useCustom bool) error {
+	type jsonName struct {
 		source *dpb.FieldDescriptorProto
 		// field's original JSON nane (which can differ in case from map key)
 		orig string
 		// true if orig is a custom JSON name (vs. the field's default JSON name)
 		custom bool
 	}
-	seen := map[string]seenName{}
+	seen := map[string]jsonName{}
 
 	for _, fd := range md.GetFields() {
 		scope := "field " + md.GetName() + "." + fd.GetName()
@@ -1187,7 +1244,7 @@ func checkJsonNames(md *desc.MessageDescriptor, res *parseResult, useCustom bool
 				}
 			}
 		} else {
-			seen[lcaseName] = seenName{orig: name, source: fd.AsFieldDescriptorProto(), custom: custom}
+			seen[lcaseName] = jsonName{source: fd.AsFieldDescriptorProto(), orig: name, custom: custom}
 		}
 	}
 	return nil
