@@ -6,6 +6,8 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
@@ -1152,32 +1154,17 @@ func (l *linker) checkJsonNamesInMessage(md *desc.MessageDescriptor, res *parseR
 }
 
 func (l *linker) checkJsonNamesInEnum(ed *desc.EnumDescriptor, res *parseResult) error {
-	type jsonName struct {
-		source *dpb.EnumValueDescriptorProto
-		// enum's camel-case name (which can differ in case from map key)
-		orig string
-	}
-	seen := map[string]jsonName{}
+	seen := map[string]*dpb.EnumValueDescriptorProto{}
 	for _, evd := range ed.GetValues() {
 		scope := "enum value " + ed.GetName() + "." + evd.GetName()
 
-		ccName := internal.JsonName(evd.GetName())
-		lcaseEnumName := strings.ToLower(ed.GetName())
-		lcaseName := strings.TrimPrefix(strings.ToLower(ccName), lcaseEnumName)
-		if len(lcaseName) != len(ccName) {
-			// it had a prefix of enum name; also strip from mixed-case string
-			ccName = ccName[len(lcaseEnumName):]
-		}
-		if existing, ok := seen[lcaseName]; ok && evd.GetNumber() != existing.source.GetNumber() {
+		name := canonicalEnumValueName(evd.GetName(), ed.GetName())
+		if existing, ok := seen[name]; ok && evd.GetNumber() != existing.GetNumber() {
 			fldNode := res.getEnumValueNode(evd.AsEnumValueDescriptorProto())
-			existingNode := res.getEnumValueNode(existing.source)
+			existingNode := res.getEnumValueNode(existing)
 			isProto3 := ed.GetFile().IsProto3()
-			otherName := ""
-			if ccName != existing.orig {
-				otherName = fmt.Sprintf(" %q", existing.orig)
-			}
-			conflictErr := errorWithPos(fldNode.Start(), "%s: camel-case name (with optional enum name prefix removed) %q conflicts with camel-case name%s of enum value %s, defined at %v",
-				scope, ccName, otherName, existing.source.GetName(), existingNode.Start())
+			conflictErr := errorWithPos(fldNode.Start(), "%s: camel-case name (with optional enum name prefix removed) %q conflicts with camel-case name of enum value %s, defined at %v",
+				scope, name, existing.GetName(), existingNode.Start())
 
 			// Since proto2 did not originally have a JSON format, we report conflicts as just warnings
 			if !isProto3 {
@@ -1186,10 +1173,77 @@ func (l *linker) checkJsonNamesInEnum(ed *desc.EnumDescriptor, res *parseResult)
 				return err
 			}
 		} else {
-			seen[lcaseName] = jsonName{source: evd.AsEnumValueDescriptorProto(), orig: ccName}
+			seen[name] = evd.AsEnumValueDescriptorProto()
 		}
 	}
 	return nil
+}
+
+func canonicalEnumValueName(enumValueName, enumName string) string {
+	return enumValCamelCase(removePrefix(enumValueName, enumName))
+}
+
+// removePrefix is used to remove the given prefix from the given str. It does not require
+// an exact match and ignores case and underscores. If the all non-underscore characters
+// would be removed from str, str is returned unchanged. If str does not have the given
+// prefix (even with the very lenient matching, in regard to case and underscores), then
+// str is returned unchanged.
+//
+// The algorithm is adapted from the protoc source:
+//   https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L922
+func removePrefix(str, prefix string) string {
+	j := 0
+	for i, r := range str {
+		if r == '_' {
+			// skip underscores in the input
+			continue
+		}
+
+		p, sz := utf8.DecodeRuneInString(prefix[j:])
+		for p == '_' {
+			j += sz // consume/skip underscore
+			p, sz = utf8.DecodeRuneInString(prefix[j:])
+		}
+
+		if j == len(prefix) {
+			// matched entire prefix; return rest of str
+			// but skipping any leading underscores
+			result := strings.TrimLeft(str[i:], "_")
+			if len(result) == 0 {
+				// result can't be empty string
+				return str
+			}
+			return result
+		}
+		if unicode.ToLower(r) != unicode.ToLower(p) {
+			// does not match prefix
+			return str
+		}
+		j += sz // consume matched rune of prefix
+	}
+	return str
+}
+
+// enumValCamelCase converts the given string to upper-camel-case.
+//
+// The algorithm is adapted from the protoc source:
+//  https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L887
+func enumValCamelCase(name string) string {
+	var js []rune
+	nextUpper := true
+	for _, r := range name {
+		if r == '_' {
+			nextUpper = true
+			continue
+		}
+		if nextUpper {
+			nextUpper = false
+			js = append(js, unicode.ToUpper(r))
+		} else {
+			js = append(js, unicode.ToLower(r))
+		}
+	}
+	return string(js)
 }
 
 func checkFieldJsonNames(md *desc.MessageDescriptor, res *parseResult, useCustom bool) error {

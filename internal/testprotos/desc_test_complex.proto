@@ -9,6 +9,8 @@ import "google/protobuf/descriptor.proto";
 message Simple {
 	optional string name = 1;
 	optional uint64 id = 2;
+	optional bytes _extra = 3; // default JSON name will be capitalized
+	repeated bool _ = 4;       // default JSON name will be empty(!)
 }
 
 extend . google. // identifier broken up strangely should still be accepted
