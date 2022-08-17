@@ -1206,7 +1206,6 @@ func hasCustomJsonName(res *parseResult, fd *desc.FieldDescriptor) bool {
 		if len(opt.Name.Parts) == 1 &&
 			opt.Name.Parts[0].Name.AsIdentifier() == "json_name" &&
 			!opt.Name.Parts[0].IsExtension() {
-			// found it
 			return true
 		}
 	}
