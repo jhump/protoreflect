@@ -1525,6 +1525,8 @@ func TestCanonicalEnumName(t *testing.T) {
 		"BAZ":                       "Baz",
 		"B_A_Z":                     "BAZ",
 		"___fu_bar_baz__":           "FuBarBaz",
+		"foobarbaz":                 "Baz",
+		"FOOBARFOOBARBAZ":           "Foobarbaz",
 	}
 	const enumName = "FooBar"
 	for k, v := range testCases {
