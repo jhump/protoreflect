@@ -105,14 +105,39 @@ func (r *parseResult) asUninterpretedOption(node *ast.OptionNode) *dpb.Uninterpr
 		opt.StringValue = []byte(val)
 	case ast.Identifier:
 		opt.IdentifierValue = proto.String(string(val))
-	case []*ast.MessageFieldNode:
-		var buf bytes.Buffer
-		aggToString(val, &buf)
-		aggStr := buf.String()
-		opt.AggregateValue = proto.String(aggStr)
-		//the grammar does not allow arrays here, so no case for []ast.ValueNode
+	default:
+		// the grammar does not allow arrays here, so the only possible case
+		// left should be []*ast.MessageFieldNode, which corresponds to an
+		// *ast.MessageLiteralNode
+		if n, ok := node.Val.(*ast.MessageLiteralNode); ok {
+			var buf bytes.Buffer
+			for i, el := range n.Elements {
+				flattenNode(r.root, el, &buf)
+				if len(n.Seps) > i && n.Seps[i] != nil {
+					buf.WriteRune(' ')
+					buf.WriteRune(n.Seps[i].Rune)
+				}
+			}
+			aggStr := buf.String()
+			opt.AggregateValue = proto.String(aggStr)
+		}
+		// TODO: else that reports an error or panics??
 	}
 	return opt
+}
+
+func flattenNode(f *ast.FileNode, n ast.Node, buf *bytes.Buffer) {
+	if cn, ok := n.(ast.CompositeNode); ok {
+		for _, ch := range cn.Children() {
+			flattenNode(f, ch, buf)
+		}
+		return
+	}
+
+	if buf.Len() > 0 {
+		buf.WriteRune(' ')
+	}
+	buf.WriteString(n.(ast.TerminalNode).RawText())
 }
 
 func (r *parseResult) asUninterpretedOptionName(parts []*ast.FieldReferenceNode) []*dpb.UninterpretedOption_NamePart {

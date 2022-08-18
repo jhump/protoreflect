@@ -226,11 +226,22 @@ func TestAggregateValueInUninterpretedOptions(t *testing.T) {
 	testutil.Ok(t, err)
 	fd := res.fd
 
+	// service TestTestService, method UserAuth; first option
 	aggregateValue1 := *fd.Service[0].Method[0].Options.UninterpretedOption[0].AggregateValue
-	testutil.Eq(t, "{ authenticated: true permission{ action: LOGIN entity: \"client\" } }", aggregateValue1)
+	testutil.Eq(t, `authenticated : true permission : { action : LOGIN entity : "client" }`, aggregateValue1)
 
+	// service TestTestService, method Get; first option
 	aggregateValue2 := *fd.Service[0].Method[1].Options.UninterpretedOption[0].AggregateValue
-	testutil.Eq(t, "{ authenticated: true permission{ action: READ entity: \"user\" } }", aggregateValue2)
+	testutil.Eq(t, `authenticated : true permission : { action : READ entity : "user" }`, aggregateValue2)
+
+	// message Another; first option
+	aggregateValue3 := *fd.MessageType[4].Options.UninterpretedOption[0].AggregateValue
+	testutil.Eq(t, `foo : "abc" s < name : "foo" , id : 123 > , array : [ 1 , 2 , 3 ] , r : [ < name : "f" > , { name : "s" } , { id : 456 } ] ,`, aggregateValue3)
+
+	// message Test.Nested._NestedNested; second option (rept)
+	//  (Test.Nested is at index 1 instead of 0 because of implicit nested message from map field m)
+	aggregateValue4 := *fd.MessageType[1].NestedType[1].NestedType[0].Options.UninterpretedOption[1].AggregateValue
+	testutil.Eq(t, `foo : "goo" [ foo . bar . Test . Nested . _NestedNested . _garblez ] : "boo"`, aggregateValue4)
 }
 
 func TestParseFilesMessageComments(t *testing.T) {
