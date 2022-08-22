@@ -44,7 +44,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   // some detached comments
 
-  // some detached comments
+  // some detached comments with unicode 这个是值
 
   // Another field comment
 
@@ -65,7 +65,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   reserved "foo", "bar", "baz";
 
-  // Group comment
+  // Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
   optional group Extras = 3 {
     // trailer for Extras
 
@@ -133,7 +133,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
   // can be these or those
   oneof xyz {
     // whoops?
-    option (testprotos.oofubar) = "whoops!";
+    option (testprotos.oofubar) = "whoops, this has invalid UTF8! \274\377";
 
     string these = 6;
 
@@ -214,7 +214,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   // some detached comments
 
-  // some detached comments
+  // some detached comments with unicode 这个是值
 
   // Another field comment
 
@@ -235,7 +235,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
   reserved "foo", "bar", "baz";
 
-  // Group comment
+  // Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
   optional group Extras = 3 {
     // trailer for Extras
 
@@ -303,7 +303,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
   // can be these or those
   oneof xyz {
     // whoops?
-    option (testprotos.oofubar) = "whoops!";
+    option (testprotos.oofubar) = "whoops, this has invalid UTF8! \274\377";
 
     string these = 6;
 
@@ -330,7 +330,7 @@ repeated int32 ids = /* detached tag */ /* tag numero uno */ 1 /*
 -------- foo.bar.Request.name (*desc.FieldDescriptor) --------
 // some detached comments
 
-// some detached comments
+// some detached comments with unicode 这个是值
 
 // Another field comment
 
@@ -340,7 +340,7 @@ optional /* type comment */ string /* name comment */ name = 2 [
   default = "fubar" // default trail
 ];
 -------- foo.bar.Request.extras (*desc.FieldDescriptor) --------
-// Group comment
+// Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
 optional group Extras = 3 {
   // trailer for Extras
 
@@ -375,14 +375,14 @@ oneof abc {
 }
 -------- foo.bar.Request.xyz (*desc.OneOfDescriptor) --------
 oneof xyz {
-  option (testprotos.oofubar) = "whoops!";
+  option (testprotos.oofubar) = "whoops, this has invalid UTF8! \274\377";
 
   string these = 6;
 
   int32 those = 7;
 }
 -------- foo.bar.Request.Extras (*desc.MessageDescriptor) --------
-// Group comment
+// Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
 message /* group name */ Extras {
   // trailer for Extras
 

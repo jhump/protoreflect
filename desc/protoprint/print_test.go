@@ -257,3 +257,16 @@ func checkContents(t *testing.T, actualContents string, goldenFileName string) {
 
 	testutil.Eq(t, string(b), actualContents, "wrong file contents for %s", goldenFileName)
 }
+
+func TestQuoteString(t *testing.T) {
+	// other tests have examples of encountering invalid UTF8 and printable unicode
+	// so this is just for testing how unprintable valid unicode characters are rendered
+	s := quotedString("\x04")
+	testutil.Eq(t, "\"\\004\"", s)
+	s = quotedString("\x7F")
+	testutil.Eq(t, "\"\\177\"", s)
+	s = quotedString("\u2028")
+	testutil.Eq(t, "\"\\u2028\"", s)
+	s = quotedString("\U0010FFFF")
+	testutil.Eq(t, "\"\\U0010FFFF\"", s)
+}

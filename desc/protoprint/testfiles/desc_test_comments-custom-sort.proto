@@ -108,7 +108,7 @@ message Request {
     string these = 6;
 
     // whoops?
-    option (testprotos.oofubar) = "whoops!";
+    option (testprotos.oofubar) = "whoops, this has invalid UTF8! \274\377";
   }
 
   // can be this or that
@@ -125,7 +125,7 @@ message Request {
 
   // some detached comments
 
-  // some detached comments
+  // some detached comments with unicode 这个是值
 
   // Another field comment
 
@@ -140,7 +140,7 @@ message Request {
     json_name = "|foo|"
   ]; // field trailer #1...
 
-  // Group comment
+  // Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
   optional group Extras = 3 {
     // trailer for Extras
 

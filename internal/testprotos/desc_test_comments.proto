@@ -36,7 +36,7 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 
 	// some detached comments
 
-	// some detached comments
+	// some detached comments with unicode 这个是值
 
 	// Another field comment
 	/* label comment */ optional /* type comment */ string /* name comment */ name = 2
@@ -51,7 +51,7 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 	/* same for reserved range comments */ reserved 10 to 20, 30 to 50 ;
 	reserved "foo", "bar", "baz"; /* reserved trailers */
 
-	// Group comment
+	// Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
 	optional group /* group name */ Extras = 3 {
 		// trailer for Extras
 
@@ -102,7 +102,7 @@ message /* detached message name */ /* request with a capital R */ Request // tr
 	// can be these or those
 	oneof xyz {
 		// whoops?
-		option (testprotos.oofubar) = "whoops!";
+		option (testprotos.oofubar) = "whoops, this has invalid UTF8! \xBC\xFF";
 
 		string these = 6;
 		int32 those = 7;
