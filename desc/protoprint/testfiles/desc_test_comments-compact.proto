@@ -19,7 +19,7 @@ message Request {
   // lead mfubar
   option (testprotos.mfubar) = true; // trailing mfubar
   // some detached comments
-  // some detached comments
+  // some detached comments with unicode 这个是值
   // Another field comment
   // label comment
   optional string name = 2 [default = "fubar"];
@@ -27,7 +27,7 @@ message Request {
   extensions 201 to 250 [(testprotos.exfubarb) = "\000\001\002\003\004\005\006\007", (testprotos.exfubar) = "splat!"];
   reserved 10 to 20, 30 to 50;
   reserved "foo", "bar", "baz";
-  // Group comment
+  // Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
   optional group Extras = 3 {
     // trailer for Extras
     // this is a custom option
@@ -65,7 +65,7 @@ message Request {
   // can be these or those
   oneof xyz {
     // whoops?
-    option (testprotos.oofubar) = "whoops!";
+    option (testprotos.oofubar) = "whoops, this has invalid UTF8! \274\377";
     string these = 6;
     int32 those = 7;
   }

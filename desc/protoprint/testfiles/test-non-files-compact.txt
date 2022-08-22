@@ -19,7 +19,7 @@ message Request {
   ];
   // label comment
   optional string name = 2 [default = "fubar"];
-  // Group comment
+  // Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
   optional group Extras = 3 {
     option no_standard_descriptor_accessor = false;
     option (.testprotos.mfubar) = false;
@@ -35,7 +35,7 @@ message Request {
   }
   // can be these or those
   oneof xyz {
-    option (.testprotos.oofubar) = "whoops!";
+    option (.testprotos.oofubar) = "whoops, this has invalid UTF8! \274\377";
     string these = 6;
     int32 those = 7;
   }
@@ -104,7 +104,7 @@ message Request {
   ];
   // label comment
   optional string name = 2 [default = "fubar"];
-  // Group comment
+  // Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
   optional group Extras = 3 {
     option no_standard_descriptor_accessor = false;
     option (.testprotos.mfubar) = false;
@@ -120,7 +120,7 @@ message Request {
   }
   // can be these or those
   oneof xyz {
-    option (.testprotos.oofubar) = "whoops!";
+    option (.testprotos.oofubar) = "whoops, this has invalid UTF8! \274\377";
     string these = 6;
     int32 those = 7;
   }
@@ -168,7 +168,7 @@ repeated int32 ids = 1 [
 // label comment
 optional string name = 2 [default = "fubar"];
 -------- foo.bar.Request.extras (*desc.FieldDescriptor) --------
-// Group comment
+// Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
 optional group Extras = 3 {
   option no_standard_descriptor_accessor = false;
   option (.testprotos.mfubar) = false;
@@ -195,12 +195,12 @@ oneof abc {
 }
 -------- foo.bar.Request.xyz (*desc.OneOfDescriptor) --------
 oneof xyz {
-  option (.testprotos.oofubar) = "whoops!";
+  option (.testprotos.oofubar) = "whoops, this has invalid UTF8! \274\377";
   string these = 6;
   int32 those = 7;
 }
 -------- foo.bar.Request.Extras (*desc.MessageDescriptor) --------
-// Group comment
+// Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
 message Extras {
   option no_standard_descriptor_accessor = false;
   option (.testprotos.mfubar) = false;

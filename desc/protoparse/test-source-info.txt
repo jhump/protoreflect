@@ -185,7 +185,7 @@ desc_test_comments.proto:43:77
  some detached comments
 
     Leading detached comment [1]:
- some detached comments
+ some detached comments with unicode 这个是值
 
     Leading detached comment [2]:
  Another field comment
@@ -381,7 +381,7 @@ desc_test_comments.proto:55:51
 desc_test_comments.proto:55:9
 desc_test_comments.proto:69:10
     Leading comments:
- Group comment
+ Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
 
     Trailing comments:
  trailer for Extras
@@ -829,12 +829,12 @@ desc_test_comments.proto:103:18
 
  > message_type[0] > oneof_decl[1] > options:
 desc_test_comments.proto:105:17
-desc_test_comments.proto:105:57
+desc_test_comments.proto:105:89
 
 
  > message_type[0] > oneof_decl[1] > options > oofubar[0]:
 desc_test_comments.proto:105:17
-desc_test_comments.proto:105:57
+desc_test_comments.proto:105:89
     Leading comments:
  whoops?
 
