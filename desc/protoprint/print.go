@@ -1706,7 +1706,7 @@ func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent
 		m.Multiline = true
 		optValBytes, err := m.Marshal(optVal.(protoV2.Message))
 		if err != nil {
-			panic(fmt.Sprintf("marshalling option %T for field %s, %v", optVal, name, err))
+			panic(fmt.Sprintf("marshalling multiline option %T for field %s, %v", optVal, name, err))
 		}
 
 		str = string(optValBytes)
