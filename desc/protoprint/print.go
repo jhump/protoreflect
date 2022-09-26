@@ -15,12 +15,10 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
-	"google.golang.org/protobuf/encoding/prototext"
-	protoV2 "google.golang.org/protobuf/proto"
-
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
 	"github.com/jhump/protoreflect/dynamic"
+	"google.golang.org/protobuf/encoding/prototext"
 )
 
 // Printer knows how to format file descriptors as proto source code. Its fields
@@ -1679,7 +1677,7 @@ func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent
 
 		m := &prototext.MarshalOptions{Multiline: false}
 
-		optText, err := m.Marshal(optVal.(protoV2.Message))
+		optText, err := m.Marshal(proto.MessageV2(optVal))
 		if err != nil {
 			panic(fmt.Sprintf("marshalling option %T for field %s, %v", optVal, name, err))
 		}
@@ -1704,7 +1702,7 @@ func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent
 
 		//multi-line form
 		m.Multiline = true
-		optValBytes, err := m.Marshal(optVal.(protoV2.Message))
+		optValBytes, err := m.Marshal(proto.MessageV2(optVal))
 		if err != nil {
 			panic(fmt.Sprintf("marshalling multiline option %T for field %s, %v", optVal, name, err))
 		}
