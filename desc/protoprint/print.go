@@ -15,6 +15,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/encoding/prototext"
+	protoV2 "google.golang.org/protobuf/proto"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/internal"
@@ -1674,11 +1676,15 @@ func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent
 			fmt.Fprintf(w, "{ %s }", proto.CompactTextString(optVal))
 			return
 		}
-		m := proto.TextMarshaler{
-			Compact:   true,
-			ExpandAny: true,
+
+		m := &prototext.MarshalOptions{Multiline: false}
+
+		optText, err := m.Marshal(optVal.(protoV2.Message))
+		if err != nil {
+			panic(fmt.Sprintf("marshalling option %T for field %s, %v", optVal, name, err))
 		}
-		str := strings.TrimSuffix(m.Text(optVal), " ")
+
+		str := strings.TrimSuffix(string(optText), " ")
 		fieldCount := strings.Count(str, ":")
 		nestedCount := strings.Count(str, "{") + strings.Count(str, "<")
 		if fieldCount <= 1 && nestedCount == 0 {
@@ -1696,9 +1702,14 @@ func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent
 			return
 		}
 
-		// multi-line form
-		m.Compact = false
-		str = m.Text(optVal)
+		//multi-line form
+		m.Multiline = true
+		optValBytes, err := m.Marshal(optVal.(protoV2.Message))
+		if err != nil {
+			panic(fmt.Sprintf("marshalling option %T for field %s, %v", optVal, name, err))
+		}
+
+		str = string(optValBytes)
 		fmt.Fprintln(w, "{")
 		p.indentMessageLiteral(w, indent+1, str)
 		p.indent(w, indent)
