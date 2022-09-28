@@ -19,6 +19,7 @@ import (
 	"github.com/jhump/protoreflect/desc/internal"
 	"github.com/jhump/protoreflect/dynamic"
 	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
 // Printer knows how to format file descriptors as proto source code. Its fields
@@ -166,6 +167,8 @@ type Printer struct {
 	//
 	// If unset (e.g. if zero), a default threshold of 50 is used.
 	MessageLiteralExpansionThresholdLength int
+
+	registry *protoregistry.Types
 }
 
 // CommentType is a kind of comments in a proto source file. This can be used
@@ -301,6 +304,12 @@ func (p *Printer) printProto(dsc desc.Descriptor, out io.Writer) error {
 	er := dynamic.ExtensionRegistry{}
 	er.AddExtensionsFromFileRecursively(dsc.GetFile())
 	mf := dynamic.NewMessageFactoryWithExtensionRegistry(&er)
+
+	if r, err := createTypeRegistry(dsc.GetFile()); err == nil {
+		p.registry = r
+		mf.WithResolver(r)
+	}
+
 	fdp := dsc.GetFile().AsFileDescriptorProto()
 	sourceInfo := internal.CreateSourceInfoMap(fdp)
 	extendOptionLocations(sourceInfo, fdp.GetSourceCodeInfo().GetLocation())
@@ -1675,7 +1684,7 @@ func (p *Printer) printOption(name string, optVal interface{}, w *writer, indent
 			return
 		}
 
-		m := &prototext.MarshalOptions{Multiline: false}
+		m := &prototext.MarshalOptions{Multiline: false, EmitUnknown: true, Resolver: p.registry}
 
 		optText, err := m.Marshal(proto.MessageV2(optVal))
 		if err != nil {

@@ -76,9 +76,11 @@ var typeOfBytes = reflect.TypeOf(([]byte)(nil))
 // also to de-serialize messages (from the standard binary format, as well
 // as from the text format and from JSON).
 type Message struct {
-	md            *desc.MessageDescriptor
-	er            *ExtensionRegistry
-	mf            *MessageFactory
+	md         *desc.MessageDescriptor
+	er         *ExtensionRegistry
+	mf         *MessageFactory
+	registryMf *RegistryMessageFactory
+
 	extraFields   map[int32]*desc.FieldDescriptor
 	values        map[int32]interface{}
 	unknownFields map[int32][]UnknownField
@@ -121,13 +123,16 @@ func NewMessageWithExtensionRegistry(md *desc.MessageDescriptor, er *ExtensionRe
 // MessageFactory is used to instantiate nested messages.
 func NewMessageWithMessageFactory(md *desc.MessageDescriptor, mf *MessageFactory) *Message {
 	var er *ExtensionRegistry
+	var registryMf *RegistryMessageFactory
 	if mf != nil {
 		er = mf.er
+		registryMf = mf.types
 	}
 	return &Message{
-		md: md,
-		mf: mf,
-		er: er,
+		md:         md,
+		mf:         mf,
+		er:         er,
+		registryMf: registryMf,
 	}
 }
 
@@ -411,19 +416,20 @@ func (m *Message) GetField(fd *desc.FieldDescriptor) interface{} {
 // The Go type of the returned value, for scalar fields, is the same as protoc
 // would generate for the field (in a non-dynamic message). The table below
 // lists the scalar types and the corresponding Go types.
-//  +-------------------------+-----------+
-//  |       Declared Type     |  Go Type  |
-//  +-------------------------+-----------+
-//  | int32, sint32, sfixed32 | int32     |
-//  | int64, sint64, sfixed64 | int64     |
-//  | uint32, fixed32         | uint32    |
-//  | uint64, fixed64         | uint64    |
-//  | float                   | float32   |
-//  | double                  | double32  |
-//  | bool                    | bool      |
-//  | string                  | string    |
-//  | bytes                   | []byte    |
-//  +-------------------------+-----------+
+//
+//	+-------------------------+-----------+
+//	|       Declared Type     |  Go Type  |
+//	+-------------------------+-----------+
+//	| int32, sint32, sfixed32 | int32     |
+//	| int64, sint64, sfixed64 | int64     |
+//	| uint32, fixed32         | uint32    |
+//	| uint64, fixed64         | uint64    |
+//	| float                   | float32   |
+//	| double                  | double32  |
+//	| bool                    | bool      |
+//	| string                  | string    |
+//	| bytes                   | []byte    |
+//	+-------------------------+-----------+
 //
 // Values for enum fields will always be int32 values. You can use the enum
 // descriptor associated with the field to lookup value names with those values.
@@ -2053,8 +2059,9 @@ func (m *Message) ProtoMessage() {
 
 // ConvertTo converts this dynamic message into the given message. This is
 // shorthand for resetting then merging:
-//   target.Reset()
-//   m.MergeInto(target)
+//
+//	target.Reset()
+//	m.MergeInto(target)
 func (m *Message) ConvertTo(target proto.Message) error {
 	if err := m.checkType(target); err != nil {
 		return err
@@ -2081,8 +2088,9 @@ func (m *Message) ConvertToDeterministic(target proto.Message) error {
 
 // ConvertFrom converts the given message into this dynamic message. This is
 // shorthand for resetting then merging:
-//   m.Reset()
-//   m.MergeFrom(target)
+//
+//	m.Reset()
+//	m.MergeFrom(target)
 func (m *Message) ConvertFrom(target proto.Message) error {
 	if err := m.checkType(target); err != nil {
 		return err

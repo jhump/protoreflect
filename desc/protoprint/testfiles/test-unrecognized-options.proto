@@ -26,7 +26,14 @@ message Foo {
 service TestService {
   rpc Get ( Test ) returns ( Test ) {
     option (foo) = {
-      bar:<baz:FROB name:"abc"> bar:<baz:NITZ name:"xyz">
+      bar: {
+        baz: FROB
+        name: "abc"
+      }
+      bar: {
+        baz: NITZ
+        name: "xyz"
+      }
     };
   }
 }

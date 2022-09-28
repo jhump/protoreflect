@@ -8,8 +8,9 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
-
 	"github.com/jhump/protoreflect/desc"
+	protoV2 "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
 var varintTypes = map[descriptor.FieldDescriptorProto_Type]bool{}
@@ -193,7 +194,18 @@ func DecodeLengthDelimitedField(fd *desc.FieldDescriptor, bytes []byte, mf Messa
 	case fd.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE ||
 		fd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP:
 		msg := mf.NewMessage(fd.GetMessageType())
-		err := proto.Unmarshal(bytes, msg)
+
+		opts := protoV2.UnmarshalOptions{
+			Merge:          true,
+			AllowPartial:   true,
+			DiscardUnknown: false,
+		}
+
+		if v, ok := mf.(interface{ Resolver() *protoregistry.Types }); ok {
+			opts.Resolver = v.Resolver()
+		}
+
+		err := opts.Unmarshal(bytes, proto.MessageV2(msg))
 		if err != nil {
 			return nil, err
 		} else {

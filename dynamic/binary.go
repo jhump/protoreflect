@@ -4,9 +4,10 @@ package dynamic
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/codec"
-	"io"
 )
 
 // defaultDeterminism, if true, will mean that calls to Marshal will produce
@@ -151,7 +152,7 @@ func (m *Message) UnmarshalMerge(b []byte) error {
 
 func (m *Message) unmarshal(buf *codec.Buffer, isGroup bool) error {
 	for !buf.EOF() {
-		fd, val, err := buf.DecodeFieldValue(m.FindFieldDescriptor, m.mf)
+		fd, val, err := buf.DecodeFieldValue(m.FindFieldDescriptor, m.registryMf)
 		if err != nil {
 			if err == codec.ErrWireTypeEndGroup {
 				if isGroup {

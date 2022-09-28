@@ -1,13 +1,35 @@
 package dynamic
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/jhump/protoreflect/desc"
 )
+
+type RegistryMessageFactory struct {
+	types *protoregistry.Types
+}
+
+func (r *RegistryMessageFactory) Resolver() *protoregistry.Types {
+	return r.types
+}
+
+func (r *RegistryMessageFactory) NewMessage(md *desc.MessageDescriptor) proto.Message {
+	fullname := protoreflect.FullName(md.GetFullyQualifiedName())
+	mt, err := r.types.FindMessageByName(fullname)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create message %s", fullname))
+	}
+
+	return dynamicpb.NewMessage(mt.Descriptor())
+}
 
 // MessageFactory can be used to create new empty message objects. A default instance
 // (without extension registry or known-type registry specified) will always return
@@ -15,8 +37,9 @@ import (
 // The well-known types include primitive wrapper types and a handful of other special
 // types defined in standard protobuf definitions, like Any, Duration, and Timestamp.
 type MessageFactory struct {
-	er  *ExtensionRegistry
-	ktr *KnownTypeRegistry
+	er    *ExtensionRegistry
+	ktr   *KnownTypeRegistry
+	types *RegistryMessageFactory
 }
 
 // NewMessageFactoryWithExtensionRegistry creates a new message factory where any
@@ -51,6 +74,11 @@ func NewMessageFactoryWithRegistries(er *ExtensionRegistry, ktr *KnownTypeRegist
 		er:  er,
 		ktr: ktr,
 	}
+}
+
+func (f *MessageFactory) WithResolver(resolver *protoregistry.Types) *MessageFactory {
+	f.types = &RegistryMessageFactory{types: resolver}
+	return f
 }
 
 // NewMessage creates a new empty message that corresponds to the given descriptor.

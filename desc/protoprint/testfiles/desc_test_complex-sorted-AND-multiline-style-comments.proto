@@ -8,46 +8,44 @@ option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 message Another {
   option (a) = {
-    test: <
+    test: {
       foo: "m&m"
       array: 1
       array: 2
-      s: <
+      s: {
         name: "yolo"
         id: 98765
-      >
-      m: <
+      }
+      m: {
         key: "bar"
         value: 200
-      >
-      m: <
+      }
+      m: {
         key: "foo"
         value: 100
-      >
+      }
       [foo.bar.Test.Nested._NestedNested._garblez]: "whoah!"
-    >
+    }
     fff: OK
   };
 
   option (eee) = V1;
 
   option (map_vals) = {
-    vals: <
+    vals: {
       key: ""
-      value: <
-      >
-    >
-    vals: <
+      value: {}
+    }
+    vals: {
       key: "bar"
-      value: <
+      value: {
         name: "baz"
-      >
-    >
-    vals: <
+      }
+    }
+    vals: {
       key: "foo"
-      value: <
-      >
-    >
+      value: {}
+    }
   }; /* no key, no value */
 
   option (rept) = {
@@ -55,35 +53,35 @@ message Another {
     array: 1
     array: 2
     array: 3
-    s: <
+    s: {
       name: "foo"
       id: 123
-    >
-    r: <
+    }
+    r: {
       name: "f"
-    >
-    r: <
+    }
+    r: {
       name: "s"
-    >
-    r: <
+    }
+    r: {
       id: 456
-    >
+    }
   };
   option (rept) = {
     foo: "def"
     array: 3
     array: 2
     array: 1
-    s: <
+    s: {
       name: "bar"
       id: 321
-    >
-    r: <
+    }
+    r: {
       name: "g"
-    >
-    r: <
+    }
+    r: {
       name: "s"
-    >
+    }
   };
   option (rept) = { foo:"def" };
 
@@ -95,14 +93,14 @@ message Another {
 message IsAuthorizedReq {
   repeated string subjects = 1 [
     (rules) = {
-      repeated: <
+      repeated: {
         min_items: 1
-        items: <
-          string: <
+        items: {
+          string: {
             pattern: "^(?:(?:team:(?:local|ldap))|user):[[:alnum:]_-]+$"
-          >
-        >
-      >
+          }
+        }
+      }
     }
   ];
 }
@@ -421,20 +419,20 @@ service TestTestService {
   rpc Get ( Test ) returns ( Test ) {
     option (validator) = {
       authenticated: true
-      permission: <
+      permission: {
         action: READ
         entity: "user"
-      >
+      }
     };
   }
 
   rpc UserAuth ( Test ) returns ( Test ) {
     option (validator) = {
       authenticated: true
-      permission: <
+      permission: {
         action: LOGIN
         entity: "client"
-      >
+      }
     };
   }
 }
