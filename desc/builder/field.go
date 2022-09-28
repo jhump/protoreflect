@@ -538,19 +538,22 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *dpb.SourceCodeInfo
 		return nil, fmt.Errorf("tag for field %s cannot be above max %d", GetFullyQualifiedName(flb), maxTag)
 	}
 
-	fd := &dpb.FieldDescriptorProto{
-		Name:         proto.String(flb.name),
-		Number:       proto.Int32(flb.number),
-		Options:      flb.Options,
-		Label:        lbl,
-		Type:         flb.fieldType.fieldType.Enum(),
-		TypeName:     typeName,
-		JsonName:     proto.String(jsName),
-		DefaultValue: def,
-		Extendee:     extendee,
-	}
+	var proto3Optional *bool
 	if flb.Proto3Optional {
-		internal.SetProto3Optional(fd)
+		proto3Optional = proto.Bool(true)
+	}
+
+	fd := &dpb.FieldDescriptorProto{
+		Name:           proto.String(flb.name),
+		Number:         proto.Int32(flb.number),
+		Options:        flb.Options,
+		Label:          lbl,
+		Type:           flb.fieldType.fieldType.Enum(),
+		TypeName:       typeName,
+		JsonName:       proto.String(jsName),
+		DefaultValue:   def,
+		Extendee:       extendee,
+		Proto3Optional: proto3Optional,
 	}
 	return fd, nil
 }
