@@ -3,8 +3,7 @@
 // new descriptors as are there methods for converting existing descriptors into
 // builders, for modification.
 //
-//
-// Factory Functions
+// # Factory Functions
 //
 // Builders are created using the numerous factory functions. Each type of
 // descriptor has two kinds of factory functions for the corresponding type of
@@ -26,8 +25,7 @@
 // nil values for required fields (such as field types, RPC method types, and
 // extendee type for extensions).
 //
-//
-// Auto-Assigning Tag Numbers and File Names
+// # Auto-Assigning Tag Numbers and File Names
 //
 // The factory function for fields does not accept a tag number. This is because
 // tags, for fields where none is set or is explicitly set to zero, are
@@ -48,8 +46,7 @@
 // can have their tags auto-assigned. If an extension is constructed with a zero
 // tag (which is not valid), the factory function will panic.
 //
-//
-// Descriptor Hierarchy
+// # Descriptor Hierarchy
 //
 // The hierarchy for builders is mutable. A descriptor builder, such as a field,
 // can be moved from one message to another. When this is done, the field is
@@ -59,10 +56,10 @@
 // can simply be copied. This allows for copying a descriptor from one parent to
 // another, like so:
 //
-//    msg := builder.FromMessage(someMsgDesc)
-//    field1 := msg.GetField("foo")
-//    field2 := *field1 // field2 is now a copy
-//    otherMsg.AddField(&field2)
+//	msg := builder.FromMessage(someMsgDesc)
+//	field1 := msg.GetField("foo")
+//	field2 := *field1 // field2 is now a copy
+//	otherMsg.AddField(&field2)
 //
 // All descriptors have a link up the hierarchy to the file in which they were
 // declared. However, it is *not* necessary to construct this full hierarchy
@@ -80,8 +77,7 @@
 // unnamed) package. In order to put descriptors into a proper package
 // namespace, they must be added to a file that has the right package name.
 //
-//
-// Builder Pattern and Method Chaining
+// # Builder Pattern and Method Chaining
 //
 // Each descriptor has some special fields that can only be updated via a Set*
 // method. They also all have some exported fields that can be updated by just
@@ -89,13 +85,13 @@
 // methods in order to support a typical method-chaining flow when building
 // objects:
 //
-//    msg, err := builder.NewMessage("MyMessage").
-//        AddField(NewField("foo", FieldTypeScalar(descriptor.FieldDescriptorProto_TYPE_STRING)).
-//            SetDefaultValue("bar")).
-//        AddField(NewField("baz", FieldTypeScalar(descriptor.FieldDescriptorProto_TYPE_INT64)).
-//            SetLabel(descriptor.FieldDescriptorProto_LABEL_REPEATED).
-//            SetOptions(&descriptor.FieldOptions{Packed: proto.Bool(true)})).
-//        Build()
+//	msg, err := builder.NewMessage("MyMessage").
+//	    AddField(NewField("foo", FieldTypeScalar(descriptor.FieldDescriptorProto_TYPE_STRING)).
+//	        SetDefaultValue("bar")).
+//	    AddField(NewField("baz", FieldTypeScalar(descriptor.FieldDescriptorProto_TYPE_INT64)).
+//	        SetLabel(descriptor.FieldDescriptorProto_LABEL_REPEATED).
+//	        SetOptions(&descriptor.FieldOptions{Packed: proto.Bool(true)})).
+//	    Build()
 //
 // So the various Set* methods all return the builder itself so that multiple
 // fields may be set in a single invocation chain.
@@ -104,8 +100,7 @@
 // can return an error if validation fails. If the method-chaining Set* form is
 // used with inputs that fail validation, the Set* method will panic.
 //
-//
-// Type References and Imported Types
+// # Type References and Imported Types
 //
 // When defining fields whose type is a message or enum and when defining
 // methods (whose request and response type are a message), the type can be set
@@ -128,8 +123,7 @@
 // imports the other). And the same would be true if one or both files were
 // explicitly assigned to a file, but not both to the same file.
 //
-//
-// Validations and Caveats
+// # Validations and Caveats
 //
 // Descriptors that are attained from a builder do not necessarily represent a
 // valid construct in the proto source language. There are some validations
@@ -153,40 +147,40 @@
 // in errors (or panics for factory functions and methods that do not return
 // errors). These are the rules that are currently enforced:
 //
-//   1. Import cycles are not allowed. (See above for more details.)
-//   2. Within a single file, symbols are not allowed to have naming conflicts.
-//      This means that is not legal to create a message and an extension with
-//      the same name in the same file.
-//   3. Messages are not allowed to have multiple fields with the same tag. Note
-//      that only non-extension fields are checked when using builders. So
-//      builders will allow tag collisions for extensions. (Use caution.)
-//   4. Map keys can only be integer types, booleans, and strings.
-//   5. Fields cannot have tags in the special reserved range 19000-19999. Also
-//      the maximum allowed tag value is 536870911 (2^29 - 1). Finally, fields
-//      cannot have negative values.
-//   6. Element names should include only underscore, letters, and numbers, and
-//      must begin with an underscore or letter.
+//  1. Import cycles are not allowed. (See above for more details.)
+//  2. Within a single file, symbols are not allowed to have naming conflicts.
+//     This means that is not legal to create a message and an extension with
+//     the same name in the same file.
+//  3. Messages are not allowed to have multiple fields with the same tag. Note
+//     that only non-extension fields are checked when using builders. So
+//     builders will allow tag collisions for extensions. (Use caution.)
+//  4. Map keys can only be integer types, booleans, and strings.
+//  5. Fields cannot have tags in the special reserved range 19000-19999. Also
+//     the maximum allowed tag value is 536870911 (2^29 - 1). Finally, fields
+//     cannot have negative values.
+//  6. Element names should include only underscore, letters, and numbers, and
+//     must begin with an underscore or letter.
 //
 // Validation rules that are *not* enforced by builders, and thus would be
 // allowed and result in illegal constructs, include the following:
 //
-//   1.  Files with a syntax of proto3 are not allowed to have required fields.
-//   2.  Files with a syntax of proto3 are not allowed to have messages that
-//       define extension ranges.
-//   3.  Files with a syntax of proto3 are not allowed to use groups.
-//   4.  Files with a syntax of proto3 are not allowed to declare default values
-//       for fields.
-//   5.  Names are supposed to be globally unique, even across multiple files
-//       if multiple files are defined in the same package.
-//   6.  Extension fields must use tag numbers that are in an extension range
-//       defined on the extended message.
-//   7.  Multiple extensions for the same message cannot re-use tag numbers, even
-//       across multiple files.
-//   8.  Non-extension fields are not allowed to use tags that lie in a message's
-//       extension ranges or reserved ranges.
-//   9.  Non-extension fields are not allowed to use names that the message has
-//       marked as reserved.
-//   10. Extension ranges and reserved ranges must not overlap.
+//  1. Files with a syntax of proto3 are not allowed to have required fields.
+//  2. Files with a syntax of proto3 are not allowed to have messages that
+//     define extension ranges.
+//  3. Files with a syntax of proto3 are not allowed to use groups.
+//  4. Files with a syntax of proto3 are not allowed to declare default values
+//     for fields.
+//  5. Names are supposed to be globally unique, even across multiple files
+//     if multiple files are defined in the same package.
+//  6. Extension fields must use tag numbers that are in an extension range
+//     defined on the extended message.
+//  7. Multiple extensions for the same message cannot re-use tag numbers, even
+//     across multiple files.
+//  8. Non-extension fields are not allowed to use tags that lie in a message's
+//     extension ranges or reserved ranges.
+//  9. Non-extension fields are not allowed to use names that the message has
+//     marked as reserved.
+//  10. Extension ranges and reserved ranges must not overlap.
 //
 // This list may change in the future, as more validation rules may be
 // implemented in the builders.
