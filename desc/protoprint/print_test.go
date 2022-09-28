@@ -22,7 +22,7 @@ const (
 	// When false, test behaves normally, checking output against golden test files.
 	// But when changed to true, running test will actually re-generate golden test
 	// files (which assumes output is correct).
-	regenerateMode = true
+	regenerateMode = false
 
 	testFilesDirectory = "testfiles"
 )
