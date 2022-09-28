@@ -2088,9 +2088,8 @@ func (m *Message) ConvertToDeterministic(target proto.Message) error {
 
 // ConvertFrom converts the given message into this dynamic message. This is
 // shorthand for resetting then merging:
-//
-//	m.Reset()
-//	m.MergeFrom(target)
+//   m.Reset()
+//   m.MergeFrom(target)
 func (m *Message) ConvertFrom(target proto.Message) error {
 	if err := m.checkType(target); err != nil {
 		return err
