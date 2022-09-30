@@ -56,6 +56,12 @@ jobs:
     working_directory: ~/repo
     docker:
       - image: cimg/go:1.18
+    steps: *simple_job_steps
+
+  build-1-19:
+    working_directory: ~/repo
+    docker:
+      - image: cimg/go:1.19
     steps:
       - checkout
       - restore_cache:
@@ -77,10 +83,10 @@ jobs:
     #- store_test_results:
     #    path: /tmp/test-reports
 
-  build-1-18-u:
+  build-1-19-u:
     working_directory: ~/repo
     docker:
-      - image: cimg/go:1.18
+      - image: cimg/go:1.19
     steps:
       - checkout
       - run:
@@ -102,4 +108,5 @@ workflows:
       - build-1-17
       - build-windows
       - build-1-18
-      - build-1-18-u
+      - build-1-19
+      - build-1-19-u
