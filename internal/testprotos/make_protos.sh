@@ -21,9 +21,9 @@ if [ "$PROTOC_OS" = "osx" ] && [ "$PROTOC_ARCH" = "arm64" ]; then
   PROTOC_ARCH="x86_64"
 fi
 
-PROTOC="./protoc/bin/protoc"
+PROTOC="${PWD}/protoc/bin/protoc"
 
-if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc ${PROTOC_VERSION}" ]]; then
+if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc 3.${PROTOC_VERSION}" ]]; then
   rm -rf ./protoc
   mkdir -p protoc
   curl -L "https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${PROTOC_OS}-${PROTOC_ARCH}.zip" > protoc/protoc.zip
@@ -39,6 +39,7 @@ outdir="."
 ${PROTOC} "--go_out=paths=source_relative:$outdir" "--gosrcinfo_out=paths=source_relative,debug:$outdir" -I. *.proto
 ${PROTOC} "--go_out=paths=source_relative:$outdir" "--gosrcinfo_out=paths=source_relative,debug:$outdir" -I. nopkg/*.proto
 ${PROTOC} "--go_out=paths=source_relative:$outdir" "--gosrcinfo_out=paths=source_relative,debug:$outdir" -I. pkg/*.proto
+${PROTOC} "--go_out=paths=source_relative:$outdir" "--gosrcinfo_out=paths=source_relative,debug:$outdir" -I. proto3_optional/desc_test_proto3_optional.proto
 ${PROTOC} "--go_out=paths=source_relative:$outdir" "--go-grpc_out=paths=source_relative:$outdir" "--gosrcinfo_out=paths=source_relative,debug:$outdir" -I. grpc/*.proto
 
 # And make descriptor set (with source info) for several files
@@ -48,9 +49,10 @@ ${PROTOC} --descriptor_set_out=./desc_test_complex.protoset -I. desc_test_comple
 ${PROTOC} --descriptor_set_out=./desc_test_complex_source_info.protoset --include_source_info --include_imports -I. desc_test_complex.proto
 ${PROTOC} --descriptor_set_out=./descriptor.protoset --include_source_info --include_imports -I./protoc/include/ google/protobuf/descriptor.proto
 ${PROTOC} --descriptor_set_out=./duration.protoset -I./protoc/include/ google/protobuf/duration.proto
-
-# We are currently pinning an earlier version of Go protobuf runtime, and thus of protoc-gen-go.
-# So it doesn't support proto3 optional fields yet. So we only create a descriptor for these, just
-# for testing proto3 optional support in the desc and desc/protoparse packages.
 ${PROTOC} --descriptor_set_out=./proto3_optional/desc_test_proto3_optional.protoset --include_source_info --include_imports -I. proto3_optional/desc_test_proto3_optional.proto
 
+# The grpc library doesn't yet have generated code for v1 of the reflection service.
+# https://github.com/grpc/grpc-go/issues/5684
+# So, for now, we generate a copy into an internal package so that our client can support that version.
+cd ../../grpcreflect/internal/grpc_reflection_v1
+${PROTOC} reflection.proto --go_out=Mreflection.proto=github.com/jhump/protoreflect/grpcreflect/internal/grpc_reflection_v1,paths=source_relative:.
