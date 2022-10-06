@@ -55,4 +55,6 @@ ${PROTOC} --descriptor_set_out=./proto3_optional/desc_test_proto3_optional.proto
 # https://github.com/grpc/grpc-go/issues/5684
 # So, for now, we generate a copy into an internal package so that our client can support that version.
 cd ../../grpcreflect/internal/grpc_reflection_v1
-${PROTOC} reflection.proto --go_out=Mreflection.proto=github.com/jhump/protoreflect/grpcreflect/internal/grpc_reflection_v1,paths=source_relative:.
+${PROTOC} --go_out=Mreflection.proto=github.com/jhump/protoreflect/grpcreflect/internal/grpc_reflection_v1,paths=source_relative:. \
+    --go-grpc_out=Mreflection.proto=github.com/jhump/protoreflect/grpcreflect/internal/grpc_reflection_v1,paths=source_relative:. \
+    reflection.proto

@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,8 +23,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
+	"google.golang.org/grpc/status"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/grpcreflect/internal/grpc_reflection_v1"
 	"github.com/jhump/protoreflect/internal"
 	testprotosgrpc "github.com/jhump/protoreflect/internal/testprotos/grpc"
 	"github.com/jhump/protoreflect/internal/testutil"
@@ -60,7 +63,7 @@ func TestMain(m *testing.M) {
 	defer cconn.Close()
 
 	stub := rpb.NewServerReflectionClient(cconn)
-	client = NewClient(context.Background(), stub)
+	client = NewClientV1Alpha(context.Background(), stub)
 
 	code = m.Run()
 }
@@ -271,7 +274,7 @@ func TestMultipleFiles(t *testing.T) {
 	testutil.Ok(t, err, "failed ot dial %v", l.Addr().String())
 	cl := rpb.NewServerReflectionClient(cc)
 
-	client := NewClient(ctx, cl)
+	client := NewClientV1Alpha(ctx, cl)
 	defer client.Reset()
 	svcs, err := client.ListServices()
 	testutil.Ok(t, err, "failed to list services")
@@ -366,4 +369,134 @@ func msgResponseForFiles(files ...string) *rpb.ServerReflectionResponse_FileDesc
 			FileDescriptorProto: descs,
 		},
 	}
+}
+
+func TestAutoVersion(t *testing.T) {
+	t.Run("v1", func(t *testing.T) {
+		testClientAuto(t,
+			func(s *grpc.Server) {
+				grpc_reflection_v1.Register(s)
+			},
+			[]string{
+				"grpc.reflection.v1.ServerReflection",
+			},
+			[]string{
+				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+			})
+	})
+
+	t.Run("v1alpha", func(t *testing.T) {
+		testClientAuto(t,
+			func(s *grpc.Server) {
+				reflection.Register(s)
+			},
+			[]string{
+				"grpc.reflection.v1alpha.ServerReflection",
+			},
+			[]string{
+				// first one fails, so falls back to v1alpha
+				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+				"/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo",
+				// next two use v1alpha
+				"/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo",
+				"/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo",
+				// final one retries v1
+				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+				"/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo",
+			})
+	})
+
+	t.Run("both", func(t *testing.T) {
+		testClientAuto(t,
+			func(s *grpc.Server) {
+				grpc_reflection_v1.Register(s)
+				reflection.Register(s)
+			},
+			[]string{
+				"grpc.reflection.v1.ServerReflection",
+				"grpc.reflection.v1alpha.ServerReflection",
+			},
+			[]string{
+				// never uses v1alpha since v1 works
+				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+			})
+	})
+}
+
+func testClientAuto(t *testing.T, register func(*grpc.Server), expectedServices []string, expectedLog []string) {
+	var capture captureStreamNames
+	svr := grpc.NewServer(grpc.StreamInterceptor(capture.intercept), grpc.UnknownServiceHandler(capture.handleUnknown))
+	register(svr)
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(fmt.Sprintf("Failed to open server socket: %s", err.Error()))
+	}
+	go svr.Serve(l)
+	defer svr.Stop()
+
+	cconn, err := grpc.Dial(l.Addr().String(), grpc.WithInsecure())
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))
+	}
+	defer cconn.Close()
+	client := NewClientAuto(context.Background(), cconn)
+	now := time.Now()
+	client.now = func() time.Time {
+		return now
+	}
+
+	svcs, err := client.ListServices()
+	testutil.Ok(t, err)
+	sort.Strings(svcs)
+	testutil.Eq(t, expectedServices, svcs)
+	client.Reset()
+
+	_, err = client.FileContainingSymbol(svcs[0])
+	testutil.Ok(t, err)
+	client.Reset()
+
+	// at the threshold, but not quite enough to retry
+	now = now.Add(time.Hour)
+	_, err = client.ListServices()
+	testutil.Ok(t, err)
+	client.Reset()
+
+	// 1 ns more, and we've crossed threshold and will retry
+	now = now.Add(1)
+	_, err = client.ListServices()
+	testutil.Ok(t, err)
+	client.Reset()
+
+	actualLog := capture.names()
+	testutil.Eq(t, expectedLog, actualLog)
+}
+
+type captureStreamNames struct {
+	mu  sync.Mutex
+	log []string
+}
+
+func (c *captureStreamNames) names() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ret := make([]string, len(c.log))
+	copy(ret, c.log)
+	return ret
+}
+
+func (c *captureStreamNames) intercept(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	c.mu.Lock()
+	c.log = append(c.log, info.FullMethod)
+	c.mu.Unlock()
+	return handler(srv, ss)
+}
+
+func (c *captureStreamNames) handleUnknown(_ interface{}, _ grpc.ServerStream) error {
+	return status.Errorf(codes.Unimplemented, "WTF?")
 }
