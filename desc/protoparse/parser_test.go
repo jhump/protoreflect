@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/bufbuild/protocompile/parser"
-	"github.com/bufbuild/protocompile/reporter"
 	"io"
 	"io/ioutil"
 	"os"
 	"sort"
 	"testing"
 
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"github.com/bufbuild/protocompile/parser"
+	"github.com/bufbuild/protocompile/reporter"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal/testutil"
@@ -182,7 +182,7 @@ func parseFileForTest(filename string) (parser.Result, error) {
 	return results[0], nil
 }
 
-func hasExtension(fd *dpb.FileDescriptorProto, name string) bool {
+func hasExtension(fd *descriptorpb.FileDescriptorProto, name string) bool {
 	for _, ext := range fd.Extension {
 		if ext.GetName() == name {
 			return true
@@ -191,7 +191,7 @@ func hasExtension(fd *dpb.FileDescriptorProto, name string) bool {
 	return false
 }
 
-func hasMessage(fd *dpb.FileDescriptorProto, name string) bool {
+func hasMessage(fd *descriptorpb.FileDescriptorProto, name string) bool {
 	for _, md := range fd.MessageType {
 		if md.GetName() == name {
 			return true
@@ -200,7 +200,7 @@ func hasMessage(fd *dpb.FileDescriptorProto, name string) bool {
 	return false
 }
 
-func hasEnum(fd *dpb.FileDescriptorProto, name string) bool {
+func hasEnum(fd *descriptorpb.FileDescriptorProto, name string) bool {
 	for _, ed := range fd.EnumType {
 		if ed.GetName() == name {
 			return true
@@ -209,7 +209,7 @@ func hasEnum(fd *dpb.FileDescriptorProto, name string) bool {
 	return false
 }
 
-func hasService(fd *dpb.FileDescriptorProto, name string) bool {
+func hasService(fd *descriptorpb.FileDescriptorProto, name string) bool {
 	for _, sd := range fd.Service {
 		if sd.GetName() == name {
 			return true
@@ -319,7 +319,7 @@ func TestParseFilesWithDependencies(t *testing.T) {
 		// Create a dependency-aware parser.
 		parser := Parser{
 			Accessor: FileContentsFromMap(contents),
-			LookupImportProto: func(imp string) (*dpb.FileDescriptorProto, error) {
+			LookupImportProto: func(imp string) (*descriptorpb.FileDescriptorProto, error) {
 				if imp == "desc_test_wellknowntypes.proto" {
 					fileDescriptor, err := desc.LoadFileDescriptor(imp)
 					if err != nil {

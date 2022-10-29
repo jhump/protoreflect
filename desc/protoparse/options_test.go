@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/internal/testutil"
 )
@@ -20,7 +20,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 	testCases := []struct {
 		contents         string
 		uninterpreted    map[string]interface{}
-		checkInterpreted func(*testing.T, *dpb.FileDescriptorProto)
+		checkInterpreted func(*testing.T, *descriptorpb.FileDescriptorProto)
 	}{
 		{
 			// file options
@@ -28,7 +28,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 			uninterpreted: map[string]interface{}{
 				"test.proto:(must.link)": "FOO",
 			},
-			checkInterpreted: func(t *testing.T, fd *dpb.FileDescriptorProto) {
+			checkInterpreted: func(t *testing.T, fd *descriptorpb.FileDescriptorProto) {
 				testutil.Eq(t, "foo.bar", fd.GetOptions().GetGoPackage())
 			},
 		},
@@ -38,7 +38,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 			uninterpreted: map[string]interface{}{
 				"Test:(must.link)": 1.234,
 			},
-			checkInterpreted: func(t *testing.T, fd *dpb.FileDescriptorProto) {
+			checkInterpreted: func(t *testing.T, fd *descriptorpb.FileDescriptorProto) {
 				testutil.Require(t, fd.GetMessageType()[0].GetOptions().GetDeprecated())
 			},
 		},
@@ -49,7 +49,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 				"Test.uid:(must.link)":   10101,
 				"Test.uid:(must.link)#1": 20202,
 			},
-			checkInterpreted: func(t *testing.T, fd *dpb.FileDescriptorProto) {
+			checkInterpreted: func(t *testing.T, fd *descriptorpb.FileDescriptorProto) {
 				testutil.Eq(t, "fubar", fd.GetMessageType()[0].GetField()[0].GetDefaultValue())
 				testutil.Eq(t, "UID", fd.GetMessageType()[0].GetField()[0].GetJsonName())
 				testutil.Require(t, fd.GetMessageType()[0].GetField()[0].GetOptions().GetDeprecated())
@@ -62,7 +62,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 				"Test.uid:(must.link)": aggregate("foo : bar"),
 				"Test.uid:default":     ident("ONE"),
 			},
-			checkInterpreted: func(t *testing.T, fd *dpb.FileDescriptorProto) {
+			checkInterpreted: func(t *testing.T, fd *descriptorpb.FileDescriptorProto) {
 				testutil.Eq(t, "UID", fd.GetMessageType()[0].GetField()[0].GetJsonName())
 				testutil.Require(t, fd.GetMessageType()[0].GetField()[0].GetOptions().GetDeprecated())
 			},
@@ -89,7 +89,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 			uninterpreted: map[string]interface{}{
 				"Test:(must.link)": 123.456,
 			},
-			checkInterpreted: func(t *testing.T, fd *dpb.FileDescriptorProto) {
+			checkInterpreted: func(t *testing.T, fd *descriptorpb.FileDescriptorProto) {
 				testutil.Require(t, fd.GetEnumType()[0].GetOptions().GetDeprecated())
 				testutil.Require(t, fd.GetEnumType()[0].GetOptions().GetAllowAlias())
 			},
@@ -100,7 +100,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 			uninterpreted: map[string]interface{}{
 				"Test.ZERO:(must.link)": -222,
 			},
-			checkInterpreted: func(t *testing.T, fd *dpb.FileDescriptorProto) {
+			checkInterpreted: func(t *testing.T, fd *descriptorpb.FileDescriptorProto) {
 				testutil.Require(t, fd.GetEnumType()[0].GetValue()[0].GetOptions().GetDeprecated())
 			},
 		},
@@ -110,7 +110,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 			uninterpreted: map[string]interface{}{
 				"Test:(must.link)": aggregate("foo : 1 , foo : 2 , bar : 3"),
 			},
-			checkInterpreted: func(t *testing.T, fd *dpb.FileDescriptorProto) {
+			checkInterpreted: func(t *testing.T, fd *descriptorpb.FileDescriptorProto) {
 				testutil.Require(t, fd.GetService()[0].GetOptions().GetDeprecated())
 			},
 		},
@@ -120,7 +120,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 			uninterpreted: map[string]interface{}{
 				"Test.Foo:(must.link)": ident("FOO"),
 			},
-			checkInterpreted: func(t *testing.T, fd *dpb.FileDescriptorProto) {
+			checkInterpreted: func(t *testing.T, fd *descriptorpb.FileDescriptorProto) {
 				testutil.Require(t, fd.GetService()[0].GetMethod()[0].GetOptions().GetDeprecated())
 			},
 		},
@@ -153,7 +153,7 @@ func accessorFor(name, contents string) FileAccessor {
 	}
 }
 
-func buildUninterpretedMapForFile(fd *dpb.FileDescriptorProto, opts map[string]interface{}) {
+func buildUninterpretedMapForFile(fd *descriptorpb.FileDescriptorProto, opts map[string]interface{}) {
 	buildUninterpretedMap(fd.GetName(), fd.GetOptions().GetUninterpretedOption(), opts)
 	for _, md := range fd.GetMessageType() {
 		buildUninterpretedMapForMessage(fd.GetPackage(), md, opts)
@@ -173,7 +173,7 @@ func buildUninterpretedMapForFile(fd *dpb.FileDescriptorProto, opts map[string]i
 	}
 }
 
-func buildUninterpretedMapForMessage(qual string, md *dpb.DescriptorProto, opts map[string]interface{}) {
+func buildUninterpretedMapForMessage(qual string, md *descriptorpb.DescriptorProto, opts map[string]interface{}) {
 	fqn := qualify(qual, md.GetName())
 	buildUninterpretedMap(fqn, md.GetOptions().GetUninterpretedOption(), opts)
 	for _, fld := range md.GetField() {
@@ -196,7 +196,7 @@ func buildUninterpretedMapForMessage(qual string, md *dpb.DescriptorProto, opts 
 	}
 }
 
-func buildUninterpretedMapForEnum(qual string, ed *dpb.EnumDescriptorProto, opts map[string]interface{}) {
+func buildUninterpretedMapForEnum(qual string, ed *descriptorpb.EnumDescriptorProto, opts map[string]interface{}) {
 	fqn := qualify(qual, ed.GetName())
 	buildUninterpretedMap(fqn, ed.GetOptions().GetUninterpretedOption(), opts)
 	for _, evd := range ed.GetValue() {
@@ -204,7 +204,7 @@ func buildUninterpretedMapForEnum(qual string, ed *dpb.EnumDescriptorProto, opts
 	}
 }
 
-func buildUninterpretedMap(prefix string, uos []*dpb.UninterpretedOption, opts map[string]interface{}) {
+func buildUninterpretedMap(prefix string, uos []*descriptorpb.UninterpretedOption, opts map[string]interface{}) {
 	for _, uo := range uos {
 		parts := make([]string, len(uo.GetName()))
 		for i, np := range uo.GetName() {

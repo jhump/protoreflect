@@ -99,7 +99,6 @@ func TestImportResolver_CreateFileDescriptors(t *testing.T) {
 				}
 				`,
 		}),
-		ImportPaths: []string{"foo"},
 	}
 	fds, err := p.ParseFilesButDoNotLink("foo/bar.proto", "fu/baz.proto")
 	testutil.Ok(t, err)

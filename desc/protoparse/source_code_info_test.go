@@ -3,14 +3,15 @@ package protoparse
 import (
 	"bytes"
 	"fmt"
-	"github.com/jhump/protoreflect/desc/internal"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"io"
 	"io/ioutil"
 	"testing"
 
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/internal"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 

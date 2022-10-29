@@ -2,8 +2,8 @@ package desc
 
 import (
 	"fmt"
-	"github.com/bufbuild/protocompile/protoutil"
 
+	"github.com/bufbuild/protocompile/protoutil"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

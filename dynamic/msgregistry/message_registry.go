@@ -341,12 +341,12 @@ func (r *MessageRegistry) ResolveApiIntoServiceDescriptor(a *apipb.Api) (*desc.S
 // UnmarshalAny will unmarshal the value embedded in the given Any value. This will use this
 // registry to resolve the given value's type URL. Use this instead of ptypes.UnmarshalAny for
 // cases where the type might not be statically linked into the current program.
-func (r *MessageRegistry) UnmarshalAny(any *anypb.Any) (proto.Message, error) {
-	return r.unmarshalAny(any, r.FindMessageTypeByUrl)
+func (r *MessageRegistry) UnmarshalAny(a *anypb.Any) (proto.Message, error) {
+	return r.unmarshalAny(a, r.FindMessageTypeByUrl)
 }
 
-func (r *MessageRegistry) unmarshalAny(any *anypb.Any, fetch func(string) (*desc.MessageDescriptor, error)) (proto.Message, error) {
-	name, err := ptypes.AnyMessageName(any)
+func (r *MessageRegistry) unmarshalAny(a *anypb.Any, fetch func(string) (*desc.MessageDescriptor, error)) (proto.Message, error) {
+	name, err := ptypes.AnyMessageName(a)
 	if err != nil {
 		return nil, err
 	}
@@ -360,16 +360,16 @@ func (r *MessageRegistry) unmarshalAny(any *anypb.Any, fetch func(string) (*desc
 		ktr = r.mf.GetKnownTypeRegistry()
 	}
 	if msg = ktr.CreateIfKnown(name); msg == nil {
-		if md, err := fetch(any.TypeUrl); err != nil {
+		if md, err := fetch(a.TypeUrl); err != nil {
 			return nil, err
 		} else if md == nil {
-			return nil, fmt.Errorf("unknown message type: %s", any.TypeUrl)
+			return nil, fmt.Errorf("unknown message type: %s", a.TypeUrl)
 		} else {
 			msg = mf.NewDynamicMessage(md)
 		}
 	}
 
-	err = proto.Unmarshal(any.Value, msg)
+	err = proto.Unmarshal(a.Value, msg)
 	if err != nil {
 		return nil, err
 	} else {
