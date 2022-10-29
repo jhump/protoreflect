@@ -53,6 +53,11 @@ desc_test_comments.proto:17:1
 desc_test_comments.proto:17:45
 
 
+ > public_dependency[0]:
+desc_test_comments.proto:17:8
+desc_test_comments.proto:17:14
+
+
  > dependency[1]:
 desc_test_comments.proto:18:1
 desc_test_comments.proto:18:34
@@ -73,8 +78,6 @@ desc_test_comments.proto:113:2
  > message_type[0] > name:
 desc_test_comments.proto:25:68
 desc_test_comments.proto:25:75
-    Leading detached comment [0]:
- detached message name 
     Leading comments:
  request with a capital R 
     Trailing comments:
@@ -124,8 +127,6 @@ desc_test_comments.proto:29:27
  > message_type[0] > field[0] > number:
 desc_test_comments.proto:29:70
 desc_test_comments.proto:29:71
-    Leading detached comment [0]:
- detached tag 
     Leading comments:
  tag numero uno 
     Trailing comments:
@@ -153,12 +154,12 @@ desc_test_comments.proto:32:56
  custom JSON! 
 
 
- > message_type[0] > field[0] > options > ffubar[0]:
+ > message_type[0] > field[0] > options > (testprotos.ffubar)[0]:
 desc_test_comments.proto:32:77
 desc_test_comments.proto:32:102
 
 
- > message_type[0] > field[0] > options > ffubarb:
+ > message_type[0] > field[0] > options > (testprotos.ffubarb):
 desc_test_comments.proto:32:104
 desc_test_comments.proto:32:130
 
@@ -168,7 +169,7 @@ desc_test_comments.proto:35:27
 desc_test_comments.proto:35:61
 
 
- > message_type[0] > options > mfubar:
+ > message_type[0] > options > (testprotos.mfubar):
 desc_test_comments.proto:35:27
 desc_test_comments.proto:35:61
     Leading comments:
@@ -202,14 +203,14 @@ desc_test_comments.proto:42:37
  > message_type[0] > field[1] > type:
 desc_test_comments.proto:42:57
 desc_test_comments.proto:42:63
-    Leading comments:
+    Leading detached comment [0]:
  type comment 
 
 
  > message_type[0] > field[1] > name:
 desc_test_comments.proto:42:83
 desc_test_comments.proto:42:87
-    Leading comments:
+    Leading detached comment [0]:
  name comment 
 
 
@@ -226,7 +227,7 @@ desc_test_comments.proto:43:76
  > message_type[0] > field[1] > default_value:
 desc_test_comments.proto:43:37
 desc_test_comments.proto:43:54
-    Leading comments:
+    Leading detached comment [0]:
  default lead 
     Trailing comments:
  default trail 
@@ -280,12 +281,12 @@ desc_test_comments.proto:47:31
 desc_test_comments.proto:47:108
 
 
- > message_type[0] > extension_range[1] > options > exfubarb:
+ > message_type[0] > extension_range[1] > options > (testprotos.exfubarb):
 desc_test_comments.proto:47:32
 desc_test_comments.proto:47:74
 
 
- > message_type[0] > extension_range[1] > options > exfubar[0]:
+ > message_type[0] > extension_range[1] > options > (testprotos.exfubar)[0]:
 desc_test_comments.proto:47:76
 desc_test_comments.proto:47:107
 
@@ -391,7 +392,7 @@ desc_test_comments.proto:69:10
  > message_type[0] > nested_type[0] > name:
 desc_test_comments.proto:55:41
 desc_test_comments.proto:55:47
-    Leading comments:
+    Leading detached comment [0]:
  group name 
 
 
@@ -405,7 +406,7 @@ desc_test_comments.proto:59:17
 desc_test_comments.proto:59:52
 
 
- > message_type[0] > nested_type[0] > options > mfubar:
+ > message_type[0] > nested_type[0] > options > (testprotos.mfubar):
 desc_test_comments.proto:59:17
 desc_test_comments.proto:59:52
     Leading comments:
@@ -553,12 +554,12 @@ desc_test_comments.proto:77:27
 desc_test_comments.proto:77:85
 
 
- > message_type[0] > enum_type[0] > value[0] > options > evfubars:
+ > message_type[0] > enum_type[0] > value[0] > options > (testprotos.evfubars):
 desc_test_comments.proto:77:28
 desc_test_comments.proto:77:56
 
 
- > message_type[0] > enum_type[0] > value[0] > options > evfubar:
+ > message_type[0] > enum_type[0] > value[0] > options > (testprotos.evfubar):
 desc_test_comments.proto:77:58
 desc_test_comments.proto:77:84
 
@@ -583,14 +584,16 @@ desc_test_comments.proto:78:27
 desc_test_comments.proto:78:99
 
 
- > message_type[0] > enum_type[0] > value[1] > options > evfubaruf:
+ > message_type[0] > enum_type[0] > value[1] > options > (testprotos.evfubaruf):
 desc_test_comments.proto:78:29
 desc_test_comments.proto:78:57
 
 
- > message_type[0] > enum_type[0] > value[1] > options > evfubaru:
+ > message_type[0] > enum_type[0] > value[1] > options > (testprotos.evfubaru):
 desc_test_comments.proto:78:73
 desc_test_comments.proto:78:98
+    Leading detached comment [0]:
+ swoosh! 
 
 
  > message_type[0] > enum_type[0] > value[2]:
@@ -628,7 +631,7 @@ desc_test_comments.proto:82:17
 desc_test_comments.proto:82:52
 
 
- > message_type[0] > enum_type[0] > options > efubars:
+ > message_type[0] > enum_type[0] > options > (testprotos.efubars):
 desc_test_comments.proto:82:17
 desc_test_comments.proto:82:52
 
@@ -683,7 +686,7 @@ desc_test_comments.proto:86:29
 desc_test_comments.proto:86:59
 
 
- > message_type[0] > enum_type[0] > value[6] > options > evfubarsf:
+ > message_type[0] > enum_type[0] > value[6] > options > (testprotos.evfubarsf):
 desc_test_comments.proto:86:30
 desc_test_comments.proto:86:58
 
@@ -753,7 +756,7 @@ desc_test_comments.proto:92:17
 desc_test_comments.proto:92:50
 
 
- > message_type[0] > enum_type[0] > options > efubar:
+ > message_type[0] > enum_type[0] > options > (testprotos.efubar):
 desc_test_comments.proto:92:17
 desc_test_comments.proto:92:50
 
@@ -832,7 +835,7 @@ desc_test_comments.proto:105:17
 desc_test_comments.proto:105:89
 
 
- > message_type[0] > oneof_decl[1] > options > oofubar[0]:
+ > message_type[0] > oneof_decl[1] > options > (testprotos.oofubar)[0]:
 desc_test_comments.proto:105:17
 desc_test_comments.proto:105:89
     Leading comments:
@@ -928,9 +931,6 @@ desc_test_comments.proto:119:8
     Leading comments:
  extendee comment
 
-    Trailing comments:
- extendee trailer
-
 
 
  > extension[0] > label:
@@ -996,10 +996,8 @@ desc_test_comments.proto:131:115
  > message_type[1] > name:
 desc_test_comments.proto:131:36
 desc_test_comments.proto:131:50
-    Leading comments:
+    Leading detached comment [0]:
  name leading comment 
-    Trailing comments:
- name trailing comment 
 
 
  > service[0]:
@@ -1017,7 +1015,7 @@ desc_test_comments.proto:156:2
  > service[0] > name:
 desc_test_comments.proto:134:28
 desc_test_comments.proto:134:38
-    Leading comments:
+    Leading detached comment [0]:
  service name 
 
 
@@ -1026,7 +1024,7 @@ desc_test_comments.proto:139:9
 desc_test_comments.proto:139:43
 
 
- > service[0] > options > sfubar > id:
+ > service[0] > options > (testprotos.sfubar) > id:
 desc_test_comments.proto:139:9
 desc_test_comments.proto:139:43
     Leading comments:
@@ -1039,7 +1037,7 @@ desc_test_comments.proto:141:9
 desc_test_comments.proto:141:47
 
 
- > service[0] > options > sfubar > name:
+ > service[0] > options > (testprotos.sfubar) > name:
 desc_test_comments.proto:141:9
 desc_test_comments.proto:141:47
     Leading comments:
@@ -1065,7 +1063,7 @@ desc_test_comments.proto:144:9
 desc_test_comments.proto:144:45
 
 
- > service[0] > options > sfubare:
+ > service[0] > options > (testprotos.sfubare):
 desc_test_comments.proto:144:9
 desc_test_comments.proto:144:45
 
@@ -1084,30 +1082,28 @@ desc_test_comments.proto:148:84
  > service[0] > method[0] > name:
 desc_test_comments.proto:147:28
 desc_test_comments.proto:147:40
-    Leading comments:
+    Leading detached comment [0]:
  rpc name 
-    Trailing comments:
- comment A 
 
 
  > service[0] > method[0] > client_streaming:
 desc_test_comments.proto:147:73
 desc_test_comments.proto:147:79
-    Leading comments:
+    Leading detached comment [0]:
  comment B 
 
 
  > service[0] > method[0] > input_type:
 desc_test_comments.proto:147:96
 desc_test_comments.proto:147:103
-    Leading comments:
+    Leading detached comment [0]:
  comment C 
 
 
  > service[0] > method[0] > output_type:
 desc_test_comments.proto:148:57
 desc_test_comments.proto:148:64
-    Leading comments:
+    Leading detached comment [0]:
 comment E 
 
 
@@ -1152,7 +1148,7 @@ desc_test_comments.proto:153:17
 desc_test_comments.proto:153:53
 
 
- > service[0] > method[1] > options > mtfubar[0]:
+ > service[0] > method[1] > options > (testprotos.mtfubar)[0]:
 desc_test_comments.proto:153:17
 desc_test_comments.proto:153:53
 
@@ -1162,7 +1158,7 @@ desc_test_comments.proto:154:17
 desc_test_comments.proto:154:56
 
 
- > service[0] > method[1] > options > mtfubard:
+ > service[0] > method[1] > options > (testprotos.mtfubard):
 desc_test_comments.proto:154:17
 desc_test_comments.proto:154:56
 ---- desc_test_complex.proto ----
@@ -1559,14 +1555,9 @@ desc_test_complex.proto:33:20
 desc_test_complex.proto:33:23
 
 
- > message_type[1] > extension_range[1] > options:
-desc_test_complex.proto:33:62
-desc_test_complex.proto:33:80
-
-
- > message_type[1] > extension_range[1] > options > label:
-desc_test_complex.proto:33:63
-desc_test_complex.proto:33:79
+ > message_type[1] > extension_range[1] > end:
+desc_test_complex.proto:33:20
+desc_test_complex.proto:33:23
 
 
  > message_type[1] > extension_range[2]:
@@ -1584,16 +1575,6 @@ desc_test_complex.proto:33:32
 desc_test_complex.proto:33:35
 
 
- > message_type[1] > extension_range[2] > options:
-desc_test_complex.proto:33:62
-desc_test_complex.proto:33:80
-
-
- > message_type[1] > extension_range[2] > options > label:
-desc_test_complex.proto:33:63
-desc_test_complex.proto:33:79
-
-
  > message_type[1] > extension_range[3]:
 desc_test_complex.proto:33:37
 desc_test_complex.proto:33:47
@@ -1607,16 +1588,6 @@ desc_test_complex.proto:33:40
  > message_type[1] > extension_range[3] > end:
 desc_test_complex.proto:33:44
 desc_test_complex.proto:33:47
-
-
- > message_type[1] > extension_range[3] > options:
-desc_test_complex.proto:33:62
-desc_test_complex.proto:33:80
-
-
- > message_type[1] > extension_range[3] > options > label:
-desc_test_complex.proto:33:63
-desc_test_complex.proto:33:79
 
 
  > message_type[1] > extension_range[4]:
@@ -1634,12 +1605,42 @@ desc_test_complex.proto:33:58
 desc_test_complex.proto:33:61
 
 
+ > message_type[1] > extension_range[1] > options:
+desc_test_complex.proto:33:62
+desc_test_complex.proto:33:80
+
+
+ > message_type[1] > extension_range[1] > options > (foo.bar.label):
+desc_test_complex.proto:33:63
+desc_test_complex.proto:33:79
+
+
+ > message_type[1] > extension_range[2] > options:
+desc_test_complex.proto:33:62
+desc_test_complex.proto:33:80
+
+
+ > message_type[1] > extension_range[2] > options > (foo.bar.label):
+desc_test_complex.proto:33:63
+desc_test_complex.proto:33:79
+
+
+ > message_type[1] > extension_range[3] > options:
+desc_test_complex.proto:33:62
+desc_test_complex.proto:33:80
+
+
+ > message_type[1] > extension_range[3] > options > (foo.bar.label):
+desc_test_complex.proto:33:63
+desc_test_complex.proto:33:79
+
+
  > message_type[1] > extension_range[4] > options:
 desc_test_complex.proto:33:62
 desc_test_complex.proto:33:80
 
 
- > message_type[1] > extension_range[4] > options > label:
+ > message_type[1] > extension_range[4] > options > (foo.bar.label):
 desc_test_complex.proto:33:63
 desc_test_complex.proto:33:79
 
@@ -1819,7 +1820,7 @@ desc_test_complex.proto:49:25
 desc_test_complex.proto:49:50
 
 
- > message_type[1] > nested_type[1] > nested_type[0] > options > fooblez:
+ > message_type[1] > nested_type[1] > nested_type[0] > options > (foo.bar.Test.Nested.fooblez):
 desc_test_complex.proto:49:25
 desc_test_complex.proto:49:50
 
@@ -1864,7 +1865,7 @@ desc_test_complex.proto:53:25
 desc_test_complex.proto:53:108
 
 
- > message_type[1] > nested_type[1] > nested_type[0] > options > rept[0]:
+ > message_type[1] > nested_type[1] > nested_type[0] > options > (foo.bar.rept)[0]:
 desc_test_complex.proto:53:25
 desc_test_complex.proto:53:108
 
@@ -1884,7 +1885,7 @@ desc_test_complex.proto:55:33
 desc_test_complex.proto:55:109
 
 
- > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > options > rept[0]:
+ > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > options > (foo.bar.rept)[0]:
 desc_test_complex.proto:55:33
 desc_test_complex.proto:55:109
 
@@ -2054,6 +2055,11 @@ desc_test_complex.proto:69:37
 desc_test_complex.proto:69:39
 
 
+ > enum_type[0] > reserved_range[4] > end:
+desc_test_complex.proto:69:37
+desc_test_complex.proto:69:39
+
+
  > enum_type[0] > reserved_range:
 desc_test_complex.proto:70:9
 desc_test_complex.proto:70:27
@@ -2145,6 +2151,11 @@ desc_test_complex.proto:75:39
 
 
  > message_type[2] > reserved_range[2] > start:
+desc_test_complex.proto:75:37
+desc_test_complex.proto:75:39
+
+
+ > message_type[2] > reserved_range[2] > end:
 desc_test_complex.proto:75:37
 desc_test_complex.proto:75:39
 
@@ -2359,7 +2370,7 @@ desc_test_complex.proto:92:5
 desc_test_complex.proto:92:130
 
 
- > message_type[4] > options > rept[0]:
+ > message_type[4] > options > (foo.bar.rept)[0]:
 desc_test_complex.proto:92:5
 desc_test_complex.proto:92:130
 
@@ -2369,7 +2380,7 @@ desc_test_complex.proto:93:5
 desc_test_complex.proto:93:115
 
 
- > message_type[4] > options > rept[1]:
+ > message_type[4] > options > (foo.bar.rept)[1]:
 desc_test_complex.proto:93:5
 desc_test_complex.proto:93:115
 
@@ -2379,7 +2390,7 @@ desc_test_complex.proto:94:5
 desc_test_complex.proto:94:36
 
 
- > message_type[4] > options > rept[2]:
+ > message_type[4] > options > (foo.bar.rept)[2]:
 desc_test_complex.proto:94:5
 desc_test_complex.proto:94:36
 
@@ -2389,7 +2400,7 @@ desc_test_complex.proto:95:5
 desc_test_complex.proto:95:23
 
 
- > message_type[4] > options > eee:
+ > message_type[4] > options > (foo.bar.eee):
 desc_test_complex.proto:95:5
 desc_test_complex.proto:95:23
 
@@ -2399,7 +2410,7 @@ desc_test_complex.proto:96:9
 desc_test_complex.proto:96:34
 
 
- > message_type[4] > options > a:
+ > message_type[4] > options > (foo.bar.a):
 desc_test_complex.proto:96:9
 desc_test_complex.proto:96:34
 
@@ -2409,7 +2420,7 @@ desc_test_complex.proto:97:9
 desc_test_complex.proto:97:86
 
 
- > message_type[4] > options > a > test:
+ > message_type[4] > options > (foo.bar.a) > test:
 desc_test_complex.proto:97:9
 desc_test_complex.proto:97:86
 
@@ -2419,7 +2430,7 @@ desc_test_complex.proto:98:9
 desc_test_complex.proto:98:37
 
 
- > message_type[4] > options > a > test > foo:
+ > message_type[4] > options > (foo.bar.a) > test > foo:
 desc_test_complex.proto:98:9
 desc_test_complex.proto:98:37
 
@@ -2429,7 +2440,7 @@ desc_test_complex.proto:99:9
 desc_test_complex.proto:99:41
 
 
- > message_type[4] > options > a > test > s > name:
+ > message_type[4] > options > (foo.bar.a) > test > s > name:
 desc_test_complex.proto:99:9
 desc_test_complex.proto:99:41
 
@@ -2439,7 +2450,7 @@ desc_test_complex.proto:100:5
 desc_test_complex.proto:100:34
 
 
- > message_type[4] > options > a > test > s > id:
+ > message_type[4] > options > (foo.bar.a) > test > s > id:
 desc_test_complex.proto:100:5
 desc_test_complex.proto:100:34
 
@@ -2449,7 +2460,7 @@ desc_test_complex.proto:101:5
 desc_test_complex.proto:101:31
 
 
- > message_type[4] > options > a > test > array[0]:
+ > message_type[4] > options > (foo.bar.a) > test > array[0]:
 desc_test_complex.proto:101:5
 desc_test_complex.proto:101:31
 
@@ -2459,7 +2470,7 @@ desc_test_complex.proto:102:5
 desc_test_complex.proto:102:31
 
 
- > message_type[4] > options > a > test > array[1]:
+ > message_type[4] > options > (foo.bar.a) > test > array[1]:
 desc_test_complex.proto:102:5
 desc_test_complex.proto:102:31
 
@@ -2469,7 +2480,7 @@ desc_test_complex.proto:103:5
 desc_test_complex.proto:103:78
 
 
- > message_type[4] > options > a > test > _garblez:
+ > message_type[4] > options > (foo.bar.a) > test > (foo.bar.Test.Nested._NestedNested._garblez):
 desc_test_complex.proto:103:5
 desc_test_complex.proto:103:78
 
@@ -2479,7 +2490,7 @@ desc_test_complex.proto:105:9
 desc_test_complex.proto:105:37
 
 
- > message_type[4] > options > map_vals > vals[0]:
+ > message_type[4] > options > (foo.bar.map_vals) > vals[0]:
 desc_test_complex.proto:105:9
 desc_test_complex.proto:105:37
     Trailing comments:
@@ -2492,7 +2503,7 @@ desc_test_complex.proto:106:9
 desc_test_complex.proto:106:47
 
 
- > message_type[4] > options > map_vals > vals[1]:
+ > message_type[4] > options > (foo.bar.map_vals) > vals[1]:
 desc_test_complex.proto:106:9
 desc_test_complex.proto:106:47
     Trailing comments:
@@ -2505,7 +2516,7 @@ desc_test_complex.proto:107:9
 desc_test_complex.proto:107:69
 
 
- > message_type[4] > options > map_vals > vals[2]:
+ > message_type[4] > options > (foo.bar.map_vals) > vals[2]:
 desc_test_complex.proto:107:9
 desc_test_complex.proto:107:69
 
@@ -2815,7 +2826,7 @@ desc_test_complex.proto:135:17
 desc_test_complex.proto:141:19
 
 
- > service[0] > method[0] > options > validator:
+ > service[0] > method[0] > options > (foo.bar.validator):
 desc_test_complex.proto:135:17
 desc_test_complex.proto:141:19
 
@@ -2845,7 +2856,7 @@ desc_test_complex.proto:144:17
 desc_test_complex.proto:150:19
 
 
- > service[0] > method[1] > options > validator:
+ > service[0] > method[1] > options > (foo.bar.validator):
 desc_test_complex.proto:144:17
 desc_test_complex.proto:150:19
 
@@ -3370,7 +3381,7 @@ desc_test_complex.proto:188:7
 desc_test_complex.proto:191:10
 
 
- > message_type[7] > field[0] > options > rules > repeated:
+ > message_type[7] > field[0] > options > (foo.bar.rules) > repeated:
 desc_test_complex.proto:188:8
 desc_test_complex.proto:191:9
 
@@ -5388,177 +5399,177 @@ desc_test_complex.proto:274:32
 desc_test_complex.proto:284:10
 
 
- > message_type[9] > field[0] > options > syntax:
+ > message_type[9] > field[0] > options > (foo.bar.syntax):
 desc_test_complex.proto:275:17
 desc_test_complex.proto:275:32
 
 
- > message_type[9] > field[0] > options > import:
+ > message_type[9] > field[0] > options > (foo.bar.import):
 desc_test_complex.proto:275:34
 desc_test_complex.proto:275:49
 
 
- > message_type[9] > field[0] > options > public:
+ > message_type[9] > field[0] > options > (foo.bar.public):
 desc_test_complex.proto:275:51
 desc_test_complex.proto:275:66
 
 
- > message_type[9] > field[0] > options > weak:
+ > message_type[9] > field[0] > options > (foo.bar.weak):
 desc_test_complex.proto:275:68
 desc_test_complex.proto:275:81
 
 
- > message_type[9] > field[0] > options > package:
+ > message_type[9] > field[0] > options > (foo.bar.package):
 desc_test_complex.proto:275:83
 desc_test_complex.proto:275:99
 
 
- > message_type[9] > field[0] > options > string:
+ > message_type[9] > field[0] > options > (foo.bar.string):
 desc_test_complex.proto:276:17
 desc_test_complex.proto:276:36
 
 
- > message_type[9] > field[0] > options > bytes:
+ > message_type[9] > field[0] > options > (foo.bar.bytes):
 desc_test_complex.proto:276:38
 desc_test_complex.proto:276:55
 
 
- > message_type[9] > field[0] > options > bool:
+ > message_type[9] > field[0] > options > (foo.bar.bool):
 desc_test_complex.proto:276:57
 desc_test_complex.proto:276:70
 
 
- > message_type[9] > field[0] > options > float:
+ > message_type[9] > field[0] > options > (foo.bar.float):
 desc_test_complex.proto:277:17
 desc_test_complex.proto:277:31
 
 
- > message_type[9] > field[0] > options > double:
+ > message_type[9] > field[0] > options > (foo.bar.double):
 desc_test_complex.proto:277:33
 desc_test_complex.proto:277:51
 
 
- > message_type[9] > field[0] > options > int32:
+ > message_type[9] > field[0] > options > (foo.bar.int32):
 desc_test_complex.proto:278:17
 desc_test_complex.proto:278:29
 
 
- > message_type[9] > field[0] > options > int64:
+ > message_type[9] > field[0] > options > (foo.bar.int64):
 desc_test_complex.proto:278:31
 desc_test_complex.proto:278:43
 
 
- > message_type[9] > field[0] > options > uint32:
+ > message_type[9] > field[0] > options > (foo.bar.uint32):
 desc_test_complex.proto:278:45
 desc_test_complex.proto:278:60
 
 
- > message_type[9] > field[0] > options > uint64:
+ > message_type[9] > field[0] > options > (foo.bar.uint64):
 desc_test_complex.proto:278:62
 desc_test_complex.proto:278:77
 
 
- > message_type[9] > field[0] > options > sint32:
+ > message_type[9] > field[0] > options > (foo.bar.sint32):
 desc_test_complex.proto:278:79
 desc_test_complex.proto:278:93
 
 
- > message_type[9] > field[0] > options > sint64:
+ > message_type[9] > field[0] > options > (foo.bar.sint64):
 desc_test_complex.proto:278:95
 desc_test_complex.proto:278:109
 
 
- > message_type[9] > field[0] > options > fixed32:
+ > message_type[9] > field[0] > options > (foo.bar.fixed32):
 desc_test_complex.proto:279:17
 desc_test_complex.proto:279:33
 
 
- > message_type[9] > field[0] > options > fixed64:
+ > message_type[9] > field[0] > options > (foo.bar.fixed64):
 desc_test_complex.proto:279:35
 desc_test_complex.proto:279:51
 
 
- > message_type[9] > field[0] > options > sfixed32:
+ > message_type[9] > field[0] > options > (foo.bar.sfixed32):
 desc_test_complex.proto:279:53
 desc_test_complex.proto:279:71
 
 
- > message_type[9] > field[0] > options > sfixed64:
+ > message_type[9] > field[0] > options > (foo.bar.sfixed64):
 desc_test_complex.proto:279:73
 desc_test_complex.proto:279:91
 
 
- > message_type[9] > field[0] > options > optional:
+ > message_type[9] > field[0] > options > (foo.bar.optional):
 desc_test_complex.proto:280:17
 desc_test_complex.proto:280:34
 
 
- > message_type[9] > field[0] > options > repeated:
+ > message_type[9] > field[0] > options > (foo.bar.repeated):
 desc_test_complex.proto:280:36
 desc_test_complex.proto:280:53
 
 
- > message_type[9] > field[0] > options > required:
+ > message_type[9] > field[0] > options > (foo.bar.required):
 desc_test_complex.proto:280:55
 desc_test_complex.proto:280:72
 
 
- > message_type[9] > field[0] > options > message:
+ > message_type[9] > field[0] > options > (foo.bar.message):
 desc_test_complex.proto:281:17
 desc_test_complex.proto:281:33
 
 
- > message_type[9] > field[0] > options > enum:
+ > message_type[9] > field[0] > options > (foo.bar.enum):
 desc_test_complex.proto:281:35
 desc_test_complex.proto:281:48
 
 
- > message_type[9] > field[0] > options > service:
+ > message_type[9] > field[0] > options > (foo.bar.service):
 desc_test_complex.proto:281:50
 desc_test_complex.proto:281:66
 
 
- > message_type[9] > field[0] > options > rpc:
+ > message_type[9] > field[0] > options > (foo.bar.rpc):
 desc_test_complex.proto:281:68
 desc_test_complex.proto:281:80
 
 
- > message_type[9] > field[0] > options > option:
+ > message_type[9] > field[0] > options > (foo.bar.option):
 desc_test_complex.proto:282:17
 desc_test_complex.proto:282:32
 
 
- > message_type[9] > field[0] > options > extend:
+ > message_type[9] > field[0] > options > (foo.bar.extend):
 desc_test_complex.proto:282:34
 desc_test_complex.proto:282:49
 
 
- > message_type[9] > field[0] > options > extensions:
+ > message_type[9] > field[0] > options > (foo.bar.extensions):
 desc_test_complex.proto:282:51
 desc_test_complex.proto:282:70
 
 
- > message_type[9] > field[0] > options > reserved:
+ > message_type[9] > field[0] > options > (foo.bar.reserved):
 desc_test_complex.proto:282:72
 desc_test_complex.proto:282:89
 
 
- > message_type[9] > field[0] > options > to:
+ > message_type[9] > field[0] > options > (foo.bar.to):
 desc_test_complex.proto:283:17
 desc_test_complex.proto:283:28
 
 
- > message_type[9] > field[0] > options > true:
+ > message_type[9] > field[0] > options > (foo.bar.true):
 desc_test_complex.proto:283:30
 desc_test_complex.proto:283:42
 
 
- > message_type[9] > field[0] > options > false:
+ > message_type[9] > field[0] > options > (foo.bar.false):
 desc_test_complex.proto:283:44
 desc_test_complex.proto:283:58
 
 
- > message_type[9] > field[0] > options > default:
+ > message_type[9] > field[0] > options > (foo.bar.default):
 desc_test_complex.proto:283:60
 desc_test_complex.proto:283:75
 
@@ -5593,7 +5604,7 @@ desc_test_complex.proto:285:34
 desc_test_complex.proto:297:10
 
 
- > message_type[9] > field[1] > options > boom:
+ > message_type[9] > field[1] > options > (foo.bar.boom):
 desc_test_complex.proto:286:17
 desc_test_complex.proto:296:18
 ---- desc_test_options.proto ----

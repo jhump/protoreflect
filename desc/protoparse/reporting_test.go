@@ -58,7 +58,6 @@ func TestErrorReporting(t *testing.T) {
 				"test.proto:5:41: syntax error: unexpected \"enum\", expecting ';'",
 				"test.proto:5:69: syntax error: unexpected ';', expecting '='",
 				"test.proto:7:53: syntax error: unexpected '='",
-				`test.proto:2:50: syntax value must be "proto2" or "proto3"`,
 			},
 		},
 		{
@@ -79,9 +78,6 @@ func TestErrorReporting(t *testing.T) {
 			},
 			expectedErrs: []string{
 				"test.proto:6:56: syntax error: unexpected '}', expecting '='",
-				"test.proto:4:62: tag number 0 must be greater than zero",
-				"test.proto:8:55: enum Bar: proto3 requires that first value in enum have numeric value of 0",
-				"test.proto:9:56: enum Bar: values BAZ and BUZZ both have the same numeric value 1; use allow_alias option if intentional",
 			},
 		},
 		{
@@ -104,11 +100,9 @@ func TestErrorReporting(t *testing.T) {
 					`,
 			},
 			expectedErrs: []string{
-				"test.proto:8:49: duplicate symbol BAZ: already defined as an enum value; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum",
-				"test.proto:10:41: duplicate symbol Bar: already defined as an enum",
-				"test.proto:12:49: duplicate symbol Bar.Foobar: already defined as a method",
-				"test.proto:12:61: method Bar.Foobar: unknown request type Frob",
-				"test.proto:12:76: method Bar.Foobar: unknown response type Nitz",
+				`test.proto:8:49: symbol "BAZ" already defined at test.proto:7:49; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum`,
+				`test.proto:10:49: symbol "Bar" already defined at test.proto:6:46`,
+				`test.proto:12:53: symbol "Bar.Foobar" already defined at test.proto:11:53`,
 			},
 		},
 		{
@@ -136,10 +130,9 @@ func TestErrorReporting(t *testing.T) {
 					`,
 			},
 			expectedErrs: []string{
+				"test2.proto:7:49: syntax error: unexpected identifier, expecting \"option\" or \"rpc\" or ';' or '}'",
 				"test1.proto:5:62: syntax error: unexpected '-', expecting int literal",
 				"test1.proto:8:62: syntax error: unexpected ';', expecting \"returns\"",
-				"test2.proto:7:49: syntax error: unexpected identifier, expecting \"option\" or \"rpc\" or ';' or '}'",
-				"test2.proto:4:49: field Baz.foo: label 'required' is not allowed in proto3",
 			},
 		},
 		{
@@ -168,9 +161,6 @@ func TestErrorReporting(t *testing.T) {
 					`,
 			},
 			expectedErrs: []string{
-				"test2.proto:4:41: duplicate symbol Bar: already defined as a service in \"test1.proto\"",
-				"test2.proto:7:41: duplicate symbol Foo: already defined as a message in \"test1.proto\"",
-				"test1.proto:8:75: method Bar.Frob: unknown response type Nitz",
 				"test2.proto:8:82: method Foo.DoSomething: invalid response type: Foo is a service, not a message",
 			},
 		},

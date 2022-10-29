@@ -242,3 +242,10 @@ func buildUninterpretedMap(prefix string, uos []*dpb.UninterpretedOption, opts m
 		opts[key] = val
 	}
 }
+
+func qualify(base, name string) string {
+	if base == "" {
+		return name
+	}
+	return base + "." + name
+}
