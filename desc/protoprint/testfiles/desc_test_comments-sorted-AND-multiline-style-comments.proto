@@ -149,7 +149,7 @@ service RpcService {
   option deprecated = false; /* DEPRECATED! */
 
   /* option that sets field */
-  option (testprotos.sfubar) = { id:100 name:"bob" };
+  option (testprotos.sfubar) = { id: 100, name: "bob" };
 
   option (testprotos.sfubare) = VALUE;
 

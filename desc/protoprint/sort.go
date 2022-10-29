@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 )
@@ -83,7 +83,7 @@ func asElement(v interface{}) Element {
 		return (*svcElement)(v)
 	case *desc.MethodDescriptor:
 		return (*methodElement)(v)
-	case *dpb.DescriptorProto_ExtensionRange:
+	case *descriptorpb.DescriptorProto_ExtensionRange:
 		return (*extRangeElement)(v)
 	default:
 		panic(fmt.Sprintf("unexpected type of element: %T", v))
@@ -409,7 +409,7 @@ func (m *methodElement) IsCustomOption() bool {
 	return false
 }
 
-type extRangeElement dpb.DescriptorProto_ExtensionRange
+type extRangeElement descriptorpb.DescriptorProto_ExtensionRange
 
 var _ Element = (*extRangeElement)(nil)
 
@@ -426,7 +426,7 @@ func (e *extRangeElement) Number() int32 {
 }
 
 func (e *extRangeElement) NumberRange() (int32, int32) {
-	ext := (*dpb.DescriptorProto_ExtensionRange)(e)
+	ext := (*descriptorpb.DescriptorProto_ExtensionRange)(e)
 	return ext.GetStart(), ext.GetEnd()
 }
 

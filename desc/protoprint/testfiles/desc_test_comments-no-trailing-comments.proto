@@ -144,7 +144,7 @@ message AnEmptyMessage {
 // Service comment
 service RpcService {
   // option that sets field
-  option (testprotos.sfubar) = { id:100 name:"bob" };
+  option (testprotos.sfubar) = { id: 100, name: "bob" };
 
   option deprecated = false;
 
