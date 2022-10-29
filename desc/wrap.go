@@ -2,8 +2,8 @@ package desc
 
 import (
 	"fmt"
+	"github.com/bufbuild/protocompile/protoutil"
 
-	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -12,7 +12,8 @@ import (
 // used to recover the underlying descriptor. Each descriptor type in this
 // package also provides a strongly-typed form of this method, such as the
 // following method for *FileDescriptor:
-//    UnwrapFile() protoreflect.FileDescriptor
+//
+//	UnwrapFile() protoreflect.FileDescriptor
 type DescriptorWrapper interface {
 	Unwrap() protoreflect.Descriptor
 }
@@ -44,12 +45,25 @@ func wrapDescriptor(d protoreflect.Descriptor, cache descriptorCache) (Descripto
 	}
 }
 
+func WrapFiles(d []protoreflect.FileDescriptor) ([]*FileDescriptor, error) {
+	cache := mapCache{}
+	results := make([]*FileDescriptor, len(d))
+	for i := range d {
+		var err error
+		results[i], err = wrapFile(d[i], cache)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return results, nil
+}
+
 func WrapFile(d protoreflect.FileDescriptor) (*FileDescriptor, error) {
 	return wrapFile(d, noopCache{})
 }
 
 func wrapFile(d protoreflect.FileDescriptor, cache descriptorCache) (*FileDescriptor, error) {
-	fdp := protodesc.ToFileDescriptorProto(d)
+	fdp := protoutil.ProtoFromFileDescriptor(d)
 	return convertFile(d, fdp, cache)
 }
 
