@@ -168,7 +168,7 @@ func TestLinkerValidation(t *testing.T) {
 				"foo2.proto": "enum foo { V = 0; }",
 			},
 			`foo.proto:1:9: symbol "foo" already defined at foo2.proto:1:6
-					|| foo2.proto:1:6: symbol \"foo\" already defined at foo.proto:1:9`,
+					|| foo2.proto:1:6: symbol "foo" already defined at foo.proto:1:9`,
 		},
 		{
 			map[string]string{
@@ -1371,9 +1371,9 @@ func TestSyntheticOneOfCollisions(t *testing.T) {
 		`foo1.proto:3:19: symbol "Foo._bar" already defined at foo2.proto:3:19`,
 	}
 	expectedOption2 := []string{
-		`foo1.proto:2:9: symbol "Foo" already defined at foo2.proto:2:9`,
-		`foo1.proto:3:19: symbol "Foo.bar" already defined at foo2.proto:3:19`,
-		`foo1.proto:3:19: symbol "Foo._bar" already defined at foo2.proto:3:19`,
+		`foo2.proto:2:9: symbol "Foo" already defined at foo1.proto:2:9`,
+		`foo2.proto:3:19: symbol "Foo.bar" already defined at foo1.proto:3:19`,
+		`foo2.proto:3:19: symbol "Foo._bar" already defined at foo1.proto:3:19`,
 	}
 
 	var actual []string
