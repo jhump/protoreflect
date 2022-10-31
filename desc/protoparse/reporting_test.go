@@ -3,6 +3,7 @@ package protoparse
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -36,9 +37,10 @@ func TestErrorReporting(t *testing.T) {
 	}
 
 	testCases := []struct {
-		fileNames    []string
-		files        map[string]string
-		expectedErrs []string
+		fileNames       []string
+		files           map[string]string
+		expectedErrs    []string
+		expectedErrsAlt []string
 	}{
 		{
 			// multiple syntax errors
@@ -134,6 +136,11 @@ func TestErrorReporting(t *testing.T) {
 				"test1.proto:5:62: syntax error: unexpected '-', expecting int literal",
 				"test1.proto:8:62: syntax error: unexpected ';', expecting \"returns\"",
 			},
+			expectedErrsAlt: []string{
+				"test1.proto:5:62: syntax error: unexpected '-', expecting int literal",
+				"test1.proto:8:62: syntax error: unexpected ';', expecting \"returns\"",
+				"test2.proto:7:49: syntax error: unexpected identifier, expecting \"option\" or \"rpc\" or ';' or '}'",
+			},
 		},
 		{
 			// link errors across multiple files
@@ -182,11 +189,18 @@ func TestErrorReporting(t *testing.T) {
 
 		// returns sentinel, but all actual errors in reported
 		testutil.Eq(t, ErrInvalidSource, err, "case #%d: parse should have failed with invalid source error", i+1)
-		testutil.Eq(t, len(tc.expectedErrs), count, "case #%d: parse should have called reporter %d times", i+1, len(tc.expectedErrs))
-		testutil.Eq(t, len(tc.expectedErrs), len(reported), "case #%d: wrong number of errors reported", i+1)
-		for j := range tc.expectedErrs {
-			testutil.Eq(t, tc.expectedErrs[j], reported[j].Error(), "case #%d: parse error[%d] have %q; instead got %q", i+1, j, tc.expectedErrs[j], reported[j].Error())
-			split := strings.SplitN(tc.expectedErrs[j], ":", 4)
+		actual := make([]string, len(reported))
+		for j := range reported {
+			actual[j] = reported[j].Error()
+		}
+		expected := tc.expectedErrs
+		if len(tc.expectedErrsAlt) > 0 && !reflect.DeepEqual(tc.expectedErrs, actual) {
+			expected = tc.expectedErrsAlt
+		}
+		testutil.Eq(t, len(expected), count, "case #%d: parse should have called reporter %d times", i+1, len(tc.expectedErrs))
+		testutil.Eq(t, expected, actual, "case #%d: wrong errors reported", i+1)
+		for j := range expected {
+			split := strings.SplitN(expected[j], ":", 4)
 			testutil.Eq(t, 4, len(split), "case #%d: expected %q [%d] to contain at least 4 elements split by :", i+1, tc.expectedErrs[j], j)
 			testutil.Eq(t, split[3], " "+reported[j].Unwrap().Error(), "case #%d: parse error underlying[%d] have %q; instead got %q", i+1, j, split[3], reported[j].Unwrap().Error())
 		}

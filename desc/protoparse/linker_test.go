@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -140,7 +141,8 @@ func TestLinkerValidation(t *testing.T) {
 				"foo.proto":  "import \"foo2.proto\"; message fubar{}",
 				"foo2.proto": "import \"foo.proto\"; message baz{}",
 			},
-			`foo.proto:1:8: cycle found in imports: "foo.proto" -> "foo2.proto" -> "foo.proto"`,
+			`foo.proto:1:8: cycle found in imports: "foo.proto" -> "foo2.proto" -> "foo.proto"
+					|| foo2.proto:1:8: cycle found in imports: "foo2.proto" -> "foo.proto" -> "foo2.proto"`,
 		},
 		{
 			map[string]string{
@@ -165,7 +167,8 @@ func TestLinkerValidation(t *testing.T) {
 				"foo.proto":  "message foo {}",
 				"foo2.proto": "enum foo { V = 0; }",
 			},
-			`foo.proto:1:9: symbol "foo" already defined at foo2.proto:1:6`,
+			`foo.proto:1:9: symbol "foo" already defined at foo2.proto:1:6
+					|| foo2.proto:1:6: symbol \"foo\" already defined at foo.proto:1:9`,
 		},
 		{
 			map[string]string{
@@ -1209,8 +1212,19 @@ func TestLinkerValidation(t *testing.T) {
 			}
 		} else if err == nil {
 			t.Errorf("case %d: expecting validation error %q; instead got no error", i, tc.errMsg)
-		} else if err.Error() != tc.errMsg {
-			t.Errorf("case %d: expecting validation error %q; instead got: %q", i, tc.errMsg, err)
+		} else {
+			options := strings.Split(tc.errMsg, "||")
+			matched := false
+			for i := range options {
+				options[i] = strings.TrimSpace(options[i])
+				if err.Error() == options[i] {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				t.Errorf("case %d: expecting validation error %q; instead got: %q", i, strings.Join(options, " || "), err)
+			}
 		}
 	}
 }
@@ -1351,17 +1365,27 @@ func TestSyntheticOneOfCollisions(t *testing.T) {
 	}.ParseFiles("foo1.proto", "foo2.proto")
 
 	testutil.Eq(t, ErrInvalidSource, err)
-
-	expected := []string{
+	expectedOption1 := []string{
 		`foo1.proto:2:9: symbol "Foo" already defined at foo2.proto:2:9`,
 		`foo1.proto:3:19: symbol "Foo.bar" already defined at foo2.proto:3:19`,
 		`foo1.proto:3:19: symbol "Foo._bar" already defined at foo2.proto:3:19`,
 	}
+	expectedOption2 := []string{
+		`foo1.proto:2:9: symbol "Foo" already defined at foo2.proto:2:9`,
+		`foo1.proto:3:19: symbol "Foo.bar" already defined at foo2.proto:3:19`,
+		`foo1.proto:3:19: symbol "Foo._bar" already defined at foo2.proto:3:19`,
+	}
+
 	var actual []string
 	for _, err := range errs {
 		actual = append(actual, err.Error())
 	}
-	testutil.Eq(t, expected, actual)
+	// Errors expected depend on which file is compiled first. This is mostly deterministic
+	// with parallelism of 1, but some things (like enabling -race in tests) can change the
+	// expected order.
+	if !reflect.DeepEqual(expectedOption1, actual) && !reflect.DeepEqual(expectedOption2, actual) {
+		t.Errorf("got errors:\n:%v\nbut wanted EITHER:\n%v\n  OR:\n%v", actual, expectedOption1, expectedOption2)
+	}
 }
 
 func TestCustomJSONNameWarnings(t *testing.T) {
