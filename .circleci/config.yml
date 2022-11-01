@@ -14,43 +14,14 @@ orbs:
   win: circleci/windows@4.1.1
 
 jobs:
-  build-1-13:
-    working_directory: ~/repo
-    docker:
-      - image: cimg/go:1.13
-    steps: *simple_job_steps
-
-  build-1-14:
-    working_directory: ~/repo
-    docker:
-      - image: cimg/go:1.14
-    steps: *simple_job_steps
-
-  build-1-15:
-    working_directory: ~/repo
-    docker:
-      - image: cimg/go:1.15
-    steps: *simple_job_steps
-
-  build-1-16:
-    working_directory: ~/repo
-    docker:
-      - image: cimg/go:1.16
-    steps: *simple_job_steps
-
-  build-1-17:
-    working_directory: ~/repo
-    docker:
-      - image: cimg/go:1.17
-    steps: *simple_job_steps
-
-  build-windows:  # as of Feb 2022, Go 1.17
-    executor:
-      name: win/default
-    steps:
-      - run: git config --global core.autocrlf false
-      - checkout
-      - run: go test ./...
+  # TODO: re-enable Windows when the image is updated to 1.18 or newer
+#  build-windows:  # as of Feb 2022, Go 1.17
+#    executor:
+#      name: win/default
+#    steps:
+#      - run: git config --global core.autocrlf false
+#      - checkout
+#      - run: go test ./...
 
   build-1-18:
     working_directory: ~/repo
@@ -101,12 +72,7 @@ jobs:
 workflows:
   pr-build-test:
     jobs:
-      - build-1-13
-      - build-1-14
-      - build-1-15
-      - build-1-16
-      - build-1-17
-      - build-windows
+      # - build-windows
       - build-1-18
       - build-1-19
       - build-1-19-u
