@@ -470,12 +470,6 @@ enum SimpleEnum {
 
   // Leading comment for VALUE0
   VALUE0 = 0; // Trailing comment for VALUE0
-
-  // Leading detached comment for VALUE1
-
-  // Leading comment for VALUE1
-  VALUE1 = 1;
-  // Trailing comment for VALUE1
 }
 
 // Leading detached comment for SimpleMessage
@@ -487,18 +481,7 @@ message SimpleMessage {
   // Leading detached comment for field1
 
   // Leading comment for field1
-  optional uint32 field1 = 1; // Trailing comment for field1
-
-  // Leading detached comment for field2
-
-  // Leading comment for field2
-  repeated string field2 = 2;
-  // Trailing comment for field2
-
-  // Leading detached comment for field3
-
-  // Leading comment for field3
-  optional SimpleEnum field3 = 3; // Trailing comment for field3
+  optional SimpleEnum field1 = 1; // Trailing comment for field1
 }
 `}
 
