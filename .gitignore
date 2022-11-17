@@ -1,2 +1,5 @@
 internal/testprotos/protoc
 coverage.out
+
+# Generated file for Goland workspace
+.idea

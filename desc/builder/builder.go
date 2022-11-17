@@ -146,7 +146,7 @@ func addCommentsTo(sourceInfo *dpb.SourceCodeInfo, path []int32, c *Comments) {
 
 	var detached []string
 	if len(c.LeadingDetachedComments) > 0 {
-		detached := make([]string, len(c.LeadingDetachedComments))
+		detached = make([]string, len(c.LeadingDetachedComments))
 		copy(detached, c.LeadingDetachedComments)
 	}
 
