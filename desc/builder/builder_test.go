@@ -13,6 +13,7 @@ import (
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/jhump/protoreflect/desc/protoparse"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -453,6 +454,109 @@ func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
 
 	checkDescriptorComments(fd)
 	testutil.Eq(t, count, descCount)
+}
+
+func TestBuilder_PreserveAllCommentsAfterBuild(t *testing.T) {
+	files := map[string]string{"test.proto": `
+syntax = "proto3";
+
+// Leading detached comment for SimpleEnum
+
+// Leading comment for SimpleEnum
+enum SimpleEnum {
+// Trailing comment for SimpleEnum
+
+  // Leading detached comment for VALUE0
+
+  // Leading comment for VALUE0
+  VALUE0 = 0; // Trailing comment for VALUE0
+
+  // Leading detached comment for VALUE1
+
+  // Leading comment for VALUE1
+  VALUE1 = 1;
+  // Trailing comment for VALUE1
+}
+
+// Leading detached comment for SimpleMessage
+
+// Leading comment for SimpleMessage
+message SimpleMessage {
+// Trailing comment for SimpleMessage
+
+  // Leading detached comment for field1
+
+  // Leading comment for field1
+  optional uint32 field1 = 1; // Trailing comment for field1
+
+  // Leading detached comment for field2
+
+  // Leading comment for field2
+  repeated string field2 = 2;
+  // Trailing comment for field2
+
+  // Leading detached comment for field3
+
+  // Leading comment for field3
+  optional SimpleEnum field3 = 3; // Trailing comment for field3
+}
+`}
+
+	pa := &protoparse.Parser{
+		Accessor:              protoparse.FileContentsFromMap(files),
+		IncludeSourceCodeInfo: true,
+	}
+	fds, err := pa.ParseFiles("test.proto")
+	testutil.Ok(t, err)
+
+	fb, err := FromFile(fds[0])
+	testutil.Ok(t, err)
+
+	fd, err := fb.Build()
+	testutil.Ok(t, err)
+
+	var checkDescriptorComments func(d desc.Descriptor)
+	checkDescriptorComments = func(d desc.Descriptor) {
+		// fmt.Println(d.GetFullyQualifiedName(), d.GetSourceInfo().GetLeadingDetachedComments(), d.GetSourceInfo().GetLeadingComments(), d.GetSourceInfo().GetTrailingComments())
+		switch d := d.(type) {
+		case *desc.FileDescriptor:
+			for _, ch := range d.GetMessageTypes() {
+				checkDescriptorComments(ch)
+			}
+			for _, ch := range d.GetEnumTypes() {
+				checkDescriptorComments(ch)
+			}
+			// files don't have comments, so bail out before check below
+			return
+		case *desc.MessageDescriptor:
+			if d.IsMapEntry() {
+				// map entry messages have no comments (and neither do their child fields)
+				return
+			}
+			for _, ch := range d.GetFields() {
+				checkDescriptorComments(ch)
+			}
+		case *desc.FieldDescriptor:
+			if d.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP {
+				// groups comments are on the message, not hte field; so bail out before check below
+				return
+			}
+		case *desc.EnumDescriptor:
+			for _, ch := range d.GetValues() {
+				checkDescriptorComments(ch)
+			}
+		}
+		testutil.Eq(t, 1, len(d.GetSourceInfo().GetLeadingDetachedComments()),
+			"wrong number of leading detached comments for %s", d.GetFullyQualifiedName())
+		testutil.Eq(t, fmt.Sprintf(" Leading detached comment for %s\n", d.GetName()), d.GetSourceInfo().GetLeadingDetachedComments()[0],
+			"wrong leading detached comment for descriptor %s", d.GetFullyQualifiedName())
+		testutil.Eq(t, fmt.Sprintf(" Leading comment for %s\n", d.GetName()), d.GetSourceInfo().GetLeadingComments(),
+			"wrong leading comment for descriptor %s", d.GetFullyQualifiedName())
+		testutil.Eq(t, fmt.Sprintf(" Trailing comment for %s\n", d.GetName()), d.GetSourceInfo().GetTrailingComments(),
+			"wrong trailing comment for descriptor %s", d.GetFullyQualifiedName())
+	}
+
+	checkDescriptorComments(fd)
 }
 
 func loadProtoset(path string) (*desc.FileDescriptor, error) {
