@@ -160,28 +160,25 @@
 //     cannot have negative values.
 //  6. Element names should include only underscore, letters, and numbers, and
 //     must begin with an underscore or letter.
+//  7. Files with a syntax of proto3 are not allowed to have required fields.
+//  8. Files with a syntax of proto3 are not allowed to have messages that
+//     define extension ranges.
+//  9. Files with a syntax of proto3 are not allowed to use groups.
+//  10. Files with a syntax of proto3 are not allowed to declare default values
+//     for fields.
+//  11. Extension fields must use tag numbers that are in an extension range
+//     defined on the extended message.
+//  12. Non-extension fields are not allowed to use tags that lie in a message's
+//     extension ranges or reserved ranges.
+//  13. Non-extension fields are not allowed to use names that the message has
+//     marked as reserved.
+//  14. Extension ranges and reserved ranges must not overlap.
 //
 // Validation rules that are *not* enforced by builders, and thus would be
 // allowed and result in illegal constructs, include the following:
 //
-//  1. Files with a syntax of proto3 are not allowed to have required fields.
-//  2. Files with a syntax of proto3 are not allowed to have messages that
-//     define extension ranges.
-//  3. Files with a syntax of proto3 are not allowed to use groups.
-//  4. Files with a syntax of proto3 are not allowed to declare default values
-//     for fields.
-//  5. Names are supposed to be globally unique, even across multiple files
+//  1. Names are supposed to be globally unique, even across multiple files
 //     if multiple files are defined in the same package.
-//  6. Extension fields must use tag numbers that are in an extension range
-//     defined on the extended message.
-//  7. Multiple extensions for the same message cannot re-use tag numbers, even
+//  2. Multiple extensions for the same message cannot re-use tag numbers, even
 //     across multiple files.
-//  8. Non-extension fields are not allowed to use tags that lie in a message's
-//     extension ranges or reserved ranges.
-//  9. Non-extension fields are not allowed to use names that the message has
-//     marked as reserved.
-//  10. Extension ranges and reserved ranges must not overlap.
-//
-// This list may change in the future, as more validation rules may be
-// implemented in the builders.
 package builder

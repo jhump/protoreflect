@@ -1576,3 +1576,111 @@ func TestPruneDependencies(t *testing.T) {
 	testutil.Eq(t, 1, len(newFileDesc.GetDependencies()))
 	testutil.Eq(t, extDesc.GetFile().GetName(), newFileDesc.GetDependencies()[0].GetName())
 }
+
+func TestInvalid(t *testing.T) {
+	testCases := []struct {
+		name          string
+		builder       func() Builder
+		expectedError string
+	}{
+		{
+			name: "required in proto3",
+			builder: func() Builder {
+				return NewFile("foo.proto").SetProto3(true).
+					AddMessage(
+						NewMessage("Foo").AddField(NewField("foo", FieldTypeBool()).SetRequired()),
+					)
+			},
+			expectedError: "proto3 does not allow required fields",
+		},
+		{
+			name: "extension range in proto3",
+			builder: func() Builder {
+				return NewFile("foo.proto").SetProto3(true).
+					AddMessage(
+						NewMessage("Foo").AddExtensionRange(100, 1000),
+					)
+			},
+			expectedError: "proto3 semantics cannot have extension ranges",
+		},
+		{
+			name: "group in proto3",
+			builder: func() Builder {
+				return NewFile("foo.proto").SetProto3(true).
+					AddMessage(
+						NewMessage("Foo").AddField(NewGroupField(NewMessage("Bar"))),
+					)
+			},
+			// NB: This is the actual error message returned by the protobuf runtime. It is
+			//     misleading since it says proto2 instead of proto3.
+			expectedError: "invalid group: invalid under proto2 semantics",
+		},
+		{
+			name: "default value in proto3",
+			builder: func() Builder {
+				return NewFile("foo.proto").SetProto3(true).
+					AddMessage(
+						NewMessage("Foo").AddField(NewField("foo", FieldTypeString()).SetDefaultValue("abc")),
+					)
+			},
+			expectedError: "invalid default: cannot be specified under proto3 semantics",
+		},
+		{
+			name: "extension tag outside range",
+			builder: func() Builder {
+				msg := NewMessage("Foo").AddExtensionRange(100, 1000)
+				return NewFile("foo.proto").
+					AddMessage(msg).
+					AddExtension(NewExtension("foo", 1, FieldTypeString(), msg))
+			},
+			expectedError: "non-extension field number: 1",
+		},
+		{
+			name: "non-extension tag in extension range",
+			builder: func() Builder {
+				return NewFile("foo.proto").
+					AddMessage(NewMessage("Foo").
+						AddField(NewField("foo", FieldTypeBool()).SetNumber(100)).
+						AddExtensionRange(100, 1000))
+			},
+			expectedError: "number 100 in extension range",
+		},
+		{
+			name: "tag in reserved range",
+			builder: func() Builder {
+				return NewFile("foo.proto").
+					AddMessage(NewMessage("Foo").
+						AddField(NewField("foo", FieldTypeBool()).SetNumber(100)).
+						AddReservedRange(100, 1000))
+			},
+			expectedError: "must not use reserved number 100",
+		},
+		{
+			name: "field has reserved name",
+			builder: func() Builder {
+				return NewFile("foo.proto").
+					AddMessage(NewMessage("Foo").
+						AddField(NewField("foo", FieldTypeBool())).
+						AddReservedName("foo"))
+			},
+			expectedError: "must not use reserved name",
+		},
+		{
+			name: "ranges overlap",
+			builder: func() Builder {
+				return NewFile("foo.proto").
+					AddMessage(NewMessage("Foo").
+						AddReservedRange(100, 1000).
+						AddExtensionRange(200, 300))
+			},
+			expectedError: "reserved and extension ranges has overlapping ranges",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, err := testCase.builder().BuildDescriptor()
+			testutil.Nok(t, err)
+			testutil.Require(t, strings.Contains(err.Error(), testCase.expectedError), "unexpected error: want %q, got %q", testCase.expectedError, err.Error())
+		})
+	}
+}
