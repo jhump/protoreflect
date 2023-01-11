@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
@@ -212,6 +213,10 @@ func TestEncodeFieldValue_Group(t *testing.T) {
 
 type TestMessage testprotos.Test
 
+func (m *TestMessage) ProtoReflect() protoreflect.Message {
+	return (*testprotos.Test)(m).ProtoReflect()
+}
+
 func (m *TestMessage) Reset() {
 	(*testprotos.Test)(m).Reset()
 }
@@ -234,6 +239,10 @@ func (m *TestMessage) MarshalDeterministic() ([]byte, error) {
 
 type TestGroup testprotos.AnotherTestMessage_RockNRoll
 
+func (m *TestGroup) ProtoReflect() protoreflect.Message {
+	return (*testprotos.AnotherTestMessage_RockNRoll)(m).ProtoReflect()
+}
+
 func (m *TestGroup) Reset() {
 	(*testprotos.AnotherTestMessage_RockNRoll)(m).Reset()
 }
@@ -252,9 +261,4 @@ func (m *TestGroup) MarshalDeterministic() ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-func init() {
-	proto.RegisterType((*TestMessage)(nil), "foo.bar.v2.TestMessage")
-	proto.RegisterType((*TestGroup)(nil), "foo.bar.v2.TestGroup")
 }

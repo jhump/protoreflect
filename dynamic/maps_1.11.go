@@ -4,8 +4,9 @@
 package dynamic
 
 import (
-	"github.com/jhump/protoreflect/desc"
 	"reflect"
+
+	"github.com/jhump/protoreflect/desc"
 )
 
 // Pre-Go-1.12, we must use reflect.Value.MapKeys to reflectively

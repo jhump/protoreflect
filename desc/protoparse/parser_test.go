@@ -10,12 +10,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"github.com/bufbuild/protocompile/parser"
+	"github.com/bufbuild/protocompile/reporter"
+	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/internal"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
@@ -55,7 +54,7 @@ func TestJunkParse(t *testing.T) {
 }
 
 func TestSimpleParse(t *testing.T) {
-	protos := map[string]*parseResult{}
+	protos := map[string]parser.Result{}
 
 	// Just verify that we can successfully parse the same files we use for
 	// testing. We do a *very* shallow check of what was parsed because we know
@@ -63,7 +62,7 @@ func TestSimpleParse(t *testing.T) {
 	// below, where we parse *and* link.)
 	res, err := parseFileForTest("../../internal/testprotos/desc_test1.proto")
 	testutil.Ok(t, err)
-	fd := res.fd
+	fd := res.FileDescriptorProto()
 	testutil.Eq(t, "../../internal/testprotos/desc_test1.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasExtension(fd, "xtm"))
@@ -72,7 +71,7 @@ func TestSimpleParse(t *testing.T) {
 
 	res, err = parseFileForTest("../../internal/testprotos/desc_test2.proto")
 	testutil.Ok(t, err)
-	fd = res.fd
+	fd = res.FileDescriptorProto()
 	testutil.Eq(t, "../../internal/testprotos/desc_test2.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasExtension(fd, "groupx"))
@@ -82,7 +81,7 @@ func TestSimpleParse(t *testing.T) {
 
 	res, err = parseFileForTest("../../internal/testprotos/desc_test_defaults.proto")
 	testutil.Ok(t, err)
-	fd = res.fd
+	fd = res.FileDescriptorProto()
 	testutil.Eq(t, "../../internal/testprotos/desc_test_defaults.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasMessage(fd, "PrimitiveDefaults"))
@@ -90,7 +89,7 @@ func TestSimpleParse(t *testing.T) {
 
 	res, err = parseFileForTest("../../internal/testprotos/desc_test_field_types.proto")
 	testutil.Ok(t, err)
-	fd = res.fd
+	fd = res.FileDescriptorProto()
 	testutil.Eq(t, "../../internal/testprotos/desc_test_field_types.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasEnum(fd, "TestEnum"))
@@ -99,7 +98,7 @@ func TestSimpleParse(t *testing.T) {
 
 	res, err = parseFileForTest("../../internal/testprotos/desc_test_options.proto")
 	testutil.Ok(t, err)
-	fd = res.fd
+	fd = res.FileDescriptorProto()
 	testutil.Eq(t, "../../internal/testprotos/desc_test_options.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasExtension(fd, "mfubar"))
@@ -109,7 +108,7 @@ func TestSimpleParse(t *testing.T) {
 
 	res, err = parseFileForTest("../../internal/testprotos/desc_test_proto3.proto")
 	testutil.Ok(t, err)
-	fd = res.fd
+	fd = res.FileDescriptorProto()
 	testutil.Eq(t, "../../internal/testprotos/desc_test_proto3.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasEnum(fd, "Proto3Enum"))
@@ -118,7 +117,7 @@ func TestSimpleParse(t *testing.T) {
 
 	res, err = parseFileForTest("../../internal/testprotos/desc_test_wellknowntypes.proto")
 	testutil.Ok(t, err)
-	fd = res.fd
+	fd = res.FileDescriptorProto()
 	testutil.Eq(t, "../../internal/testprotos/desc_test_wellknowntypes.proto", fd.GetName())
 	testutil.Eq(t, "testprotos", fd.GetPackage())
 	testutil.Require(t, hasMessage(fd, "TestWellKnownTypes"))
@@ -126,14 +125,14 @@ func TestSimpleParse(t *testing.T) {
 
 	res, err = parseFileForTest("../../internal/testprotos/nopkg/desc_test_nopkg.proto")
 	testutil.Ok(t, err)
-	fd = res.fd
+	fd = res.FileDescriptorProto()
 	testutil.Eq(t, "../../internal/testprotos/nopkg/desc_test_nopkg.proto", fd.GetName())
 	testutil.Eq(t, "", fd.GetPackage())
 	protos[fd.GetName()] = res
 
 	res, err = parseFileForTest("../../internal/testprotos/nopkg/desc_test_nopkg_new.proto")
 	testutil.Ok(t, err)
-	fd = res.fd
+	fd = res.FileDescriptorProto()
 	testutil.Eq(t, "../../internal/testprotos/nopkg/desc_test_nopkg_new.proto", fd.GetName())
 	testutil.Eq(t, "", fd.GetPackage())
 	testutil.Require(t, hasMessage(fd, "TopLevel"))
@@ -141,7 +140,7 @@ func TestSimpleParse(t *testing.T) {
 
 	res, err = parseFileForTest("../../internal/testprotos/pkg/desc_test_pkg.proto")
 	testutil.Ok(t, err)
-	fd = res.fd
+	fd = res.FileDescriptorProto()
 	testutil.Eq(t, "../../internal/testprotos/pkg/desc_test_pkg.proto", fd.GetName())
 	testutil.Eq(t, "jhump.protoreflect.desc", fd.GetPackage())
 	testutil.Require(t, hasEnum(fd, "Foo"))
@@ -172,20 +171,18 @@ func TestSimpleParse(t *testing.T) {
 	testutil.Eq(t, expected, actual)
 }
 
-func parseFileForTest(filename string) (*parseResult, error) {
-	f, err := os.Open(filename)
+func parseFileForTest(filename string) (parser.Result, error) {
+	filenames := []string{filename}
+	res, _ := Parser{}.getResolver(filenames)
+	rep := reporter.NewHandler(nil)
+	results, err := parseToProtos(res, filenames, rep, true)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = f.Close()
-	}()
-	errs := newErrorHandler(nil, nil)
-	res := parseProto(filename, f, errs, true, true)
-	return res, errs.getError()
+	return results[0], nil
 }
 
-func hasExtension(fd *dpb.FileDescriptorProto, name string) bool {
+func hasExtension(fd *descriptorpb.FileDescriptorProto, name string) bool {
 	for _, ext := range fd.Extension {
 		if ext.GetName() == name {
 			return true
@@ -194,7 +191,7 @@ func hasExtension(fd *dpb.FileDescriptorProto, name string) bool {
 	return false
 }
 
-func hasMessage(fd *dpb.FileDescriptorProto, name string) bool {
+func hasMessage(fd *descriptorpb.FileDescriptorProto, name string) bool {
 	for _, md := range fd.MessageType {
 		if md.GetName() == name {
 			return true
@@ -203,7 +200,7 @@ func hasMessage(fd *dpb.FileDescriptorProto, name string) bool {
 	return false
 }
 
-func hasEnum(fd *dpb.FileDescriptorProto, name string) bool {
+func hasEnum(fd *descriptorpb.FileDescriptorProto, name string) bool {
 	for _, ed := range fd.EnumType {
 		if ed.GetName() == name {
 			return true
@@ -212,7 +209,7 @@ func hasEnum(fd *dpb.FileDescriptorProto, name string) bool {
 	return false
 }
 
-func hasService(fd *dpb.FileDescriptorProto, name string) bool {
+func hasService(fd *descriptorpb.FileDescriptorProto, name string) bool {
 	for _, sd := range fd.Service {
 		if sd.GetName() == name {
 			return true
@@ -224,7 +221,7 @@ func hasService(fd *dpb.FileDescriptorProto, name string) bool {
 func TestAggregateValueInUninterpretedOptions(t *testing.T) {
 	res, err := parseFileForTest("../../internal/testprotos/desc_test_complex.proto")
 	testutil.Ok(t, err)
-	fd := res.fd
+	fd := res.FileDescriptorProto()
 
 	// service TestTestService, method UserAuth; first option
 	aggregateValue1 := *fd.Service[0].Method[0].Options.UninterpretedOption[0].AggregateValue
@@ -322,7 +319,7 @@ func TestParseFilesWithDependencies(t *testing.T) {
 		// Create a dependency-aware parser.
 		parser := Parser{
 			Accessor: FileContentsFromMap(contents),
-			LookupImportProto: func(imp string) (*dpb.FileDescriptorProto, error) {
+			LookupImportProto: func(imp string) (*descriptorpb.FileDescriptorProto, error) {
 				if imp == "desc_test_wellknowntypes.proto" {
 					fileDescriptor, err := desc.LoadFileDescriptor(imp)
 					if err != nil {
@@ -388,49 +385,4 @@ message Foo {
 
 	comment := fds[0].GetMessageTypes()[0].GetFields()[0].GetSourceInfo().GetLeadingComments()
 	testutil.Eq(t, " leading comments\n", comment)
-}
-
-func TestParseCustomOptions(t *testing.T) {
-	accessor := FileContentsFromMap(map[string]string{
-		"test.proto": `
-syntax = "proto3";
-import "google/protobuf/descriptor.proto";
-extend google.protobuf.MessageOptions {
-    string foo = 30303;
-    int64 bar = 30304;
-}
-message Foo {
-  option (.foo) = "foo";
-  option (bar) = 123;
-}
-`,
-	})
-
-	p := Parser{
-		Accessor:              accessor,
-		IncludeSourceCodeInfo: true,
-	}
-	fds, err := p.ParseFiles("test.proto")
-	testutil.Ok(t, err)
-
-	md := fds[0].GetMessageTypes()[0]
-	opts := md.GetMessageOptions()
-	data := internal.GetUnrecognized(opts)
-	buf := codec.NewBuffer(data)
-
-	tag, wt, err := buf.DecodeTagAndWireType()
-	testutil.Ok(t, err)
-	testutil.Eq(t, int32(30303), tag)
-	testutil.Eq(t, int8(proto.WireBytes), wt)
-	fieldData, err := buf.DecodeRawBytes(false)
-	testutil.Ok(t, err)
-	testutil.Eq(t, "foo", string(fieldData))
-
-	tag, wt, err = buf.DecodeTagAndWireType()
-	testutil.Ok(t, err)
-	testutil.Eq(t, int32(30304), tag)
-	testutil.Eq(t, int8(proto.WireVarint), wt)
-	fieldVal, err := buf.DecodeVarint()
-	testutil.Ok(t, err)
-	testutil.Eq(t, uint64(123), fieldVal)
 }

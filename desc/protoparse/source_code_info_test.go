@@ -7,10 +7,11 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
+	"github.com/jhump/protoreflect/desc/internal"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
@@ -58,97 +59,92 @@ func TestSourceCodeInfo(t *testing.T) {
 // descriptor, in a manner that is much easier to read and check than raw
 // descriptor form.
 func printSourceCodeInfo(t *testing.T, fd *desc.FileDescriptor, out io.Writer) {
-	fmt.Fprintf(out, "---- %s ----\n", fd.GetName())
-	md, err := desc.LoadMessageDescriptorForMessage(fd.AsProto())
-	testutil.Ok(t, err)
-	er := &dynamic.ExtensionRegistry{}
-	er.AddExtensionsFromFileRecursively(fd)
-	mf := dynamic.NewMessageFactoryWithExtensionRegistry(er)
-	dfd := mf.NewDynamicMessage(md)
-	err = dfd.ConvertFrom(fd.AsProto())
-	testutil.Ok(t, err)
+	_, _ = fmt.Fprintf(out, "---- %s ----\n", fd.GetName())
+	msg := fd.AsFileDescriptorProto().ProtoReflect()
+	var reg protoregistry.Types
+	internal.RegisterExtensionsForFile(&reg, fd.UnwrapFile())
 
 	for _, loc := range fd.AsFileDescriptorProto().GetSourceCodeInfo().GetLocation() {
 		var buf bytes.Buffer
-		findLocation(mf, dfd, md, loc.Path, &buf)
-		fmt.Fprintf(out, "\n\n%s:\n", buf.String())
+		findLocation(msg, &reg, loc.Path, &buf)
+		_, _ = fmt.Fprintf(out, "\n\n%s:\n", buf.String())
 		if len(loc.Span) == 3 {
-			fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[1]+1)
-			fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[2]+1)
+			_, _ = fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[1]+1)
+			_, _ = fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[2]+1)
 		} else {
-			fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[1]+1)
-			fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[2]+1, loc.Span[3]+1)
+			_, _ = fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[0]+1, loc.Span[1]+1)
+			_, _ = fmt.Fprintf(out, "%s:%d:%d\n", fd.GetName(), loc.Span[2]+1, loc.Span[3]+1)
 		}
 		if len(loc.LeadingDetachedComments) > 0 {
 			for i, comment := range loc.LeadingDetachedComments {
-				fmt.Fprintf(out, "    Leading detached comment [%d]:\n%s\n", i, comment)
+				_, _ = fmt.Fprintf(out, "    Leading detached comment [%d]:\n%s\n", i, comment)
 			}
 		}
 		if loc.LeadingComments != nil {
-			fmt.Fprintf(out, "    Leading comments:\n%s\n", loc.GetLeadingComments())
+			_, _ = fmt.Fprintf(out, "    Leading comments:\n%s\n", loc.GetLeadingComments())
 		}
 		if loc.TrailingComments != nil {
-			fmt.Fprintf(out, "    Trailing comments:\n%s\n", loc.GetTrailingComments())
+			_, _ = fmt.Fprintf(out, "    Trailing comments:\n%s\n", loc.GetTrailingComments())
 		}
 	}
 }
 
-func findLocation(mf *dynamic.MessageFactory, msg *dynamic.Message, md *desc.MessageDescriptor, path []int32, buf *bytes.Buffer) {
+func findLocation(msg protoreflect.Message, reg protoregistry.ExtensionTypeResolver, path []int32, buf *bytes.Buffer) {
 	if len(path) == 0 {
 		return
 	}
 
-	var fld *desc.FieldDescriptor
-	if msg != nil {
-		fld = msg.FindFieldDescriptor(path[0])
-	} else {
-		fld = md.FindFieldByNumber(path[0])
-		if fld == nil {
-			fld = mf.GetExtensionRegistry().FindExtension(md.GetFullyQualifiedName(), path[0])
+	fieldNumber := protoreflect.FieldNumber(path[0])
+	md := msg.Descriptor()
+	fld := md.Fields().ByNumber(fieldNumber)
+	if fld == nil {
+		xt, err := reg.FindExtensionByNumber(md.FullName(), fieldNumber)
+		if err == nil {
+			fld = xt.TypeDescriptor()
 		}
 	}
 	if fld == nil {
-		panic(fmt.Sprintf("could not find field with tag %d in message of type %s", path[0], msg.XXX_MessageName()))
+		panic(fmt.Sprintf("could not find field with tag %d in message of type %s", path[0], md.FullName()))
 	}
 
-	fmt.Fprintf(buf, " > %s", fld.GetName())
+	var name string
+	if fld.IsExtension() {
+		name = "(" + string(fld.FullName()) + ")"
+	} else {
+		name = string(fld.Name())
+	}
+	_, _ = fmt.Fprintf(buf, " > %s", name)
 	path = path[1:]
 	idx := -1
-	if fld.IsRepeated() && len(path) > 0 {
+	if fld.Cardinality() == protoreflect.Repeated && len(path) > 0 {
 		idx = int(path[0])
-		fmt.Fprintf(buf, "[%d]", path[0])
+		_, _ = fmt.Fprintf(buf, "[%d]", path[0])
 		path = path[1:]
 	}
 
 	if len(path) > 0 {
-		var next proto.Message
-		if msg != nil {
-			if idx >= 0 {
-				if idx < msg.FieldLength(fld) {
-					next = msg.GetRepeatedField(fld, idx).(proto.Message)
-				}
+		if fld.Kind() != protoreflect.MessageKind && fld.Kind() != protoreflect.GroupKind {
+			panic(fmt.Sprintf("path indicates tag %d, but field %v is %v, not a message", path[0], name, fld.Kind()))
+		}
+		var present bool
+		var next protoreflect.Message
+		if idx == -1 {
+			present = msg.Has(fld)
+			next = msg.Get(fld).Message()
+		} else {
+			list := msg.Get(fld).List()
+			present = idx < list.Len()
+			if present {
+				next = list.Get(idx).Message()
 			} else {
-				if m, ok := msg.GetField(fld).(proto.Message); ok {
-					next = m
-				} else {
-					panic(fmt.Sprintf("path traverses into non-message type %T: %s -> %v", msg.GetField(fld), buf.String(), path))
-				}
+				next = list.NewElement().Message()
 			}
 		}
 
-		if next == nil && msg != nil {
+		if !present {
 			buf.WriteString(" !!! ")
 		}
 
-		if dm, ok := next.(*dynamic.Message); ok || next == nil {
-			findLocation(mf, dm, fld.GetMessageType(), path, buf)
-		} else {
-			dm := mf.NewDynamicMessage(fld.GetMessageType())
-			err := dm.ConvertFrom(next)
-			if err != nil {
-				panic(err.Error())
-			}
-			findLocation(mf, dm, fld.GetMessageType(), path, buf)
-		}
+		findLocation(next, reg, path, buf)
 	}
 }

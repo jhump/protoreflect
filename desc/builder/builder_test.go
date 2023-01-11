@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/jhump/protoreflect/desc/protoparse"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -22,7 +22,7 @@ import (
 )
 
 func TestSimpleDescriptorsFromScratch(t *testing.T) {
-	md, err := desc.LoadMessageDescriptorForMessage((*empty.Empty)(nil))
+	md, err := desc.LoadMessageDescriptorForMessage((*emptypb.Empty)(nil))
 	testutil.Ok(t, err)
 
 	file := NewFile("foo/bar.proto").SetPackageName("foo.bar")
@@ -70,7 +70,7 @@ func TestSimpleDescriptorsFromScratch(t *testing.T) {
 }
 
 func TestSimpleDescriptorsFromScratch_SyntheticFiles(t *testing.T) {
-	md, err := desc.LoadMessageDescriptorForMessage((*empty.Empty)(nil))
+	md, err := desc.LoadMessageDescriptorForMessage((*emptypb.Empty)(nil))
 	testutil.Ok(t, err)
 
 	en := NewEnum("Options")
@@ -120,11 +120,11 @@ func TestSimpleDescriptorsFromScratch_SyntheticFiles(t *testing.T) {
 }
 
 func TestComplexDescriptorsFromScratch(t *testing.T) {
-	mdEmpty, err := desc.LoadMessageDescriptorForMessage((*empty.Empty)(nil))
+	mdEmpty, err := desc.LoadMessageDescriptorForMessage((*emptypb.Empty)(nil))
 	testutil.Ok(t, err)
-	mdAny, err := desc.LoadMessageDescriptorForMessage((*any.Any)(nil))
+	mdAny, err := desc.LoadMessageDescriptorForMessage((*anypb.Any)(nil))
 	testutil.Ok(t, err)
-	mdTimestamp, err := desc.LoadMessageDescriptorForMessage((*timestamp.Timestamp)(nil))
+	mdTimestamp, err := desc.LoadMessageDescriptorForMessage((*timestamppb.Timestamp)(nil))
 	testutil.Ok(t, err)
 	mbAny, err := FromMessage(mdAny)
 	testutil.Ok(t, err)
@@ -135,7 +135,7 @@ func TestComplexDescriptorsFromScratch(t *testing.T) {
 		AddField(NewField("extras", FieldTypeImportedMessage(mdAny)).
 			SetRepeated()).
 		AddField(NewField("builder", FieldTypeMessage(mbAny))).
-		SetExtensionRanges([]*dpb.DescriptorProto_ExtensionRange{{Start: proto.Int32(100), End: proto.Int32(201)}})
+		SetExtensionRanges([]*descriptorpb.DescriptorProto_ExtensionRange{{Start: proto.Int32(100), End: proto.Int32(201)}})
 	msgA2 := NewMessage("Nnn").
 		AddField(NewField("uid1", FieldTypeFixed64())).
 		AddField(NewField("uid2", FieldTypeFixed64()))
@@ -246,7 +246,7 @@ func TestCreatingGroupField(t *testing.T) {
 	testutil.Ok(t, err)
 
 	testutil.Require(t, md.FindFieldByName("groupa") != nil)
-	testutil.Eq(t, dpb.FieldDescriptorProto_TYPE_GROUP, md.FindFieldByName("groupa").GetType())
+	testutil.Eq(t, descriptorpb.FieldDescriptorProto_TYPE_GROUP, md.FindFieldByName("groupa").GetType())
 	nmd := md.GetNestedMessageTypes()[0]
 	testutil.Eq(t, "GroupA", nmd.GetName())
 	testutil.Eq(t, nmd, md.FindFieldByName("groupa").GetMessageType())
@@ -276,7 +276,7 @@ func TestCreatingGroupField(t *testing.T) {
 
 	// field also renamed
 	testutil.Require(t, md.FindFieldByName("foobarbaz") != nil)
-	testutil.Eq(t, dpb.FieldDescriptorProto_TYPE_GROUP, md.FindFieldByName("foobarbaz").GetType())
+	testutil.Eq(t, descriptorpb.FieldDescriptorProto_TYPE_GROUP, md.FindFieldByName("foobarbaz").GetType())
 	nmd = md.GetNestedMessageTypes()[0]
 	testutil.Eq(t, "FooBarBaz", nmd.GetName())
 	testutil.Eq(t, nmd, md.FindFieldByName("foobarbaz").GetMessageType())
@@ -365,7 +365,7 @@ func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
 			hasComment = false
 		case *FieldBuilder:
 			// comments for groups are on the message, not the field
-			hasComment = b.GetType().GetType() != dpb.FieldDescriptorProto_TYPE_GROUP
+			hasComment = b.GetType().GetType() != descriptorpb.FieldDescriptorProto_TYPE_GROUP
 		case *MessageBuilder:
 			// comments for maps are on the field, not the entry message
 			if b.Options.GetMapEntry() {
@@ -433,7 +433,7 @@ func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
 				checkDescriptorComments(ch)
 			}
 		case *desc.FieldDescriptor:
-			if d.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP {
+			if d.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 				// groups comments are on the message, not hte field; so bail out before check below
 				return
 			}
@@ -520,7 +520,7 @@ message SimpleMessage {
 				checkDescriptorComments(ch)
 			}
 		case *desc.FieldDescriptor:
-			if d.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP {
+			if d.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 				// groups comments are on the message, not hte field; so bail out before check below
 				return
 			}
@@ -543,7 +543,7 @@ message SimpleMessage {
 }
 
 func loadProtoset(path string) (*desc.FileDescriptor, error) {
-	var fds dpb.FileDescriptorSet
+	var fds descriptorpb.FileDescriptorSet
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -590,9 +590,13 @@ func roundTripFile(t *testing.T, fd *desc.FileDescriptor) {
 	//     statements in the source file.
 	//  2. The builder imports the actual source of all elements and never
 	//     uses public imports. The original file, on the other hand, could
-	//     used public imports and "indirectly" import other files that way.
+	//     use public imports and "indirectly" import other files that way.
 	//  3. The builder never emits weak imports.
-	//  4. The builder tries to preserve SourceCodeInfo, but will not preserve
+	//  4. The builder behaves like protoc in that it emits nil as the file
+	//     package if none is set. However the new protobuf runtime, when
+	//     reconstructing the proto from a protoreflect.FileDescriptor, will
+	//     instead emit a pointer to empty string :(
+	//  5. The builder tries to preserve SourceCodeInfo, but will not preserve
 	//     position information. So that info does not survive round-tripping
 	//     (though comments do: there is a separate test for that). Also, the
 	//     round-tripped version will have source code info (even though it
@@ -626,6 +630,12 @@ func roundTripFile(t *testing.T, fd *desc.FileDescriptor) {
 	// files to handle any actual public import encountered.)
 	fdp.PublicDependency = nil
 	fdp.WeakDependency = nil
+
+	// Fix the one we loaded so it uses nil as the package instead of an
+	// empty string, since that is what builders produce.
+	if fdp.GetPackage() == "" {
+		fdp.Package = nil
+	}
 
 	// Remove source code info: what the builder generates is not expected to
 	// match the original source.
@@ -900,39 +910,39 @@ var (
 
 func init() {
 	var err error
-	fileOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*dpb.FileOptions)(nil))
+	fileOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.FileOptions)(nil))
 	if err != nil {
 		panic(err)
 	}
-	msgOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*dpb.MessageOptions)(nil))
+	msgOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.MessageOptions)(nil))
 	if err != nil {
 		panic(err)
 	}
-	fieldOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*dpb.FieldOptions)(nil))
+	fieldOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.FieldOptions)(nil))
 	if err != nil {
 		panic(err)
 	}
-	oneofOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*dpb.OneofOptions)(nil))
+	oneofOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.OneofOptions)(nil))
 	if err != nil {
 		panic(err)
 	}
-	extRangeOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*dpb.ExtensionRangeOptions)(nil))
+	extRangeOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.ExtensionRangeOptions)(nil))
 	if err != nil {
 		panic(err)
 	}
-	enumOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*dpb.EnumOptions)(nil))
+	enumOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.EnumOptions)(nil))
 	if err != nil {
 		panic(err)
 	}
-	enumValOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*dpb.EnumValueOptions)(nil))
+	enumValOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.EnumValueOptions)(nil))
 	if err != nil {
 		panic(err)
 	}
-	svcOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*dpb.ServiceOptions)(nil))
+	svcOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.ServiceOptions)(nil))
 	if err != nil {
 		panic(err)
 	}
-	mtdOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*dpb.MethodOptions)(nil))
+	mtdOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.MethodOptions)(nil))
 	if err != nil {
 		panic(err)
 	}
@@ -974,7 +984,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 
 	t.Run("file options", func(t *testing.T) {
 		fb := clone(t, file)
-		fb.Options = &dpb.FileOptions{}
+		fb.Options = &descriptorpb.FileOptions{}
 		ext, err := fileOpt.Build()
 		testutil.Ok(t, err)
 		err = dynamic.SetExtension(fb.Options, ext, "fubar")
@@ -984,7 +994,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 
 	t.Run("message options", func(t *testing.T) {
 		mb := NewMessage("Foo")
-		mb.Options = &dpb.MessageOptions{}
+		mb.Options = &descriptorpb.MessageOptions{}
 		ext, err := msgOpt.Build()
 		testutil.Ok(t, err)
 		err = dynamic.SetExtension(mb.Options, ext, "fubar")
@@ -997,7 +1007,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 
 	t.Run("field options", func(t *testing.T) {
 		flb := NewField("foo", FieldTypeString())
-		flb.Options = &dpb.FieldOptions{}
+		flb.Options = &descriptorpb.FieldOptions{}
 		// fields must be connected to a message
 		mb := NewMessage("Foo").AddField(flb)
 		ext, err := fieldOpt.Build()
@@ -1012,7 +1022,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 
 	t.Run("oneof options", func(t *testing.T) {
 		oob := NewOneOf("oo")
-		oob.Options = &dpb.OneofOptions{}
+		oob.AddChoice(NewField("foo", FieldTypeString()))
+		oob.Options = &descriptorpb.OneofOptions{}
 		// oneofs must be connected to a message
 		mb := NewMessage("Foo").AddOneOf(oob)
 		ext, err := oneofOpt.Build()
@@ -1026,7 +1037,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 	})
 
 	t.Run("extension range options", func(t *testing.T) {
-		var erOpts dpb.ExtensionRangeOptions
+		var erOpts descriptorpb.ExtensionRangeOptions
 		ext, err := extRangeOpt.Build()
 		testutil.Ok(t, err)
 		err = dynamic.SetExtension(&erOpts, ext, "fubar")
@@ -1040,7 +1051,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 
 	t.Run("enum options", func(t *testing.T) {
 		eb := NewEnum("Foo")
-		eb.Options = &dpb.EnumOptions{}
+		eb.AddValue(NewEnumValue("FOO"))
+		eb.Options = &descriptorpb.EnumOptions{}
 		ext, err := enumOpt.Build()
 		testutil.Ok(t, err)
 		err = dynamic.SetExtension(eb.Options, ext, "fubar")
@@ -1055,7 +1067,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		evb := NewEnumValue("FOO")
 		// enum values must be connected to an enum
 		eb := NewEnum("Foo").AddValue(evb)
-		evb.Options = &dpb.EnumValueOptions{}
+		evb.Options = &descriptorpb.EnumValueOptions{}
 		ext, err := enumValOpt.Build()
 		testutil.Ok(t, err)
 		err = dynamic.SetExtension(evb.Options, ext, "fubar")
@@ -1068,7 +1080,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 
 	t.Run("service options", func(t *testing.T) {
 		sb := NewService("Foo")
-		sb.Options = &dpb.ServiceOptions{}
+		sb.Options = &descriptorpb.ServiceOptions{}
 		ext, err := svcOpt.Build()
 		testutil.Ok(t, err)
 		err = dynamic.SetExtension(sb.Options, ext, "fubar")
@@ -1087,7 +1099,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 			RpcTypeMessage(resp, false))
 		// methods must be connected to a service
 		sb := NewService("Bar").AddMethod(mtb)
-		mtb.Options = &dpb.MethodOptions{}
+		mtb.Options = &descriptorpb.MethodOptions{}
 		ext, err := mtdOpt.Build()
 		testutil.Ok(t, err)
 		err = dynamic.SetExtension(mtb.Options, ext, "fubar")
@@ -1158,7 +1170,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Run("file options", func(t *testing.T) {
 				fb := newFile()
-				fb.Options = &dpb.FileOptions{}
+				fb.Options = &descriptorpb.FileOptions{}
 				ext, err := fileOpt.Build()
 				testutil.Ok(t, err)
 				err = dynamic.SetExtension(fb.Options, ext, "fubar")
@@ -1168,7 +1180,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 			t.Run("message options", func(t *testing.T) {
 				mb := NewMessage("Foo")
-				mb.Options = &dpb.MessageOptions{}
+				mb.Options = &descriptorpb.MessageOptions{}
 				ext, err := msgOpt.Build()
 				testutil.Ok(t, err)
 				err = dynamic.SetExtension(mb.Options, ext, "fubar")
@@ -1181,7 +1193,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 			t.Run("field options", func(t *testing.T) {
 				flb := NewField("foo", FieldTypeString())
-				flb.Options = &dpb.FieldOptions{}
+				flb.Options = &descriptorpb.FieldOptions{}
 				// fields must be connected to a message
 				mb := NewMessage("Foo").AddField(flb)
 				ext, err := fieldOpt.Build()
@@ -1196,7 +1208,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 			t.Run("oneof options", func(t *testing.T) {
 				oob := NewOneOf("oo")
-				oob.Options = &dpb.OneofOptions{}
+				oob.AddChoice(NewField("foo", FieldTypeString()))
+				oob.Options = &descriptorpb.OneofOptions{}
 				// oneofs must be connected to a message
 				mb := NewMessage("Foo").AddOneOf(oob)
 				ext, err := oneofOpt.Build()
@@ -1210,7 +1223,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 			})
 
 			t.Run("extension range options", func(t *testing.T) {
-				var erOpts dpb.ExtensionRangeOptions
+				var erOpts descriptorpb.ExtensionRangeOptions
 				ext, err := extRangeOpt.Build()
 				testutil.Ok(t, err)
 				err = dynamic.SetExtension(&erOpts, ext, "fubar")
@@ -1224,7 +1237,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 			t.Run("enum options", func(t *testing.T) {
 				eb := NewEnum("Foo")
-				eb.Options = &dpb.EnumOptions{}
+				eb.AddValue(NewEnumValue("FOO"))
+				eb.Options = &descriptorpb.EnumOptions{}
 				ext, err := enumOpt.Build()
 				testutil.Ok(t, err)
 				err = dynamic.SetExtension(eb.Options, ext, "fubar")
@@ -1239,7 +1253,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 				evb := NewEnumValue("FOO")
 				// enum values must be connected to an enum
 				eb := NewEnum("Foo").AddValue(evb)
-				evb.Options = &dpb.EnumValueOptions{}
+				evb.Options = &descriptorpb.EnumValueOptions{}
 				ext, err := enumValOpt.Build()
 				testutil.Ok(t, err)
 				err = dynamic.SetExtension(evb.Options, ext, "fubar")
@@ -1252,7 +1266,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 			t.Run("service options", func(t *testing.T) {
 				sb := NewService("Foo")
-				sb.Options = &dpb.ServiceOptions{}
+				sb.Options = &descriptorpb.ServiceOptions{}
 				ext, err := svcOpt.Build()
 				testutil.Ok(t, err)
 				err = dynamic.SetExtension(sb.Options, ext, "fubar")
@@ -1271,7 +1285,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 					RpcTypeMessage(resp, false))
 				// methods must be connected to a service
 				sb := NewService("Bar").AddMethod(mtb)
-				mtb.Options = &dpb.MethodOptions{}
+				mtb.Options = &descriptorpb.MethodOptions{}
 				ext, err := mtdOpt.Build()
 				testutil.Ok(t, err)
 				err = dynamic.SetExtension(mtb.Options, ext, "fubar")
@@ -1349,7 +1363,7 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 
 	t.Run("file options", func(t *testing.T) {
 		fb := NewFile("foo.proto")
-		fb.Options = &dpb.FileOptions{}
+		fb.Options = &descriptorpb.FileOptions{}
 		err = dynamic.SetExtension(fb.Options, fileOpt, "fubar")
 		testutil.Ok(t, err)
 		checkBuildWithExtensions(t, &exts, fileOpt.GetFile(), fb)
@@ -1357,7 +1371,7 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 
 	t.Run("message options", func(t *testing.T) {
 		mb := NewMessage("Foo")
-		mb.Options = &dpb.MessageOptions{}
+		mb.Options = &descriptorpb.MessageOptions{}
 		err = dynamic.SetExtension(mb.Options, msgOpt, "fubar")
 		testutil.Ok(t, err)
 		checkBuildWithExtensions(t, &exts, msgOpt.GetFile(), mb)
@@ -1365,7 +1379,7 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 
 	t.Run("field options", func(t *testing.T) {
 		flb := NewField("foo", FieldTypeString())
-		flb.Options = &dpb.FieldOptions{}
+		flb.Options = &descriptorpb.FieldOptions{}
 		// fields must be connected to a message
 		NewMessage("Foo").AddField(flb)
 		err = dynamic.SetExtension(flb.Options, fieldOpt, "fubar")
@@ -1375,7 +1389,8 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 
 	t.Run("oneof options", func(t *testing.T) {
 		oob := NewOneOf("oo")
-		oob.Options = &dpb.OneofOptions{}
+		oob.AddChoice(NewField("foo", FieldTypeString()))
+		oob.Options = &descriptorpb.OneofOptions{}
 		// oneofs must be connected to a message
 		NewMessage("Foo").AddOneOf(oob)
 		err = dynamic.SetExtension(oob.Options, oneofOpt, "fubar")
@@ -1384,7 +1399,7 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 	})
 
 	t.Run("extension range options", func(t *testing.T) {
-		var erOpts dpb.ExtensionRangeOptions
+		var erOpts descriptorpb.ExtensionRangeOptions
 		err = dynamic.SetExtension(&erOpts, extRangeOpt, "fubar")
 		testutil.Ok(t, err)
 		mb := NewMessage("foo").AddExtensionRangeWithOptions(100, 200, &erOpts)
@@ -1393,7 +1408,8 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 
 	t.Run("enum options", func(t *testing.T) {
 		eb := NewEnum("Foo")
-		eb.Options = &dpb.EnumOptions{}
+		eb.AddValue(NewEnumValue("FOO"))
+		eb.Options = &descriptorpb.EnumOptions{}
 		err = dynamic.SetExtension(eb.Options, enumOpt, "fubar")
 		testutil.Ok(t, err)
 		checkBuildWithExtensions(t, &exts, enumOpt.GetFile(), eb)
@@ -1403,7 +1419,7 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 		evb := NewEnumValue("FOO")
 		// enum values must be connected to an enum
 		NewEnum("Foo").AddValue(evb)
-		evb.Options = &dpb.EnumValueOptions{}
+		evb.Options = &descriptorpb.EnumValueOptions{}
 		err = dynamic.SetExtension(evb.Options, enumValOpt, "fubar")
 		testutil.Ok(t, err)
 		checkBuildWithExtensions(t, &exts, enumValOpt.GetFile(), evb)
@@ -1411,7 +1427,7 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 
 	t.Run("service options", func(t *testing.T) {
 		sb := NewService("Foo")
-		sb.Options = &dpb.ServiceOptions{}
+		sb.Options = &descriptorpb.ServiceOptions{}
 		err = dynamic.SetExtension(sb.Options, svcOpt, "fubar")
 		testutil.Ok(t, err)
 		checkBuildWithExtensions(t, &exts, svcOpt.GetFile(), sb)
@@ -1423,7 +1439,7 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 			RpcTypeMessage(NewMessage("Response"), false))
 		// methods must be connected to a service
 		NewService("Bar").AddMethod(mtb)
-		mtb.Options = &dpb.MethodOptions{}
+		mtb.Options = &descriptorpb.MethodOptions{}
 		err = dynamic.SetExtension(mtb.Options, mtdOpt, "fubar")
 		testutil.Ok(t, err)
 		checkBuildWithExtensions(t, &exts, mtdOpt.GetFile(), mtb)
@@ -1511,7 +1527,7 @@ func clone(t *testing.T, fb *FileBuilder) *FileBuilder {
 }
 
 func TestPruneDependencies(t *testing.T) {
-	msgOpts := &dpb.MessageOptions{}
+	msgOpts := &descriptorpb.MessageOptions{}
 	msgOptsDesc, err := desc.LoadMessageDescriptorForMessage(msgOpts)
 	testutil.Ok(t, err)
 	extDesc, err := NewExtensionImported("foo", 20001, FieldTypeString(), msgOptsDesc).Build()
@@ -1522,7 +1538,7 @@ func TestPruneDependencies(t *testing.T) {
 	err = dm.ConvertTo(msgOpts)
 	testutil.Ok(t, err)
 
-	emptyDesc, err := desc.LoadMessageDescriptorForMessage(&empty.Empty{})
+	emptyDesc, err := desc.LoadMessageDescriptorForMessage(&emptypb.Empty{})
 	testutil.Ok(t, err)
 
 	// we have to explicitly import the file for the custom option

@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	protov2 "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
@@ -1886,42 +1886,42 @@ func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value, al
 	}
 
 	switch t {
-	case descriptor.FieldDescriptorProto_TYPE_SFIXED32,
-		descriptor.FieldDescriptorProto_TYPE_INT32,
-		descriptor.FieldDescriptorProto_TYPE_SINT32,
-		descriptor.FieldDescriptorProto_TYPE_ENUM:
+	case descriptorpb.FieldDescriptorProto_TYPE_SFIXED32,
+		descriptorpb.FieldDescriptorProto_TYPE_INT32,
+		descriptorpb.FieldDescriptorProto_TYPE_SINT32,
+		descriptorpb.FieldDescriptorProto_TYPE_ENUM:
 		return toInt32(reflect.Indirect(val), fd)
 
-	case descriptor.FieldDescriptorProto_TYPE_SFIXED64,
-		descriptor.FieldDescriptorProto_TYPE_INT64,
-		descriptor.FieldDescriptorProto_TYPE_SINT64:
+	case descriptorpb.FieldDescriptorProto_TYPE_SFIXED64,
+		descriptorpb.FieldDescriptorProto_TYPE_INT64,
+		descriptorpb.FieldDescriptorProto_TYPE_SINT64:
 		return toInt64(reflect.Indirect(val), fd)
 
-	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
-		descriptor.FieldDescriptorProto_TYPE_UINT32:
+	case descriptorpb.FieldDescriptorProto_TYPE_FIXED32,
+		descriptorpb.FieldDescriptorProto_TYPE_UINT32:
 		return toUint32(reflect.Indirect(val), fd)
 
-	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
-		descriptor.FieldDescriptorProto_TYPE_UINT64:
+	case descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
+		descriptorpb.FieldDescriptorProto_TYPE_UINT64:
 		return toUint64(reflect.Indirect(val), fd)
 
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
+	case descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
 		return toFloat32(reflect.Indirect(val), fd)
 
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+	case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
 		return toFloat64(reflect.Indirect(val), fd)
 
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
+	case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
 		return toBool(reflect.Indirect(val), fd)
 
-	case descriptor.FieldDescriptorProto_TYPE_BYTES:
+	case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
 		return toBytes(reflect.Indirect(val), fd)
 
-	case descriptor.FieldDescriptorProto_TYPE_STRING:
+	case descriptorpb.FieldDescriptorProto_TYPE_STRING:
 		return toString(reflect.Indirect(val), fd)
 
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
-		descriptor.FieldDescriptorProto_TYPE_GROUP:
+	case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
+		descriptorpb.FieldDescriptorProto_TYPE_GROUP:
 		m, err := asMessage(val, fd.GetFullyQualifiedName())
 		// check that message is correct type
 		if err != nil {
@@ -2558,6 +2558,37 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 		}
 	}
 
+	// With API v2, it is possible that the new protoreflect interfaces
+	// were used to store an extension, which means it can't be returned
+	// by proto.ExtensionDescs and it's also not in the unrecognized data.
+	// So we have a separate loop to trawl through it...
+	var err error
+	proto.MessageReflect(pm).Range(func(fld protoreflect.FieldDescriptor, val protoreflect.Value) bool {
+		if !fld.IsExtension() {
+			// normal field... we already got it above
+			return true
+		}
+		xt := fld.(protoreflect.ExtensionTypeDescriptor)
+		if _, ok := xt.Type().(*proto.ExtensionDesc); ok {
+			// known extension... we already got it above
+			return true
+		}
+		var fd *desc.FieldDescriptor
+		fd, err = desc.WrapField(fld)
+		if err != nil {
+			return false
+		}
+		v := convertProtoReflectValue(val)
+		if v, err = validFieldValue(fd, v); err != nil {
+			return false
+		}
+		values[fd] = v
+		return true
+	})
+	if err != nil {
+		return err
+	}
+
 	// unrecognized extensions fields:
 	//   In API v2 of proto, some extensions may NEITHER be included in ExtensionDescs
 	//   above NOR included in unrecognized fields below. These are extensions that use
@@ -2607,6 +2638,31 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 	}
 
 	return nil
+}
+
+func convertProtoReflectValue(v protoreflect.Value) interface{} {
+	val := v.Interface()
+	switch val := val.(type) {
+	case protoreflect.Message:
+		return val.Interface()
+	case protoreflect.Map:
+		mp := make(map[interface{}]interface{}, val.Len())
+		val.Range(func(k protoreflect.MapKey, v protoreflect.Value) bool {
+			mp[convertProtoReflectValue(k.Value())] = convertProtoReflectValue(v)
+			return true
+		})
+		return mp
+	case protoreflect.List:
+		sl := make([]interface{}, val.Len())
+		for i := 0; i < val.Len(); i++ {
+			sl[i] = convertProtoReflectValue(val.Get(i))
+		}
+		return sl
+	case protoreflect.EnumNumber:
+		return int32(val)
+	default:
+		return val
+	}
 }
 
 // Validate checks that all required fields are present. It returns an error if any are absent.

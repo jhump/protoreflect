@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	refv1alpha "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 	refv1 "github.com/jhump/protoreflect/grpcreflect/internal/grpc_reflection_v1"
@@ -131,7 +131,7 @@ type Client struct {
 	lastTriedV1 time.Time
 
 	cacheMu          sync.RWMutex
-	protosByName     map[string]*dpb.FileDescriptorProto
+	protosByName     map[string]*descriptorpb.FileDescriptorProto
 	filesByName      map[string]*desc.FileDescriptor
 	filesBySymbol    map[string]*desc.FileDescriptor
 	filesByExtension map[extDesc]*desc.FileDescriptor
@@ -160,7 +160,7 @@ func newClient(ctx context.Context, stubv1 refv1.ServerReflectionClient, stubv1a
 		now:              time.Now,
 		stubV1:           stubv1,
 		stubV1Alpha:      stubv1alpha,
-		protosByName:     map[string]*dpb.FileDescriptorProto{},
+		protosByName:     map[string]*descriptorpb.FileDescriptorProto{},
 		filesByName:      map[string]*desc.FileDescriptor{},
 		filesBySymbol:    map[string]*desc.FileDescriptor{},
 		filesByExtension: map[extDesc]*desc.FileDescriptor{},
@@ -315,9 +315,9 @@ func (cr *Client) getAndCacheFileDescriptors(req *refv1alpha.ServerReflectionReq
 	// should be the answer). If we're looking for a file by name, we can be
 	// smarter and make sure to grab one by name instead of just grabbing the
 	// first one.
-	var fds []*dpb.FileDescriptorProto
+	var fds []*descriptorpb.FileDescriptorProto
 	for _, fdBytes := range fdResp.FileDescriptorProto {
-		fd := &dpb.FileDescriptorProto{}
+		fd := &descriptorpb.FileDescriptorProto{}
 		if err = proto.Unmarshal(fdBytes, fd); err != nil {
 			return nil, err
 		}
@@ -353,7 +353,7 @@ func (cr *Client) getAndCacheFileDescriptors(req *refv1alpha.ServerReflectionReq
 	return nil, status.Errorf(codes.NotFound, "response does not include expected file")
 }
 
-func (cr *Client) descriptorFromProto(fd *dpb.FileDescriptorProto) (*desc.FileDescriptor, error) {
+func (cr *Client) descriptorFromProto(fd *descriptorpb.FileDescriptorProto) (*desc.FileDescriptor, error) {
 	deps := make([]*desc.FileDescriptor, len(fd.GetDependency()))
 	for i, depName := range fd.GetDependency() {
 		if dep, err := cr.FileByFilename(depName); err != nil {

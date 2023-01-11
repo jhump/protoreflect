@@ -4,8 +4,9 @@
 package dynamic
 
 import (
-	"github.com/jhump/protoreflect/desc"
 	"reflect"
+
+	"github.com/jhump/protoreflect/desc"
 )
 
 // With Go 1.12 and above, we can use reflect.Value.MapRange to iterate

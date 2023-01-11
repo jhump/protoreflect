@@ -7,7 +7,7 @@ import (
 	"sort"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
 )
@@ -175,74 +175,74 @@ func (b *Buffer) encodeFieldElement(fd *desc.FieldDescriptor, val interface{}) e
 
 func (b *Buffer) encodeFieldValue(fd *desc.FieldDescriptor, val interface{}) error {
 	switch fd.GetType() {
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
+	case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
 		v := val.(bool)
 		if v {
 			return b.EncodeVarint(1)
 		}
 		return b.EncodeVarint(0)
 
-	case descriptor.FieldDescriptorProto_TYPE_ENUM,
-		descriptor.FieldDescriptorProto_TYPE_INT32:
+	case descriptorpb.FieldDescriptorProto_TYPE_ENUM,
+		descriptorpb.FieldDescriptorProto_TYPE_INT32:
 		v := val.(int32)
 		return b.EncodeVarint(uint64(v))
 
-	case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
+	case descriptorpb.FieldDescriptorProto_TYPE_SFIXED32:
 		v := val.(int32)
 		return b.EncodeFixed32(uint64(v))
 
-	case descriptor.FieldDescriptorProto_TYPE_SINT32:
+	case descriptorpb.FieldDescriptorProto_TYPE_SINT32:
 		v := val.(int32)
 		return b.EncodeVarint(EncodeZigZag32(v))
 
-	case descriptor.FieldDescriptorProto_TYPE_UINT32:
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT32:
 		v := val.(uint32)
 		return b.EncodeVarint(uint64(v))
 
-	case descriptor.FieldDescriptorProto_TYPE_FIXED32:
+	case descriptorpb.FieldDescriptorProto_TYPE_FIXED32:
 		v := val.(uint32)
 		return b.EncodeFixed32(uint64(v))
 
-	case descriptor.FieldDescriptorProto_TYPE_INT64:
+	case descriptorpb.FieldDescriptorProto_TYPE_INT64:
 		v := val.(int64)
 		return b.EncodeVarint(uint64(v))
 
-	case descriptor.FieldDescriptorProto_TYPE_SFIXED64:
+	case descriptorpb.FieldDescriptorProto_TYPE_SFIXED64:
 		v := val.(int64)
 		return b.EncodeFixed64(uint64(v))
 
-	case descriptor.FieldDescriptorProto_TYPE_SINT64:
+	case descriptorpb.FieldDescriptorProto_TYPE_SINT64:
 		v := val.(int64)
 		return b.EncodeVarint(EncodeZigZag64(v))
 
-	case descriptor.FieldDescriptorProto_TYPE_UINT64:
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT64:
 		v := val.(uint64)
 		return b.EncodeVarint(v)
 
-	case descriptor.FieldDescriptorProto_TYPE_FIXED64:
+	case descriptorpb.FieldDescriptorProto_TYPE_FIXED64:
 		v := val.(uint64)
 		return b.EncodeFixed64(v)
 
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+	case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
 		v := val.(float64)
 		return b.EncodeFixed64(math.Float64bits(v))
 
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
+	case descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
 		v := val.(float32)
 		return b.EncodeFixed32(uint64(math.Float32bits(v)))
 
-	case descriptor.FieldDescriptorProto_TYPE_BYTES:
+	case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
 		v := val.([]byte)
 		return b.EncodeRawBytes(v)
 
-	case descriptor.FieldDescriptorProto_TYPE_STRING:
+	case descriptorpb.FieldDescriptorProto_TYPE_STRING:
 		v := val.(string)
 		return b.EncodeRawBytes(([]byte)(v))
 
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
+	case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE:
 		return b.EncodeDelimitedMessage(val.(proto.Message))
 
-	case descriptor.FieldDescriptorProto_TYPE_GROUP:
+	case descriptorpb.FieldDescriptorProto_TYPE_GROUP:
 		// just append the nested message to this buffer
 		return b.EncodeMessage(val.(proto.Message))
 		// whosoever writeth start-group tag (e.g. caller) is responsible for writing end-group tag
@@ -252,34 +252,34 @@ func (b *Buffer) encodeFieldValue(fd *desc.FieldDescriptor, val interface{}) err
 	}
 }
 
-func getWireType(t descriptor.FieldDescriptorProto_Type) (int8, error) {
+func getWireType(t descriptorpb.FieldDescriptorProto_Type) (int8, error) {
 	switch t {
-	case descriptor.FieldDescriptorProto_TYPE_ENUM,
-		descriptor.FieldDescriptorProto_TYPE_BOOL,
-		descriptor.FieldDescriptorProto_TYPE_INT32,
-		descriptor.FieldDescriptorProto_TYPE_SINT32,
-		descriptor.FieldDescriptorProto_TYPE_UINT32,
-		descriptor.FieldDescriptorProto_TYPE_INT64,
-		descriptor.FieldDescriptorProto_TYPE_SINT64,
-		descriptor.FieldDescriptorProto_TYPE_UINT64:
+	case descriptorpb.FieldDescriptorProto_TYPE_ENUM,
+		descriptorpb.FieldDescriptorProto_TYPE_BOOL,
+		descriptorpb.FieldDescriptorProto_TYPE_INT32,
+		descriptorpb.FieldDescriptorProto_TYPE_SINT32,
+		descriptorpb.FieldDescriptorProto_TYPE_UINT32,
+		descriptorpb.FieldDescriptorProto_TYPE_INT64,
+		descriptorpb.FieldDescriptorProto_TYPE_SINT64,
+		descriptorpb.FieldDescriptorProto_TYPE_UINT64:
 		return proto.WireVarint, nil
 
-	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED32,
-		descriptor.FieldDescriptorProto_TYPE_FLOAT:
+	case descriptorpb.FieldDescriptorProto_TYPE_FIXED32,
+		descriptorpb.FieldDescriptorProto_TYPE_SFIXED32,
+		descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
 		return proto.WireFixed32, nil
 
-	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED64,
-		descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+	case descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
+		descriptorpb.FieldDescriptorProto_TYPE_SFIXED64,
+		descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
 		return proto.WireFixed64, nil
 
-	case descriptor.FieldDescriptorProto_TYPE_BYTES,
-		descriptor.FieldDescriptorProto_TYPE_STRING,
-		descriptor.FieldDescriptorProto_TYPE_MESSAGE:
+	case descriptorpb.FieldDescriptorProto_TYPE_BYTES,
+		descriptorpb.FieldDescriptorProto_TYPE_STRING,
+		descriptorpb.FieldDescriptorProto_TYPE_MESSAGE:
 		return proto.WireBytes, nil
 
-	case descriptor.FieldDescriptorProto_TYPE_GROUP:
+	case descriptorpb.FieldDescriptorProto_TYPE_GROUP:
 		return proto.WireStartGroup, nil
 
 	default:

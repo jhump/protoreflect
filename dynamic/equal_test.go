@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
+
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"

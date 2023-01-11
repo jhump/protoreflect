@@ -21,11 +21,11 @@ import "desc_test_options.proto";
 // be preserved...
 
 // We need a request for our RPC service below.
-message /* detached message name */ /* request with a capital R */ Request /* trailer */ {
+message /* request with a capital R */ Request /* trailer */ {
   option deprecated = true; // deprecated!
 
   // A field comment
-  repeated int32 ids = /* detached tag */ /* tag numero uno */ 1 /*
+  repeated int32 ids = /* tag numero uno */ 1 /*
        * tag trailer
        * that spans multiple lines...
        * more than two.
@@ -50,6 +50,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
   // label comment
   optional /* type comment */ string /* name comment */ name = 2 [
     // default lead
+
     default = "fubar" // default trail
   ];
 
@@ -94,6 +95,8 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
     LUIGI = 2 [
       (testprotos.evfubaruf) = 100,
+      // swoosh!
+
       (testprotos.evfubaru) = 200
     ];
 
@@ -145,7 +148,7 @@ message /* detached message name */ /* request with a capital R */ Request /* tr
 
 // And next we'll need some extensions...
 
-extend /* extendee comment */ Request /* extendee trailer */ {
+extend /* extendee comment */ Request {
   // trailer for extend block
 
   // comment for guid1
@@ -155,7 +158,7 @@ extend /* extendee comment */ Request /* extendee trailer */ {
   optional uint64 guid2 = 124;
 }
 
-message /* name leading comment */ AnEmptyMessage /* name trailing comment */ {
+message /* name leading comment */ AnEmptyMessage {
   // trailer for AnEmptyMessage
 
 }
@@ -166,14 +169,14 @@ service /* service name */ RpcService {
   // that spans multiple lines
 
   // option that sets field
-  option (testprotos.sfubar) = { id:100 name:"bob" };
+  option (testprotos.sfubar) = { id: 100, name: "bob" };
 
   option deprecated = false; // DEPRECATED!
 
   option (testprotos.sfubare) = VALUE;
 
   // Method comment
-  rpc /* rpc name */ StreamingRpc /* comment A */ ( /* comment C */ stream Request ) returns ( /*comment E */ Request ); // compact method trailer
+  rpc /* rpc name */ StreamingRpc ( /* comment C */ stream Request ) returns ( /*comment E */ Request ); // compact method trailer
 
   rpc UnaryRpc ( Request ) returns ( google.protobuf.Empty ) {
     // trailer for method

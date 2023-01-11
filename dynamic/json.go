@@ -17,14 +17,14 @@ import (
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 	// link in the well-known-types that have a special JSON format
-	_ "github.com/golang/protobuf/ptypes/any"
-	_ "github.com/golang/protobuf/ptypes/duration"
-	_ "github.com/golang/protobuf/ptypes/empty"
-	_ "github.com/golang/protobuf/ptypes/struct"
-	_ "github.com/golang/protobuf/ptypes/timestamp"
-	_ "github.com/golang/protobuf/ptypes/wrappers"
+	_ "google.golang.org/protobuf/types/known/anypb"
+	_ "google.golang.org/protobuf/types/known/durationpb"
+	_ "google.golang.org/protobuf/types/known/emptypb"
+	_ "google.golang.org/protobuf/types/known/structpb"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
+	_ "google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/jhump/protoreflect/desc"
 )
@@ -669,13 +669,13 @@ func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
 }
 
 func isWellKnownValue(fd *desc.FieldDescriptor) bool {
-	return !fd.IsRepeated() && fd.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE &&
+	return !fd.IsRepeated() && fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE &&
 		fd.GetMessageType().GetFullyQualifiedName() == "google.protobuf.Value"
 }
 
 func isWellKnownListValue(fd *desc.FieldDescriptor) bool {
 	// we look for ListValue; but we also look for Value, which can be assigned a ListValue
-	return !fd.IsRepeated() && fd.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE &&
+	return !fd.IsRepeated() && fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE &&
 		(fd.GetMessageType().GetFullyQualifiedName() == "google.protobuf.ListValue" ||
 			fd.GetMessageType().GetFullyQualifiedName() == "google.protobuf.Value")
 }
@@ -794,8 +794,8 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 	}
 
 	switch fd.GetType() {
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
-		descriptor.FieldDescriptorProto_TYPE_GROUP:
+	case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
+		descriptorpb.FieldDescriptorProto_TYPE_GROUP:
 
 		if t == nil && allowNilMessage {
 			// if json is simply "null" return a nil pointer
@@ -822,7 +822,7 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 		}
 		return m, nil
 
-	case descriptor.FieldDescriptorProto_TYPE_ENUM:
+	case descriptorpb.FieldDescriptorProto_TYPE_ENUM:
 		if e, err := r.nextNumber(); err != nil {
 			return nil, err
 		} else {
@@ -842,9 +842,9 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 			}
 		}
 
-	case descriptor.FieldDescriptorProto_TYPE_INT32,
-		descriptor.FieldDescriptorProto_TYPE_SINT32,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED32:
+	case descriptorpb.FieldDescriptorProto_TYPE_INT32,
+		descriptorpb.FieldDescriptorProto_TYPE_SINT32,
+		descriptorpb.FieldDescriptorProto_TYPE_SFIXED32:
 		if i, err := r.nextInt(); err != nil {
 			return nil, err
 		} else if i > math.MaxInt32 || i < math.MinInt32 {
@@ -853,13 +853,13 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 			return int32(i), err
 		}
 
-	case descriptor.FieldDescriptorProto_TYPE_INT64,
-		descriptor.FieldDescriptorProto_TYPE_SINT64,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED64:
+	case descriptorpb.FieldDescriptorProto_TYPE_INT64,
+		descriptorpb.FieldDescriptorProto_TYPE_SINT64,
+		descriptorpb.FieldDescriptorProto_TYPE_SFIXED64:
 		return r.nextInt()
 
-	case descriptor.FieldDescriptorProto_TYPE_UINT32,
-		descriptor.FieldDescriptorProto_TYPE_FIXED32:
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT32,
+		descriptorpb.FieldDescriptorProto_TYPE_FIXED32:
 		if i, err := r.nextUint(); err != nil {
 			return nil, err
 		} else if i > math.MaxUint32 {
@@ -868,11 +868,11 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 			return uint32(i), err
 		}
 
-	case descriptor.FieldDescriptorProto_TYPE_UINT64,
-		descriptor.FieldDescriptorProto_TYPE_FIXED64:
+	case descriptorpb.FieldDescriptorProto_TYPE_UINT64,
+		descriptorpb.FieldDescriptorProto_TYPE_FIXED64:
 		return r.nextUint()
 
-	case descriptor.FieldDescriptorProto_TYPE_BOOL:
+	case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
 		if str, ok := t.(string); ok {
 			if str == "true" {
 				r.poll() // consume token
@@ -884,20 +884,20 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 		}
 		return r.nextBool()
 
-	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
+	case descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
 		if f, err := r.nextFloat(); err != nil {
 			return nil, err
 		} else {
 			return float32(f), nil
 		}
 
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+	case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
 		return r.nextFloat()
 
-	case descriptor.FieldDescriptorProto_TYPE_BYTES:
+	case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
 		return r.nextBytes()
 
-	case descriptor.FieldDescriptorProto_TYPE_STRING:
+	case descriptorpb.FieldDescriptorProto_TYPE_STRING:
 		return r.nextString()
 
 	default:

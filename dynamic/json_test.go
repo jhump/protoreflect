@@ -11,13 +11,13 @@ import (
 
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/duration"
-	"github.com/golang/protobuf/ptypes/struct"
-	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal/testprotos"
@@ -55,31 +55,31 @@ func TestJSONExtensionFields(t *testing.T) {
 func createTestFileDescriptor(t *testing.T, packageName string) *desc.FileDescriptor {
 	// Create a new type that could only be resolved via custom resolver
 	// because it does not exist in compiled form
-	fdp := descriptor.FileDescriptorProto{
+	fdp := descriptorpb.FileDescriptorProto{
 		Name:       proto.String(fmt.Sprintf("%s.proto", packageName)),
 		Dependency: []string{"google/protobuf/any.proto"},
 		Package:    proto.String(packageName),
-		MessageType: []*descriptor.DescriptorProto{
+		MessageType: []*descriptorpb.DescriptorProto{
 			{
 				Name: proto.String("MyMessage"),
-				Field: []*descriptor.FieldDescriptorProto{
+				Field: []*descriptorpb.FieldDescriptorProto{
 					{
 						Name:   proto.String("abc"),
 						Number: proto.Int(1),
-						Label:  descriptor.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						Type:   descriptor.FieldDescriptorProto_TYPE_STRING.Enum(),
+						Label:  descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+						Type:   descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
 					},
 					{
 						Name:   proto.String("def"),
 						Number: proto.Int(2),
-						Label:  descriptor.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						Type:   descriptor.FieldDescriptorProto_TYPE_INT32.Enum(),
+						Label:  descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+						Type:   descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
 					},
 					{
 						Name:     proto.String("ghi"),
 						Number:   proto.Int(3),
-						Label:    descriptor.FieldDescriptorProto_LABEL_REPEATED.Enum(),
-						Type:     descriptor.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
 						TypeName: proto.String(".google.protobuf.Any"),
 					},
 				},
@@ -109,7 +109,7 @@ func TestJSONAnyResolver(t *testing.T) {
 	a2, err := ptypes.MarshalAny(dm)
 	testutil.Ok(t, err)
 
-	msg := &testprotos.TestWellKnownTypes{Extras: []*any.Any{a1, a2}}
+	msg := &testprotos.TestWellKnownTypes{Extras: []*anypb.Any{a1, a2}}
 	resolver := AnyResolver(nil, fd1, fd2)
 
 	jsm := jsonpb.Marshaler{AnyResolver: resolver}
@@ -144,7 +144,7 @@ func TestJSONAnyResolver_AutomaticForDynamicMessage(t *testing.T) {
 	testutil.Ok(t, err)
 	dm.SetFieldByNumber(1, "xyz")
 	dm.SetFieldByNumber(2, int32(-987))
-	dm.SetFieldByNumber(3, []*any.Any{a1, a2})
+	dm.SetFieldByNumber(3, []*anypb.Any{a1, a2})
 
 	js, err := dm.MarshalJSON()
 	testutil.Ok(t, err)
@@ -285,7 +285,7 @@ func TestMarshalJSONIndentEmbedWellKnownTypes(t *testing.T) {
 	testutil.Ok(t, err)
 	dm.SetFieldByNumber(1, ts)
 
-	anys := make([]*any.Any, 3)
+	anys := make([]*anypb.Any, 3)
 	anys[0], err = ptypes.MarshalAny(&testprotos.TestRequest{Bar: "foo"})
 	testutil.Ok(t, err)
 	anys[1], err = ptypes.MarshalAny(&testprotos.TestRequest{Bar: "bar"})
@@ -382,17 +382,17 @@ func TestJSONWellKnownType(t *testing.T) {
 	testutil.Ok(t, err)
 
 	wkts := &testprotos.TestWellKnownTypes{
-		StartTime: &timestamp.Timestamp{Seconds: 1010101, Nanos: 20202},
-		Elapsed:   &duration.Duration{Seconds: 30303, Nanos: 40404},
-		Dbl:       &wrappers.DoubleValue{Value: 3.14159},
-		Flt:       &wrappers.FloatValue{Value: -1.0101010},
-		Bl:        &wrappers.BoolValue{Value: true},
-		I32:       &wrappers.Int32Value{Value: -42},
-		I64:       &wrappers.Int64Value{Value: -9090909090},
-		U32:       &wrappers.UInt32Value{Value: 42},
-		U64:       &wrappers.UInt64Value{Value: 9090909090},
-		Str:       &wrappers.StringValue{Value: "foobar"},
-		Byt:       &wrappers.BytesValue{Value: []byte("snafu")},
+		StartTime: &timestamppb.Timestamp{Seconds: 1010101, Nanos: 20202},
+		Elapsed:   &durationpb.Duration{Seconds: 30303, Nanos: 40404},
+		Dbl:       &wrapperspb.DoubleValue{Value: 3.14159},
+		Flt:       &wrapperspb.FloatValue{Value: -1.0101010},
+		Bl:        &wrapperspb.BoolValue{Value: true},
+		I32:       &wrapperspb.Int32Value{Value: -42},
+		I64:       &wrapperspb.Int64Value{Value: -9090909090},
+		U32:       &wrapperspb.UInt32Value{Value: 42},
+		U64:       &wrapperspb.UInt64Value{Value: 9090909090},
+		Str:       &wrapperspb.StringValue{Value: "foobar"},
+		Byt:       &wrapperspb.BytesValue{Value: []byte("snafu")},
 		Json: []*structpb.Value{
 			{Kind: &structpb.Value_BoolValue{BoolValue: true}},
 			{Kind: &structpb.Value_ListValue{ListValue: &structpb.ListValue{Values: []*structpb.Value{
@@ -406,7 +406,7 @@ func TestJSONWellKnownType(t *testing.T) {
 				"baz": {Kind: &structpb.Value_NumberValue{NumberValue: 30303.40404}},
 			}}}},
 		},
-		Extras: []*any.Any{any1, any2},
+		Extras: []*anypb.Any{any1, any2},
 	}
 
 	jsm := jsonpb.Marshaler{}
@@ -421,47 +421,47 @@ func TestJSONWellKnownType(t *testing.T) {
 
 	// check that the unmarshalled fields were constructed correctly with the
 	// right value and type (e.g. generated well-known-type, not dynamic message)
-	ts, ok := dm.GetFieldByNumber(1).(*timestamp.Timestamp)
+	ts, ok := dm.GetFieldByNumber(1).(*timestamppb.Timestamp)
 	testutil.Require(t, ok)
 	testutil.Ceq(t, wkts.StartTime, ts, eqpm)
 
-	dur, ok := dm.GetFieldByNumber(2).(*duration.Duration)
+	dur, ok := dm.GetFieldByNumber(2).(*durationpb.Duration)
 	testutil.Require(t, ok)
 	testutil.Ceq(t, wkts.Elapsed, dur, eqpm)
 
-	dbl, ok := dm.GetFieldByNumber(3).(*wrappers.DoubleValue)
+	dbl, ok := dm.GetFieldByNumber(3).(*wrapperspb.DoubleValue)
 	testutil.Require(t, ok)
 	testutil.Eq(t, wkts.Dbl.Value, dbl.Value)
 
-	flt, ok := dm.GetFieldByNumber(4).(*wrappers.FloatValue)
+	flt, ok := dm.GetFieldByNumber(4).(*wrapperspb.FloatValue)
 	testutil.Require(t, ok)
 	testutil.Eq(t, wkts.Flt.Value, flt.Value)
 
-	bl, ok := dm.GetFieldByNumber(5).(*wrappers.BoolValue)
+	bl, ok := dm.GetFieldByNumber(5).(*wrapperspb.BoolValue)
 	testutil.Require(t, ok)
 	testutil.Eq(t, wkts.Bl.Value, bl.Value)
 
-	i32, ok := dm.GetFieldByNumber(6).(*wrappers.Int32Value)
+	i32, ok := dm.GetFieldByNumber(6).(*wrapperspb.Int32Value)
 	testutil.Require(t, ok)
 	testutil.Eq(t, wkts.I32.Value, i32.Value)
 
-	i64, ok := dm.GetFieldByNumber(7).(*wrappers.Int64Value)
+	i64, ok := dm.GetFieldByNumber(7).(*wrapperspb.Int64Value)
 	testutil.Require(t, ok)
 	testutil.Eq(t, wkts.I64.Value, i64.Value)
 
-	u32, ok := dm.GetFieldByNumber(8).(*wrappers.UInt32Value)
+	u32, ok := dm.GetFieldByNumber(8).(*wrapperspb.UInt32Value)
 	testutil.Require(t, ok)
 	testutil.Eq(t, wkts.U32.Value, u32.Value)
 
-	u64, ok := dm.GetFieldByNumber(9).(*wrappers.UInt64Value)
+	u64, ok := dm.GetFieldByNumber(9).(*wrapperspb.UInt64Value)
 	testutil.Require(t, ok)
 	testutil.Eq(t, wkts.U64.Value, u64.Value)
 
-	str, ok := dm.GetFieldByNumber(10).(*wrappers.StringValue)
+	str, ok := dm.GetFieldByNumber(10).(*wrapperspb.StringValue)
 	testutil.Require(t, ok)
 	testutil.Eq(t, wkts.Str.Value, str.Value)
 
-	byt, ok := dm.GetFieldByNumber(11).(*wrappers.BytesValue)
+	byt, ok := dm.GetFieldByNumber(11).(*wrapperspb.BytesValue)
 	testutil.Require(t, ok)
 	testutil.Eq(t, wkts.Byt.Value, byt.Value)
 
@@ -478,7 +478,7 @@ func TestJSONWellKnownType(t *testing.T) {
 	testutil.Require(t, ok)
 	testutil.Eq(t, len(wkts.Extras), len(extras))
 	for i := range extras {
-		v, ok := extras[i].(*any.Any)
+		v, ok := extras[i].(*anypb.Any)
 		testutil.Require(t, ok)
 		testutil.Eq(t, wkts.Extras[i].TypeUrl, v.TypeUrl)
 		testutil.Eq(t, wkts.Extras[i].Value, v.Value)
@@ -490,7 +490,7 @@ func TestJSONWellKnownTypeFromFileDescriptorSet(t *testing.T) {
 
 	data, err := ioutil.ReadFile("../internal/testprotos/duration.protoset")
 	testutil.Ok(t, err)
-	fds := &descriptor.FileDescriptorSet{}
+	fds := &descriptorpb.FileDescriptorSet{}
 	err = proto.Unmarshal(data, fds)
 	testutil.Ok(t, err)
 	fd, err := desc.CreateFileDescriptorFromSet(fds)
@@ -498,7 +498,7 @@ func TestJSONWellKnownTypeFromFileDescriptorSet(t *testing.T) {
 	md := fd.FindMessage("google.protobuf.Duration")
 	testutil.Neq(t, nil, md)
 
-	dur := &duration.Duration{Seconds: 30303, Nanos: 40404}
+	dur := &durationpb.Duration{Seconds: 30303, Nanos: 40404}
 
 	// marshal duration to JSON
 	jsm := jsonpb.Marshaler{}

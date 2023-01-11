@@ -1,7 +1,6 @@
 package protoparse
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/jhump/protoreflect/internal/testutil"
@@ -389,9 +388,10 @@ func TestBasicValidation(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		errs := newErrorHandler(nil, nil)
-		_ = parseProto("test.proto", strings.NewReader(tc.contents), errs, true, true)
-		err := errs.getError()
+		_, err := Parser{
+			Accessor:              FileContentsFromMap(map[string]string{"test.proto": tc.contents}),
+			ValidateUnlinkedFiles: true,
+		}.ParseFilesButDoNotLink("test.proto")
 		if tc.succeeds {
 			testutil.Ok(t, err, "case #%d should succeed", i)
 		} else {

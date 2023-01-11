@@ -5,14 +5,18 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/golang/protobuf/jsonpb"
-	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	protov1 "github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/internal"
 	_ "github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
@@ -23,10 +27,16 @@ func TestSimpleLink(t *testing.T) {
 
 	b, err := ioutil.ReadFile("../../internal/testprotos/desc_test_complex.protoset")
 	testutil.Ok(t, err)
-	var files dpb.FileDescriptorSet
-	err = proto.Unmarshal(b, &files)
+
+	var reg protoregistry.Types
+	for _, fd := range fds {
+		internal.RegisterExtensionsForFile(&reg, fd.UnwrapFile())
+	}
+	var fdSet descriptorpb.FileDescriptorSet
+	err = proto.UnmarshalOptions{Resolver: &reg}.Unmarshal(b, &fdSet)
 	testutil.Ok(t, err)
-	testutil.Require(t, proto.Equal(files.File[0], fds[0].AsProto()), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(files.File[0]), toString(fds[0].AsProto()))
+
+	testutil.Require(t, proto.Equal(fdSet.File[0], protov1.MessageV2(fds[0].AsProto())), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(fdSet.File[0]), toString(protov1.MessageV2(fds[0].AsProto())))
 }
 
 func TestMultiFileLink(t *testing.T) {
@@ -44,11 +54,11 @@ func TestMultiFileLink(t *testing.T) {
 func TestProto3Optional(t *testing.T) {
 	data, err := ioutil.ReadFile("../../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset")
 	testutil.Ok(t, err)
-	var fdset dpb.FileDescriptorSet
+	var fdset descriptorpb.FileDescriptorSet
 	err = proto.Unmarshal(data, &fdset)
 	testutil.Ok(t, err)
 
-	var descriptorProto *dpb.FileDescriptorProto
+	var descriptorProto *descriptorpb.FileDescriptorProto
 	for _, fd := range fdset.File {
 		// not comparing source code info
 		fd.SourceCodeInfo = nil
@@ -68,7 +78,7 @@ func TestProto3Optional(t *testing.T) {
 
 	fds, err := Parser{
 		ImportPaths: []string{"../../internal/testprotos"},
-		LookupImportProto: func(name string) (*dpb.FileDescriptorProto, error) {
+		LookupImportProto: func(name string) (*descriptorpb.FileDescriptorProto, error) {
 			if name == "google/protobuf/descriptor.proto" {
 				return descriptorProto, nil
 			}
@@ -90,7 +100,7 @@ func checkFiles(t *testing.T, act, exp *desc.FileDescriptor, checked map[string]
 	// remove any source code info from expected value, since actual won't have any
 	exp.AsFileDescriptorProto().SourceCodeInfo = nil
 
-	testutil.Require(t, proto.Equal(exp.AsFileDescriptorProto(), act.AsProto()), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(exp.AsProto()), toString(act.AsProto()))
+	testutil.Require(t, proto.Equal(exp.AsFileDescriptorProto(), protov1.MessageV2(act.AsProto())), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(protov1.MessageV2(exp.AsProto())), toString(protov1.MessageV2(act.AsProto())))
 
 	for i, dep := range act.GetDependencies() {
 		checkFiles(t, dep, exp.GetDependencies()[i], checked)
@@ -98,12 +108,12 @@ func checkFiles(t *testing.T, act, exp *desc.FileDescriptor, checked map[string]
 }
 
 func toString(m proto.Message) string {
-	msh := jsonpb.Marshaler{Indent: "  "}
-	s, err := msh.MarshalToString(m)
+	msh := protojson.MarshalOptions{Indent: "  "}
+	data, err := msh.Marshal(m)
 	if err != nil {
 		panic(err)
 	}
-	return s
+	return string(data)
 }
 
 func TestLinkerValidation(t *testing.T) {
@@ -131,32 +141,34 @@ func TestLinkerValidation(t *testing.T) {
 				"foo.proto":  "import \"foo2.proto\"; message fubar{}",
 				"foo2.proto": "import \"foo.proto\"; message baz{}",
 			},
-			`foo.proto:1:8: cycle found in imports: "foo.proto" -> "foo2.proto" -> "foo.proto"`,
+			`foo.proto:1:8: cycle found in imports: "foo.proto" -> "foo2.proto" -> "foo.proto"
+					|| foo2.proto:1:8: cycle found in imports: "foo2.proto" -> "foo.proto" -> "foo2.proto"`,
 		},
 		{
 			map[string]string{
 				"foo.proto": "enum foo { bar = 1; baz = 2; } enum fu { bar = 1; baz = 2; }",
 			},
-			`foo.proto:1:42: duplicate symbol bar: already defined as an enum value; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum`,
+			`foo.proto:1:42: symbol "bar" already defined at foo.proto:1:12; protobuf uses C++ scoping rules for enum values, so they exist in the scope enclosing the enum`,
 		},
 		{
 			map[string]string{
 				"foo.proto": "message foo {} enum foo { V = 0; }",
 			},
-			"foo.proto:1:16: duplicate symbol foo: already defined as a message",
+			`foo.proto:1:21: symbol "foo" already defined at foo.proto:1:9`,
 		},
 		{
 			map[string]string{
 				"foo.proto": "message foo { optional string a = 1; optional string a = 2; }",
 			},
-			"foo.proto:1:38: duplicate symbol foo.a: already defined as a field",
+			`foo.proto:1:54: symbol "foo.a" already defined at foo.proto:1:31`,
 		},
 		{
 			map[string]string{
 				"foo.proto":  "message foo {}",
 				"foo2.proto": "enum foo { V = 0; }",
 			},
-			"foo2.proto:1:1: duplicate symbol foo: already defined as a message in \"foo.proto\"",
+			`foo.proto:1:9: symbol "foo" already defined at foo2.proto:1:6
+					|| foo2.proto:1:6: symbol "foo" already defined at foo.proto:1:9`,
 		},
 		{
 			map[string]string{
@@ -174,7 +186,7 @@ func TestLinkerValidation(t *testing.T) {
 			map[string]string{
 				"foo.proto": "message foo { extensions 1 to 2; } extend foo { optional string a = 1; } extend foo { optional int32 b = 1; }",
 			},
-			"foo.proto:1:106: field b: duplicate extension: a and b are both using tag 1",
+			"foo.proto:1:106: extension with tag 1 for message foo already defined at foo.proto:1:69",
 		},
 		{
 			map[string]string{
@@ -185,7 +197,7 @@ func TestLinkerValidation(t *testing.T) {
 					message DescriptorProto { }
 				`,
 			},
-			`google/protobuf/descriptor.proto: duplicate symbol google.protobuf.DescriptorProto: already defined as a message in "foo.proto"`,
+			`foo.proto:5:49: symbol "google.protobuf.DescriptorProto" already defined at google/protobuf/descriptor.proto`,
 		},
 		{
 			map[string]string{
@@ -215,7 +227,7 @@ func TestLinkerValidation(t *testing.T) {
 			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ extensions 1; } extend foobar { optional string a = 2; }",
 			},
-			"foo.proto:1:85: field fu.baz.a: tag 2 is not in valid range for extended type fu.baz.foobar",
+			"foo.proto:1:85: extension fu.baz.a: tag 2 is not in valid range for extended type fu.baz.foobar",
 		},
 		{
 			map[string]string{
@@ -390,7 +402,7 @@ func TestLinkerValidation(t *testing.T) {
 					"option (f) = { a: \"a\" };\n" +
 					"option (f) = { a: \"b\" };",
 			},
-			"foo.proto:6:8: option (f): non-repeated option field f already set",
+			"foo.proto:6:8: option (f): non-repeated option field (f) already set",
 		},
 		{
 			map[string]string{
@@ -445,7 +457,7 @@ func TestLinkerValidation(t *testing.T) {
 			map[string]string{
 				"foo.proto": "message Foo { extensions 1 to max; } extend Foo { optional int32 bar = 536870912; }",
 			},
-			"foo.proto:1:72: field bar: tag 536870912 is not in valid range for extended type Foo",
+			"foo.proto:1:72: extension bar: tag 536870912 is not in valid range for extended type Foo",
 		},
 		{
 			map[string]string{
@@ -583,7 +595,7 @@ func TestLinkerValidation(t *testing.T) {
 					"  }\n" +
 					"}",
 			},
-			`a.proto:4:5: duplicate symbol m.z: already defined as a oneof`,
+			`a.proto:4:11: symbol "m.z" already defined at a.proto:3:9`,
 		},
 		{
 			map[string]string{
@@ -593,7 +605,7 @@ func TestLinkerValidation(t *testing.T) {
 					"  oneof z{int64 b=2;}\n" +
 					"}",
 			},
-			`a.proto:3:3: duplicate symbol m.z: already defined as a oneof`,
+			`a.proto:4:9: symbol "m.z" already defined at a.proto:3:10`,
 		},
 		{
 			map[string]string{
@@ -628,7 +640,7 @@ func TestLinkerValidation(t *testing.T) {
 					"extend google.protobuf.MessageOptions { optional a msga = 10000; }\n" +
 					"message c {\n" +
 					"  extend a { optional b b = 1; }\n" +
-					"  extend b { repeated int32 i = 1; repeated float f = 2; }\n" +
+					"  extend foo.bar.b { repeated int32 i = 1; repeated float f = 2; }\n" +
 					"  option (msga) = {\n" +
 					"    [foo.bar.c.b] {\n" +
 					"      [foo.bar.c.i]: 123\n" +
@@ -718,7 +730,7 @@ func TestLinkerValidation(t *testing.T) {
 					"  oneof z{int64 b=2;}\n" +
 					"}",
 			},
-			`a.proto:4:3: duplicate symbol m.z: already defined as a oneof`,
+			`a.proto:4:9: symbol "m.z" already defined at a.proto:3:9`,
 		},
 		{
 			map[string]string{
@@ -1200,8 +1212,19 @@ func TestLinkerValidation(t *testing.T) {
 			}
 		} else if err == nil {
 			t.Errorf("case %d: expecting validation error %q; instead got no error", i, tc.errMsg)
-		} else if err.Error() != tc.errMsg {
-			t.Errorf("case %d: expecting validation error %q; instead got: %q", i, tc.errMsg, err)
+		} else {
+			options := strings.Split(tc.errMsg, "||")
+			matched := false
+			for i := range options {
+				options[i] = strings.TrimSpace(options[i])
+				if err.Error() == options[i] {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				t.Errorf("case %d: expecting validation error %q; instead got: %q", i, strings.Join(options, " || "), err)
+			}
 		}
 	}
 }
@@ -1342,17 +1365,27 @@ func TestSyntheticOneOfCollisions(t *testing.T) {
 	}.ParseFiles("foo1.proto", "foo2.proto")
 
 	testutil.Eq(t, ErrInvalidSource, err)
-
-	expected := []string{
-		`foo2.proto:2:1: duplicate symbol Foo: already defined as a message in "foo1.proto"`,
-		`foo2.proto:3:3: duplicate symbol Foo._bar: already defined as a oneof in "foo1.proto"`,
-		`foo2.proto:3:3: duplicate symbol Foo.bar: already defined as a field in "foo1.proto"`,
+	expectedOption1 := []string{
+		`foo1.proto:2:9: symbol "Foo" already defined at foo2.proto:2:9`,
+		`foo1.proto:3:19: symbol "Foo.bar" already defined at foo2.proto:3:19`,
+		`foo1.proto:3:19: symbol "Foo._bar" already defined at foo2.proto:3:19`,
 	}
+	expectedOption2 := []string{
+		`foo2.proto:2:9: symbol "Foo" already defined at foo1.proto:2:9`,
+		`foo2.proto:3:19: symbol "Foo.bar" already defined at foo1.proto:3:19`,
+		`foo2.proto:3:19: symbol "Foo._bar" already defined at foo1.proto:3:19`,
+	}
+
 	var actual []string
 	for _, err := range errs {
 		actual = append(actual, err.Error())
 	}
-	testutil.Eq(t, actual, expected)
+	// Errors expected depend on which file is compiled first. This is mostly deterministic
+	// with parallelism of 1, but some things (like enabling -race in tests) can change the
+	// expected order.
+	if !reflect.DeepEqual(expectedOption1, actual) && !reflect.DeepEqual(expectedOption2, actual) {
+		t.Errorf("got errors:\n:%v\nbut wanted EITHER:\n%v\n  OR:\n%v", actual, expectedOption1, expectedOption2)
+	}
 }
 
 func TestCustomJSONNameWarnings(t *testing.T) {
@@ -1511,26 +1544,5 @@ func TestCustomJSONNameWarnings(t *testing.T) {
 				t.Errorf("case %d: expecting warning %q; instead got: %v", i, tc.warning, warnings)
 			}
 		}
-	}
-}
-
-func TestCanonicalEnumName(t *testing.T) {
-	testCases := map[string]string{
-		"FOO_BAR___foo_bar_baz":     "FooBarBaz",
-		"foo__bar__baz":             "Baz",
-		"_foo_bar_":                 "FooBar",
-		"__F_O_O_B_A_R_FOO_BAR_BAZ": "FooBarBaz",
-		"FooBar_FooBarBaz":          "Foobarbaz",
-		"FOOBAR_BAZ":                "Baz",
-		"BAZ":                       "Baz",
-		"B_A_Z":                     "BAZ",
-		"___fu_bar_baz__":           "FuBarBaz",
-		"foobarbaz":                 "Baz",
-		"FOOBARFOOBARBAZ":           "Foobarbaz",
-	}
-	const enumName = "FooBar"
-	for k, v := range testCases {
-		name := canonicalEnumValueName(k, enumName)
-		testutil.Eq(t, name, v, "enum value name %v (in enum %s) resulted in wrong canonical name")
 	}
 }

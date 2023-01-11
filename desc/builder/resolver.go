@@ -5,15 +5,20 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/descriptorpb"
+
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/internal"
 	"github.com/jhump/protoreflect/dynamic"
 )
 
 type dependencies struct {
 	descs map[*desc.FileDescriptor]struct{}
-	exts  dynamic.ExtensionRegistry
+	res   protoregistry.Types
 }
 
 func newDependencies() *dependencies {
@@ -28,7 +33,7 @@ func (d *dependencies) add(fd *desc.FileDescriptor) {
 		return
 	}
 	d.descs[fd] = struct{}{}
-	d.exts.AddExtensionsFromFile(fd)
+	internal.RegisterExtensionsForFile(&d.res, fd.UnwrapFile())
 }
 
 // dependencyResolver is the work-horse for converting a tree of builders into a
@@ -174,7 +179,7 @@ func isDuplicateDependency(dep *desc.FileDescriptor, depMap map[string]*desc.Fil
 	return true, nil
 }
 
-func setSourceCodeInfo(fdp *descriptor.FileDescriptorProto, info *descriptor.SourceCodeInfo) (reset func()) {
+func setSourceCodeInfo(fdp *descriptorpb.FileDescriptorProto, info *descriptorpb.SourceCodeInfo) (reset func()) {
 	prevSourceCodeInfo := fdp.SourceCodeInfo
 	fdp.SourceCodeInfo = info
 	return func() { fdp.SourceCodeInfo = prevSourceCodeInfo }
@@ -421,35 +426,69 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts *dynam
 		return nil
 	}
 
-	msgName := proto.MessageName(opts)
+	ref := opts.ProtoReflect()
+	tags := map[int32]protoreflect.ExtensionType{}
+	proto.RangeExtensions(opts, func(xt protoreflect.ExtensionType, _ interface{}) bool {
+		num := int32(xt.TypeDescriptor().Number())
+		tags[num] = xt
+		return true
+	})
 
-	extdescs, err := proto.ExtensionDescs(opts)
-	if err != nil {
-		return err
+	unk := ref.GetUnknown()
+	for len(unk) > 0 {
+		v, n := protowire.ConsumeVarint(unk)
+		if n < 0 {
+			break
+		}
+		unk = unk[n:]
+
+		num, t := protowire.DecodeTag(v)
+		if _, ok := tags[int32(num)]; !ok {
+			tags[int32(num)] = nil
+		}
+
+		switch t {
+		case protowire.VarintType:
+			_, n = protowire.ConsumeVarint(unk)
+		case protowire.Fixed64Type:
+			_, n = protowire.ConsumeFixed64(unk)
+		case protowire.BytesType:
+			_, n = protowire.ConsumeBytes(unk)
+		case protowire.StartGroupType:
+			_, n = protowire.ConsumeGroup(num, unk)
+		case protowire.EndGroupType:
+			// invalid encoding
+			break
+		case protowire.Fixed32Type:
+			_, n = protowire.ConsumeFixed32(unk)
+		}
+		if n < 0 {
+			break
+		}
+		unk = unk[n:]
 	}
 
-	for _, ed := range extdescs {
+	msgName := string(proto.MessageName(opts))
+	for tag, xt := range tags {
 		// see if known dependencies have this option
-		extd := deps.exts.FindExtension(msgName, ed.Field)
-		if extd != nil {
+		if _, err := deps.res.FindExtensionByNumber(protoreflect.FullName(msgName), protoreflect.FieldNumber(tag)); err == nil {
 			// yep! nothing else to do
 			continue
 		}
 		// see if this extension is defined in *this* builder
-		if findExtension(root, msgName, ed.Field) {
+		if findExtension(root, msgName, tag) {
 			// yep!
 			continue
 		}
 		// see if configured extension registry knows about it
-		extd = r.opts.Extensions.FindExtension(msgName, ed.Field)
-		if extd != nil {
+		if extd := r.opts.Extensions.FindExtension(string(msgName), int32(tag)); extd != nil {
 			// extension registry recognized it!
 			deps.add(extd.GetFile())
 			continue
 		}
 		// see if given file extensions knows about it
 		if fileExts != nil {
-			extd = fileExts.FindExtension(msgName, ed.Field)
+			extd := fileExts.FindExtension(msgName, tag)
 			if extd != nil {
 				// file extensions recognized it!
 				deps.add(extd.GetFile())
@@ -457,21 +496,19 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts *dynam
 			}
 		}
 
-		if ed.Filename != "" {
-			// if filename is filled in, then this extension is a known
-			// extension (registered in proto package)
-			fd, err := desc.LoadFileDescriptor(ed.Filename)
+		if xt != nil {
+			// known extension? add its file to builder's deps
+			fd, err := desc.WrapFile(xt.TypeDescriptor().ParentFile())
 			if err != nil {
 				return err
 			}
 			deps.add(fd)
 			continue
-
 		}
 
 		if r.opts.RequireInterpretedOptions {
 			// we require options to be interpreted but are not able to!
-			return fmt.Errorf("could not interpret custom option for %s, tag %d", msgName, ed.Field)
+			return fmt.Errorf("could not interpret custom option for %s, tag %d", msgName, tag)
 		}
 	}
 	return nil
