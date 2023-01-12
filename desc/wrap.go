@@ -18,6 +18,8 @@ type DescriptorWrapper interface {
 	Unwrap() protoreflect.Descriptor
 }
 
+// WrapDescriptor wraps the given descriptor, returning a desc.Descriptor
+// value that represents the same element.
 func WrapDescriptor(d protoreflect.Descriptor) (Descriptor, error) {
 	return wrapDescriptor(d, noopCache{})
 }
@@ -45,6 +47,8 @@ func wrapDescriptor(d protoreflect.Descriptor, cache descriptorCache) (Descripto
 	}
 }
 
+// WrapFiles wraps the given file descriptors, returning a slice of *desc.FileDescriptor
+// values that represent the same files.
 func WrapFiles(d []protoreflect.FileDescriptor) ([]*FileDescriptor, error) {
 	cache := mapCache{}
 	results := make([]*FileDescriptor, len(d))
@@ -58,6 +62,8 @@ func WrapFiles(d []protoreflect.FileDescriptor) ([]*FileDescriptor, error) {
 	return results, nil
 }
 
+// WrapFile wraps the given file descriptor, returning a *desc.FileDescriptor
+// value that represents the same file.
 func WrapFile(d protoreflect.FileDescriptor) (*FileDescriptor, error) {
 	return wrapFile(d, noopCache{})
 }
@@ -67,6 +73,8 @@ func wrapFile(d protoreflect.FileDescriptor, cache descriptorCache) (*FileDescri
 	return convertFile(d, fdp, cache)
 }
 
+// WrapMessage wraps the given message descriptor, returning a *desc.MessageDescriptor
+// value that represents the same message.
 func WrapMessage(d protoreflect.MessageDescriptor) (*MessageDescriptor, error) {
 	return wrapMessage(d, noopCache{})
 }
@@ -86,6 +94,8 @@ func wrapMessage(d protoreflect.MessageDescriptor, cache descriptorCache) (*Mess
 	}
 }
 
+// WrapField wraps the given field descriptor, returning a *desc.FieldDescriptor
+// value that represents the same field.
 func WrapField(d protoreflect.FieldDescriptor) (*FieldDescriptor, error) {
 	return wrapField(d, noopCache{})
 }
@@ -108,6 +118,8 @@ func wrapField(d protoreflect.FieldDescriptor, cache descriptorCache) (*FieldDes
 	}
 }
 
+// WrapOneOf wraps the given oneof descriptor, returning a *desc.OneOfDescriptor
+// value that represents the same oneof.
 func WrapOneOf(d protoreflect.OneofDescriptor) (*OneOfDescriptor, error) {
 	return wrapOneOf(d, noopCache{})
 }
@@ -123,6 +135,8 @@ func wrapOneOf(d protoreflect.OneofDescriptor, cache descriptorCache) (*OneOfDes
 	return nil, fmt.Errorf("oneof has unexpected parent type: %T", parent)
 }
 
+// WrapEnum wraps the given enum descriptor, returning a *desc.EnumDescriptor
+// value that represents the same enum.
 func WrapEnum(d protoreflect.EnumDescriptor) (*EnumDescriptor, error) {
 	return wrapEnum(d, noopCache{})
 }
@@ -142,6 +156,8 @@ func wrapEnum(d protoreflect.EnumDescriptor, cache descriptorCache) (*EnumDescri
 	}
 }
 
+// WrapEnumValue wraps the given enum value descriptor, returning a *desc.EnumValueDescriptor
+// value that represents the same enum value.
 func WrapEnumValue(d protoreflect.EnumValueDescriptor) (*EnumValueDescriptor, error) {
 	return wrapEnumValue(d, noopCache{})
 }
@@ -157,6 +173,8 @@ func wrapEnumValue(d protoreflect.EnumValueDescriptor, cache descriptorCache) (*
 	return nil, fmt.Errorf("enum value has unexpected parent type: %T", parent)
 }
 
+// WrapService wraps the given service descriptor, returning a *desc.ServiceDescriptor
+// value that represents the same service.
 func WrapService(d protoreflect.ServiceDescriptor) (*ServiceDescriptor, error) {
 	return wrapService(d, noopCache{})
 }
@@ -172,6 +190,8 @@ func wrapService(d protoreflect.ServiceDescriptor, cache descriptorCache) (*Serv
 	return nil, fmt.Errorf("service has unexpected parent type: %T", parent)
 }
 
+// WrapMethod wraps the given method descriptor, returning a *desc.MethodDescriptor
+// value that represents the same method.
 func WrapMethod(d protoreflect.MethodDescriptor) (*MethodDescriptor, error) {
 	return wrapMethod(d, noopCache{})
 }

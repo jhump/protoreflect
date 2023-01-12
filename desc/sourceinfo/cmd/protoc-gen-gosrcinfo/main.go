@@ -10,9 +10,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/jhump/gopoet"
 	"github.com/jhump/goprotoc/plugins"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/pluginpb"
 
 	"github.com/jhump/protoreflect/desc"
