@@ -49,9 +49,9 @@ func (c mapCache) put(key protoreflect.Descriptor, val Descriptor) {
 
 type noopCache struct{}
 
-func (noopCache) get(d protoreflect.Descriptor) Descriptor {
+func (noopCache) get(protoreflect.Descriptor) Descriptor {
 	return nil
 }
 
-func (noopCache) put(key protoreflect.Descriptor, val Descriptor) {
+func (noopCache) put(protoreflect.Descriptor, Descriptor) {
 }

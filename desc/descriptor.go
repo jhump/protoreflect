@@ -64,10 +64,14 @@ type FileDescriptor struct {
 	sourceInfoRecomputeFunc
 }
 
+// Unwrap returns the underlying protoreflect.Descriptor. Most usages will be more
+// interested in UnwrapFile, which has a more specific return type. This generic
+// version is present to satisfy the DescriptorWrapper interface.
 func (fd *FileDescriptor) Unwrap() protoreflect.Descriptor {
 	return fd.wrapped
 }
 
+// UnwrapFile returns the underlying protoreflect.FileDescriptor.
 func (fd *FileDescriptor) UnwrapFile() protoreflect.FileDescriptor {
 	return fd.wrapped
 }
@@ -284,10 +288,14 @@ type MessageDescriptor struct {
 	jsonNames      jsonNameMap
 }
 
+// Unwrap returns the underlying protoreflect.Descriptor. Most usages will be more
+// interested in UnwrapMessage, which has a more specific return type. This generic
+// version is present to satisfy the DescriptorWrapper interface.
 func (md *MessageDescriptor) Unwrap() protoreflect.Descriptor {
 	return md.wrapped
 }
 
+// UnwrapMessage returns the underlying protoreflect.MessageDescriptor.
 func (md *MessageDescriptor) UnwrapMessage() protoreflect.MessageDescriptor {
 	return md.wrapped
 }
@@ -555,10 +563,14 @@ type FieldDescriptor struct {
 	def            memoizedDefault
 }
 
+// Unwrap returns the underlying protoreflect.Descriptor. Most usages will be more
+// interested in UnwrapField, which has a more specific return type. This generic
+// version is present to satisfy the DescriptorWrapper interface.
 func (fd *FieldDescriptor) Unwrap() protoreflect.Descriptor {
 	return fd.wrapped
 }
 
+// UnwrapField returns the underlying protoreflect.FieldDescriptor.
 func (fd *FieldDescriptor) UnwrapField() protoreflect.FieldDescriptor {
 	return fd.wrapped
 }
@@ -1153,10 +1165,14 @@ type EnumDescriptor struct {
 	sourceInfoPath []int32
 }
 
+// Unwrap returns the underlying protoreflect.Descriptor. Most usages will be more
+// interested in UnwrapEnum, which has a more specific return type. This generic
+// version is present to satisfy the DescriptorWrapper interface.
 func (ed *EnumDescriptor) Unwrap() protoreflect.Descriptor {
 	return ed.wrapped
 }
 
+// UnwrapEnum returns the underlying protoreflect.EnumDescriptor.
 func (ed *EnumDescriptor) UnwrapEnum() protoreflect.EnumDescriptor {
 	return ed.wrapped
 }
@@ -1306,10 +1322,14 @@ type EnumValueDescriptor struct {
 	sourceInfoPath []int32
 }
 
+// Unwrap returns the underlying protoreflect.Descriptor. Most usages will be more
+// interested in UnwrapEnumValue, which has a more specific return type. This generic
+// version is present to satisfy the DescriptorWrapper interface.
 func (vd *EnumValueDescriptor) Unwrap() protoreflect.Descriptor {
 	return vd.wrapped
 }
 
+// UnwrapEnumValue returns the underlying protoreflect.EnumValueDescriptor.
 func (vd *EnumValueDescriptor) UnwrapEnumValue() protoreflect.EnumValueDescriptor {
 	return vd.wrapped
 }
@@ -1415,10 +1435,14 @@ type ServiceDescriptor struct {
 	sourceInfoPath []int32
 }
 
+// Unwrap returns the underlying protoreflect.Descriptor. Most usages will be more
+// interested in UnwrapService, which has a more specific return type. This generic
+// version is present to satisfy the DescriptorWrapper interface.
 func (sd *ServiceDescriptor) Unwrap() protoreflect.Descriptor {
 	return sd.wrapped
 }
 
+// UnwrapService returns the underlying protoreflect.ServiceDescriptor.
 func (sd *ServiceDescriptor) UnwrapService() protoreflect.ServiceDescriptor {
 	return sd.wrapped
 }
@@ -1538,10 +1562,14 @@ type MethodDescriptor struct {
 	sourceInfoPath []int32
 }
 
+// Unwrap returns the underlying protoreflect.Descriptor. Most usages will be more
+// interested in UnwrapMethod, which has a more specific return type. This generic
+// version is present to satisfy the DescriptorWrapper interface.
 func (md *MethodDescriptor) Unwrap() protoreflect.Descriptor {
 	return md.wrapped
 }
 
+// UnwrapMethod returns the underlying protoreflect.MethodDescriptor.
 func (md *MethodDescriptor) UnwrapMethod() protoreflect.MethodDescriptor {
 	return md.wrapped
 }
@@ -1676,10 +1704,14 @@ type OneOfDescriptor struct {
 	sourceInfoPath []int32
 }
 
+// Unwrap returns the underlying protoreflect.Descriptor. Most usages will be more
+// interested in UnwrapOneOf, which has a more specific return type. This generic
+// version is present to satisfy the DescriptorWrapper interface.
 func (od *OneOfDescriptor) Unwrap() protoreflect.Descriptor {
 	return od.wrapped
 }
 
+// UnwrapOneOf returns the underlying protoreflect.OneofDescriptor.
 func (od *OneOfDescriptor) UnwrapOneOf() protoreflect.OneofDescriptor {
 	return od.wrapped
 }
