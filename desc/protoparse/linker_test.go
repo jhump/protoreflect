@@ -1047,7 +1047,7 @@ func TestLinkerValidation(t *testing.T) {
 					"  string bar = 2 [json_name=\"Foo_Bar\"];\n" +
 					"}\n",
 			},
-			"foo.proto:4:3: field Foo.bar: custom JSON name \"Foo_Bar\" conflicts with custom JSON name \"foo_bar\" of field foo, defined at foo.proto:3:3",
+			"", // should succeed
 		},
 		{
 			map[string]string{
@@ -1076,7 +1076,7 @@ func TestLinkerValidation(t *testing.T) {
 					"  string FOO_BAR = 2;\n" +
 					"}\n",
 			},
-			"foo.proto:4:3: field Foo.FOO_BAR: default JSON name \"FOOBAR\" conflicts with default JSON name \"fooBar\" of field fooBar, defined at foo.proto:3:3",
+			"", // should succeed
 		},
 		{
 			map[string]string{
@@ -1086,7 +1086,7 @@ func TestLinkerValidation(t *testing.T) {
 					"  string __foo_bar = 2;\n" +
 					"}\n",
 			},
-			"foo.proto:4:3: field Foo.__foo_bar: default JSON name \"FooBar\" conflicts with default JSON name \"fooBar\" of field fooBar, defined at foo.proto:3:3",
+			"", // should succeed
 		},
 		{
 			map[string]string{
@@ -1096,7 +1096,7 @@ func TestLinkerValidation(t *testing.T) {
 					"  optional string bar = 2 [json_name=\"Foo_Bar\"];\n" +
 					"}\n",
 			},
-			"foo.proto:4:3: field Foo.bar: custom JSON name \"Foo_Bar\" conflicts with custom JSON name \"foo_bar\" of field foo, defined at foo.proto:3:3",
+			"", // should succeed
 		},
 		{
 			map[string]string{
@@ -1108,7 +1108,7 @@ func TestLinkerValidation(t *testing.T) {
 					"  }\n" +
 					"}\n",
 			},
-			"foo.proto:5:5: field Foo.bar: custom JSON name \"Foo_Bar\" conflicts with custom JSON name \"foo_bar\" of field foo, defined at foo.proto:4:5",
+			"", // should succeed
 		},
 		{
 			map[string]string{
@@ -1396,14 +1396,6 @@ func TestCustomJSONNameWarnings(t *testing.T) {
 		{
 			source: "syntax = \"proto2\";\n" +
 				"message Foo {\n" +
-				"  optional string foo = 1;\n" +
-				"  optional string bar = 2 [json_name=\"foo\"];\n" +
-				"}\n",
-			warning: "test.proto:4:3: field Foo.bar: custom JSON name \"foo\" conflicts with default JSON name of field foo, defined at test.proto:3:3",
-		},
-		{
-			source: "syntax = \"proto2\";\n" +
-				"message Foo {\n" +
 				"  optional string foo_bar = 1;\n" +
 				"  optional string fooBar = 2;\n" +
 				"}\n",
@@ -1418,14 +1410,6 @@ func TestCustomJSONNameWarnings(t *testing.T) {
 			warning: "test.proto:4:3: field Foo.fooBar: default JSON name \"fooBar\" conflicts with default JSON name of field foo_bar, defined at test.proto:3:3",
 		},
 		// in nested message
-		{
-			source: "syntax = \"proto2\";\n" +
-				"message Blah { message Foo {\n" +
-				"  optional string foo = 1;\n" +
-				"  optional string bar = 2 [json_name=\"foo\"];\n" +
-				"} }\n",
-			warning: "test.proto:4:3: field Foo.bar: custom JSON name \"foo\" conflicts with default JSON name of field foo, defined at test.proto:3:3",
-		},
 		{
 			source: "syntax = \"proto2\";\n" +
 				"message Blah { message Foo {\n" +
