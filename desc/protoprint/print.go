@@ -1985,10 +1985,13 @@ func uninterpretedToOptions(uninterp []*descriptorpb.UninterpretedOption) []opti
 }
 
 func optionsAsElementAddrs(optionsTag int32, order int, opts map[int32][]option) []elementAddr {
-	var optAddrs []elementAddr
+	optAddrs := make([]elementAddr, 0, len(opts))
 	for tag := range opts {
 		optAddrs = append(optAddrs, elementAddr{elementType: optionsTag, elementIndex: int(tag), order: order})
 	}
+	// We want stable output. So, if the printer can't sort these a better way,
+	// they'll at least be in a deterministic order (by name).
+	sort.Sort(optionsByName{addrs: optAddrs, opts: opts})
 	return optAddrs
 }
 
@@ -2390,6 +2393,25 @@ func (cso customSortOrder) Less(i, j int) bool {
 	ei := asElement(cso.at(cso.addrs[i]))
 	ej := asElement(cso.at(cso.addrs[j]))
 	return cso.less(ei, ej)
+}
+
+type optionsByName struct {
+	addrs []elementAddr
+	opts  map[int32][]option
+}
+
+func (o optionsByName) Len() int {
+	return len(o.addrs)
+}
+
+func (o optionsByName) Less(i, j int) bool {
+	oi := o.opts[int32(o.addrs[i].elementIndex)]
+	oj := o.opts[int32(o.addrs[j].elementIndex)]
+	return optionLess(oi, oj)
+}
+
+func (o optionsByName) Swap(i, j int) {
+	o.addrs[i], o.addrs[j] = o.addrs[j], o.addrs[i]
 }
 
 func optionLess(i, j []option) bool {

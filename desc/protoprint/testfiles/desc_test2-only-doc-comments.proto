@@ -1,7 +1,5 @@
 syntax = "proto2";
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
-
 package testprotos;
 
 import "desc_test1.proto";
@@ -9,6 +7,20 @@ import "desc_test1.proto";
 import "pkg/desc_test_pkg.proto";
 
 import "nopkg/desc_test_nopkg.proto";
+
+option cc_enable_arenas = true;
+
+option csharp_namespace = "jhump.protoreflect.testprotos";
+
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
+option java_generate_equals_and_hash = true;
+
+option java_multiple_files = true;
+
+option java_package = "com.github.jhump.protoreflect.internal.testprotos";
+
+option ruby_package = "protoreflect-testprotos";
 
 message Frobnitz {
   optional TestMessage a = 1;
