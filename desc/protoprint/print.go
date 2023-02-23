@@ -1985,10 +1985,15 @@ func uninterpretedToOptions(uninterp []*descriptorpb.UninterpretedOption) []opti
 }
 
 func optionsAsElementAddrs(optionsTag int32, order int, opts map[int32][]option) []elementAddr {
-	var optAddrs []elementAddr
+	optAddrs := make([]elementAddr, 0, len(opts))
 	for tag := range opts {
 		optAddrs = append(optAddrs, elementAddr{elementType: optionsTag, elementIndex: int(tag), order: order})
 	}
+	// We want stable output. So in case the printer can't sort these a better way, let's
+	// at least store them in a deterministic order (by tag number).
+	sort.Slice(optAddrs, func(i, j int) bool {
+		return optAddrs[i].elementIndex < optAddrs[j].elementIndex
+	})
 	return optAddrs
 }
 

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
@@ -87,8 +88,14 @@ func TestPrinter(t *testing.T) {
 		fds[i] = fd
 	}
 	// extra descriptor that has no source info
-	fd, err := desc.LoadFileDescriptor("desc_test2.proto")
+	// NB: We can't use desc.LoadFileDescriptor here because that, under the hood, will get
+	//     source code info from the desc/sourceinfo package! So explicitly load the version
+	//     from the underlying registry, which will NOT have source code info.
+	underlyingFd, err := protoregistry.GlobalFiles.FindFileByPath("desc_test2.proto")
 	testutil.Ok(t, err)
+	fd, err := desc.WrapFile(underlyingFd)
+	testutil.Ok(t, err)
+	testutil.Require(t, fd.AsFileDescriptorProto().SourceCodeInfo == nil)
 	fds[len(files)] = fd
 
 	for _, fd := range fds {
