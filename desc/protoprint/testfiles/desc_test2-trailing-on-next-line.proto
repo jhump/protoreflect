@@ -8,17 +8,17 @@ import "pkg/desc_test_pkg.proto";
 
 import "nopkg/desc_test_nopkg.proto";
 
-option java_package = "com.github.jhump.protoreflect.internal.testprotos";
+option cc_enable_arenas = true;
 
-option java_multiple_files = true;
+option csharp_namespace = "jhump.protoreflect.testprotos";
 
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 option java_generate_equals_and_hash = true;
 
-option cc_enable_arenas = true;
+option java_multiple_files = true;
 
-option csharp_namespace = "jhump.protoreflect.testprotos";
+option java_package = "com.github.jhump.protoreflect.internal.testprotos";
 
 option ruby_package = "protoreflect-testprotos";
 
