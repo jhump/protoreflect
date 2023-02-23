@@ -44,7 +44,19 @@ message Frobnitz {
   optional TestMessage a = 1;
 }
 
+option ruby_package = "protoreflect-testprotos";
+
+option java_package = "com.github.jhump.protoreflect.internal.testprotos";
+
+option java_multiple_files = true;
+
+option java_generate_equals_and_hash = true;
+
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
+option csharp_namespace = "jhump.protoreflect.testprotos";
+
+option cc_enable_arenas = true;
 
 import "pkg/desc_test_pkg.proto";
 

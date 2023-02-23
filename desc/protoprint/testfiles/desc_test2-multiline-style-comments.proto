@@ -2,6 +2,18 @@ syntax = "proto2";
 
 option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
+option java_generate_equals_and_hash = true;
+
+option java_multiple_files = true;
+
+option java_package = "com.github.jhump.protoreflect.internal.testprotos";
+
+option cc_enable_arenas = true;
+
+option ruby_package = "protoreflect-testprotos";
+
+option csharp_namespace = "jhump.protoreflect.testprotos";
+
 package testprotos;
 
 import "desc_test1.proto";
