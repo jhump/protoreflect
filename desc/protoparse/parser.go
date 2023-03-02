@@ -3,8 +3,6 @@ package protoparse
 import (
 	"context"
 	"fmt"
-	"github.com/bufbuild/protocompile/linker"
-	"github.com/bufbuild/protocompile/walk"
 	"io"
 	"io/ioutil"
 	"os"
@@ -14,11 +12,13 @@ import (
 
 	"github.com/bufbuild/protocompile"
 	ast2 "github.com/bufbuild/protocompile/ast"
+	"github.com/bufbuild/protocompile/linker"
 	"github.com/bufbuild/protocompile/options"
 	"github.com/bufbuild/protocompile/parser"
 	"github.com/bufbuild/protocompile/protoutil"
 	"github.com/bufbuild/protocompile/reporter"
 	"github.com/bufbuild/protocompile/sourceinfo"
+	"github.com/bufbuild/protocompile/walk"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"

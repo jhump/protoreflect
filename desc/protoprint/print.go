@@ -2598,7 +2598,7 @@ func (p *Printer) printComment(comments string, w *writer, indent int, forceNext
 	}
 
 	for i, l := range lines {
-		if !strings.HasPrefix(l, " ") {
+		if l != "" && !strings.HasPrefix(l, " ") {
 			l = " " + l
 		}
 		p.maybeIndent(w, indent, i > 0)
