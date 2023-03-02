@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -25,7 +25,7 @@ func TestSimpleLink(t *testing.T) {
 	fds, err := Parser{ImportPaths: []string{"../../internal/testprotos"}}.ParseFiles("desc_test_complex.proto")
 	testutil.Ok(t, err)
 
-	b, err := ioutil.ReadFile("../../internal/testprotos/desc_test_complex.protoset")
+	b, err := os.ReadFile("../../internal/testprotos/desc_test_complex.protoset")
 	testutil.Ok(t, err)
 
 	var reg protoregistry.Types
@@ -52,7 +52,7 @@ func TestMultiFileLink(t *testing.T) {
 }
 
 func TestProto3Optional(t *testing.T) {
-	data, err := ioutil.ReadFile("../../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset")
+	data, err := os.ReadFile("../../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset")
 	testutil.Ok(t, err)
 	var fdset descriptorpb.FileDescriptorSet
 	err = proto.Unmarshal(data, &fdset)
@@ -1199,7 +1199,7 @@ func TestLinkerValidation(t *testing.T) {
 			if !ok {
 				return nil, fmt.Errorf("file not found: %s", filename)
 			}
-			return ioutil.NopCloser(strings.NewReader(f)), nil
+			return io.NopCloser(strings.NewReader(f)), nil
 		}
 		names := make([]string, 0, len(tc.input))
 		for k := range tc.input {
@@ -1259,7 +1259,7 @@ func TestProto3Enums(t *testing.T) {
 				default:
 					return nil, fmt.Errorf("file not found: %s", filename)
 				}
-				return ioutil.NopCloser(strings.NewReader(data)), nil
+				return io.NopCloser(strings.NewReader(data)), nil
 			}
 			_, err := Parser{Accessor: acc}.ParseFiles("f1.proto", "f2.proto")
 
@@ -1305,7 +1305,7 @@ message ReferencesFooOption {
 		if !ok {
 			return nil, fmt.Errorf("file not found: %s", filename)
 		}
-		return ioutil.NopCloser(strings.NewReader(f)), nil
+		return io.NopCloser(strings.NewReader(f)), nil
 	}
 	names := make([]string, 0, len(input))
 	for k := range input {
@@ -1347,7 +1347,7 @@ func TestSyntheticOneOfCollisions(t *testing.T) {
 		if !ok {
 			return nil, fmt.Errorf("file not found: %s", filename)
 		}
-		return ioutil.NopCloser(strings.NewReader(f)), nil
+		return io.NopCloser(strings.NewReader(f)), nil
 	}
 
 	var errs []error
@@ -1502,7 +1502,7 @@ func TestCustomJSONNameWarnings(t *testing.T) {
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
 			if filename == "test.proto" {
-				return ioutil.NopCloser(strings.NewReader(tc.source)), nil
+				return io.NopCloser(strings.NewReader(tc.source)), nil
 			}
 			return nil, fmt.Errorf("file not found: %s", filename)
 		}

@@ -355,7 +355,12 @@ func TestParseFilesWithDependencies(t *testing.T) {
 				"test.proto": `syntax = "proto3";`,
 			}),
 			LookupImport: func(imp string) (*desc.FileDescriptor, error) {
-				t.Errorf("LookupImport was called on a filename available to the Accessor.")
+				// It's okay for descriptor.proto to be requested implicitly, but
+				// nothing else should make it here since it should instead be
+				// retrieved via Accessor.
+				if imp != "google/protobuf/descriptor.proto" {
+					t.Errorf("LookupImport was called on a filename available to the Accessor: %q", imp)
+				}
 				return nil, errors.New("unimportant")
 			},
 		}
