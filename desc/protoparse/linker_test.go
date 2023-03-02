@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -12,11 +12,9 @@ import (
 	protov1 "github.com/golang/protobuf/proto"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/internal"
 	_ "github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
@@ -25,15 +23,11 @@ func TestSimpleLink(t *testing.T) {
 	fds, err := Parser{ImportPaths: []string{"../../internal/testprotos"}}.ParseFiles("desc_test_complex.proto")
 	testutil.Ok(t, err)
 
-	b, err := ioutil.ReadFile("../../internal/testprotos/desc_test_complex.protoset")
+	b, err := os.ReadFile("../../internal/testprotos/desc_test_complex.protoset")
 	testutil.Ok(t, err)
 
-	var reg protoregistry.Types
-	for _, fd := range fds {
-		internal.RegisterExtensionsForFile(&reg, fd.UnwrapFile())
-	}
 	var fdSet descriptorpb.FileDescriptorSet
-	err = proto.UnmarshalOptions{Resolver: &reg}.Unmarshal(b, &fdSet)
+	err = proto.Unmarshal(b, &fdSet)
 	testutil.Ok(t, err)
 
 	testutil.Require(t, proto.Equal(fdSet.File[0], protov1.MessageV2(fds[0].AsProto())), "linked descriptor did not match output from protoc:\nwanted: %s\ngot: %s", toString(fdSet.File[0]), toString(protov1.MessageV2(fds[0].AsProto())))
@@ -52,7 +46,7 @@ func TestMultiFileLink(t *testing.T) {
 }
 
 func TestProto3Optional(t *testing.T) {
-	data, err := ioutil.ReadFile("../../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset")
+	data, err := os.ReadFile("../../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset")
 	testutil.Ok(t, err)
 	var fdset descriptorpb.FileDescriptorSet
 	err = proto.Unmarshal(data, &fdset)
@@ -1199,7 +1193,7 @@ func TestLinkerValidation(t *testing.T) {
 			if !ok {
 				return nil, fmt.Errorf("file not found: %s", filename)
 			}
-			return ioutil.NopCloser(strings.NewReader(f)), nil
+			return io.NopCloser(strings.NewReader(f)), nil
 		}
 		names := make([]string, 0, len(tc.input))
 		for k := range tc.input {
@@ -1259,7 +1253,7 @@ func TestProto3Enums(t *testing.T) {
 				default:
 					return nil, fmt.Errorf("file not found: %s", filename)
 				}
-				return ioutil.NopCloser(strings.NewReader(data)), nil
+				return io.NopCloser(strings.NewReader(data)), nil
 			}
 			_, err := Parser{Accessor: acc}.ParseFiles("f1.proto", "f2.proto")
 
@@ -1305,7 +1299,7 @@ message ReferencesFooOption {
 		if !ok {
 			return nil, fmt.Errorf("file not found: %s", filename)
 		}
-		return ioutil.NopCloser(strings.NewReader(f)), nil
+		return io.NopCloser(strings.NewReader(f)), nil
 	}
 	names := make([]string, 0, len(input))
 	for k := range input {
@@ -1347,7 +1341,7 @@ func TestSyntheticOneOfCollisions(t *testing.T) {
 		if !ok {
 			return nil, fmt.Errorf("file not found: %s", filename)
 		}
-		return ioutil.NopCloser(strings.NewReader(f)), nil
+		return io.NopCloser(strings.NewReader(f)), nil
 	}
 
 	var errs []error
@@ -1502,7 +1496,7 @@ func TestCustomJSONNameWarnings(t *testing.T) {
 	for i, tc := range testCases {
 		acc := func(filename string) (io.ReadCloser, error) {
 			if filename == "test.proto" {
-				return ioutil.NopCloser(strings.NewReader(tc.source)), nil
+				return io.NopCloser(strings.NewReader(tc.source)), nil
 			}
 			return nil, fmt.Errorf("file not found: %s", filename)
 		}

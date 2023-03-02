@@ -2553,7 +2553,7 @@ func (p *Printer) printComment(comments string, w *writer, indent int, forceNext
 	if lines[0] == "" {
 		lines = lines[1:]
 	}
-	if lines[len(lines)-1] == "" {
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}
 	if len(lines) == 0 {
@@ -2598,6 +2598,9 @@ func (p *Printer) printComment(comments string, w *writer, indent int, forceNext
 	}
 
 	for i, l := range lines {
+		if l != "" && !strings.HasPrefix(l, " ") {
+			l = " " + l
+		}
 		p.maybeIndent(w, indent, i > 0)
 		if multiLine {
 			if i == 0 {
@@ -2605,7 +2608,7 @@ func (p *Printer) printComment(comments string, w *writer, indent int, forceNext
 				_, _ = fmt.Fprintf(w, "/*%s\n", strings.TrimRight(l, " \t"))
 			} else if i == len(lines)-1 {
 				// last line
-				if l == "" {
+				if strings.TrimSpace(l) == "" {
 					_, _ = fmt.Fprint(w, " */")
 				} else {
 					_, _ = fmt.Fprintf(w, " *%s*/", l)

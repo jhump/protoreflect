@@ -131,8 +131,8 @@ desc_test_comments.proto:29:71
  tag numero uno 
     Trailing comments:
  tag trailer
- that spans multiple lines...
- more than two. 
+that spans multiple lines...
+more than two. 
 
 
  > message_type[0] > field[0] > options:
