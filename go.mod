@@ -3,12 +3,12 @@ module github.com/jhump/protoreflect
 go 1.18
 
 require (
-	github.com/bufbuild/protocompile v0.2.1-0.20230123224550-da57cd758c2f
+	github.com/bufbuild/protocompile v0.4.0
 	github.com/golang/protobuf v1.5.0
 	github.com/jhump/gopoet v0.1.0
 	github.com/jhump/goprotoc v0.5.0
 	google.golang.org/grpc v1.38.0
-	google.golang.org/protobuf v1.28.2-0.20220831092852-f930b1dc76e8
+	google.golang.org/protobuf v1.28.2-0.20230222093303-bc1253ad3743
 )
 
 require (
