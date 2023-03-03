@@ -21,7 +21,11 @@
 
 syntax = "proto3";
 
-package grpc.reflection.v1;
+// NOTE: This package has been changed so that if the "canonical" version of this
+// proto is compiled and linked into the same program, it won't result in an init
+// failure (which can happen if two different Go packages try to define the same
+// proto files/types).
+package jhump.protoreflect.grpc.reflection.v1;
 
 option go_package = "google.golang.org/grpc/reflection/grpc_reflection_v1";
 option java_multiple_files = true;

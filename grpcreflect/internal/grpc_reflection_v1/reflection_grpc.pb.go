@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v4.22.0
-// source: reflection.proto
+// source: grpcreflect/internal/grpc_reflection_v1/reflection.proto
 
 package grpc_reflection_v1
 
@@ -137,5 +137,5 @@ var ServerReflection_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "reflection.proto",
+	Metadata: "grpcreflect/internal/grpc_reflection_v1/reflection.proto",
 }
