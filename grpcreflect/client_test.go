@@ -376,9 +376,11 @@ func TestAutoVersion(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
 				grpc_reflection_v1.Register(s)
+				// HACK: The above won't show up in list of service names, so we need at least one other.
+				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
 			[]string{
-				"grpc.reflection.v1.ServerReflection",
+				"testprotos.DummyService",
 			},
 			[]string{
 				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
@@ -392,9 +394,11 @@ func TestAutoVersion(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
 				reflection.Register(s)
+				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
 			[]string{
 				"grpc.reflection.v1alpha.ServerReflection",
+				"testprotos.DummyService",
 			},
 			[]string{
 				// first one fails, so falls back to v1alpha
@@ -414,10 +418,11 @@ func TestAutoVersion(t *testing.T) {
 			func(s *grpc.Server) {
 				grpc_reflection_v1.Register(s)
 				reflection.Register(s)
+				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
 			[]string{
-				"grpc.reflection.v1.ServerReflection",
 				"grpc.reflection.v1alpha.ServerReflection",
+				"testprotos.DummyService",
 			},
 			[]string{
 				// never uses v1alpha since v1 works

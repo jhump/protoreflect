@@ -19,7 +19,15 @@ func (r registrarInterceptor) RegisterService(desc *grpc.ServiceDesc, impl inter
 }
 
 func (r registrarInterceptor) GetServiceInfo() map[string]grpc.ServiceInfo {
-	return r.svr.GetServiceInfo()
+	// HACK: We're using generated code for a proto file where we hacked the proto package
+	// to avoid init-time issues (for a future where the grpc module also provides the same
+	// protos/types). But we've rewritten the service names in the generated code, so that
+	// we expose the expected service (e.g. w/out the hacked package name). That will lead
+	// to issues trying to load/resolve descriptors for the hacked service. So we remove
+	// it from the service info.
+	info := r.svr.GetServiceInfo()
+	delete(info, "grpc.reflection.v1.ServerReflection")
+	return info
 }
 
 type reflectImpl struct {
