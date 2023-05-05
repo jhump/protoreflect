@@ -5,8 +5,9 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 // GRPCServer is the interface provided by a gRPC server. In addition to being a
@@ -16,24 +17,12 @@ type GRPCServer = reflection.GRPCServer
 
 // LoadServiceDescriptors loads the service descriptors for all services exposed by the
 // given GRPC server.
-func LoadServiceDescriptors(s GRPCServer) (map[string]*desc.ServiceDescriptor, error) {
-	descs := map[string]*desc.ServiceDescriptor{}
-	for name, info := range s.GetServiceInfo() {
-		file, ok := info.Metadata.(string)
-		if !ok {
-			return nil, fmt.Errorf("service %q has unexpected metadata: expecting a string; got %v", name, info.Metadata)
-		}
-		fd, err := desc.LoadFileDescriptor(file)
+func LoadServiceDescriptors(s GRPCServer) (map[string]protoreflect.ServiceDescriptor, error) {
+	descs := map[string]protoreflect.ServiceDescriptor{}
+	for name := range s.GetServiceInfo() {
+		sd, err := protoresolve.GlobalDescriptors.FindServiceByName(protoreflect.FullName(name))
 		if err != nil {
-			return nil, err
-		}
-		d := fd.FindSymbol(name)
-		if d == nil {
-			return nil, fmt.Errorf("file descriptor for %q has no element named %q", file, name)
-		}
-		sd, ok := d.(*desc.ServiceDescriptor)
-		if !ok {
-			return nil, fmt.Errorf("file descriptor for %q has incorrect element named %q: expecting a service descriptor; got %v", file, name, d)
+			return nil, fmt.Errorf("could not resolve descriptor for service %q: %w", name, err)
 		}
 		descs[name] = sd
 	}
@@ -46,22 +35,10 @@ func LoadServiceDescriptors(s GRPCServer) (map[string]*desc.ServiceDescriptor, e
 // is used internally to register a service implementation with a GRPC server.
 // But it can also be used by this package to retrieve the rich descriptor for
 // the service.
-func LoadServiceDescriptor(svc *grpc.ServiceDesc) (*desc.ServiceDescriptor, error) {
-	file, ok := svc.Metadata.(string)
-	if !ok {
-		return nil, fmt.Errorf("service %q has unexpected metadata: expecting a string; got %v", svc.ServiceName, svc.Metadata)
-	}
-	fd, err := desc.LoadFileDescriptor(file)
+func LoadServiceDescriptor(svc *grpc.ServiceDesc) (protoreflect.ServiceDescriptor, error) {
+	sd, err := protoresolve.GlobalDescriptors.FindServiceByName(protoreflect.FullName(svc.ServiceName))
 	if err != nil {
-		return nil, err
-	}
-	d := fd.FindSymbol(svc.ServiceName)
-	if d == nil {
-		return nil, fmt.Errorf("file descriptor for %q has no element named %q", file, svc.ServiceName)
-	}
-	sd, ok := d.(*desc.ServiceDescriptor)
-	if !ok {
-		return nil, fmt.Errorf("file descriptor for %q has incorrect element named %q: expecting a service descriptor; got %v", file, svc.ServiceName, d)
+		return nil, fmt.Errorf("could not resolve descriptor for service %q: %w", svc.ServiceName, err)
 	}
 	return sd, nil
 }
