@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos/grpc";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testdata/grpc";
 
 package testprotos;
 

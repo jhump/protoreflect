@@ -5,7 +5,7 @@
 // from binary, JSON, and text formats and for creating protoreflect.FileDescriptor
 // instances from *descriptorpb.FileDescriptorProto instances. However, it uses
 // anonymous interface types for many of these cases. This package provides named
-// types, useful for more compact parameter and field types as well as for type
+// types, useful for more compact parameter and field declarations as well as type
 // assertions.
 //
 // The core API also includes two resolver implementations:
@@ -19,7 +19,7 @@
 // and the result can automatically be used as a type registry, too, with all
 // dynamic types.
 //
-// This package also provides functions for composability: layering resolvers
+// This package also provides functions for composition: layering resolvers
 // such that one is tried first (the "preferred" resolver), and then others
 // can be used if the first fails to resolve. This is useful to blend known
 // and unknown types.

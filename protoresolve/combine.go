@@ -5,7 +5,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
-	"strings"
 )
 
 // Combine returns a resolver that iterates through the given resolvers to find elements.
@@ -184,6 +183,23 @@ func (c combined) FindExtensionByNumber(message protoreflect.FullName, number pr
 	return nil, protoregistry.NotFound
 }
 
+func (c combined) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionDescriptor) bool) {
+	seen := map[protoreflect.FieldNumber]struct{}{}
+	for _, res := range c {
+		var keepGoing bool
+		res.RangeExtensionsByMessage(message, func(ext protoreflect.ExtensionDescriptor) bool {
+			if _, ok := seen[ext.Number()]; ok {
+				return true
+			}
+			keepGoing = fn(ext)
+			return keepGoing
+		})
+		if !keepGoing {
+			return
+		}
+	}
+}
+
 func (c combined) FindMessageByURL(url string) (protoreflect.MessageDescriptor, error) {
 	for _, res := range c {
 		msg, err := res.FindMessageByURL(url)
@@ -208,7 +224,7 @@ func (d dynTypeResolver) FindExtensionByName(name protoreflect.FullName) (protor
 	if err != nil {
 		return nil, err
 	}
-	return dynamicpb.NewExtensionType(ext), nil
+	return ExtensionType(ext), nil
 }
 
 func (d dynTypeResolver) FindExtensionByNumber(message protoreflect.FullName, number protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
@@ -216,7 +232,7 @@ func (d dynTypeResolver) FindExtensionByNumber(message protoreflect.FullName, nu
 	if err != nil {
 		return nil, err
 	}
-	return dynamicpb.NewExtensionType(ext), nil
+	return ExtensionType(ext), nil
 }
 
 func (d dynTypeResolver) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageType, error) {
@@ -228,7 +244,7 @@ func (d dynTypeResolver) FindMessageByName(name protoreflect.FullName) (protoref
 }
 
 func (d dynTypeResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
-	return d.FindMessageByName(typeNameFromURL(url))
+	return d.FindMessageByName(TypeNameFromURL(url))
 }
 
 func (d dynTypeResolver) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumType, error) {
@@ -237,9 +253,4 @@ func (d dynTypeResolver) FindEnumByName(name protoreflect.FullName) (protoreflec
 		return nil, err
 	}
 	return dynamicpb.NewEnumType(en), nil
-}
-
-func typeNameFromURL(url string) protoreflect.FullName {
-	pos := strings.LastIndexByte(url, '/')
-	return protoreflect.FullName(url[pos+1:])
 }

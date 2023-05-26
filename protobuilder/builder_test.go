@@ -8,17 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/jhump/protoreflect/desc/protoparse"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
-	_ "github.com/jhump/protoreflect/internal/testprotos"
-	"github.com/jhump/protoreflect/internal/testutil"
+	_ "github.com/jhump/protoreflect/v2/internal/testdata"
 )
 
 func TestSimpleDescriptorsFromScratch(t *testing.T) {
@@ -34,7 +30,7 @@ func TestSimpleDescriptorsFromScratch(t *testing.T) {
 
 	msg := NewMessage("FooRequest").
 		AddField(NewField("id", FieldTypeInt64())).
-		AddField(NewField("name", FieldTypeString())).
+		AddField(NewField("path", FieldTypeString())).
 		AddField(NewField("options", FieldTypeEnum(en)).
 			SetRepeated())
 	file.AddMessage(msg)
@@ -80,7 +76,7 @@ func TestSimpleDescriptorsFromScratch_SyntheticFiles(t *testing.T) {
 
 	msg := NewMessage("FooRequest")
 	msg.AddField(NewField("id", FieldTypeInt64()))
-	msg.AddField(NewField("name", FieldTypeString()))
+	msg.AddField(NewField("path", FieldTypeString()))
 	msg.AddField(NewField("options", FieldTypeEnum(en)).
 		SetRepeated())
 
@@ -130,7 +126,7 @@ func TestComplexDescriptorsFromScratch(t *testing.T) {
 	testutil.Ok(t, err)
 
 	msgA := NewMessage("FooA").
-		AddField(NewField("id", FieldTypeUInt64())).
+		AddField(NewField("id", FieldTypeUint64())).
 		AddField(NewField("when", FieldTypeImportedMessage(mdTimestamp))).
 		AddField(NewField("extras", FieldTypeImportedMessage(mdAny)).
 			SetRepeated()).
@@ -147,7 +143,7 @@ func TestComplexDescriptorsFromScratch(t *testing.T) {
 	msgB := NewMessage("FooB").
 		AddField(NewField("foo_a", FieldTypeMessage(msgA)).
 			SetRepeated()).
-		AddField(NewField("name", FieldTypeString()))
+		AddField(NewField("path", FieldTypeString()))
 	NewFile("").
 		SetPackageName("foo.bar").
 		AddMessage(msgB)
@@ -158,7 +154,7 @@ func TestComplexDescriptorsFromScratch(t *testing.T) {
 		AddValue(NewEnumValue("VALUE_B")).
 		AddValue(NewEnumValue("VALUE_C"))
 	msgC := NewMessage("BarBaz").
-		AddOneOf(NewOneOf("bbb").
+		AddOneOf(NewOneof("bbb").
 			AddChoice(NewField("b1", FieldTypeMessage(msgA))).
 			AddChoice(NewField("b2", FieldTypeMessage(msgB)))).
 		AddField(NewField("v", FieldTypeEnum(enC)))
@@ -235,7 +231,7 @@ func TestComplexDescriptorsFromScratch(t *testing.T) {
 
 func TestCreatingGroupField(t *testing.T) {
 	grpMb := NewMessage("GroupA").
-		AddField(NewField("name", FieldTypeString())).
+		AddField(NewField("path", FieldTypeString())).
 		AddField(NewField("id", FieldTypeInt64()))
 	grpFlb := NewGroupField(grpMb)
 
@@ -254,7 +250,7 @@ func TestCreatingGroupField(t *testing.T) {
 	// try a rename that will fail
 	err = grpMb.TrySetName("fooBarBaz")
 	testutil.Require(t, err != nil)
-	testutil.Eq(t, "group name fooBarBaz must start with capital letter", err.Error())
+	testutil.Eq(t, "group path fooBarBaz must start with capital letter", err.Error())
 	// failed rename should not have modified any state
 	md2, err := mb.Build()
 	testutil.Ok(t, err)
@@ -262,7 +258,7 @@ func TestCreatingGroupField(t *testing.T) {
 	// another attempt that will fail
 	err = grpFlb.TrySetName("foobarbaz")
 	testutil.Require(t, err != nil)
-	testutil.Eq(t, "cannot change name of group field TestMessage.groupa; change name of group instead", err.Error())
+	testutil.Eq(t, "cannot change path of group field TestMessage.groupa; change path of group instead", err.Error())
 	// again, no state should have been modified
 	md2, err = mb.Build()
 	testutil.Ok(t, err)
@@ -283,7 +279,7 @@ func TestCreatingGroupField(t *testing.T) {
 }
 
 func TestCreatingMapField(t *testing.T) {
-	mapFlb := NewMapField("countsByName", FieldTypeString(), FieldTypeUInt64())
+	mapFlb := NewMapField("countsByName", FieldTypeString(), FieldTypeUint64())
 	testutil.Require(t, mapFlb.IsMap())
 
 	mb := NewMessage("TestMessage").
@@ -301,7 +297,7 @@ func TestCreatingMapField(t *testing.T) {
 	// try a rename that will fail
 	err = mapFlb.GetType().localMsgType.TrySetName("fooBarBaz")
 	testutil.Require(t, err != nil)
-	testutil.Eq(t, "cannot change name of map entry TestMessage.CountsByNameEntry; change name of field instead", err.Error())
+	testutil.Eq(t, "cannot change path of map entry TestMessage.CountsByNameEntry; change path of field instead", err.Error())
 	// failed rename should not have modified any state
 	md2, err := mb.Build()
 	testutil.Ok(t, err)
@@ -365,7 +361,7 @@ func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
 			hasComment = false
 		case *FieldBuilder:
 			// comments for groups are on the message, not the field
-			hasComment = b.GetType().GetType() != descriptorpb.FieldDescriptorProto_TYPE_GROUP
+			hasComment = b.GetType().Kind() != descriptorpb.FieldDescriptorProto_TYPE_GROUP
 		case *MessageBuilder:
 			// comments for maps are on the field, not the entry message
 			if b.Options.GetMapEntry() {
@@ -378,7 +374,7 @@ func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
 		if hasComment {
 			count++
 			testutil.Eq(t, fmt.Sprintf(" Comment for %s\n", b.GetName()), b.GetComments().LeadingComment,
-				"wrong comment for builder %s", GetFullyQualifiedName(b))
+				"wrong comment for builder %s", FullName(b))
 		}
 		for _, ch := range b.GetChildren() {
 			checkBuilderComments(ch)
@@ -500,7 +496,7 @@ message SimpleMessage {
 
 	var checkDescriptorComments func(d desc.Descriptor)
 	checkDescriptorComments = func(d desc.Descriptor) {
-		// fmt.Println(d.GetFullyQualifiedName(), d.GetSourceInfo().GetLeadingDetachedComments(), d.GetSourceInfo().GetLeadingComments(), d.GetSourceInfo().GetTrailingComments())
+		// fmt.Println(d.FullName(), d.GetSourceInfo().GetLeadingDetachedComments(), d.GetSourceInfo().GetLeadingComments(), d.GetSourceInfo().GetTrailingComments())
 		switch d := d.(type) {
 		case *desc.FileDescriptor:
 			for _, ch := range d.GetMessageTypes() {
@@ -657,7 +653,7 @@ func roundTripMessage(t *testing.T, md *desc.MessageDescriptor) {
 		roundTripField(t, fld)
 	}
 	for _, ood := range md.GetOneOfs() {
-		oob, err := FromOneOf(ood)
+		oob, err := FromOneof(ood)
 		testutil.Ok(t, err)
 		roundTripped, err := oob.Build()
 		testutil.Ok(t, err)
@@ -731,7 +727,7 @@ func checkDescriptors(t *testing.T, d1, d2 desc.Descriptor) {
 func TestAddRemoveMoveBuilders(t *testing.T) {
 	// add field to one-of
 	fld1 := NewField("foo", FieldTypeInt32())
-	oo1 := NewOneOf("oofoo")
+	oo1 := NewOneof("oofoo")
 	oo1.AddChoice(fld1)
 	checkChildren(t, oo1, fld1)
 	testutil.Eq(t, oo1.GetChoice("foo"), fld1)
@@ -748,7 +744,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	testutil.Eq(t, msg1.GetField("foo"), fld1)
 
 	// add empty one-of to message
-	oo2 := NewOneOf("oobar")
+	oo2 := NewOneof("oobar")
 	msg1.AddOneOf(oo2)
 	checkChildren(t, msg1, oo1, oo2)
 	testutil.Eq(t, msg1.GetOneOf("oobar"), oo2)
@@ -760,7 +756,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	// field also now registered with msg1
 	testutil.Eq(t, msg1.GetField("bar"), fld2)
 
-	// add fails due to name collisions
+	// add fails due to path collisions
 	fld1dup := NewField("foo", FieldTypeInt32())
 	err := oo1.TryAddChoice(fld1dup)
 	checkFailedAdd(t, err, oo1, fld1dup, "already contains field")
@@ -768,7 +764,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	err = msg1.TryAddField(fld2)
 	checkFailedAdd(t, err, msg1, fld2, "already contains element")
 	msg2 := NewMessage("oofoo")
-	// name collision can be different type
+	// path collision can be different type
 	// (here, nested message conflicts with a one-of)
 	err = msg1.TryAddNestedMessage(msg2)
 	checkFailedAdd(t, err, msg1, msg2, "already contains element")
@@ -805,7 +801,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	ext2 := NewExtension("xyz", 234, FieldTypeInt32(), msg1)
 	msg1.AddNestedExtension(ext2)
 	checkChildren(t, msg1, oo1, oo2, msg2, groupField, mapField, ext2)
-	err = msg1.TryAddNestedExtension(ext1) // name collision
+	err = msg1.TryAddNestedExtension(ext1) // path collision
 	checkFailedAdd(t, err, msg1, ext1, "already contains element")
 	fld3 := NewField("ijk", FieldTypeString())
 	err = msg1.TryAddNestedExtension(fld3)
@@ -821,7 +817,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	enum1.AddValue(enumVal2)
 	checkChildren(t, enum1, enumVal1, enumVal2)
 	testutil.Eq(t, enum1.GetValue("B"), enumVal2)
-	// fail w/ name collision
+	// fail w/ path collision
 	enumVal3 := NewEnumValue("B")
 	err = enum1.TryAddValue(enumVal3)
 	checkFailedAdd(t, err, enum1, enumVal3, "already contains value")
@@ -860,7 +856,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	checkChildren(t, fb, msg1, svc1, enum2, ext3)
 	testutil.Eq(t, fb.GetExtension("foosball"), ext3)
 
-	// errors and name collisions
+	// errors and path collisions
 	err = fb.TryAddExtension(fld3)
 	checkFailedAdd(t, err, fb, fld3, "is not an extension")
 	msg3 := NewMessage("fizzle")
@@ -874,24 +870,24 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 }
 
 func checkChildren(t *testing.T, parent Builder, children ...Builder) {
-	testutil.Eq(t, len(children), len(parent.GetChildren()), "Wrong number of children for %s (%T)", GetFullyQualifiedName(parent), parent)
+	testutil.Eq(t, len(children), len(parent.GetChildren()), "Wrong number of children for %s (%T)", FullName(parent), parent)
 	ch := map[Builder]struct{}{}
 	for _, child := range children {
-		testutil.Eq(t, child.GetParent(), parent, "Child %s (%T) does not report %s (%T) as its parent", child.GetName(), child, GetFullyQualifiedName(parent), parent)
+		testutil.Eq(t, child.GetParent(), parent, "Child %s (%T) does not report %s (%T) as its parent", child.GetName(), child, FullName(parent), parent)
 		ch[child] = struct{}{}
 	}
 	for _, child := range parent.GetChildren() {
 		_, ok := ch[child]
-		testutil.Require(t, ok, "Child %s (%T) does appear in list of children for %s (%T)", child.GetName(), child, GetFullyQualifiedName(parent), parent)
+		testutil.Require(t, ok, "Child %s (%T) does appear in list of children for %s (%T)", child.GetName(), child, FullName(parent), parent)
 	}
 }
 
 func checkFailedAdd(t *testing.T, err error, parent Builder, child Builder, errorMsg string) {
-	testutil.Require(t, err != nil, "Expecting error assigning %s (%T) to %s (%T)", child.GetName(), child, GetFullyQualifiedName(parent), parent)
-	testutil.Require(t, strings.Contains(err.Error(), errorMsg), "Expecting error assigning %s (%T) to %s (%T) to contain text %q: %q", child.GetName(), child, GetFullyQualifiedName(parent), parent, errorMsg, err.Error())
+	testutil.Require(t, err != nil, "Expecting error assigning %s (%T) to %s (%T)", child.GetName(), child, FullName(parent), parent)
+	testutil.Require(t, strings.Contains(err.Error(), errorMsg), "Expecting error assigning %s (%T) to %s (%T) to contain text %q: %q", child.GetName(), child, FullName(parent), parent, errorMsg, err.Error())
 	testutil.Eq(t, nil, child.GetParent(), "Child %s (%T) should not have a parent after failed add", child.GetName(), child)
 	for _, ch := range parent.GetChildren() {
-		testutil.Require(t, ch != child, "Child %s (%T) should not appear in list of children for %s (%T) but does", child.GetName(), child, GetFullyQualifiedName(parent), parent)
+		testutil.Require(t, ch != child, "Child %s (%T) should not appear in list of children for %s (%T) but does", child.GetName(), child, FullName(parent), parent)
 	}
 }
 
@@ -1021,7 +1017,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 	})
 
 	t.Run("oneof options", func(t *testing.T) {
-		oob := NewOneOf("oo")
+		oob := NewOneof("oo")
 		oob.AddChoice(NewField("foo", FieldTypeString()))
 		oob.Options = &descriptorpb.OneofOptions{}
 		// oneofs must be connected to a message
@@ -1207,7 +1203,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 			})
 
 			t.Run("oneof options", func(t *testing.T) {
-				oob := NewOneOf("oo")
+				oob := NewOneof("oo")
 				oob.AddChoice(NewField("foo", FieldTypeString()))
 				oob.Options = &descriptorpb.OneofOptions{}
 				// oneofs must be connected to a message
@@ -1388,7 +1384,7 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 	})
 
 	t.Run("oneof options", func(t *testing.T) {
-		oob := NewOneOf("oo")
+		oob := NewOneof("oo")
 		oob.AddChoice(NewField("foo", FieldTypeString()))
 		oob.Options = &descriptorpb.OneofOptions{}
 		// oneofs must be connected to a message
@@ -1687,14 +1683,14 @@ func TestInvalid(t *testing.T) {
 			expectedError: "must not use reserved number 100",
 		},
 		{
-			name: "field has reserved name",
+			name: "field has reserved path",
 			builder: func() Builder {
 				return NewFile("foo.proto").
 					AddMessage(NewMessage("Foo").
 						AddField(NewField("foo", FieldTypeBool())).
 						AddReservedName("foo"))
 			},
-			expectedError: "must not use reserved name",
+			expectedError: "must not use reserved path",
 		},
 		{
 			name: "ranges overlap",

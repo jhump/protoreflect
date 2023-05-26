@@ -50,41 +50,96 @@ type ProtoWrapper interface {
 	AsProto() proto.Message
 }
 
+// FileWrapper is a ProtoWrapper for files: it implements
+// [protoreflect.FileDescriptor] and wraps a [*descriptorpb.FileDescriptorProto].
+//
+// Implementations of this interface should return wrappers from the methods
+// used to access child elements. For example, calling file.Messages().Get(0)
+// should also return a MessageWrapper, not just a plain
+// [protoreflect.MessageDescriptor].
 type FileWrapper interface {
 	protoreflect.FileDescriptor
 	FileDescriptorProto() *descriptorpb.FileDescriptorProto
 }
 
+// MessageWrapper is a ProtoWrapper for messages: it implements
+// [protoreflect.MessageDescriptor] and wraps a [*descriptorpb.DescriptorProto].
+//
+// Implementations of this interface should return wrappers from the methods
+// used to access child elements. For example, calling msg.Fields().Get(0)
+// should also return a FieldWrapper, not just a plain
+// [protoreflect.FieldDescriptor].
 type MessageWrapper interface {
 	protoreflect.MessageDescriptor
 	MessageDescriptorProto() *descriptorpb.DescriptorProto
 }
 
+// FieldWrapper is a ProtoWrapper for fields: it implements
+// [protoreflect.FieldDescriptor] and wraps a [*descriptorpb.FieldDescriptorProto].
+//
+// Implementations of this interface should return wrappers from the methods
+// used to access related elements. For example, calling field.ContainingOneof()
+// should also return a OneofWrapper, not just a plain
+// [protoreflect.OneofDescriptor]. This may not always be feasible, like if the
+// related element (like the field's message or enum type) is defined in another
+// file that was not created as a FileWrapper.
 type FieldWrapper interface {
 	protoreflect.FieldDescriptor
 	FieldDescriptorProto() *descriptorpb.FieldDescriptorProto
 }
 
+// OneofWrapper is a ProtoWrapper for oneofs: it implements
+// [protoreflect.OneofDescriptor] and wraps a [*descriptorpb.OneofDescriptorProto].
+//
+// Implementations of this interface should return wrappers from the methods
+// used to access child elements. For example, calling oneof.Fields().Get(0)
+// should also return a FieldWrapper, not just a plain
+// [protoreflect.FieldDescriptor].
 type OneofWrapper interface {
 	protoreflect.OneofDescriptor
 	OneofDescriptorProto() *descriptorpb.OneofDescriptorProto
 }
 
+// EnumWrapper is a ProtoWrapper for enums: it implements
+// [protoreflect.EnumDescriptor] and wraps a [*descriptorpb.EnumDescriptorProto].
+//
+// Implementations of this interface should return wrappers from the methods
+// used to access child elements. For example, calling enum.Values().Get(0)
+// should also return an EnumValueWrapper, not just a plain
+// [protoreflect.EnumValueDescriptor].
 type EnumWrapper interface {
 	protoreflect.EnumDescriptor
 	EnumDescriptorProto() *descriptorpb.EnumDescriptorProto
 }
 
+// EnumValueWrapper is a ProtoWrapper for enum values: it implements
+// [protoreflect.EnumValueDescriptor] and wraps a [*descriptorpb.EnumValueDescriptorProto].
 type EnumValueWrapper interface {
 	protoreflect.EnumValueDescriptor
 	EnumValueDescriptorProto() *descriptorpb.EnumValueDescriptorProto
 }
 
+// ServiceWrapper is a ProtoWrapper for services: it implements
+// [protoreflect.ServiceDescriptor] and wraps a [*descriptorpb.ServiceDescriptorProto].
+//
+// Implementations of this interface should return wrappers from the methods
+// used to access child elements. For example, calling svc.Methods().Get(0)
+// should also return an MethodWrapper, not just a plain
+// [protoreflect.MethodDescriptor].
 type ServiceWrapper interface {
 	protoreflect.ServiceDescriptor
 	ServiceDescriptorProto() *descriptorpb.ServiceDescriptorProto
 }
 
+// MethodWrapper is a ProtoWrapper for methods: it implements
+// [protoreflect.MethodDescriptor] and wraps a [*descriptorpb.MethodDescriptorProto].
+//
+// Implementations of this interface should return wrappers from the methods
+// used to access related elements. For example, calling method.Input()
+// should also return an MessageWrapper, not just a plain
+// [protoreflect.MessageDescriptor]. However, this may not always be feasible,
+// such as if the message type is defined in another file that was not created
+// as a FileWrapper.
 type MethodWrapper interface {
 	protoreflect.MethodDescriptor
 	MethodDescriptorProto() *descriptorpb.MethodDescriptorProto

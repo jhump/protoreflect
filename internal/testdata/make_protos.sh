@@ -4,7 +4,7 @@ set -e
 
 cd $(dirname $0)
 
-PROTOC_VERSION="22.0"
+PROTOC_VERSION="23.0"
 PROTOC_OS="$(uname -s)"
 PROTOC_ARCH="$(uname -m)"
 case "${PROTOC_OS}" in
@@ -32,7 +32,7 @@ fi
 
 go install google.golang.org/protobuf/cmd/protoc-gen-go
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0
-go install github.com/jhump/protoreflect/desc/sourceinfo/cmd/protoc-gen-gosrcinfo
+go install github.com/jhump/protoreflect/v2/sourceinfo/cmd/protoc-gen-gosrcinfo
 
 # Output directory will effectively be GOPATH/src.
 outdir="."

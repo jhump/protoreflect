@@ -515,6 +515,14 @@ func (m messageType) Descriptor() protoreflect.MessageDescriptor {
 	return messageDescriptor{m.MessageType.Descriptor()}
 }
 
+type enumType struct {
+	protoreflect.EnumType
+}
+
+func (e enumType) Descriptor() protoreflect.EnumDescriptor {
+	return enumDescriptor{e.EnumType.Descriptor()}
+}
+
 // WrapFile wraps the given file descriptor so that it will include source
 // code info that was registered with this package if the given file was
 // processed with protoc-gen-gosrcinfo. Returns fd without wrapping if fd

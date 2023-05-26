@@ -3,9 +3,12 @@ package protobuilder
 import (
 	"fmt"
 
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 // FieldType represents the type of a field or extension. It can represent a
@@ -17,137 +20,136 @@ import (
 // There are numerous factory methods for creating FieldType instances.
 type FieldType struct {
 	fieldType       descriptorpb.FieldDescriptorProto_Type
-	foreignMsgType  *desc.MessageDescriptor
+	foreignMsgType  protoreflect.MessageDescriptor
 	localMsgType    *MessageBuilder
-	foreignEnumType *desc.EnumDescriptor
+	foreignEnumType protoreflect.EnumDescriptor
 	localEnumType   *EnumBuilder
 }
 
-// GetType returns the enum value indicating the type of the field. If the type
-// is a message (or group) or enum type, GetTypeName provides the name of the
-// referenced type.
-func (ft *FieldType) GetType() descriptorpb.FieldDescriptorProto_Type {
-	return ft.fieldType
+// Kind returns the kind of this field type. If the kind is a message (or group)
+// or enum, TypeName() provides the path of the referenced type.
+func (ft *FieldType) Kind() protoreflect.Kind {
+	return protoreflect.Kind(ft.fieldType)
 }
 
-// GetTypeName returns the fully-qualified name of the referenced message or
+// TypeName returns the fully-qualified path of the referenced message or
 // enum type. It returns an empty string if this type does not represent a
 // message or enum type.
-func (ft *FieldType) GetTypeName() string {
+func (ft *FieldType) TypeName() protoreflect.FullName {
 	if ft.foreignMsgType != nil {
-		return ft.foreignMsgType.GetFullyQualifiedName()
+		return ft.foreignMsgType.FullName()
 	} else if ft.foreignEnumType != nil {
-		return ft.foreignEnumType.GetFullyQualifiedName()
+		return ft.foreignEnumType.FullName()
 	} else if ft.localMsgType != nil {
-		return GetFullyQualifiedName(ft.localMsgType)
+		return FullName(ft.localMsgType)
 	} else if ft.localEnumType != nil {
-		return GetFullyQualifiedName(ft.localEnumType)
+		return FullName(ft.localEnumType)
 	} else {
 		return ""
 	}
 }
 
-var scalarTypes = map[descriptorpb.FieldDescriptorProto_Type]*FieldType{
-	descriptorpb.FieldDescriptorProto_TYPE_BOOL:     {fieldType: descriptorpb.FieldDescriptorProto_TYPE_BOOL},
-	descriptorpb.FieldDescriptorProto_TYPE_INT32:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_INT32},
-	descriptorpb.FieldDescriptorProto_TYPE_INT64:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_INT64},
-	descriptorpb.FieldDescriptorProto_TYPE_SINT32:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SINT32},
-	descriptorpb.FieldDescriptorProto_TYPE_SINT64:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SINT64},
-	descriptorpb.FieldDescriptorProto_TYPE_UINT32:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_UINT32},
-	descriptorpb.FieldDescriptorProto_TYPE_UINT64:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_UINT64},
-	descriptorpb.FieldDescriptorProto_TYPE_FIXED32:  {fieldType: descriptorpb.FieldDescriptorProto_TYPE_FIXED32},
-	descriptorpb.FieldDescriptorProto_TYPE_FIXED64:  {fieldType: descriptorpb.FieldDescriptorProto_TYPE_FIXED64},
-	descriptorpb.FieldDescriptorProto_TYPE_SFIXED32: {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SFIXED32},
-	descriptorpb.FieldDescriptorProto_TYPE_SFIXED64: {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SFIXED64},
-	descriptorpb.FieldDescriptorProto_TYPE_FLOAT:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_FLOAT},
-	descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_DOUBLE},
-	descriptorpb.FieldDescriptorProto_TYPE_STRING:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_STRING},
-	descriptorpb.FieldDescriptorProto_TYPE_BYTES:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_BYTES},
+var scalarTypes = map[protoreflect.Kind]*FieldType{
+	protoreflect.BoolKind:     {fieldType: descriptorpb.FieldDescriptorProto_TYPE_BOOL},
+	protoreflect.Int32Kind:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_INT32},
+	protoreflect.Int64Kind:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_INT64},
+	protoreflect.Sint32Kind:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SINT32},
+	protoreflect.Sint64Kind:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SINT64},
+	protoreflect.Uint32Kind:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_UINT32},
+	protoreflect.Uint64Kind:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_UINT64},
+	protoreflect.Fixed32Kind:  {fieldType: descriptorpb.FieldDescriptorProto_TYPE_FIXED32},
+	protoreflect.Fixed64Kind:  {fieldType: descriptorpb.FieldDescriptorProto_TYPE_FIXED64},
+	protoreflect.Sfixed32Kind: {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SFIXED32},
+	protoreflect.Sfixed64Kind: {fieldType: descriptorpb.FieldDescriptorProto_TYPE_SFIXED64},
+	protoreflect.FloatKind:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_FLOAT},
+	protoreflect.DoubleKind:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_DOUBLE},
+	protoreflect.StringKind:   {fieldType: descriptorpb.FieldDescriptorProto_TYPE_STRING},
+	protoreflect.BytesKind:    {fieldType: descriptorpb.FieldDescriptorProto_TYPE_BYTES},
 }
 
 // FieldTypeScalar returns a FieldType for the given scalar type. If the given
 // type is not scalar (e.g. it is a message, group, or enum) than this function
 // will panic.
-func FieldTypeScalar(t descriptorpb.FieldDescriptorProto_Type) *FieldType {
-	if ft, ok := scalarTypes[t]; ok {
+func FieldTypeScalar(k protoreflect.Kind) *FieldType {
+	if ft, ok := scalarTypes[k]; ok {
 		return ft
 	}
-	panic(fmt.Sprintf("field %v is not scalar", t))
+	panic(fmt.Sprintf("field kind %v is not scalar", k))
 }
 
 // FieldTypeInt32 returns a FieldType for the int32 scalar type.
 func FieldTypeInt32() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_INT32)
+	return FieldTypeScalar(protoreflect.Int32Kind)
 }
 
-// FieldTypeUInt32 returns a FieldType for the uint32 scalar type.
-func FieldTypeUInt32() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_UINT32)
+// FieldTypeUint32 returns a FieldType for the uint32 scalar type.
+func FieldTypeUint32() *FieldType {
+	return FieldTypeScalar(protoreflect.Uint32Kind)
 }
 
-// FieldTypeSInt32 returns a FieldType for the sint32 scalar type.
-func FieldTypeSInt32() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_SINT32)
+// FieldTypeSint32 returns a FieldType for the sint32 scalar type.
+func FieldTypeSint32() *FieldType {
+	return FieldTypeScalar(protoreflect.Sint32Kind)
 }
 
 // FieldTypeFixed32 returns a FieldType for the fixed32 scalar type.
 func FieldTypeFixed32() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_FIXED32)
+	return FieldTypeScalar(protoreflect.Fixed32Kind)
 }
 
-// FieldTypeSFixed32 returns a FieldType for the sfixed32 scalar type.
-func FieldTypeSFixed32() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_SFIXED32)
+// FieldTypeSfixed32 returns a FieldType for the sfixed32 scalar type.
+func FieldTypeSfixed32() *FieldType {
+	return FieldTypeScalar(protoreflect.Sfixed32Kind)
 }
 
 // FieldTypeInt64 returns a FieldType for the int64 scalar type.
 func FieldTypeInt64() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_INT64)
+	return FieldTypeScalar(protoreflect.Int64Kind)
 }
 
-// FieldTypeUInt64 returns a FieldType for the uint64 scalar type.
-func FieldTypeUInt64() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_UINT64)
+// FieldTypeUint64 returns a FieldType for the uint64 scalar type.
+func FieldTypeUint64() *FieldType {
+	return FieldTypeScalar(protoreflect.Uint64Kind)
 }
 
-// FieldTypeSInt64 returns a FieldType for the sint64 scalar type.
-func FieldTypeSInt64() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_SINT64)
+// FieldTypeSint64 returns a FieldType for the sint64 scalar type.
+func FieldTypeSint64() *FieldType {
+	return FieldTypeScalar(protoreflect.Sint64Kind)
 }
 
 // FieldTypeFixed64 returns a FieldType for the fixed64 scalar type.
 func FieldTypeFixed64() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_FIXED64)
+	return FieldTypeScalar(protoreflect.Fixed64Kind)
 }
 
-// FieldTypeSFixed64 returns a FieldType for the sfixed64 scalar type.
-func FieldTypeSFixed64() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_SFIXED64)
+// FieldTypeSfixed64 returns a FieldType for the sfixed64 scalar type.
+func FieldTypeSfixed64() *FieldType {
+	return FieldTypeScalar(protoreflect.Sfixed64Kind)
 }
 
 // FieldTypeFloat returns a FieldType for the float scalar type.
 func FieldTypeFloat() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_FLOAT)
+	return FieldTypeScalar(protoreflect.FloatKind)
 }
 
 // FieldTypeDouble returns a FieldType for the double scalar type.
 func FieldTypeDouble() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_DOUBLE)
+	return FieldTypeScalar(protoreflect.DoubleKind)
 }
 
 // FieldTypeBool returns a FieldType for the bool scalar type.
 func FieldTypeBool() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_BOOL)
+	return FieldTypeScalar(protoreflect.BoolKind)
 }
 
 // FieldTypeString returns a FieldType for the string scalar type.
 func FieldTypeString() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_STRING)
+	return FieldTypeScalar(protoreflect.StringKind)
 }
 
 // FieldTypeBytes returns a FieldType for the bytes scalar type.
 func FieldTypeBytes() *FieldType {
-	return FieldTypeScalar(descriptorpb.FieldDescriptorProto_TYPE_BYTES)
+	return FieldTypeScalar(protoreflect.BytesKind)
 }
 
 // FieldTypeMessage returns a FieldType for the given message type.
@@ -160,7 +162,7 @@ func FieldTypeMessage(mb *MessageBuilder) *FieldType {
 
 // FieldTypeImportedMessage returns a FieldType that references the given
 // message descriptor.
-func FieldTypeImportedMessage(md *desc.MessageDescriptor) *FieldType {
+func FieldTypeImportedMessage(md protoreflect.MessageDescriptor) *FieldType {
 	return &FieldType{
 		fieldType:      descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
 		foreignMsgType: md,
@@ -177,23 +179,23 @@ func FieldTypeEnum(eb *EnumBuilder) *FieldType {
 
 // FieldTypeImportedEnum returns a FieldType that references the given enum
 // descriptor.
-func FieldTypeImportedEnum(ed *desc.EnumDescriptor) *FieldType {
+func FieldTypeImportedEnum(ed protoreflect.EnumDescriptor) *FieldType {
 	return &FieldType{
 		fieldType:       descriptorpb.FieldDescriptorProto_TYPE_ENUM,
 		foreignEnumType: ed,
 	}
 }
 
-func fieldTypeFromDescriptor(fld *desc.FieldDescriptor) *FieldType {
-	switch fld.GetType() {
-	case descriptorpb.FieldDescriptorProto_TYPE_GROUP:
-		return &FieldType{fieldType: descriptorpb.FieldDescriptorProto_TYPE_GROUP, foreignMsgType: fld.GetMessageType()}
-	case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE:
-		return FieldTypeImportedMessage(fld.GetMessageType())
-	case descriptorpb.FieldDescriptorProto_TYPE_ENUM:
-		return FieldTypeImportedEnum(fld.GetEnumType())
+func fieldTypeFromDescriptor(fld protoreflect.FieldDescriptor) *FieldType {
+	switch fld.Kind() {
+	case protoreflect.GroupKind:
+		return &FieldType{fieldType: descriptorpb.FieldDescriptorProto_TYPE_GROUP, foreignMsgType: fld.Message()}
+	case protoreflect.MessageKind:
+		return FieldTypeImportedMessage(fld.Message())
+	case protoreflect.EnumKind:
+		return FieldTypeImportedEnum(fld.Enum())
 	default:
-		return FieldTypeScalar(fld.GetType())
+		return FieldTypeScalar(fld.Kind())
 	}
 }
 
@@ -207,7 +209,7 @@ func fieldTypeFromDescriptor(fld *desc.FieldDescriptor) *FieldType {
 type RpcType struct {
 	IsStream bool
 
-	foreignType *desc.MessageDescriptor
+	foreignType protoreflect.MessageDescriptor
 	localType   *MessageBuilder
 }
 
@@ -221,19 +223,57 @@ func RpcTypeMessage(mb *MessageBuilder, stream bool) *RpcType {
 
 // RpcTypeImportedMessage creates an RpcType that refers to the given message
 // descriptor.
-func RpcTypeImportedMessage(md *desc.MessageDescriptor, stream bool) *RpcType {
+func RpcTypeImportedMessage(md protoreflect.MessageDescriptor, stream bool) *RpcType {
 	return &RpcType{
 		IsStream:    stream,
 		foreignType: md,
 	}
 }
 
-// GetTypeName returns the fully qualified name of the message type to which
+// TypeName returns the fully qualified path of the message type to which
 // this RpcType refers.
-func (rt *RpcType) GetTypeName() string {
+func (rt *RpcType) TypeName() protoreflect.FullName {
 	if rt.foreignType != nil {
-		return rt.foreignType.GetFullyQualifiedName()
+		return rt.foreignType.FullName()
 	} else {
-		return GetFullyQualifiedName(rt.localType)
+		return FullName(rt.localType)
 	}
+}
+
+type pointerMsg[T any] interface {
+	*T
+	proto.Message
+}
+
+func as[M pointerMsg[T], T any](msg proto.Message) (M, error) {
+	dest, ok := msg.(M)
+	if ok {
+		return dest, nil
+	}
+	var exts *protoregistry.Types
+	var err error
+	msg.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
+		if fd.IsExtension() {
+			if exts == nil {
+				exts = &protoregistry.Types{}
+			}
+			err = exts.RegisterExtension(protoresolve.ExtensionType(fd))
+			return err == nil
+		}
+		return true
+	})
+	if err != nil {
+		return nil, err
+	}
+	dest = new(T)
+	var opts proto.UnmarshalOptions
+	if exts != nil {
+		opts.Resolver = exts
+	}
+	if data, err := proto.Marshal(msg); err != nil {
+		return nil, err
+	} else if err = (proto.UnmarshalOptions{Resolver: exts}).Unmarshal(data, dest); err != nil {
+		return nil, err
+	}
+	return dest, nil
 }

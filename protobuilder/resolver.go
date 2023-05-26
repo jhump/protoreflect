@@ -11,29 +11,28 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/internal"
-	"github.com/jhump/protoreflect/dynamic"
+	"github.com/jhump/protoreflect/v2/protoresolve"
+	"github.com/jhump/protoreflect/v2/protowrap"
 )
 
 type dependencies struct {
-	descs map[*desc.FileDescriptor]struct{}
+	descs map[protoreflect.FileDescriptor]struct{}
 	res   protoregistry.Types
 }
 
 func newDependencies() *dependencies {
 	return &dependencies{
-		descs: map[*desc.FileDescriptor]struct{}{},
+		descs: map[protoreflect.FileDescriptor]struct{}{},
 	}
 }
 
-func (d *dependencies) add(fd *desc.FileDescriptor) {
+func (d *dependencies) add(fd protoreflect.FileDescriptor) error {
 	if _, ok := d.descs[fd]; ok {
 		// already added
-		return
+		return nil
 	}
 	d.descs[fd] = struct{}{}
-	internal.RegisterExtensionsForFile(&d.res, fd.UnwrapFile())
+	return protoresolve.RegisterTypesInFile(fd, &d.res, protoresolve.TypeKindExtension)
 }
 
 // dependencyResolver is the work-horse for converting a tree of builders into a
@@ -42,20 +41,21 @@ func (d *dependencies) add(fd *desc.FileDescriptor) {
 // references to other already-built descriptors). The result of resolution is a
 // file descriptor (or an error).
 type dependencyResolver struct {
-	resolvedRoots map[Builder]*desc.FileDescriptor
+	registry      protoresolve.Registry
+	resolvedRoots map[Builder]protoreflect.FileDescriptor
 	seen          map[Builder]struct{}
 	opts          BuilderOptions
 }
 
 func newResolver(opts BuilderOptions) *dependencyResolver {
 	return &dependencyResolver{
-		resolvedRoots: map[Builder]*desc.FileDescriptor{},
+		resolvedRoots: map[Builder]protoreflect.FileDescriptor{},
 		seen:          map[Builder]struct{}{},
 		opts:          opts,
 	}
 }
 
-func (r *dependencyResolver) resolveElement(b Builder, seen []Builder) (*desc.FileDescriptor, error) {
+func (r *dependencyResolver) resolveElement(b Builder, seen []Builder) (protoreflect.FileDescriptor, error) {
 	b = getRoot(b)
 
 	if fd, ok := r.resolvedRoots[b]; ok {
@@ -66,15 +66,15 @@ func (r *dependencyResolver) resolveElement(b Builder, seen []Builder) (*desc.Fi
 		if s == b {
 			names := make([]string, len(seen)+1)
 			for i, s := range seen {
-				names[i] = s.GetName()
+				names[i] = string(s.Name())
 			}
-			names[len(seen)] = b.GetName()
+			names[len(seen)] = string(b.Name())
 			return nil, fmt.Errorf("descriptors have cyclic dependency: %s", strings.Join(names, " ->  "))
 		}
 	}
 	seen = append(seen, b)
 
-	var fd *desc.FileDescriptor
+	var fd protoreflect.FileDescriptor
 	var err error
 	switch b := b.(type) {
 	case *FileBuilder:
@@ -89,11 +89,13 @@ func (r *dependencyResolver) resolveElement(b Builder, seen []Builder) (*desc.Fi
 	return fd, nil
 }
 
-func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []Builder) (*desc.FileDescriptor, error) {
+func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []Builder) (protoreflect.FileDescriptor, error) {
 	deps := newDependencies()
 	// add explicit imports first
 	for fd := range fb.explicitImports {
-		deps.add(fd)
+		if err := deps.add(fd); err != nil {
+			return nil, err
+		}
 	}
 	for dep := range fb.explicitDeps {
 		if dep == fb {
@@ -104,7 +106,9 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 		if err != nil {
 			return nil, err
 		}
-		deps.add(fd)
+		if err := deps.add(fd); err != nil {
+			return nil, err
+		}
 	}
 	// now accumulate implicit dependencies based on other types referenced
 	for _, mb := range fb.messages {
@@ -129,14 +133,15 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 		return nil, err
 	}
 
-	depSlice := make([]*desc.FileDescriptor, 0, len(deps.descs))
-	depMap := make(map[string]*desc.FileDescriptor, len(deps.descs))
+	depSlice := make([]protoreflect.FileDescriptor, 0, len(deps.descs))
+	depMap := make(filesByPath, len(deps.descs))
 	for dep := range deps.descs {
 		isDuplicate, err := isDuplicateDependency(dep, depMap)
 		if err != nil {
 			return nil, err
 		}
 		if !isDuplicate {
+			depMap[dep.Path()] = dep
 			depSlice = append(depSlice, dep)
 		}
 	}
@@ -146,35 +151,57 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 		return nil, err
 	}
 
-	// make sure this file name doesn't collide with any of its dependencies
+	// make sure this file path doesn't collide with any of its dependencies
 	fileNames := map[string]struct{}{}
 	for _, d := range depSlice {
 		addFileNames(d, fileNames)
-		fileNames[d.GetName()] = struct{}{}
+		fileNames[d.Path()] = struct{}{}
 	}
 	unique := makeUnique(fp.GetName(), fileNames)
 	if unique != fp.GetName() {
 		fp.Name = proto.String(unique)
 	}
 
-	return desc.CreateFileDescriptor(fp, depSlice...)
+	for _, dep := range depSlice {
+		isDuplicate, err := isDuplicateDependency(dep, &r.registry)
+		if err != nil {
+			return nil, err
+		}
+		if isDuplicate {
+			continue
+		}
+		if err := r.registry.RegisterFile(dep); err != nil {
+			return nil, err
+		}
+	}
+	return protowrap.AddToRegistry(fp, &r.registry)
+}
+
+type filesByPath map[string]protoreflect.FileDescriptor
+
+func (d filesByPath) FindFileByPath(path string) (protoreflect.FileDescriptor, error) {
+	file, ok := d[path]
+	if ok {
+		return file, nil
+	}
+	return nil, protoregistry.NotFound
 }
 
 // isDuplicateDependency checks for duplicate descriptors
-func isDuplicateDependency(dep *desc.FileDescriptor, depMap map[string]*desc.FileDescriptor) (bool, error) {
-	if _, exists := depMap[dep.GetName()]; !exists {
-		depMap[dep.GetName()] = dep
+func isDuplicateDependency(dep protoreflect.FileDescriptor, files protoresolve.FileResolver) (bool, error) {
+	existing, err := files.FindFileByPath(dep.Path())
+	if err == nil {
 		return false, nil
 	}
-	prevFDP := depMap[dep.GetName()].AsFileDescriptorProto()
-	depFDP := dep.AsFileDescriptorProto()
+	prevFDP := protowrap.ProtoFromFileDescriptor(existing)
+	depFDP := protowrap.ProtoFromFileDescriptor(dep)
 
-	// temporarily reset Source Code Fields as builders does not have SourceCodeInfo
+	// temporarily reset source code info: builders do not have them
 	defer setSourceCodeInfo(prevFDP, nil)()
 	defer setSourceCodeInfo(depFDP, nil)()
 
 	if !proto.Equal(prevFDP, depFDP) {
-		return true, fmt.Errorf("multiple versions of descriptors found with same file name: %s", dep.GetName())
+		return true, fmt.Errorf("multiple versions of descriptors found with same file path: %s", dep.Path())
 	}
 	return true, nil
 }
@@ -185,22 +212,24 @@ func setSourceCodeInfo(fdp *descriptorpb.FileDescriptorProto, info *descriptorpb
 	return func() { fdp.SourceCodeInfo = prevSourceCodeInfo }
 }
 
-func addFileNames(fd *desc.FileDescriptor, files map[string]struct{}) {
-	if _, ok := files[fd.GetName()]; ok {
+func addFileNames(fd protoreflect.FileDescriptor, files map[string]struct{}) {
+	if _, ok := files[fd.Path()]; ok {
 		// already added
 		return
 	}
-	files[fd.GetName()] = struct{}{}
-	for _, d := range fd.GetDependencies() {
-		addFileNames(d, files)
+	files[fd.Path()] = struct{}{}
+	imps := fd.Imports()
+	for i, length := 0, imps.Len(); i < length; i++ {
+		imp := imps.Get(i).FileDescriptor
+		addFileNames(imp, files)
 	}
 }
 
-func (r *dependencyResolver) resolveSyntheticFile(b Builder, seen []Builder) (*desc.FileDescriptor, error) {
+func (r *dependencyResolver) resolveSyntheticFile(b Builder, seen []Builder) (protoreflect.FileDescriptor, error) {
 	// find ancestor to temporarily attach to new file
 	curr := b
-	for curr.GetParent() != nil {
-		curr = curr.GetParent()
+	for curr.Parent() != nil {
+		curr = curr.Parent()
 	}
 	f := NewFile("")
 	switch curr := curr.(type) {
@@ -216,8 +245,8 @@ func (r *dependencyResolver) resolveSyntheticFile(b Builder, seen []Builder) (*d
 		} else {
 			panic("field must be added to message before calling Build()")
 		}
-	case *OneOfBuilder:
-		if _, ok := b.(*OneOfBuilder); ok {
+	case *OneofBuilder:
+		if _, ok := b.(*OneofBuilder); ok {
 			panic("one-of must be added to message before calling Build()")
 		} else {
 			// b was a child of one-of which means it must have been a field
@@ -247,7 +276,7 @@ func (r *dependencyResolver) resolveTypesInMessage(root Builder, seen []Builder,
 				return err
 			}
 		} else {
-			oob := b.(*OneOfBuilder)
+			oob := b.(*OneofBuilder)
 			for _, flb := range oob.choices {
 				if err := r.resolveTypesInField(root, seen, deps, flb); err != nil {
 					return err
@@ -273,7 +302,9 @@ func (r *dependencyResolver) resolveTypesInExtension(root Builder, seen []Builde
 		return err
 	}
 	if exb.foreignExtendee != nil {
-		deps.add(exb.foreignExtendee.GetFile())
+		if err := deps.add(exb.foreignExtendee.ParentFile()); err != nil {
+			return err
+		}
 	} else if err := r.resolveType(root, seen, exb.localExtendee, deps); err != nil {
 		return err
 	}
@@ -294,7 +325,9 @@ func (r *dependencyResolver) resolveTypesInService(root Builder, seen []Builder,
 
 func (r *dependencyResolver) resolveRpcType(root Builder, seen []Builder, t *RpcType, deps *dependencies) error {
 	if t.foreignType != nil {
-		deps.add(t.foreignType.GetFile())
+		if err := deps.add(t.foreignType.ParentFile()); err != nil {
+			return err
+		}
 	} else {
 		return r.resolveType(root, seen, t.localType, deps)
 	}
@@ -303,9 +336,13 @@ func (r *dependencyResolver) resolveRpcType(root Builder, seen []Builder, t *Rpc
 
 func (r *dependencyResolver) resolveTypesInField(root Builder, seen []Builder, deps *dependencies, flb *FieldBuilder) error {
 	if flb.fieldType.foreignMsgType != nil {
-		deps.add(flb.fieldType.foreignMsgType.GetFile())
+		if err := deps.add(flb.fieldType.foreignMsgType.ParentFile()); err != nil {
+			return err
+		}
 	} else if flb.fieldType.foreignEnumType != nil {
-		deps.add(flb.fieldType.foreignEnumType.GetFile())
+		if err := deps.add(flb.fieldType.foreignEnumType.ParentFile()); err != nil {
+			return err
+		}
 	} else if flb.fieldType.localMsgType != nil {
 		if flb.fieldType.localMsgType == flb.msgType {
 			return r.resolveTypesInMessage(root, seen, deps, flb.msgType)
@@ -328,47 +365,46 @@ func (r *dependencyResolver) resolveType(root Builder, seen []Builder, typeBuild
 	if err != nil {
 		return err
 	}
-	deps.add(fd)
-	return nil
+	return deps.add(fd)
 }
 
 func (r *dependencyResolver) resolveTypesInFileOptions(root Builder, deps *dependencies, fb *FileBuilder) error {
 	for _, mb := range fb.messages {
-		if err := r.resolveTypesInMessageOptions(root, fb.origExts, deps, mb); err != nil {
+		if err := r.resolveTypesInMessageOptions(root, &fb.origExts, deps, mb); err != nil {
 			return err
 		}
 	}
 	for _, eb := range fb.enums {
-		if err := r.resolveTypesInEnumOptions(root, fb.origExts, deps, eb); err != nil {
+		if err := r.resolveTypesInEnumOptions(root, &fb.origExts, deps, eb); err != nil {
 			return err
 		}
 	}
 	for _, exb := range fb.extensions {
-		if err := r.resolveTypesInOptions(root, fb.origExts, deps, exb.Options); err != nil {
+		if err := r.resolveTypesInOptions(root, &fb.origExts, deps, exb.Options); err != nil {
 			return err
 		}
 	}
 	for _, sb := range fb.services {
 		for _, mtb := range sb.methods {
-			if err := r.resolveTypesInOptions(root, fb.origExts, deps, mtb.Options); err != nil {
+			if err := r.resolveTypesInOptions(root, &fb.origExts, deps, mtb.Options); err != nil {
 				return err
 			}
 		}
-		if err := r.resolveTypesInOptions(root, fb.origExts, deps, sb.Options); err != nil {
+		if err := r.resolveTypesInOptions(root, &fb.origExts, deps, sb.Options); err != nil {
 			return err
 		}
 	}
-	return r.resolveTypesInOptions(root, fb.origExts, deps, fb.Options)
+	return r.resolveTypesInOptions(root, &fb.origExts, deps, fb.Options)
 }
 
-func (r *dependencyResolver) resolveTypesInMessageOptions(root Builder, fileExts *dynamic.ExtensionRegistry, deps *dependencies, mb *MessageBuilder) error {
+func (r *dependencyResolver) resolveTypesInMessageOptions(root Builder, fileExts protoresolve.ExtensionTypeResolver, deps *dependencies, mb *MessageBuilder) error {
 	for _, b := range mb.fieldsAndOneOfs {
 		if flb, ok := b.(*FieldBuilder); ok {
 			if err := r.resolveTypesInOptions(root, fileExts, deps, flb.Options); err != nil {
 				return err
 			}
 		} else {
-			oob := b.(*OneOfBuilder)
+			oob := b.(*OneofBuilder)
 			for _, flb := range oob.choices {
 				if err := r.resolveTypesInOptions(root, fileExts, deps, flb.Options); err != nil {
 					return err
@@ -405,7 +441,7 @@ func (r *dependencyResolver) resolveTypesInMessageOptions(root Builder, fileExts
 	return nil
 }
 
-func (r *dependencyResolver) resolveTypesInEnumOptions(root Builder, fileExts *dynamic.ExtensionRegistry, deps *dependencies, eb *EnumBuilder) error {
+func (r *dependencyResolver) resolveTypesInEnumOptions(root Builder, fileExts protoresolve.ExtensionTypeResolver, deps *dependencies, eb *EnumBuilder) error {
 	for _, evb := range eb.values {
 		if err := r.resolveTypesInOptions(root, fileExts, deps, evb.Options); err != nil {
 			return err
@@ -417,7 +453,7 @@ func (r *dependencyResolver) resolveTypesInEnumOptions(root Builder, fileExts *d
 	return nil
 }
 
-func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts *dynamic.ExtensionRegistry, deps *dependencies, opts proto.Message) error {
+func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts protoresolve.ExtensionTypeResolver, deps *dependencies, opts proto.Message) error {
 	// nothing to see if opts is nil
 	if opts == nil {
 		return nil
@@ -427,9 +463,9 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts *dynam
 	}
 
 	ref := opts.ProtoReflect()
-	tags := map[int32]protoreflect.ExtensionType{}
+	tags := map[protoreflect.FieldNumber]protoreflect.ExtensionType{}
 	proto.RangeExtensions(opts, func(xt protoreflect.ExtensionType, _ interface{}) bool {
-		num := int32(xt.TypeDescriptor().Number())
+		num := xt.TypeDescriptor().Number()
 		tags[num] = xt
 		return true
 	})
@@ -443,8 +479,8 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts *dynam
 		unk = unk[n:]
 
 		num, t := protowire.DecodeTag(v)
-		if _, ok := tags[int32(num)]; !ok {
-			tags[int32(num)] = nil
+		if _, ok := tags[num]; !ok {
+			tags[num] = nil
 		}
 
 		switch t {
@@ -468,10 +504,10 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts *dynam
 		unk = unk[n:]
 	}
 
-	msgName := string(proto.MessageName(opts))
+	msgName := proto.MessageName(opts)
 	for tag, xt := range tags {
 		// see if known dependencies have this option
-		if _, err := deps.res.FindExtensionByNumber(protoreflect.FullName(msgName), protoreflect.FieldNumber(tag)); err == nil {
+		if _, err := deps.res.FindExtensionByNumber(msgName, tag); err == nil {
 			// yep! nothing else to do
 			continue
 		}
@@ -481,28 +517,30 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts *dynam
 			continue
 		}
 		// see if configured extension registry knows about it
-		if extd := r.opts.Extensions.FindExtension(string(msgName), int32(tag)); extd != nil {
+		if extd, err := r.opts.Resolver.FindExtensionByNumber(msgName, tag); err == nil {
 			// extension registry recognized it!
-			deps.add(extd.GetFile())
+			if err := deps.add(extd.TypeDescriptor().ParentFile()); err != nil {
+				return err
+			}
 			continue
 		}
 		// see if given file extensions knows about it
 		if fileExts != nil {
-			extd := fileExts.FindExtension(msgName, tag)
-			if extd != nil {
+			if extd, err := fileExts.FindExtensionByNumber(msgName, tag); err == nil {
 				// file extensions recognized it!
-				deps.add(extd.GetFile())
+				if err := deps.add(extd.TypeDescriptor().ParentFile()); err != nil {
+					return err
+				}
 				continue
 			}
 		}
 
 		if xt != nil {
 			// known extension? add its file to builder's deps
-			fd, err := desc.WrapFile(xt.TypeDescriptor().ParentFile())
-			if err != nil {
+			fd := xt.TypeDescriptor().ParentFile()
+			if err := deps.add(fd); err != nil {
 				return err
 			}
-			deps.add(fd)
 			continue
 		}
 
@@ -514,7 +552,7 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts *dynam
 	return nil
 }
 
-func findExtension(b Builder, messageName string, extTag int32) bool {
+func findExtension(b Builder, messageName protoreflect.FullName, extTag protoreflect.FieldNumber) bool {
 	if fb, ok := b.(*FileBuilder); ok && findExtensionInFile(fb, messageName, extTag) {
 		return true
 	}
@@ -524,9 +562,9 @@ func findExtension(b Builder, messageName string, extTag int32) bool {
 	return false
 }
 
-func findExtensionInFile(fb *FileBuilder, messageName string, extTag int32) bool {
+func findExtensionInFile(fb *FileBuilder, messageName protoreflect.FullName, extTag protoreflect.FieldNumber) bool {
 	for _, extb := range fb.extensions {
-		if extb.GetExtendeeTypeName() == messageName && extb.number == extTag {
+		if extb.ExtendeeTypeName() == messageName && extb.number == extTag {
 			return true
 		}
 	}
@@ -538,9 +576,9 @@ func findExtensionInFile(fb *FileBuilder, messageName string, extTag int32) bool
 	return false
 }
 
-func findExtensionInMessage(mb *MessageBuilder, messageName string, extTag int32) bool {
+func findExtensionInMessage(mb *MessageBuilder, messageName protoreflect.FullName, extTag protoreflect.FieldNumber) bool {
 	for _, extb := range mb.nestedExtensions {
-		if extb.GetExtendeeTypeName() == messageName && extb.number == extTag {
+		if extb.ExtendeeTypeName() == messageName && extb.number == extTag {
 			return true
 		}
 	}

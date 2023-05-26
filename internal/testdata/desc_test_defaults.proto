@@ -3,7 +3,7 @@ syntax = "proto" // multi-line string literal
 
 option go_package = "github.com/" // more multi-line string literals
                     "jhump/protoreflect/"
-                    "internal/testprotos";
+                    "v2/internal/testdata";
 
 package testprotos;
 

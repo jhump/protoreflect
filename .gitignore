@@ -1,4 +1,4 @@
-internal/testprotos/protoc
+internal/testdata/protoc
 coverage.out
 
 # Generated file for Goland workspace

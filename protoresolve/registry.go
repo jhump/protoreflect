@@ -20,11 +20,6 @@ type Registry struct {
 
 var _ Resolver = (*Registry)(nil)
 
-// NewRegistry returns a new, empty registry.
-func NewRegistry() *Registry {
-	return &Registry{}
-}
-
 // FromFiles returns a new registry that wraps the given files. After creating
 // this registry, callers should not directly use files -- most especially, they
 // should not register any additional descriptors with files and should instead
@@ -39,7 +34,7 @@ func NewRegistry() *Registry {
 func FromFiles(files *protoregistry.Files) (*Registry, error) {
 	if files == protoregistry.GlobalFiles {
 		// Don't wrap files if it's the global registry; make an effective copy
-		reg := NewRegistry()
+		reg := &Registry{}
 		var err error
 		files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
 			err = reg.RegisterFile(fd)
@@ -69,6 +64,7 @@ func FromFiles(files *protoregistry.Files) (*Registry, error) {
 	return reg, nil
 }
 
+// RegisterFile implements part of the Resolver interface.
 func (r *Registry) RegisterFile(file protoreflect.FileDescriptor) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -86,12 +82,7 @@ func (r *Registry) RegisterFile(file protoreflect.FileDescriptor) error {
 	return nil
 }
 
-type extContainer interface {
-	Extensions() protoreflect.ExtensionDescriptors
-	Messages() protoreflect.MessageDescriptors
-}
-
-func (r *Registry) checkExtensionsLocked(container extContainer) error {
+func (r *Registry) checkExtensionsLocked(container TypeContainer) error {
 	exts := container.Extensions()
 	for i, length := 0, exts.Len(); i < length; i++ {
 		ext := exts.Get(i)
@@ -114,7 +105,7 @@ func (r *Registry) checkExtensionsLocked(container extContainer) error {
 	return nil
 }
 
-func (r *Registry) registerExtensionsLocked(container extContainer) {
+func (r *Registry) registerExtensionsLocked(container TypeContainer) {
 	exts := container.Extensions()
 	for i, length := 0, exts.Len(); i < length; i++ {
 		ext := exts.Get(i)
@@ -135,19 +126,22 @@ func (r *Registry) registerExtensionsLocked(container extContainer) {
 	}
 }
 
+// FindFileByPath implements part of the Resolver interface.
 func (r *Registry) FindFileByPath(path string) (protoreflect.FileDescriptor, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.files.FindFileByPath(path)
 }
 
+// NumFiles implements part of the FilePool interface.
 func (r *Registry) NumFiles() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.files.NumFiles()
 }
 
-func (r *Registry) RangeFiles(f func(protoreflect.FileDescriptor) bool) {
+// RangeFiles implements part of the FilePool interface.
+func (r *Registry) RangeFiles(fn func(protoreflect.FileDescriptor) bool) {
 	var files []protoreflect.FileDescriptor
 	func() {
 		r.mu.RLock()
@@ -161,19 +155,21 @@ func (r *Registry) RangeFiles(f func(protoreflect.FileDescriptor) bool) {
 		})
 	}()
 	for _, file := range files {
-		if !f(file) {
+		if !fn(file) {
 			return
 		}
 	}
 }
 
+// NumFilesByPackage implements part of the FilePool interface.
 func (r *Registry) NumFilesByPackage(name protoreflect.FullName) int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.files.NumFilesByPackage(name)
 }
 
-func (r *Registry) RangeFilesByPackage(name protoreflect.FullName, f func(protoreflect.FileDescriptor) bool) {
+// RangeFilesByPackage implements part of the FilePool interface.
+func (r *Registry) RangeFilesByPackage(name protoreflect.FullName, fn func(protoreflect.FileDescriptor) bool) {
 	var files []protoreflect.FileDescriptor
 	func() {
 		r.mu.RLock()
@@ -187,12 +183,13 @@ func (r *Registry) RangeFilesByPackage(name protoreflect.FullName, f func(protor
 		})
 	}()
 	for _, file := range files {
-		if !f(file) {
+		if !fn(file) {
 			return
 		}
 	}
 }
 
+// FindDescriptorByName implements part of the Resolver interface.
 func (r *Registry) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -225,6 +222,7 @@ func descType(d protoreflect.Descriptor) string {
 	}
 }
 
+// FindMessageByName implements part of the Resolver interface.
 func (r *Registry) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageDescriptor, error) {
 	d, err := r.FindDescriptorByName(name)
 	if err != nil {
@@ -237,6 +235,7 @@ func (r *Registry) FindMessageByName(name protoreflect.FullName) (protoreflect.M
 	return msg, nil
 }
 
+// FindFieldByName implements part of the Resolver interface.
 func (r *Registry) FindFieldByName(name protoreflect.FullName) (protoreflect.FieldDescriptor, error) {
 	d, err := r.FindDescriptorByName(name)
 	if err != nil {
@@ -249,6 +248,7 @@ func (r *Registry) FindFieldByName(name protoreflect.FullName) (protoreflect.Fie
 	return fld, nil
 }
 
+// FindExtensionByName implements part of the Resolver interface.
 func (r *Registry) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
 	d, err := r.FindDescriptorByName(name)
 	if err != nil {
@@ -264,6 +264,7 @@ func (r *Registry) FindExtensionByName(name protoreflect.FullName) (protoreflect
 	return fld, nil
 }
 
+// FindOneofByName implements part of the Resolver interface.
 func (r *Registry) FindOneofByName(name protoreflect.FullName) (protoreflect.OneofDescriptor, error) {
 	d, err := r.FindDescriptorByName(name)
 	if err != nil {
@@ -276,6 +277,7 @@ func (r *Registry) FindOneofByName(name protoreflect.FullName) (protoreflect.One
 	return ood, nil
 }
 
+// FindEnumByName implements part of the Resolver interface.
 func (r *Registry) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumDescriptor, error) {
 	d, err := r.FindDescriptorByName(name)
 	if err != nil {
@@ -288,6 +290,7 @@ func (r *Registry) FindEnumByName(name protoreflect.FullName) (protoreflect.Enum
 	return en, nil
 }
 
+// FindEnumValueByName implements part of the Resolver interface.
 func (r *Registry) FindEnumValueByName(name protoreflect.FullName) (protoreflect.EnumValueDescriptor, error) {
 	d, err := r.FindDescriptorByName(name)
 	if err != nil {
@@ -300,6 +303,7 @@ func (r *Registry) FindEnumValueByName(name protoreflect.FullName) (protoreflect
 	return enVal, nil
 }
 
+// FindServiceByName implements part of the Resolver interface.
 func (r *Registry) FindServiceByName(name protoreflect.FullName) (protoreflect.ServiceDescriptor, error) {
 	d, err := r.FindDescriptorByName(name)
 	if err != nil {
@@ -312,6 +316,7 @@ func (r *Registry) FindServiceByName(name protoreflect.FullName) (protoreflect.S
 	return svc, nil
 }
 
+// FindMethodByName implements part of the Resolver interface.
 func (r *Registry) FindMethodByName(name protoreflect.FullName) (protoreflect.MethodDescriptor, error) {
 	d, err := r.FindDescriptorByName(name)
 	if err != nil {
@@ -324,6 +329,7 @@ func (r *Registry) FindMethodByName(name protoreflect.FullName) (protoreflect.Me
 	return mtd, nil
 }
 
+// FindExtensionByNumber implements part of the Resolver interface.
 func (r *Registry) FindExtensionByNumber(message protoreflect.FullName, fieldNumber protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -334,11 +340,43 @@ func (r *Registry) FindExtensionByNumber(message protoreflect.FullName, fieldNum
 	return ext, nil
 }
 
+// FindMessageByURL implements part of the Resolver interface.
 func (r *Registry) FindMessageByURL(url string) (protoreflect.MessageDescriptor, error) {
-	return r.FindMessageByName(typeNameFromURL(url))
+	return r.FindMessageByName(TypeNameFromURL(url))
 }
 
+// RangeExtensionsByMessage implements part of the Resolver interface.
+func (r *Registry) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionDescriptor) bool) {
+	var exts []protoreflect.ExtensionDescriptor
+	func() {
+		r.mu.RLock()
+		defer r.mu.RUnlock()
+		extMap := r.exts[message]
+		if len(extMap) == 0 {
+			return
+		}
+		exts = make([]protoreflect.ExtensionDescriptor, len(extMap))
+		i := 0
+		for _, v := range extMap {
+			exts[i] = v
+			i++
+		}
+	}()
+	for _, ext := range exts {
+		if !fn(ext) {
+			return
+		}
+	}
+}
+
+// AsTypeResolver implements part of the Resolver interface.
 func (r *Registry) AsTypeResolver() TypeResolver {
+	return r.AsTypePool()
+}
+
+// AsTypePool returns a view of this registry as a TypePool. This offers more methods
+// than AsTypeResolver, providing the ability to enumerate types.
+func (r *Registry) AsTypePool() TypePool {
 	return (*dynamicTypeResolver)(r)
 }
 
@@ -350,7 +388,7 @@ func (d *dynamicTypeResolver) FindExtensionByName(name protoreflect.FullName) (p
 	if err != nil {
 		return nil, err
 	}
-	return dynamicpb.NewExtensionType(ext), nil
+	return ExtensionType(ext), nil
 }
 
 func (d *dynamicTypeResolver) FindExtensionByNumber(message protoreflect.FullName, number protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
@@ -359,7 +397,7 @@ func (d *dynamicTypeResolver) FindExtensionByNumber(message protoreflect.FullNam
 	if err != nil {
 		return nil, err
 	}
-	return dynamicpb.NewExtensionType(ext), nil
+	return ExtensionType(ext), nil
 }
 
 func (d *dynamicTypeResolver) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageType, error) {
@@ -387,4 +425,82 @@ func (d *dynamicTypeResolver) FindEnumByName(name protoreflect.FullName) (protor
 		return nil, err
 	}
 	return dynamicpb.NewEnumType(en), nil
+}
+
+func (d *dynamicTypeResolver) RangeMessages(fn func(protoreflect.MessageType) bool) {
+	r := (*Registry)(d)
+	var rangeInContext func(container TypeContainer, fn func(protoreflect.MessageType) bool) bool
+	rangeInContext = func(container TypeContainer, fn func(protoreflect.MessageType) bool) bool {
+		msgs := container.Messages()
+		for i, length := 0, msgs.Len(); i < length; i++ {
+			msg := msgs.Get(i)
+			if !fn(dynamicpb.NewMessageType(msg)) {
+				return false
+			}
+			if !rangeInContext(msg, fn) {
+				return false
+			}
+		}
+		return true
+	}
+	r.RangeFiles(func(file protoreflect.FileDescriptor) bool {
+		return rangeInContext(file, fn)
+	})
+}
+
+func (d *dynamicTypeResolver) RangeEnums(fn func(protoreflect.EnumType) bool) {
+	r := (*Registry)(d)
+	var rangeInContext func(container TypeContainer, fn func(protoreflect.EnumType) bool) bool
+	rangeInContext = func(container TypeContainer, fn func(protoreflect.EnumType) bool) bool {
+		enums := container.Enums()
+		for i, length := 0, enums.Len(); i < length; i++ {
+			enum := enums.Get(i)
+			if !fn(dynamicpb.NewEnumType(enum)) {
+				return false
+			}
+		}
+		msgs := container.Messages()
+		for i, length := 0, msgs.Len(); i < length; i++ {
+			msg := msgs.Get(i)
+			if !rangeInContext(msg, fn) {
+				return false
+			}
+		}
+		return true
+	}
+	r.RangeFiles(func(file protoreflect.FileDescriptor) bool {
+		return rangeInContext(file, fn)
+	})
+}
+
+func (d *dynamicTypeResolver) RangeExtensions(fn func(protoreflect.ExtensionType) bool) {
+	r := (*Registry)(d)
+	var rangeInContext func(container TypeContainer, fn func(protoreflect.ExtensionType) bool) bool
+	rangeInContext = func(container TypeContainer, fn func(protoreflect.ExtensionType) bool) bool {
+		exts := container.Extensions()
+		for i, length := 0, exts.Len(); i < length; i++ {
+			ext := exts.Get(i)
+			if !fn(ExtensionType(ext)) {
+				return false
+			}
+		}
+		msgs := container.Messages()
+		for i, length := 0, msgs.Len(); i < length; i++ {
+			msg := msgs.Get(i)
+			if !rangeInContext(msg, fn) {
+				return false
+			}
+		}
+		return true
+	}
+	r.RangeFiles(func(file protoreflect.FileDescriptor) bool {
+		return rangeInContext(file, fn)
+	})
+}
+
+func (d *dynamicTypeResolver) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionType) bool) {
+	r := (*Registry)(d)
+	r.RangeExtensionsByMessage(message, func(ext protoreflect.ExtensionDescriptor) bool {
+		return fn(ExtensionType(ext))
+	})
 }

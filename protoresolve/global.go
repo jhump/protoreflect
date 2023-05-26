@@ -144,6 +144,12 @@ func (g globalResolver) FindExtensionByNumber(message protoreflect.FullName, num
 	return ext.TypeDescriptor(), nil
 }
 
+func (g globalResolver) RangeExtensionsByMessage(message protoreflect.FullName, fn func(descriptor protoreflect.ExtensionDescriptor) bool) {
+	protoregistry.GlobalTypes.RangeExtensionsByMessage(message, func(ext protoreflect.ExtensionType) bool {
+		return fn(ext.TypeDescriptor())
+	})
+}
+
 func (g globalResolver) FindMessageByURL(url string) (protoreflect.MessageDescriptor, error) {
 	msg, err := protoregistry.GlobalTypes.FindMessageByURL(url)
 	if err != nil {
@@ -153,27 +159,5 @@ func (g globalResolver) FindMessageByURL(url string) (protoreflect.MessageDescri
 }
 
 func (g globalResolver) AsTypeResolver() TypeResolver {
-	return globalTypeResolver{}
-}
-
-type globalTypeResolver struct{}
-
-func (g globalTypeResolver) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionType, error) {
-	return protoregistry.GlobalTypes.FindExtensionByName(name)
-}
-
-func (g globalTypeResolver) FindExtensionByNumber(message protoreflect.FullName, number protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
-	return protoregistry.GlobalTypes.FindExtensionByNumber(message, number)
-}
-
-func (g globalTypeResolver) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageType, error) {
-	return protoregistry.GlobalTypes.FindMessageByName(name)
-}
-
-func (g globalTypeResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
-	return protoregistry.GlobalTypes.FindMessageByURL(url)
-}
-
-func (g globalTypeResolver) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumType, error) {
-	return protoregistry.GlobalTypes.FindEnumByName(name)
+	return protoregistry.GlobalTypes
 }

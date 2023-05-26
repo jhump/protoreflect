@@ -1,17 +1,19 @@
 package protobuilder
 
 import (
+	"errors"
 	"fmt"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"sort"
 	"strings"
 	"sync/atomic"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/internal"
-	"github.com/jhump/protoreflect/dynamic"
+	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 var uniqueFileCounter uint64
@@ -33,22 +35,22 @@ func makeUnique(name string, existingNames map[string]struct{}) string {
 	}
 }
 
-// FileBuilder is a builder used to construct a desc.FileDescriptor. This is the
+// FileBuilder is a builder used to construct a protoreflect.FileDescriptor. This is the
 // root of the hierarchy. All other descriptors belong to a file, and thus all
 // other builders also belong to a file.
 //
 // If a builder is *not* associated with a file, the resulting descriptor will
 // be associated with a synthesized file that contains only the built descriptor
 // and its ancestors. This means that such descriptors will have no associated
-// package name.
+// package path.
 //
 // To create a new FileBuilder, use NewFile.
 type FileBuilder struct {
-	name string
+	path string
 
-	IsProto3 bool
-	Package  string
-	Options  *descriptorpb.FileOptions
+	Syntax  protoreflect.Syntax
+	Package protoreflect.FullName
+	Options *descriptorpb.FileOptions
 
 	comments        Comments
 	SyntaxComments  Comments
@@ -58,19 +60,21 @@ type FileBuilder struct {
 	extensions []*FieldBuilder
 	enums      []*EnumBuilder
 	services   []*ServiceBuilder
-	symbols    map[string]Builder
+	symbols    map[protoreflect.Name]Builder
 
-	origExts        *dynamic.ExtensionRegistry
+	origExts        protoregistry.Types
 	explicitDeps    map[*FileBuilder]struct{}
-	explicitImports map[*desc.FileDescriptor]struct{}
+	explicitImports map[protoreflect.FileDescriptor]struct{}
 }
 
-// NewFile creates a new FileBuilder for a file with the given name. The
-// name can be blank, which indicates a unique name should be generated for it.
-func NewFile(name string) *FileBuilder {
+var _ Builder = (*FileBuilder)(nil)
+
+// NewFile creates a new FileBuilder for a file with the given path. The
+// path can be blank, which indicates a unique path should be generated for it.
+func NewFile(path string) *FileBuilder {
 	return &FileBuilder{
-		name:    name,
-		symbols: map[string]Builder{},
+		path:    path,
+		symbols: map[protoreflect.Name]Builder{},
 	}
 }
 
@@ -79,56 +83,66 @@ func NewFile(name string) *FileBuilder {
 // the given descriptor included it. Instead, comments are extracted from the
 // given descriptor's source info (if present) and, when built, the resulting
 // descriptor will have just the comment info (no location information).
-func FromFile(fd *desc.FileDescriptor) (*FileBuilder, error) {
-	fb := NewFile(fd.GetName())
-	fb.IsProto3 = fd.IsProto3()
-	fb.Package = fd.GetPackage()
-	fb.Options = fd.GetFileOptions()
-	setComments(&fb.comments, fd.GetSourceInfo())
+func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
+	fb := NewFile(fd.Path())
+	fb.Syntax = fd.Syntax()
+	fb.Package = fd.Package()
+	var err error
+	fb.Options, err = as[*descriptorpb.FileOptions](fd.Options())
+	if err != nil {
+		return nil, err
+	}
+	setComments(&fb.comments, fd.SourceLocations().ByPath(nil))
 
-	// find syntax and package comments, too
-	for _, loc := range fd.AsFileDescriptorProto().GetSourceCodeInfo().GetLocation() {
-		if len(loc.Path) == 1 {
-			if loc.Path[0] == internal.File_syntaxTag {
-				setComments(&fb.SyntaxComments, loc)
-			} else if loc.Path[0] == internal.File_packageTag {
-				setComments(&fb.PackageComments, loc)
-			}
+	path := []int32{internal.File_syntaxTag}
+	setComments(&fb.SyntaxComments, fd.SourceLocations().ByPath(path))
+	path = []int32{internal.File_packageTag}
+	setComments(&fb.PackageComments, fd.SourceLocations().ByPath(path))
+
+	// add imports explicitly
+	imps := fd.Imports()
+	for i, length := 0, imps.Len(); i < length; i++ {
+		imp := imps.Get(i).FileDescriptor
+		fb.AddImportedDependency(imp)
+		if err := fb.addExtensionsFromImport(imp); err != nil {
+			return nil, err
 		}
 	}
 
-	// add imports explicitly
-	for _, dep := range fd.GetDependencies() {
-		fb.AddImportedDependency(dep)
-		fb.addExtensionsFromImport(dep)
-	}
+	localMessages := map[protoreflect.MessageDescriptor]*MessageBuilder{}
+	localEnums := map[protoreflect.EnumDescriptor]*EnumBuilder{}
 
-	localMessages := map[*desc.MessageDescriptor]*MessageBuilder{}
-	localEnums := map[*desc.EnumDescriptor]*EnumBuilder{}
-
-	for _, md := range fd.GetMessageTypes() {
-		if mb, err := fromMessage(md, localMessages, localEnums); err != nil {
+	msgs := fd.Messages()
+	for i, length := 0, msgs.Len(); i < length; i++ {
+		msg := msgs.Get(i)
+		if mb, err := fromMessage(msg, localMessages, localEnums); err != nil {
 			return nil, err
 		} else if err := fb.TryAddMessage(mb); err != nil {
 			return nil, err
 		}
 	}
-	for _, ed := range fd.GetEnumTypes() {
-		if eb, err := fromEnum(ed, localEnums); err != nil {
+	enums := fd.Enums()
+	for i, length := 0, msgs.Len(); i < length; i++ {
+		enum := enums.Get(i)
+		if eb, err := fromEnum(enum, localEnums); err != nil {
 			return nil, err
 		} else if err := fb.TryAddEnum(eb); err != nil {
 			return nil, err
 		}
 	}
-	for _, exd := range fd.GetExtensions() {
-		if exb, err := fromField(exd); err != nil {
+	exts := fd.Extensions()
+	for i, length := 0, msgs.Len(); i < length; i++ {
+		ext := exts.Get(i)
+		if exb, err := fromField(ext); err != nil {
 			return nil, err
 		} else if err := fb.TryAddExtension(exb); err != nil {
 			return nil, err
 		}
 	}
-	for _, sd := range fd.GetServices() {
-		if sb, err := fromService(sd); err != nil {
+	svcs := fd.Services()
+	for i, length := 0, msgs.Len(); i < length; i++ {
+		svc := svcs.Get(i)
+		if sb, err := fromService(svc); err != nil {
 			return nil, err
 		} else if err := fb.TryAddService(sb); err != nil {
 			return nil, err
@@ -153,12 +167,12 @@ func FromFile(fd *desc.FileDescriptor) (*FileBuilder, error) {
 	return fb, nil
 }
 
-func updateLocalRefsInMessage(mb *MessageBuilder, localMessages map[*desc.MessageDescriptor]*MessageBuilder, localEnums map[*desc.EnumDescriptor]*EnumBuilder) {
+func updateLocalRefsInMessage(mb *MessageBuilder, localMessages map[protoreflect.MessageDescriptor]*MessageBuilder, localEnums map[protoreflect.EnumDescriptor]*EnumBuilder) {
 	for _, b := range mb.fieldsAndOneOfs {
 		if flb, ok := b.(*FieldBuilder); ok {
 			updateLocalRefsInField(flb, localMessages, localEnums)
 		} else {
-			oob := b.(*OneOfBuilder)
+			oob := b.(*OneofBuilder)
 			for _, flb := range oob.choices {
 				updateLocalRefsInField(flb, localMessages, localEnums)
 			}
@@ -172,7 +186,7 @@ func updateLocalRefsInMessage(mb *MessageBuilder, localMessages map[*desc.Messag
 	}
 }
 
-func updateLocalRefsInField(flb *FieldBuilder, localMessages map[*desc.MessageDescriptor]*MessageBuilder, localEnums map[*desc.EnumDescriptor]*EnumBuilder) {
+func updateLocalRefsInField(flb *FieldBuilder, localMessages map[protoreflect.MessageDescriptor]*MessageBuilder, localEnums map[protoreflect.EnumDescriptor]*EnumBuilder) {
 	if flb.fieldType.foreignMsgType != nil {
 		if mb, ok := localMessages[flb.fieldType.foreignMsgType]; ok {
 			flb.fieldType.foreignMsgType = nil
@@ -196,7 +210,7 @@ func updateLocalRefsInField(flb *FieldBuilder, localMessages map[*desc.MessageDe
 	}
 }
 
-func updateLocalRefsInRpcType(rpcType *RpcType, localMessages map[*desc.MessageDescriptor]*MessageBuilder) {
+func updateLocalRefsInRpcType(rpcType *RpcType, localMessages map[protoreflect.MessageDescriptor]*MessageBuilder) {
 	if rpcType.foreignType != nil {
 		if mb, ok := localMessages[rpcType.foreignType]; ok {
 			rpcType.foreignType = nil
@@ -205,30 +219,40 @@ func updateLocalRefsInRpcType(rpcType *RpcType, localMessages map[*desc.MessageD
 	}
 }
 
-// GetName returns the name of the file. It may include relative path
-// information, too.
-func (fb *FileBuilder) GetName() string {
-	return fb.name
+func (fb *FileBuilder) Name() protoreflect.Name {
+	return ""
 }
 
-// SetName changes this file's name, returning the file builder for method
-// chaining.
-func (fb *FileBuilder) SetName(newName string) *FileBuilder {
-	fb.name = newName
+func (fb *FileBuilder) SetName(newName protoreflect.Name) *FileBuilder {
+	if err := fb.TrySetName(newName); err != nil {
+		panic(err)
+	}
 	return fb
 }
 
-// TrySetName changes this file's name. It always returns nil since renaming
+// TrySetName changes this file's path. It always returns nil since renaming
 // a file cannot fail. (It is specified to return error to satisfy the Builder
 // interface.)
-func (fb *FileBuilder) TrySetName(newName string) error {
-	fb.name = newName
-	return nil
+func (fb *FileBuilder) TrySetName(_ protoreflect.Name) error {
+	return errors.New("can't set name on FileBuilder; use SetPath instead")
 }
 
-// GetParent always returns nil since files are the roots of builder
+// Path returns the path of the file. It may include relative path
+// information, too.
+func (fb *FileBuilder) Path() string {
+	return fb.path
+}
+
+// SetPath changes this file's path, returning the file builder for method
+// chaining.
+func (fb *FileBuilder) SetPath(path string) *FileBuilder {
+	fb.path = path
+	return fb
+}
+
+// Parent always returns nil since files are the roots of builder
 // hierarchies.
-func (fb *FileBuilder) GetParent() Builder {
+func (fb *FileBuilder) Parent() Builder {
 	return nil
 }
 
@@ -238,10 +262,10 @@ func (fb *FileBuilder) setParent(parent Builder) {
 	}
 }
 
-// GetComments returns comments associated with the file itself and not any
+// Comments returns comments associated with the file itself and not any
 // particular element therein. (Note that such a comment will not be rendered by
 // the protoprint package.)
-func (fb *FileBuilder) GetComments() *Comments {
+func (fb *FileBuilder) Comments() *Comments {
 	return &fb.comments
 }
 
@@ -269,14 +293,14 @@ func (fb *FileBuilder) SetPackageComments(c Comments) *FileBuilder {
 	return fb
 }
 
-// GetFile implements the Builder interface and always returns this file.
-func (fb *FileBuilder) GetFile() *FileBuilder {
+// ParentFile implements the Builder interface and always returns this file.
+func (fb *FileBuilder) ParentFile() *FileBuilder {
 	return fb
 }
 
-// GetChildren returns builders for all nested elements, including all top-level
+// Children returns builders for all nested elements, including all top-level
 // messages, enums, extensions, and services.
-func (fb *FileBuilder) GetChildren() []Builder {
+func (fb *FileBuilder) Children() []Builder {
 	var ch []Builder
 	for _, mb := range fb.messages {
 		ch = append(ch, mb)
@@ -293,31 +317,31 @@ func (fb *FileBuilder) GetChildren() []Builder {
 	return ch
 }
 
-func (fb *FileBuilder) findChild(name string) Builder {
+func (fb *FileBuilder) findChild(name protoreflect.Name) Builder {
 	return fb.symbols[name]
 }
 
 func (fb *FileBuilder) removeChild(b Builder) {
-	if p, ok := b.GetParent().(*FileBuilder); !ok || p != fb {
+	if p, ok := b.Parent().(*FileBuilder); !ok || p != fb {
 		return
 	}
 
 	switch b.(type) {
 	case *MessageBuilder:
-		fb.messages = deleteBuilder(b.GetName(), fb.messages).([]*MessageBuilder)
+		fb.messages = deleteBuilder(b.Name(), fb.messages).([]*MessageBuilder)
 	case *FieldBuilder:
-		fb.extensions = deleteBuilder(b.GetName(), fb.extensions).([]*FieldBuilder)
+		fb.extensions = deleteBuilder(b.Name(), fb.extensions).([]*FieldBuilder)
 	case *EnumBuilder:
-		fb.enums = deleteBuilder(b.GetName(), fb.enums).([]*EnumBuilder)
+		fb.enums = deleteBuilder(b.Name(), fb.enums).([]*EnumBuilder)
 	case *ServiceBuilder:
-		fb.services = deleteBuilder(b.GetName(), fb.services).([]*ServiceBuilder)
+		fb.services = deleteBuilder(b.Name(), fb.services).([]*ServiceBuilder)
 	}
-	delete(fb.symbols, b.GetName())
+	delete(fb.symbols, b.Name())
 	b.setParent(nil)
 }
 
-func (fb *FileBuilder) renamedChild(b Builder, oldName string) error {
-	if p, ok := b.GetParent().(*FileBuilder); !ok || p != fb {
+func (fb *FileBuilder) renamedChild(b Builder, oldName protoreflect.Name) error {
+	if p, ok := b.Parent().(*FileBuilder); !ok || p != fb {
 		return nil
 	}
 
@@ -329,32 +353,32 @@ func (fb *FileBuilder) renamedChild(b Builder, oldName string) error {
 }
 
 func (fb *FileBuilder) addSymbol(b Builder) error {
-	if ex, ok := fb.symbols[b.GetName()]; ok {
-		return fmt.Errorf("file %q already contains element (%T) named %q", fb.GetName(), ex, b.GetName())
+	if ex, ok := fb.symbols[b.Name()]; ok {
+		return fmt.Errorf("file %q already contains element (%T) named %q", fb.Name(), ex, b.Name())
 	}
-	fb.symbols[b.GetName()] = b
+	fb.symbols[b.Name()] = b
 	return nil
 }
 
-func (fb *FileBuilder) findFullyQualifiedElement(fqn string) Builder {
+func (fb *FileBuilder) findFullyQualifiedElement(fqn protoreflect.FullName) Builder {
 	if fb.Package != "" {
-		if !strings.HasPrefix(fqn, fb.Package+".") {
+		if !strings.HasPrefix(string(fqn), string(fb.Package+".")) {
 			return nil
 		}
 		fqn = fqn[len(fb.Package)+1:]
 	}
-	names := strings.Split(fqn, ".")
+	names := strings.Split(string(fqn), ".")
 	var b Builder = fb
 	for b != nil && len(names) > 0 {
-		b = b.findChild(names[0])
+		b = b.findChild(protoreflect.Name(names[0]))
 		names = names[1:]
 	}
 	return b
 }
 
-// GetMessage returns the top-level message with the given name. If no such
+// GetMessage returns the top-level message with the given path. If no such
 // message exists in the file, nil is returned.
-func (fb *FileBuilder) GetMessage(name string) *MessageBuilder {
+func (fb *FileBuilder) GetMessage(name protoreflect.Name) *MessageBuilder {
 	b := fb.symbols[name]
 	if mb, ok := b.(*MessageBuilder); ok {
 		return mb
@@ -363,17 +387,17 @@ func (fb *FileBuilder) GetMessage(name string) *MessageBuilder {
 	}
 }
 
-// RemoveMessage removes the top-level message with the given name. If no such
+// RemoveMessage removes the top-level message with the given path. If no such
 // message exists in the file, this is a no-op. This returns the file builder,
 // for method chaining.
-func (fb *FileBuilder) RemoveMessage(name string) *FileBuilder {
+func (fb *FileBuilder) RemoveMessage(name protoreflect.Name) *FileBuilder {
 	fb.TryRemoveMessage(name)
 	return fb
 }
 
-// TryRemoveMessage removes the top-level message with the given name and
+// TryRemoveMessage removes the top-level message with the given path and
 // returns false if the file has no such message.
-func (fb *FileBuilder) TryRemoveMessage(name string) bool {
+func (fb *FileBuilder) TryRemoveMessage(name protoreflect.Name) bool {
 	b := fb.symbols[name]
 	if mb, ok := b.(*MessageBuilder); ok {
 		fb.removeChild(mb)
@@ -393,7 +417,7 @@ func (fb *FileBuilder) AddMessage(mb *MessageBuilder) *FileBuilder {
 }
 
 // TryAddMessage adds the given message to this file, returning any error that
-// prevents the message from being added (such as a name collision with another
+// prevents the message from being added (such as a path collision with another
 // element already added to the file).
 func (fb *FileBuilder) TryAddMessage(mb *MessageBuilder) error {
 	if err := fb.addSymbol(mb); err != nil {
@@ -405,9 +429,9 @@ func (fb *FileBuilder) TryAddMessage(mb *MessageBuilder) error {
 	return nil
 }
 
-// GetExtension returns the top-level extension with the given name. If no such
+// GetExtension returns the top-level extension with the given path. If no such
 // extension exists in the file, nil is returned.
-func (fb *FileBuilder) GetExtension(name string) *FieldBuilder {
+func (fb *FileBuilder) GetExtension(name protoreflect.Name) *FieldBuilder {
 	b := fb.symbols[name]
 	if exb, ok := b.(*FieldBuilder); ok {
 		return exb
@@ -416,17 +440,17 @@ func (fb *FileBuilder) GetExtension(name string) *FieldBuilder {
 	}
 }
 
-// RemoveExtension removes the top-level extension with the given name. If no
+// RemoveExtension removes the top-level extension with the given path. If no
 // such extension exists in the file, this is a no-op. This returns the file
 // builder, for method chaining.
-func (fb *FileBuilder) RemoveExtension(name string) *FileBuilder {
+func (fb *FileBuilder) RemoveExtension(name protoreflect.Name) *FileBuilder {
 	fb.TryRemoveExtension(name)
 	return fb
 }
 
-// TryRemoveExtension removes the top-level extension with the given name and
+// TryRemoveExtension removes the top-level extension with the given path and
 // returns false if the file has no such extension.
-func (fb *FileBuilder) TryRemoveExtension(name string) bool {
+func (fb *FileBuilder) TryRemoveExtension(name protoreflect.Name) bool {
 	b := fb.symbols[name]
 	if exb, ok := b.(*FieldBuilder); ok {
 		fb.removeChild(exb)
@@ -446,11 +470,11 @@ func (fb *FileBuilder) AddExtension(exb *FieldBuilder) *FileBuilder {
 }
 
 // TryAddExtension adds the given extension to this file, returning any error
-// that prevents the extension from being added (such as a name collision with
+// that prevents the extension from being added (such as a path collision with
 // another element already added to the file).
 func (fb *FileBuilder) TryAddExtension(exb *FieldBuilder) error {
 	if !exb.IsExtension() {
-		return fmt.Errorf("field %s is not an extension", exb.GetName())
+		return fmt.Errorf("field %s is not an extension", exb.Name())
 	}
 	if err := fb.addSymbol(exb); err != nil {
 		return err
@@ -461,9 +485,9 @@ func (fb *FileBuilder) TryAddExtension(exb *FieldBuilder) error {
 	return nil
 }
 
-// GetEnum returns the top-level enum with the given name. If no such enum
+// GetEnum returns the top-level enum with the given path. If no such enum
 // exists in the file, nil is returned.
-func (fb *FileBuilder) GetEnum(name string) *EnumBuilder {
+func (fb *FileBuilder) GetEnum(name protoreflect.Name) *EnumBuilder {
 	b := fb.symbols[name]
 	if eb, ok := b.(*EnumBuilder); ok {
 		return eb
@@ -472,17 +496,17 @@ func (fb *FileBuilder) GetEnum(name string) *EnumBuilder {
 	}
 }
 
-// RemoveEnum removes the top-level enum with the given name. If no such enum
+// RemoveEnum removes the top-level enum with the given path. If no such enum
 // exists in the file, this is a no-op. This returns the file builder, for
 // method chaining.
-func (fb *FileBuilder) RemoveEnum(name string) *FileBuilder {
+func (fb *FileBuilder) RemoveEnum(name protoreflect.Name) *FileBuilder {
 	fb.TryRemoveEnum(name)
 	return fb
 }
 
-// TryRemoveEnum removes the top-level enum with the given name and returns
+// TryRemoveEnum removes the top-level enum with the given path and returns
 // false if the file has no such enum.
-func (fb *FileBuilder) TryRemoveEnum(name string) bool {
+func (fb *FileBuilder) TryRemoveEnum(name protoreflect.Name) bool {
 	b := fb.symbols[name]
 	if eb, ok := b.(*EnumBuilder); ok {
 		fb.removeChild(eb)
@@ -502,7 +526,7 @@ func (fb *FileBuilder) AddEnum(eb *EnumBuilder) *FileBuilder {
 }
 
 // TryAddEnum adds the given enum to this file, returning any error that
-// prevents the enum from being added (such as a name collision with another
+// prevents the enum from being added (such as a path collision with another
 // element already added to the file).
 func (fb *FileBuilder) TryAddEnum(eb *EnumBuilder) error {
 	if err := fb.addSymbol(eb); err != nil {
@@ -514,9 +538,9 @@ func (fb *FileBuilder) TryAddEnum(eb *EnumBuilder) error {
 	return nil
 }
 
-// GetService returns the top-level service with the given name. If no such
+// GetService returns the top-level service with the given path. If no such
 // service exists in the file, nil is returned.
-func (fb *FileBuilder) GetService(name string) *ServiceBuilder {
+func (fb *FileBuilder) GetService(name protoreflect.Name) *ServiceBuilder {
 	b := fb.symbols[name]
 	if sb, ok := b.(*ServiceBuilder); ok {
 		return sb
@@ -525,17 +549,17 @@ func (fb *FileBuilder) GetService(name string) *ServiceBuilder {
 	}
 }
 
-// RemoveService removes the top-level service with the given name. If no such
+// RemoveService removes the top-level service with the given path. If no such
 // service exists in the file, this is a no-op. This returns the file builder,
 // for method chaining.
-func (fb *FileBuilder) RemoveService(name string) *FileBuilder {
+func (fb *FileBuilder) RemoveService(name protoreflect.Name) *FileBuilder {
 	fb.TryRemoveService(name)
 	return fb
 }
 
-// TryRemoveService removes the top-level service with the given name and
+// TryRemoveService removes the top-level service with the given path and
 // returns false if the file has no such service.
-func (fb *FileBuilder) TryRemoveService(name string) bool {
+func (fb *FileBuilder) TryRemoveService(name protoreflect.Name) bool {
 	b := fb.symbols[name]
 	if sb, ok := b.(*ServiceBuilder); ok {
 		fb.removeChild(sb)
@@ -555,7 +579,7 @@ func (fb *FileBuilder) AddService(sb *ServiceBuilder) *FileBuilder {
 }
 
 // TryAddService adds the given service to this file, returning any error that
-// prevents the service from being added (such as a name collision with another
+// prevents the service from being added (such as a path collision with another
 // element already added to the file).
 func (fb *FileBuilder) TryAddService(sb *ServiceBuilder) error {
 	if err := fb.addSymbol(sb); err != nil {
@@ -567,16 +591,23 @@ func (fb *FileBuilder) TryAddService(sb *ServiceBuilder) error {
 	return nil
 }
 
-func (fb *FileBuilder) addExtensionsFromImport(dep *desc.FileDescriptor) {
-	if fb.origExts == nil {
-		fb.origExts = &dynamic.ExtensionRegistry{}
+func (fb *FileBuilder) addExtensionsFromImport(dep protoreflect.FileDescriptor) error {
+	if err := protoresolve.RegisterTypesInFile(dep, &fb.origExts, protoresolve.TypeKindExtension); err != nil {
+		return err
 	}
-	fb.origExts.AddExtensionsFromFile(dep)
 	// we also add any extensions from this dependency's "public" imports since
 	// they are also visible to the importing file
-	for _, publicDep := range dep.GetPublicDependencies() {
-		fb.addExtensionsFromImport(publicDep)
+	imps := dep.Imports()
+	for i, length := 0, imps.Len(); i < length; i++ {
+		imp := imps.Get(i)
+		if !imp.IsPublic {
+			continue
+		}
+		if err := fb.addExtensionsFromImport(imp.FileDescriptor); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // AddDependency adds the given file as an explicit import. Normally,
@@ -605,9 +636,9 @@ func (fb *FileBuilder) AddDependency(dep *FileBuilder) *FileBuilder {
 //
 // Knowledge of custom options can also be provided by using BuilderOptions with
 // an ExtensionRegistry, when building the file.
-func (fb *FileBuilder) AddImportedDependency(dep *desc.FileDescriptor) *FileBuilder {
+func (fb *FileBuilder) AddImportedDependency(dep protoreflect.FileDescriptor) *FileBuilder {
 	if fb.explicitImports == nil {
-		fb.explicitImports = map[*desc.FileDescriptor]struct{}{}
+		fb.explicitImports = map[protoreflect.FileDescriptor]struct{}{}
 	}
 	fb.explicitImports[dep] = struct{}{}
 	return fb
@@ -641,32 +672,37 @@ func (fb *FileBuilder) SetOptions(options *descriptorpb.FileOptions) *FileBuilde
 	return fb
 }
 
-// SetPackageName sets the name of the package for this file and returns the
+// SetPackageName sets the path of the package for this file and returns the
 // file, for method chaining.
-func (fb *FileBuilder) SetPackageName(pkg string) *FileBuilder {
+func (fb *FileBuilder) SetPackageName(pkg protoreflect.FullName) *FileBuilder {
 	fb.Package = pkg
 	return fb
 }
 
-// SetProto3 sets whether this file is declared to use "proto3" syntax or not
+// SetSyntax sets whether this file is declared to use "proto3" syntax or not
 // and returns the file, for method chaining.
-func (fb *FileBuilder) SetProto3(isProto3 bool) *FileBuilder {
-	fb.IsProto3 = isProto3
+func (fb *FileBuilder) SetSyntax(syntax protoreflect.Syntax) *FileBuilder {
+	fb.Syntax = syntax
 	return fb
 }
 
-func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*descriptorpb.FileDescriptorProto, error) {
-	name := fb.name
+func (fb *FileBuilder) buildProto(deps []protoreflect.FileDescriptor) (*descriptorpb.FileDescriptorProto, error) {
+	name := fb.path
 	if name == "" {
 		name = uniqueFileName()
 	}
 	var syntax *string
-	if fb.IsProto3 {
+	switch fb.Syntax {
+	case protoreflect.Proto3:
 		syntax = proto.String("proto3")
+	case protoreflect.Proto2, 0: // default (zero) is proto2
+		syntax = proto.String("proto2")
+	default:
+		return nil, fmt.Errorf("builder contains unknown syntax: %v", fb.Syntax)
 	}
 	var pkg *string
 	if fb.Package != "" {
-		pkg = proto.String(fb.Package)
+		pkg = proto.String(string(fb.Package))
 	}
 
 	path := make([]int32, 0, 10)
@@ -677,7 +713,7 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*descriptorpb.Fi
 
 	imports := make([]string, 0, len(deps))
 	for _, dep := range deps {
-		imports = append(imports, dep.GetName())
+		imports = append(imports, dep.Path())
 	}
 	sort.Strings(imports)
 
@@ -739,25 +775,26 @@ func isExtendeeMessageSet(flb *FieldBuilder) bool {
 	if flb.localExtendee != nil {
 		return flb.localExtendee.Options.GetMessageSetWireFormat()
 	}
-	return flb.foreignExtendee.GetMessageOptions().GetMessageSetWireFormat()
+	opts, _ := as[*descriptorpb.MessageOptions](flb.foreignExtendee.Options())
+	return opts.GetMessageSetWireFormat()
 }
 
 // Build constructs a file descriptor based on the contents of this file
 // builder. If there are any problems constructing the descriptor, including
 // resolving symbols referenced by the builder or failing to meet certain
 // validation rules, an error is returned.
-func (fb *FileBuilder) Build() (*desc.FileDescriptor, error) {
+func (fb *FileBuilder) Build() (protoreflect.FileDescriptor, error) {
 	fd, err := fb.BuildDescriptor()
 	if err != nil {
 		return nil, err
 	}
-	return fd.(*desc.FileDescriptor), nil
+	return fd.(protoreflect.FileDescriptor), nil
 }
 
 // BuildDescriptor constructs a file descriptor based on the contents of this
 // file builder. Most usages will prefer Build() instead, whose return type is a
 // concrete descriptor type. This method is present to satisfy the Builder
 // interface.
-func (fb *FileBuilder) BuildDescriptor() (desc.Descriptor, error) {
+func (fb *FileBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(fb, BuilderOptions{})
 }

@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/jhump/protoreflect/desc/sourceinfo"
-	_ "github.com/jhump/protoreflect/internal/testprotos"
-	"github.com/jhump/protoreflect/internal/testutil"
+	_ "github.com/jhump/protoreflect/v2/internal/testdata"
+	"github.com/jhump/protoreflect/v2/sourceinfo"
 )
 
 func TestRegistry(t *testing.T) {
-	fd, err := sourceinfo.GlobalFiles.FindFileByPath("desc_test1.proto")
-	testutil.Ok(t, err)
+	fd, err := sourceinfo.Files.FindFileByPath("desc_test1.proto")
+	require.NoError(t, err)
 	checkFileComments(t, fd)
 }
 
@@ -78,5 +78,5 @@ func checkEnumComments(t *testing.T, srcLocs protoreflect.SourceLocations, ed pr
 
 func checkComment(t *testing.T, srcLocs protoreflect.SourceLocations, d protoreflect.Descriptor) {
 	cmt := fmt.Sprintf(" Comment for %s\n", d.Name())
-	testutil.Eq(t, cmt, srcLocs.ByDescriptor(d).LeadingComments)
+	require.Equal(t, cmt, srcLocs.ByDescriptor(d).LeadingComments)
 }

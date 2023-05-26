@@ -12,7 +12,9 @@ import (
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
-func FromFileDescriptorProto(fd *descriptorpb.FileDescriptorProto, deps protoresolve.DependencyResolver) (protoreflect.FileDescriptor, error) {
+// FromFileDescriptorProto is identical to [protodesc.NewFile] except that it
+// returns a FileWrapper, not just a [protoreflect.FileDescriptor].
+func FromFileDescriptorProto(fd *descriptorpb.FileDescriptorProto, deps protoresolve.DependencyResolver) (FileWrapper, error) {
 	file, err := protodesc.NewFile(fd, deps)
 	if err != nil {
 		return nil, err
@@ -20,7 +22,9 @@ func FromFileDescriptorProto(fd *descriptorpb.FileDescriptorProto, deps protores
 	return &fileWrapper{FileDescriptor: file, proto: fd}, nil
 }
 
-func AddToRegistry(fd *descriptorpb.FileDescriptorProto, reg *protoresolve.Registry) (protoreflect.FileDescriptor, error) {
+// AddToRegistry converts the given proto to a FileWrapper, using reg to resolve
+// any imports, and also registers the wrapper with reg.
+func AddToRegistry(fd *descriptorpb.FileDescriptorProto, reg protoresolve.DescriptorRegistry) (FileWrapper, error) {
 	file, err := FromFileDescriptorProto(fd, reg)
 	if err != nil {
 		return nil, err
@@ -31,6 +35,8 @@ func AddToRegistry(fd *descriptorpb.FileDescriptorProto, reg *protoresolve.Regis
 	return file, nil
 }
 
+// FromFileDescriptorSet is identical to [protodesc.NewFiles] except that all
+// descriptors registered with the returned resolver will be FileWrapper instances.
 func FromFileDescriptorSet(files *descriptorpb.FileDescriptorSet) (protoresolve.Resolver, error) {
 	protosByPath := map[string]*descriptorpb.FileDescriptorProto{}
 	for _, fd := range files.File {
@@ -39,7 +45,7 @@ func FromFileDescriptorSet(files *descriptorpb.FileDescriptorSet) (protoresolve.
 		}
 		protosByPath[fd.GetName()] = fd
 	}
-	reg := protoresolve.NewRegistry()
+	reg := &protoresolve.Registry{}
 	for _, fd := range files.File {
 		if err := resolveFile(fd, protosByPath, reg); err != nil {
 			return nil, err
@@ -587,7 +593,8 @@ func (w *fieldWrapper) doInit() {
 			w.mapValue = findField(mapVal, w.ParentFile())
 		}
 		if oo := w.FieldDescriptor.ContainingOneof(); oo != nil {
-			w.containingOneof = findOneof(oo, w.ParentFile())
+			parent := w.parent.(MessageWrapper)
+			w.containingOneof = parent.Oneofs().Get(oo.Index())
 		}
 		if !w.IsExtension() {
 			w.containingMsg = w.parent.(MessageWrapper)
@@ -855,11 +862,6 @@ func findField(fld protoreflect.FieldDescriptor, root protoreflect.FileDescripto
 	}
 	msg := findMessage(fld.Parent().(protoreflect.MessageDescriptor), root)
 	return msg.Fields().Get(fld.Index())
-}
-
-func findOneof(oo protoreflect.OneofDescriptor, root protoreflect.FileDescriptor) protoreflect.OneofDescriptor {
-	msg := findMessage(oo.Parent().(protoreflect.MessageDescriptor), root)
-	return msg.Oneofs().Get(oo.Index())
 }
 
 func findMessage(msg protoreflect.MessageDescriptor, root protoreflect.FileDescriptor) protoreflect.MessageDescriptor {

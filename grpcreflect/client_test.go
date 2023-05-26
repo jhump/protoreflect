@@ -13,11 +13,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
-	rpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
+	refv1 "google.golang.org/grpc/reflection/grpc_reflection_v1"
+	refv1alpha "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	_ "google.golang.org/protobuf/types/known/apipb"
 	_ "google.golang.org/protobuf/types/known/emptypb"
 	_ "google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -25,238 +29,258 @@ import (
 	_ "google.golang.org/protobuf/types/known/typepb"
 	_ "google.golang.org/protobuf/types/pluginpb"
 
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/internal"
-	testprotosgrpc "github.com/jhump/protoreflect/internal/testprotos/grpc"
-	"github.com/jhump/protoreflect/internal/testutil"
+	testprotosgrpc "github.com/jhump/protoreflect/v2/internal/testdata/grpc"
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
-var client *Client
+var clientv1, clientv1alpha *Client
 
 func TestMain(m *testing.M) {
 	code := 1
 	defer func() {
 		p := recover()
 		if p != nil {
-			fmt.Fprintf(os.Stderr, "PANIC: %v\n", p)
+			_, _ = fmt.Fprintf(os.Stderr, "PANIC: %v\n", p)
 		}
 		os.Exit(code)
 	}()
 
 	svr := grpc.NewServer()
 	testprotosgrpc.RegisterDummyServiceServer(svr, testService{})
+	// support both v1 and v1alpha
+	registerV1(svr)
 	reflection.Register(svr)
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		panic(fmt.Sprintf("Failed to open server socket: %s", err.Error()))
 	}
-	go svr.Serve(l)
+	go func() {
+		_ = svr.Serve(l)
+	}()
 	defer svr.Stop()
 
 	// create grpc client
 	addr := l.Addr().String()
-	cconn, err := grpc.Dial(addr, grpc.WithInsecure())
+	cconn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))
 	}
-	defer cconn.Close()
+	defer func() {
+		_ = cconn.Close()
+	}()
 
-	stub := rpb.NewServerReflectionClient(cconn)
-	client = NewClientV1Alpha(context.Background(), stub)
+	stubv1alpha := refv1alpha.NewServerReflectionClient(cconn)
+	clientv1alpha = NewClientV1Alpha(context.Background(), stubv1alpha)
+	stubv1 := refv1.NewServerReflectionClient(cconn)
+	clientv1 = NewClientV1(context.Background(), stubv1)
 
 	code = m.Run()
 }
 
-func TestFileByFileName(t *testing.T) {
-	fd, err := client.FileByFilename("desc_test1.proto")
-	testutil.Ok(t, err)
-	// shallow check that the descriptor appears correct and complete
-	testutil.Eq(t, "desc_test1.proto", fd.GetName())
-	testutil.Eq(t, "testprotos", fd.GetPackage())
-	md := fd.GetMessageTypes()[0]
-	testutil.Eq(t, "TestMessage", md.GetName())
-	md = md.GetNestedMessageTypes()[0]
-	testutil.Eq(t, "NestedMessage", md.GetName())
-	md = md.GetNestedMessageTypes()[0]
-	testutil.Eq(t, "AnotherNestedMessage", md.GetName())
-	md = md.GetNestedMessageTypes()[0]
-	testutil.Eq(t, "YetAnotherNestedMessage", md.GetName())
-	ed := md.GetNestedEnumTypes()[0]
-	testutil.Eq(t, "DeeplyNestedEnum", ed.GetName())
+func testVersions(t *testing.T, fn func(*testing.T, *Client)) {
+	t.Run("v1", func(t *testing.T) {
+		fn(t, clientv1)
+	})
+	t.Run("v1alpha", func(t *testing.T) {
+		fn(t, clientv1alpha)
+	})
+}
 
-	_, err = client.FileByFilename("does not exist")
-	testutil.Require(t, IsElementNotFoundError(err))
+func TestFileByFileName(t *testing.T) {
+	testVersions(t, func(t *testing.T, client *Client) {
+		fd, err := client.FileByFilename("desc_test1.proto")
+		require.NoError(t, err)
+		// shallow check that the descriptor appears correct and complete
+		require.Equal(t, "desc_test1.proto", fd.Path())
+		require.Equal(t, protoreflect.FullName("testprotos"), fd.Package())
+		md := fd.Messages().Get(0)
+		require.Equal(t, protoreflect.Name("TestMessage"), md.Name())
+		md = md.Messages().Get(0)
+		require.Equal(t, protoreflect.Name("NestedMessage"), md.Name())
+		md = md.Messages().Get(0)
+		require.Equal(t, protoreflect.Name("AnotherNestedMessage"), md.Name())
+		md = md.Messages().Get(0)
+		require.Equal(t, protoreflect.Name("YetAnotherNestedMessage"), md.Name())
+		ed := md.Enums().Get(0)
+		require.Equal(t, protoreflect.Name("DeeplyNestedEnum"), ed.Name())
+
+		_, err = client.FileByFilename("does not exist")
+		require.True(t, IsElementNotFoundError(err))
+	})
 }
 
 func TestFileByFileNameForWellKnownProtos(t *testing.T) {
-	wellKnownProtos := map[string][]string{
-		"google/protobuf/any.proto":             {"google.protobuf.Any"},
-		"google/protobuf/api.proto":             {"google.protobuf.Api", "google.protobuf.Method", "google.protobuf.Mixin"},
-		"google/protobuf/descriptor.proto":      {"google.protobuf.FileDescriptorSet", "google.protobuf.DescriptorProto"},
-		"google/protobuf/duration.proto":        {"google.protobuf.Duration"},
-		"google/protobuf/empty.proto":           {"google.protobuf.Empty"},
-		"google/protobuf/field_mask.proto":      {"google.protobuf.FieldMask"},
-		"google/protobuf/source_context.proto":  {"google.protobuf.SourceContext"},
-		"google/protobuf/struct.proto":          {"google.protobuf.Struct", "google.protobuf.Value", "google.protobuf.NullValue"},
-		"google/protobuf/timestamp.proto":       {"google.protobuf.Timestamp"},
-		"google/protobuf/type.proto":            {"google.protobuf.Type", "google.protobuf.Field", "google.protobuf.Syntax"},
-		"google/protobuf/wrappers.proto":        {"google.protobuf.DoubleValue", "google.protobuf.Int32Value", "google.protobuf.StringValue"},
-		"google/protobuf/compiler/plugin.proto": {"google.protobuf.compiler.CodeGeneratorRequest"},
-	}
-
-	for file, types := range wellKnownProtos {
-		fd, err := client.FileByFilename(file)
-		testutil.Ok(t, err)
-		testutil.Eq(t, file, fd.GetName())
-		for _, typ := range types {
-			d := fd.FindSymbol(typ)
-			testutil.Require(t, d != nil)
+	testVersions(t, func(t *testing.T, client *Client) {
+		wellKnownProtos := map[string][]protoreflect.FullName{
+			"google/protobuf/any.proto":             {"google.protobuf.Any"},
+			"google/protobuf/api.proto":             {"google.protobuf.Api", "google.protobuf.Method", "google.protobuf.Mixin"},
+			"google/protobuf/descriptor.proto":      {"google.protobuf.FileDescriptorSet", "google.protobuf.DescriptorProto"},
+			"google/protobuf/duration.proto":        {"google.protobuf.Duration"},
+			"google/protobuf/empty.proto":           {"google.protobuf.Empty"},
+			"google/protobuf/field_mask.proto":      {"google.protobuf.FieldMask"},
+			"google/protobuf/source_context.proto":  {"google.protobuf.SourceContext"},
+			"google/protobuf/struct.proto":          {"google.protobuf.Struct", "google.protobuf.Value", "google.protobuf.NullValue"},
+			"google/protobuf/timestamp.proto":       {"google.protobuf.Timestamp"},
+			"google/protobuf/type.proto":            {"google.protobuf.Type", "google.protobuf.Field", "google.protobuf.Syntax"},
+			"google/protobuf/wrappers.proto":        {"google.protobuf.DoubleValue", "google.protobuf.Int32Value", "google.protobuf.StringValue"},
+			"google/protobuf/compiler/plugin.proto": {"google.protobuf.compiler.CodeGeneratorRequest"},
 		}
 
-		// also try loading via alternate name
-		file = internal.StdFileAliases[file]
-		if file == "" {
-			// not a file that has a known alternate, so nothing else to check...
-			continue
+		for file, types := range wellKnownProtos {
+			fd, err := client.FileByFilename(file)
+			require.NoError(t, err)
+			require.Equal(t, file, fd.Path())
+			for _, typ := range types {
+				d := protoresolve.FindDescriptorByNameInFile(fd, typ)
+				require.NotNil(t, d)
+			}
 		}
-		fd, err = client.FileByFilename(file)
-		testutil.Ok(t, err)
-		testutil.Eq(t, file, fd.GetName())
-		for _, typ := range types {
-			d := fd.FindSymbol(typ)
-			testutil.Require(t, d != nil)
-		}
-	}
+	})
 }
 
 func TestFileContainingSymbol(t *testing.T) {
-	fd, err := client.FileContainingSymbol("TopLevel")
-	testutil.Ok(t, err)
-	// shallow check that the descriptor appears correct and complete
-	testutil.Eq(t, "nopkg/desc_test_nopkg_new.proto", fd.GetName())
-	testutil.Eq(t, "", fd.GetPackage())
-	md := fd.GetMessageTypes()[0]
-	testutil.Eq(t, "TopLevel", md.GetName())
-	testutil.Eq(t, "i", md.GetFields()[0].GetName())
-	testutil.Eq(t, "j", md.GetFields()[1].GetName())
-	testutil.Eq(t, "k", md.GetFields()[2].GetName())
-	testutil.Eq(t, "l", md.GetFields()[3].GetName())
-	testutil.Eq(t, "m", md.GetFields()[4].GetName())
-	testutil.Eq(t, "n", md.GetFields()[5].GetName())
-	testutil.Eq(t, "o", md.GetFields()[6].GetName())
-	testutil.Eq(t, "p", md.GetFields()[7].GetName())
-	testutil.Eq(t, "q", md.GetFields()[8].GetName())
-	testutil.Eq(t, "r", md.GetFields()[9].GetName())
-	testutil.Eq(t, "s", md.GetFields()[10].GetName())
-	testutil.Eq(t, "t", md.GetFields()[11].GetName())
+	testVersions(t, func(t *testing.T, client *Client) {
+		fd, err := client.FileContainingSymbol("TopLevel")
+		require.NoError(t, err)
+		// shallow check that the descriptor appears correct and complete
+		require.Equal(t, "nopkg/desc_test_nopkg_new.proto", fd.Path())
+		require.Equal(t, protoreflect.FullName(""), fd.Package())
+		md := fd.Messages().Get(0)
+		require.Equal(t, protoreflect.Name("TopLevel"), md.Name())
+		require.Equal(t, protoreflect.Name("i"), md.Fields().Get(0).Name())
+		require.Equal(t, protoreflect.Name("j"), md.Fields().Get(1).Name())
+		require.Equal(t, protoreflect.Name("k"), md.Fields().Get(2).Name())
+		require.Equal(t, protoreflect.Name("l"), md.Fields().Get(3).Name())
+		require.Equal(t, protoreflect.Name("m"), md.Fields().Get(4).Name())
+		require.Equal(t, protoreflect.Name("n"), md.Fields().Get(5).Name())
+		require.Equal(t, protoreflect.Name("o"), md.Fields().Get(6).Name())
+		require.Equal(t, protoreflect.Name("p"), md.Fields().Get(7).Name())
+		require.Equal(t, protoreflect.Name("q"), md.Fields().Get(8).Name())
+		require.Equal(t, protoreflect.Name("r"), md.Fields().Get(9).Name())
+		require.Equal(t, protoreflect.Name("s"), md.Fields().Get(10).Name())
+		require.Equal(t, protoreflect.Name("t"), md.Fields().Get(11).Name())
 
-	_, err = client.FileContainingSymbol("does not exist")
-	testutil.Require(t, IsElementNotFoundError(err))
+		_, err = client.FileContainingSymbol("does not exist")
+		require.True(t, IsElementNotFoundError(err))
+	})
 }
 
 func TestFileContainingExtension(t *testing.T) {
-	fd, err := client.FileContainingExtension("TopLevel", 100)
-	testutil.Ok(t, err)
-	// shallow check that the descriptor appears correct and complete
-	testutil.Eq(t, "desc_test2.proto", fd.GetName())
-	testutil.Eq(t, "testprotos", fd.GetPackage())
-	testutil.Eq(t, 4, len(fd.GetMessageTypes()))
-	testutil.Eq(t, "Frobnitz", fd.GetMessageTypes()[0].GetName())
-	testutil.Eq(t, "Whatchamacallit", fd.GetMessageTypes()[1].GetName())
-	testutil.Eq(t, "Whatzit", fd.GetMessageTypes()[2].GetName())
-	testutil.Eq(t, "GroupX", fd.GetMessageTypes()[3].GetName())
+	testVersions(t, func(t *testing.T, client *Client) {
+		fd, err := client.FileContainingExtension("TopLevel", 100)
+		require.NoError(t, err)
+		// shallow check that the descriptor appears correct and complete
+		require.Equal(t, "desc_test2.proto", fd.Path())
+		require.Equal(t, protoreflect.FullName("testprotos"), fd.Package())
+		require.Equal(t, 4, fd.Messages().Len())
+		require.Equal(t, protoreflect.Name("Frobnitz"), fd.Messages().Get(0).Name())
+		require.Equal(t, protoreflect.Name("Whatchamacallit"), fd.Messages().Get(1).Name())
+		require.Equal(t, protoreflect.Name("Whatzit"), fd.Messages().Get(2).Name())
+		require.Equal(t, protoreflect.Name("GroupX"), fd.Messages().Get(3).Name())
 
-	testutil.Eq(t, "desc_test1.proto", fd.GetDependencies()[0].GetName())
-	testutil.Eq(t, "pkg/desc_test_pkg.proto", fd.GetDependencies()[1].GetName())
-	testutil.Eq(t, "nopkg/desc_test_nopkg.proto", fd.GetDependencies()[2].GetName())
+		require.Equal(t, "desc_test1.proto", fd.Imports().Get(0).Path())
+		require.Equal(t, "pkg/desc_test_pkg.proto", fd.Imports().Get(1).Path())
+		require.Equal(t, "nopkg/desc_test_nopkg.proto", fd.Imports().Get(2).Path())
 
-	_, err = client.FileContainingExtension("does not exist", 100)
-	testutil.Require(t, IsElementNotFoundError(err))
-	_, err = client.FileContainingExtension("TopLevel", -9)
-	testutil.Require(t, IsElementNotFoundError(err))
+		_, err = client.FileContainingExtension("does not exist", 100)
+		require.True(t, IsElementNotFoundError(err))
+		_, err = client.FileContainingExtension("TopLevel", -9)
+		require.True(t, IsElementNotFoundError(err))
+	})
 }
 
 func TestAllExtensionNumbersForType(t *testing.T) {
-	nums, err := client.AllExtensionNumbersForType("TopLevel")
-	testutil.Ok(t, err)
-	inums := make([]int, len(nums))
-	for idx, v := range nums {
-		inums[idx] = int(v)
-	}
-	sort.Ints(inums)
-	testutil.Eq(t, []int{100, 104}, inums)
+	testVersions(t, func(t *testing.T, client *Client) {
+		nums, err := client.AllExtensionNumbersForType("TopLevel")
+		require.NoError(t, err)
+		inums := make([]int, len(nums))
+		for idx, v := range nums {
+			inums[idx] = int(v)
+		}
+		sort.Ints(inums)
+		require.Equal(t, []int{100, 104}, inums)
 
-	nums, err = client.AllExtensionNumbersForType("testprotos.AnotherTestMessage")
-	testutil.Ok(t, err)
-	testutil.Eq(t, 5, len(nums))
-	inums = make([]int, len(nums))
-	for idx, v := range nums {
-		inums[idx] = int(v)
-	}
-	sort.Ints(inums)
-	testutil.Eq(t, []int{100, 101, 102, 103, 200}, inums)
+		nums, err = client.AllExtensionNumbersForType("testprotos.AnotherTestMessage")
+		require.NoError(t, err)
+		require.Equal(t, 5, len(nums))
+		inums = make([]int, len(nums))
+		for idx, v := range nums {
+			inums[idx] = int(v)
+		}
+		sort.Ints(inums)
+		require.Equal(t, []int{100, 101, 102, 103, 200}, inums)
 
-	_, err = client.AllExtensionNumbersForType("does not exist")
-	testutil.Require(t, IsElementNotFoundError(err))
+		nums, err = client.AllExtensionNumbersForType("does not exist")
+		require.NoError(t, err)
+		require.Empty(t, nums)
+	})
 }
 
 func TestListServices(t *testing.T) {
-	s, err := client.ListServices()
-	testutil.Ok(t, err)
+	testVersions(t, func(t *testing.T, client *Client) {
+		s, err := client.ListServices()
+		require.NoError(t, err)
 
-	sort.Strings(s)
-	testutil.Eq(t, []string{
-		"grpc.reflection.v1.ServerReflection",
-		"grpc.reflection.v1alpha.ServerReflection",
-		"testprotos.DummyService",
-	}, s)
+		sort.Slice(s, func(i, j int) bool {
+			return s[i] < s[j]
+		})
+		require.Equal(t, []protoreflect.FullName{
+			"grpc.reflection.v1.ServerReflection",
+			"grpc.reflection.v1alpha.ServerReflection",
+			"testprotos.DummyService",
+		}, s)
+	})
 }
 
 func TestReset(t *testing.T) {
-	_, err := client.ListServices()
-	testutil.Ok(t, err)
+	testVersions(t, func(t *testing.T, client *Client) {
+		_, err := client.ListServices()
+		require.NoError(t, err)
 
-	// save the current stream
-	stream := client.stream
-	// intercept cancellation
-	cancel := client.cancel
-	var cancelled int32
-	client.cancel = func() {
-		atomic.StoreInt32(&cancelled, 1)
-		cancel()
-	}
+		// save the current stream
+		stream := client.stream
+		// intercept cancellation
+		cancel := client.cancel
+		var cancelled int32
+		client.cancel = func() {
+			atomic.StoreInt32(&cancelled, 1)
+			cancel()
+		}
 
-	client.Reset()
-	testutil.Eq(t, int32(1), atomic.LoadInt32(&cancelled))
-	testutil.Eq(t, nil, client.stream)
+		client.Reset()
+		require.Equal(t, int32(1), atomic.LoadInt32(&cancelled))
+		require.Equal(t, nil, client.stream)
 
-	_, err = client.ListServices()
-	testutil.Ok(t, err)
+		_, err = client.ListServices()
+		require.NoError(t, err)
 
-	// stream was re-created
-	testutil.Eq(t, true, client.stream != nil && client.stream != stream)
+		// stream was re-created
+		require.Equal(t, true, client.stream != nil && client.stream != stream)
+	})
 }
 
 func TestRecover(t *testing.T) {
-	_, err := client.ListServices()
-	testutil.Ok(t, err)
+	testVersions(t, func(t *testing.T, client *Client) {
+		_, err := client.ListServices()
+		require.NoError(t, err)
 
-	// kill the stream
-	stream := client.stream
-	client.stream.CloseSend()
+		// kill the stream
+		stream := client.stream
+		_ = client.stream.CloseSend()
 
-	// it should auto-recover and re-create stream
-	_, err = client.ListServices()
-	testutil.Ok(t, err)
-	testutil.Eq(t, true, client.stream != nil && client.stream != stream)
+		// it should auto-recover and re-create stream
+		_, err = client.ListServices()
+		require.NoError(t, err)
+		require.Equal(t, true, client.stream != nil && client.stream != stream)
+	})
 }
 
 func TestMultipleFiles(t *testing.T) {
 	svr := grpc.NewServer()
-	rpb.RegisterServerReflectionServer(svr, testReflectionServer{})
+	refv1alpha.RegisterServerReflectionServer(svr, testReflectionServer{})
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
-	testutil.Ok(t, err, "failed to listen")
+	require.NoError(t, err, "failed to listen")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
@@ -266,33 +290,38 @@ func TestMultipleFiles(t *testing.T) {
 		}
 	}()
 	time.Sleep(100 * time.Millisecond) // give server a chance to start
-	testutil.Ok(t, ctx.Err(), "failed to start server")
+	require.NoError(t, ctx.Err(), "failed to start server")
 	defer func() {
 		svr.Stop()
 	}()
 
 	dialCtx, dialCancel := context.WithTimeout(ctx, 3*time.Second)
 	defer dialCancel()
-	cc, err := grpc.DialContext(dialCtx, l.Addr().String(), grpc.WithInsecure(), grpc.WithBlock())
-	testutil.Ok(t, err, "failed ot dial %v", l.Addr().String())
-	cl := rpb.NewServerReflectionClient(cc)
+	cc, err := grpc.DialContext(
+		dialCtx,
+		l.Addr().String(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
+	require.NoError(t, err, "failed to dial %v", l.Addr().String())
+	cl := refv1alpha.NewServerReflectionClient(cc)
 
 	client := NewClientV1Alpha(ctx, cl)
 	defer client.Reset()
 	svcs, err := client.ListServices()
-	testutil.Ok(t, err, "failed to list services")
+	require.NoError(t, err, "failed to list services")
 	for _, svc := range svcs {
 		fd, err := client.FileContainingSymbol(svc)
-		testutil.Ok(t, err, "failed to file for service %v", svc)
-		sd := fd.FindSymbol(svc)
-		_, ok := sd.(*desc.ServiceDescriptor)
-		testutil.Require(t, ok, "symbol for %s is not a service descriptor, instead is %T", svc, sd)
+		require.NoError(t, err, "failed to get file for service %v", svc)
+		sd := fd.Services().ByName(svc.Name())
+		require.NotNil(t, sd)
+		require.Equal(t, svc, sd.FullName())
 	}
 }
 
 type testReflectionServer struct{}
 
-func (t testReflectionServer) ServerReflectionInfo(server rpb.ServerReflection_ServerReflectionInfoServer) error {
+func (t testReflectionServer) ServerReflectionInfo(server refv1alpha.ServerReflection_ServerReflectionInfoServer) error {
 	const svcA_file = "ChdzYW5kYm94L3NlcnZpY2VfQS5wcm90bxIHc2FuZGJveCIWCghSZXF1ZXN0QRIKCgJpZBgBIAEoBSIYCglSZXNwb25zZUESCwoDc3RyGAEgASgJMj0KCVNlcnZpY2VfQRIwCgdFeGVjdXRlEhEuc2FuZGJveC5SZXF1ZXN0QRoSLnNhbmRib3guUmVzcG9uc2VBYgZwcm90bzM="
 	const svcB_file = "ChdzYW5kYm94L1NlcnZpY2VfQi5wcm90bxIHc2FuZGJveCIWCghSZXF1ZXN0QhIKCgJpZBgBIAEoBSIYCglSZXNwb25zZUISCwoDc3RyGAEgASgJMj0KCVNlcnZpY2VfQhIwCgdFeGVjdXRlEhEuc2FuZGJveC5SZXF1ZXN0QhoSLnNhbmRib3guUmVzcG9uc2VCYgZwcm90bzM="
 
@@ -303,24 +332,24 @@ func (t testReflectionServer) ServerReflectionInfo(server rpb.ServerReflection_S
 		} else if err != nil {
 			return err
 		}
-		var resp rpb.ServerReflectionResponse
+		var resp refv1alpha.ServerReflectionResponse
 		resp.OriginalRequest = req
 		switch req := req.MessageRequest.(type) {
-		case *rpb.ServerReflectionRequest_FileByFilename:
+		case *refv1alpha.ServerReflectionRequest_FileByFilename:
 			switch req.FileByFilename {
 			case "sandbox/service_A.proto":
 				resp.MessageResponse = msgResponseForFiles(svcA_file)
 			case "sandbox/service_B.proto":
 				resp.MessageResponse = msgResponseForFiles(svcB_file)
 			default:
-				resp.MessageResponse = &rpb.ServerReflectionResponse_ErrorResponse{
-					ErrorResponse: &rpb.ErrorResponse{
+				resp.MessageResponse = &refv1alpha.ServerReflectionResponse_ErrorResponse{
+					ErrorResponse: &refv1alpha.ErrorResponse{
 						ErrorCode:    int32(codes.NotFound),
 						ErrorMessage: "not found",
 					},
 				}
 			}
-		case *rpb.ServerReflectionRequest_FileContainingSymbol:
+		case *refv1alpha.ServerReflectionRequest_FileContainingSymbol:
 			switch req.FileContainingSymbol {
 			case "sandbox.Service_A":
 				resp.MessageResponse = msgResponseForFiles(svcA_file)
@@ -328,25 +357,25 @@ func (t testReflectionServer) ServerReflectionInfo(server rpb.ServerReflection_S
 				// HERE is where we return two files instead of one
 				resp.MessageResponse = msgResponseForFiles(svcA_file, svcB_file)
 			default:
-				resp.MessageResponse = &rpb.ServerReflectionResponse_ErrorResponse{
-					ErrorResponse: &rpb.ErrorResponse{
+				resp.MessageResponse = &refv1alpha.ServerReflectionResponse_ErrorResponse{
+					ErrorResponse: &refv1alpha.ErrorResponse{
 						ErrorCode:    int32(codes.NotFound),
 						ErrorMessage: "not found",
 					},
 				}
 			}
-		case *rpb.ServerReflectionRequest_ListServices:
-			resp.MessageResponse = &rpb.ServerReflectionResponse_ListServicesResponse{
-				ListServicesResponse: &rpb.ListServiceResponse{
-					Service: []*rpb.ServiceResponse{
+		case *refv1alpha.ServerReflectionRequest_ListServices:
+			resp.MessageResponse = &refv1alpha.ServerReflectionResponse_ListServicesResponse{
+				ListServicesResponse: &refv1alpha.ListServiceResponse{
+					Service: []*refv1alpha.ServiceResponse{
 						{Name: "sandbox.Service_A"},
 						{Name: "sandbox.Service_B"},
 					},
 				},
 			}
 		default:
-			resp.MessageResponse = &rpb.ServerReflectionResponse_ErrorResponse{
-				ErrorResponse: &rpb.ErrorResponse{
+			resp.MessageResponse = &refv1alpha.ServerReflectionResponse_ErrorResponse{
+				ErrorResponse: &refv1alpha.ErrorResponse{
 					ErrorCode:    int32(codes.NotFound),
 					ErrorMessage: "not found",
 				},
@@ -358,7 +387,7 @@ func (t testReflectionServer) ServerReflectionInfo(server rpb.ServerReflection_S
 	}
 }
 
-func msgResponseForFiles(files ...string) *rpb.ServerReflectionResponse_FileDescriptorResponse {
+func msgResponseForFiles(files ...string) *refv1alpha.ServerReflectionResponse_FileDescriptorResponse {
 	descs := make([][]byte, len(files))
 	for i, f := range files {
 		b, err := base64.StdEncoding.DecodeString(f)
@@ -367,8 +396,8 @@ func msgResponseForFiles(files ...string) *rpb.ServerReflectionResponse_FileDesc
 		}
 		descs[i] = b
 	}
-	return &rpb.ServerReflectionResponse_FileDescriptorResponse{
-		FileDescriptorResponse: &rpb.FileDescriptorResponse{
+	return &refv1alpha.ServerReflectionResponse_FileDescriptorResponse{
+		FileDescriptorResponse: &refv1alpha.FileDescriptorResponse{
 			FileDescriptorProto: descs,
 		},
 	}
@@ -378,10 +407,10 @@ func TestAutoVersion(t *testing.T) {
 	t.Run("v1", func(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
-				reflection.RegisterV1(s)
+				registerV1(s)
 				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
-			[]string{
+			[]protoreflect.FullName{
 				"grpc.reflection.v1.ServerReflection",
 				"testprotos.DummyService",
 			},
@@ -396,11 +425,10 @@ func TestAutoVersion(t *testing.T) {
 	t.Run("v1alpha", func(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
-				impl := reflection.NewServer(reflection.ServerOptions{Services: s})
-				rpb.RegisterServerReflectionServer(s, impl)
+				reflection.Register(s) // this one just uses v1alpha
 				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
-			[]string{
+			[]protoreflect.FullName{
 				"grpc.reflection.v1alpha.ServerReflection",
 				"testprotos.DummyService",
 			},
@@ -420,10 +448,11 @@ func TestAutoVersion(t *testing.T) {
 	t.Run("both", func(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
-				reflection.Register(s)
+				registerV1(s)
+				reflection.Register(s) // this one just uses v1alpha
 				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
-			[]string{
+			[]protoreflect.FullName{
 				"grpc.reflection.v1.ServerReflection",
 				"grpc.reflection.v1alpha.ServerReflection",
 				"testprotos.DummyService",
@@ -438,7 +467,7 @@ func TestAutoVersion(t *testing.T) {
 	})
 }
 
-func testClientAuto(t *testing.T, register func(*grpc.Server), expectedServices []string, expectedLog []string) {
+func testClientAuto(t *testing.T, register func(*grpc.Server), expectedServices []protoreflect.FullName, expectedLog []string) {
 	var capture captureStreamNames
 	svr := grpc.NewServer(grpc.StreamInterceptor(capture.intercept), grpc.UnknownServiceHandler(capture.handleUnknown))
 	register(svr)
@@ -446,14 +475,18 @@ func testClientAuto(t *testing.T, register func(*grpc.Server), expectedServices 
 	if err != nil {
 		panic(fmt.Sprintf("Failed to open server socket: %s", err.Error()))
 	}
-	go svr.Serve(l)
+	go func() {
+		_ = svr.Serve(l)
+	}()
 	defer svr.Stop()
 
-	cconn, err := grpc.Dial(l.Addr().String(), grpc.WithInsecure())
+	cconn, err := grpc.Dial(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))
 	}
-	defer cconn.Close()
+	defer func() {
+		_ = cconn.Close()
+	}()
 	client := NewClientAuto(context.Background(), cconn)
 	now := time.Now()
 	client.now = func() time.Time {
@@ -461,29 +494,31 @@ func testClientAuto(t *testing.T, register func(*grpc.Server), expectedServices 
 	}
 
 	svcs, err := client.ListServices()
-	testutil.Ok(t, err)
-	sort.Strings(svcs)
-	testutil.Eq(t, expectedServices, svcs)
+	require.NoError(t, err)
+	sort.Slice(svcs, func(i, j int) bool {
+		return svcs[i] < svcs[j]
+	})
+	require.Equal(t, expectedServices, svcs)
 	client.Reset()
 
 	_, err = client.FileContainingSymbol(svcs[0])
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	client.Reset()
 
 	// at the threshold, but not quite enough to retry
 	now = now.Add(time.Hour)
 	_, err = client.ListServices()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	client.Reset()
 
 	// 1 ns more, and we've crossed threshold and will retry
 	now = now.Add(1)
 	_, err = client.ListServices()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	client.Reset()
 
 	actualLog := capture.names()
-	testutil.Eq(t, expectedLog, actualLog)
+	require.Equal(t, expectedLog, actualLog)
 }
 
 type captureStreamNames struct {
@@ -508,4 +543,45 @@ func (c *captureStreamNames) intercept(srv interface{}, ss grpc.ServerStream, in
 
 func (c *captureStreamNames) handleUnknown(_ interface{}, _ grpc.ServerStream) error {
 	return status.Errorf(codes.Unimplemented, "WTF?")
+}
+
+func registerV1(svr reflection.GRPCServer) {
+	reflection.Register(registrarInterceptor{svr})
+}
+
+type registrarInterceptor struct {
+	svr reflection.GRPCServer
+}
+
+func (r registrarInterceptor) RegisterService(_ *grpc.ServiceDesc, impl interface{}) {
+	r.svr.RegisterService(&refv1.ServerReflection_ServiceDesc, reflectImpl{svr: impl.(refv1alpha.ServerReflectionServer)})
+}
+
+func (r registrarInterceptor) GetServiceInfo() map[string]grpc.ServiceInfo {
+	return r.svr.GetServiceInfo()
+}
+
+type reflectImpl struct {
+	svr refv1alpha.ServerReflectionServer
+	refv1.UnimplementedServerReflectionServer
+}
+
+func (r reflectImpl) ServerReflectionInfo(stream refv1.ServerReflection_ServerReflectionInfoServer) error {
+	return r.svr.ServerReflectionInfo(streamImpl{stream})
+}
+
+type streamImpl struct {
+	refv1.ServerReflection_ServerReflectionInfoServer
+}
+
+func (s streamImpl) Send(response *refv1alpha.ServerReflectionResponse) error {
+	return s.ServerReflection_ServerReflectionInfoServer.Send(toV1Response(response))
+}
+
+func (s streamImpl) Recv() (*refv1alpha.ServerReflectionRequest, error) {
+	resp, err := s.ServerReflection_ServerReflectionInfoServer.Recv()
+	if err != nil {
+		return nil, err
+	}
+	return toV1AlphaRequest(resp), nil
 }

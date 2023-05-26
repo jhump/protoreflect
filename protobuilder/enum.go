@@ -5,34 +5,42 @@ import (
 	"sort"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/internal"
+	"github.com/jhump/protoreflect/v2/internal"
 )
 
-// EnumBuilder is a builder used to construct a desc.EnumDescriptor.
+// EnumRange is a range of enum numbers. The first element is the start
+// of the range, inclusive, and the second element is the end of the range,
+// inclusive. (Note: this differs from FieldRange, where the end of the
+// range is exclusive.)
+type EnumRange [2]protoreflect.EnumNumber
+
+// EnumBuilder is a builder used to construct a protoreflect.EnumDescriptor.
 //
 // To create a new EnumBuilder, use NewEnum.
 type EnumBuilder struct {
 	baseBuilder
 
 	Options        *descriptorpb.EnumOptions
-	ReservedRanges []*descriptorpb.EnumDescriptorProto_EnumReservedRange
-	ReservedNames  []string
+	ReservedRanges []EnumRange
+	ReservedNames  []protoreflect.Name
 
 	values  []*EnumValueBuilder
-	symbols map[string]*EnumValueBuilder
+	symbols map[protoreflect.Name]*EnumValueBuilder
 }
 
-// NewEnum creates a new EnumBuilder for an enum with the given name. Since the
-// new message has no parent element, it also has no package name (e.g. it is in
+var _ Builder = (*EnumBuilder)(nil)
+
+// NewEnum creates a new EnumBuilder for an enum with the given path. Since the
+// new message has no parent element, it also has no package path (e.g. it is in
 // the unnamed package, until it is assigned to a file builder that defines a
-// package name).
-func NewEnum(name string) *EnumBuilder {
+// package path).
+func NewEnum(name protoreflect.Name) *EnumBuilder {
 	return &EnumBuilder{
 		baseBuilder: baseBuilderWithName(name),
-		symbols:     map[string]*EnumValueBuilder{},
+		symbols:     map[protoreflect.Name]*EnumValueBuilder{},
 	}
 }
 
@@ -46,19 +54,19 @@ func NewEnum(name string) *EnumBuilder {
 //
 // This means that enum builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original enum's
-// package name.
-func FromEnum(ed *desc.EnumDescriptor) (*EnumBuilder, error) {
-	if fb, err := FromFile(ed.GetFile()); err != nil {
+// package path.
+func FromEnum(ed protoreflect.EnumDescriptor) (*EnumBuilder, error) {
+	if fb, err := FromFile(ed.ParentFile()); err != nil {
 		return nil, err
-	} else if eb, ok := fb.findFullyQualifiedElement(ed.GetFullyQualifiedName()).(*EnumBuilder); ok {
+	} else if eb, ok := fb.findFullyQualifiedElement(ed.FullName()).(*EnumBuilder); ok {
 		return eb, nil
 	} else {
-		return nil, fmt.Errorf("could not find enum %s after converting file %q to builder", ed.GetFullyQualifiedName(), ed.GetFile().GetName())
+		return nil, fmt.Errorf("could not find enum %s after converting file %q to builder", ed.FullName(), ed.ParentFile().Path())
 	}
 }
 
-func fromEnum(ed *desc.EnumDescriptor, localEnums map[*desc.EnumDescriptor]*EnumBuilder) (*EnumBuilder, error) {
-	eb := NewEnum(ed.GetName())
+func fromEnum(ed protoreflect.EnumDescriptor, localEnums map[protoreflect.EnumDescriptor]*EnumBuilder) (*EnumBuilder, error) {
+	eb := NewEnum(ed.Name())
 	eb.Options = ed.GetEnumOptions()
 	eb.ReservedRanges = ed.AsEnumDescriptorProto().GetReservedRange()
 	eb.ReservedNames = ed.AsEnumDescriptorProto().GetReservedName()
@@ -77,20 +85,20 @@ func fromEnum(ed *desc.EnumDescriptor, localEnums map[*desc.EnumDescriptor]*Enum
 	return eb, nil
 }
 
-// SetName changes this enum's name, returning the enum builder for method
-// chaining. If the given new name is not valid (e.g. TrySetName would have
+// SetName changes this enum's path, returning the enum builder for method
+// chaining. If the given new path is not valid (e.g. TrySetName would have
 // returned an error) then this method will panic.
-func (eb *EnumBuilder) SetName(newName string) *EnumBuilder {
+func (eb *EnumBuilder) SetName(newName protoreflect.Name) *EnumBuilder {
 	if err := eb.TrySetName(newName); err != nil {
 		panic(err)
 	}
 	return eb
 }
 
-// TrySetName changes this enum's name. It will return an error if the given new
-// name is not a valid protobuf identifier or if the parent builder already has
-// an element with the given name.
-func (eb *EnumBuilder) TrySetName(newName string) error {
+// TrySetName changes this enum's path. It will return an error if the given new
+// path is not a valid protobuf identifier or if the parent builder already has
+// an element with the given path.
+func (eb *EnumBuilder) TrySetName(newName protoreflect.Name) error {
 	return eb.baseBuilder.setName(eb, newName)
 }
 
@@ -101,9 +109,9 @@ func (eb *EnumBuilder) SetComments(c Comments) *EnumBuilder {
 	return eb
 }
 
-// GetChildren returns any builders assigned to this enum builder. These will be
+// Children returns any builders assigned to this enum builder. These will be
 // the enum's values.
-func (eb *EnumBuilder) GetChildren() []Builder {
+func (eb *EnumBuilder) Children() []Builder {
 	var ch []Builder
 	for _, evb := range eb.values {
 		ch = append(ch, evb)
@@ -111,21 +119,21 @@ func (eb *EnumBuilder) GetChildren() []Builder {
 	return ch
 }
 
-func (eb *EnumBuilder) findChild(name string) Builder {
+func (eb *EnumBuilder) findChild(name protoreflect.Name) Builder {
 	return eb.symbols[name]
 }
 
 func (eb *EnumBuilder) removeChild(b Builder) {
-	if p, ok := b.GetParent().(*EnumBuilder); !ok || p != eb {
+	if p, ok := b.Parent().(*EnumBuilder); !ok || p != eb {
 		return
 	}
-	eb.values = deleteBuilder(b.GetName(), eb.values).([]*EnumValueBuilder)
-	delete(eb.symbols, b.GetName())
+	eb.values = deleteBuilder(b.Name(), eb.values).([]*EnumValueBuilder)
+	delete(eb.symbols, b.Name())
 	b.setParent(nil)
 }
 
-func (eb *EnumBuilder) renamedChild(b Builder, oldName string) error {
-	if p, ok := b.GetParent().(*EnumBuilder); !ok || p != eb {
+func (eb *EnumBuilder) renamedChild(b Builder, oldName protoreflect.Name) error {
+	if p, ok := b.Parent().(*EnumBuilder); !ok || p != eb {
 		return nil
 	}
 
@@ -137,10 +145,10 @@ func (eb *EnumBuilder) renamedChild(b Builder, oldName string) error {
 }
 
 func (eb *EnumBuilder) addSymbol(b *EnumValueBuilder) error {
-	if _, ok := eb.symbols[b.GetName()]; ok {
-		return fmt.Errorf("enum %s already contains value named %q", GetFullyQualifiedName(eb), b.GetName())
+	if _, ok := eb.symbols[b.Name()]; ok {
+		return fmt.Errorf("enum %s already contains value named %q", FullName(eb), b.Name())
 	}
-	eb.symbols[b.GetName()] = b
+	eb.symbols[b.Name()] = b
 	return nil
 }
 
@@ -151,23 +159,23 @@ func (eb *EnumBuilder) SetOptions(options *descriptorpb.EnumOptions) *EnumBuilde
 	return eb
 }
 
-// GetValue returns the enum value with the given name. If no such value exists
+// GetValue returns the enum value with the given path. If no such value exists
 // in the enum, nil is returned.
-func (eb *EnumBuilder) GetValue(name string) *EnumValueBuilder {
+func (eb *EnumBuilder) GetValue(name protoreflect.Name) *EnumValueBuilder {
 	return eb.symbols[name]
 }
 
-// RemoveValue removes the enum value with the given name. If no such value
+// RemoveValue removes the enum value with the given path. If no such value
 // exists in the enum, this is a no-op. This returns the enum builder, for
 // method chaining.
-func (eb *EnumBuilder) RemoveValue(name string) *EnumBuilder {
+func (eb *EnumBuilder) RemoveValue(name protoreflect.Name) *EnumBuilder {
 	eb.TryRemoveValue(name)
 	return eb
 }
 
-// TryRemoveValue removes the enum value with the given name and returns false
+// TryRemoveValue removes the enum value with the given path and returns false
 // if the enum has no such value.
-func (eb *EnumBuilder) TryRemoveValue(name string) bool {
+func (eb *EnumBuilder) TryRemoveValue(name protoreflect.Name) bool {
 	if evb, ok := eb.symbols[name]; ok {
 		eb.removeChild(evb)
 		return true
@@ -186,7 +194,7 @@ func (eb *EnumBuilder) AddValue(evb *EnumValueBuilder) *EnumBuilder {
 }
 
 // TryAddValue adds the given enum value to this enum, returning any error that
-// prevents the value from being added (such as a name collision with another
+// prevents the value from being added (such as a path collision with another
 // value already added to the enum).
 func (eb *EnumBuilder) TryAddValue(evb *EnumValueBuilder) error {
 	if err := eb.addSymbol(evb); err != nil {
@@ -201,7 +209,7 @@ func (eb *EnumBuilder) TryAddValue(evb *EnumValueBuilder) error {
 // AddReservedRange adds the given reserved range to this message. The range is
 // inclusive of both the start and end, just like defining a range in proto IDL
 // source. This returns the message, for method chaining.
-func (eb *EnumBuilder) AddReservedRange(start, end int32) *EnumBuilder {
+func (eb *EnumBuilder) AddReservedRange(start, end protoreflect.EnumNumber) *EnumBuilder {
 	rr := &descriptorpb.EnumDescriptorProto_EnumReservedRange{
 		Start: proto.Int32(start),
 		End:   proto.Int32(end),
@@ -212,21 +220,21 @@ func (eb *EnumBuilder) AddReservedRange(start, end int32) *EnumBuilder {
 
 // SetReservedRanges replaces all of this enum's reserved ranges with the
 // given slice of ranges. This returns the enum, for method chaining.
-func (eb *EnumBuilder) SetReservedRanges(ranges []*descriptorpb.EnumDescriptorProto_EnumReservedRange) *EnumBuilder {
+func (eb *EnumBuilder) SetReservedRanges(ranges []EnumRange) *EnumBuilder {
 	eb.ReservedRanges = ranges
 	return eb
 }
 
-// AddReservedName adds the given name to the list of reserved value names for
+// AddReservedName adds the given path to the list of reserved value names for
 // this enum. This returns the enum, for method chaining.
-func (eb *EnumBuilder) AddReservedName(name string) *EnumBuilder {
+func (eb *EnumBuilder) AddReservedName(name protoreflect.Name) *EnumBuilder {
 	eb.ReservedNames = append(eb.ReservedNames, name)
 	return eb
 }
 
 // SetReservedNames replaces all of this enum's reserved value names with the
 // given slice of names. This returns the enum, for method chaining.
-func (eb *EnumBuilder) SetReservedNames(names []string) *EnumBuilder {
+func (eb *EnumBuilder) SetReservedNames(names []protoreflect.Name) *EnumBuilder {
 	eb.ReservedNames = names
 	return eb
 }
@@ -289,23 +297,23 @@ func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceC
 // builder. If there are any problems constructing the descriptor, including
 // resolving symbols referenced by the builder or failing to meet certain
 // validation rules, an error is returned.
-func (eb *EnumBuilder) Build() (*desc.EnumDescriptor, error) {
+func (eb *EnumBuilder) Build() (protoreflect.EnumDescriptor, error) {
 	ed, err := eb.BuildDescriptor()
 	if err != nil {
 		return nil, err
 	}
-	return ed.(*desc.EnumDescriptor), nil
+	return ed.(protoreflect.EnumDescriptor), nil
 }
 
 // BuildDescriptor constructs an enum descriptor based on the contents of this
 // enum builder. Most usages will prefer Build() instead, whose return type
 // is a concrete descriptor type. This method is present to satisfy the Builder
 // interface.
-func (eb *EnumBuilder) BuildDescriptor() (desc.Descriptor, error) {
+func (eb *EnumBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(eb, BuilderOptions{})
 }
 
-// EnumValueBuilder is a builder used to construct a desc.EnumValueDescriptor.
+// EnumValueBuilder is a builder used to construct a protoreflect.EnumValueDescriptor.
 // A enum value builder *must* be added to an enum before calling its Build()
 // method.
 //
@@ -313,16 +321,18 @@ func (eb *EnumBuilder) BuildDescriptor() (desc.Descriptor, error) {
 type EnumValueBuilder struct {
 	baseBuilder
 
-	number    int32
+	number    protoreflect.EnumNumber
 	numberSet bool
 	Options   *descriptorpb.EnumValueOptions
 }
 
+var _ Builder = (*EnumValueBuilder)(nil)
+
 // NewEnumValue creates a new EnumValueBuilder for an enum value with the given
-// name. The return value's numeric value will not be set, which means it will
+// path. The return value's numeric value will not be set, which means it will
 // be auto-assigned when the descriptor is built, unless explicitly set with a
 // call to SetNumber.
-func NewEnumValue(name string) *EnumValueBuilder {
+func NewEnumValue(name protoreflect.Name) *EnumValueBuilder {
 	return &EnumValueBuilder{baseBuilder: baseBuilderWithName(name)}
 }
 
@@ -336,19 +346,19 @@ func NewEnumValue(name string) *EnumValueBuilder {
 //
 // This means that enum value builders created from descriptors do not need to
 // be explicitly assigned to a file in order to preserve the original enum
-// value's package name.
-func FromEnumValue(evd *desc.EnumValueDescriptor) (*EnumValueBuilder, error) {
-	if fb, err := FromFile(evd.GetFile()); err != nil {
+// value's package path.
+func FromEnumValue(evd protoreflect.EnumValueDescriptor) (*EnumValueBuilder, error) {
+	if fb, err := FromFile(evd.ParentFile()); err != nil {
 		return nil, err
-	} else if evb, ok := fb.findFullyQualifiedElement(evd.GetFullyQualifiedName()).(*EnumValueBuilder); ok {
+	} else if evb, ok := fb.findFullyQualifiedElement(evd.FullName()).(*EnumValueBuilder); ok {
 		return evb, nil
 	} else {
-		return nil, fmt.Errorf("could not find enum value %s after converting file %q to builder", evd.GetFullyQualifiedName(), evd.GetFile().GetName())
+		return nil, fmt.Errorf("could not find enum value %s after converting file %q to builder", evd.FullName(), evd.ParentFile().Path())
 	}
 }
 
-func fromEnumValue(evd *desc.EnumValueDescriptor) (*EnumValueBuilder, error) {
-	evb := NewEnumValue(evd.GetName())
+func fromEnumValue(evd protoreflect.EnumValueDescriptor) (*EnumValueBuilder, error) {
+	evb := NewEnumValue(evd.Name())
 	evb.Options = evd.GetEnumValueOptions()
 	evb.number = evd.GetNumber()
 	evb.numberSet = true
@@ -357,20 +367,20 @@ func fromEnumValue(evd *desc.EnumValueDescriptor) (*EnumValueBuilder, error) {
 	return evb, nil
 }
 
-// SetName changes this enum value's name, returning the enum value builder for
-// method chaining. If the given new name is not valid (e.g. TrySetName would
+// SetName changes this enum value's path, returning the enum value builder for
+// method chaining. If the given new path is not valid (e.g. TrySetName would
 // have returned an error) then this method will panic.
-func (evb *EnumValueBuilder) SetName(newName string) *EnumValueBuilder {
+func (evb *EnumValueBuilder) SetName(newName protoreflect.Name) *EnumValueBuilder {
 	if err := evb.TrySetName(newName); err != nil {
 		panic(err)
 	}
 	return evb
 }
 
-// TrySetName changes this enum value's name. It will return an error if the
-// given new name is not a valid protobuf identifier or if the parent enum
-// builder already has an enum value with the given name.
-func (evb *EnumValueBuilder) TrySetName(newName string) error {
+// TrySetName changes this enum value's path. It will return an error if the
+// given new path is not a valid protobuf identifier or if the parent enum
+// builder already has an enum value with the given path.
+func (evb *EnumValueBuilder) TrySetName(newName protoreflect.Name) error {
 	return evb.baseBuilder.setName(evb, newName)
 }
 
@@ -381,14 +391,14 @@ func (evb *EnumValueBuilder) SetComments(c Comments) *EnumValueBuilder {
 	return evb
 }
 
-// GetChildren returns nil, since enum values cannot have child elements. It is
+// Children returns nil, since enum values cannot have child elements. It is
 // present to satisfy the Builder interface.
-func (evb *EnumValueBuilder) GetChildren() []Builder {
+func (evb *EnumValueBuilder) Children() []Builder {
 	// enum values do not have children
 	return nil
 }
 
-func (evb *EnumValueBuilder) findChild(name string) Builder {
+func (evb *EnumValueBuilder) findChild(name protoreflect.Name) Builder {
 	// enum values do not have children
 	return nil
 }
@@ -397,7 +407,7 @@ func (evb *EnumValueBuilder) removeChild(b Builder) {
 	// enum values do not have children
 }
 
-func (evb *EnumValueBuilder) renamedChild(b Builder, oldName string) error {
+func (evb *EnumValueBuilder) renamedChild(b Builder, oldName protoreflect.Name) error {
 	// enum values do not have children
 	return nil
 }
@@ -409,9 +419,9 @@ func (evb *EnumValueBuilder) SetOptions(options *descriptorpb.EnumValueOptions) 
 	return evb
 }
 
-// GetNumber returns the enum value's numeric value. If the number has not been
+// Number returns the enum value's numeric value. If the number has not been
 // set this returns zero.
-func (evb *EnumValueBuilder) GetNumber() int32 {
+func (evb *EnumValueBuilder) Number() protoreflect.EnumNumber {
 	return evb.number
 }
 
@@ -433,7 +443,7 @@ func (evb *EnumValueBuilder) ClearNumber() *EnumValueBuilder {
 
 // SetNumber changes the numeric value for this enum value and then returns the
 // enum value, for method chaining.
-func (evb *EnumValueBuilder) SetNumber(number int32) *EnumValueBuilder {
+func (evb *EnumValueBuilder) SetNumber(number protoreflect.EnumNumber) *EnumValueBuilder {
 	evb.number = number
 	evb.numberSet = true
 	return evb
@@ -453,18 +463,18 @@ func (evb *EnumValueBuilder) buildProto(path []int32, sourceInfo *descriptorpb.S
 // value builder. If there are any problems constructing the descriptor,
 // including resolving symbols referenced by the builder or failing to meet
 // certain validation rules, an error is returned.
-func (evb *EnumValueBuilder) Build() (*desc.EnumValueDescriptor, error) {
+func (evb *EnumValueBuilder) Build() (protoreflect.EnumValueDescriptor, error) {
 	evd, err := evb.BuildDescriptor()
 	if err != nil {
 		return nil, err
 	}
-	return evd.(*desc.EnumValueDescriptor), nil
+	return evd.(protoreflect.EnumValueDescriptor), nil
 }
 
 // BuildDescriptor constructs an enum value descriptor based on the contents of
 // this enum value builder. Most usages will prefer Build() instead, whose
 // return type is a concrete descriptor type. This method is present to satisfy
 // the Builder interface.
-func (evb *EnumValueBuilder) BuildDescriptor() (desc.Descriptor, error) {
+func (evb *EnumValueBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(evb, BuilderOptions{})
 }

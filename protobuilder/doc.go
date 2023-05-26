@@ -1,4 +1,4 @@
-// Package builder contains a means of building and modifying proto descriptors
+// Package protobuilder contains a means of building and modifying proto descriptors
 // programmatically. There are numerous factory methods to aid in constructing
 // new descriptors as are there methods for converting existing descriptors into
 // builders, for modification.
@@ -38,9 +38,9 @@
 // tags will start at one and proceed from there but will not conflict with tags
 // that were explicitly assigned to fields.
 //
-// Similarly, when constructing a file builder, a name is accepted but can be
-// blank. A blank name means that the file will be given a generated, unique
-// name when the descriptor is built.
+// Similarly, when constructing a file builder, a path is accepted but can be
+// blank. A blank path means that the file will be given a generated, unique
+// path when the descriptor is built.
 //
 // Note that extensions *must* be given a tag number. Only non-extension fields
 // can have their tags auto-assigned. If an extension is constructed with a zero
@@ -75,7 +75,7 @@
 //
 // When descriptors are created this way, they are created in the default (e.g.
 // unnamed) package. In order to put descriptors into a proper package
-// namespace, they must be added to a file that has the right package name.
+// namespace, they must be added to a file that has the right package path.
 //
 // # Builder Pattern and Method Chaining
 //
@@ -89,7 +89,7 @@
 //	    AddField(NewField("foo", FieldTypeScalar(descriptor.FieldDescriptorProto_TYPE_STRING)).
 //	        SetDefaultValue("bar")).
 //	    AddField(NewField("baz", FieldTypeScalar(descriptor.FieldDescriptorProto_TYPE_INT64)).
-//	        SetLabel(descriptor.FieldDescriptorProto_LABEL_REPEATED).
+//	        SetCardinality(descriptor.FieldDescriptorProto_LABEL_REPEATED).
 //	        SetOptions(&descriptor.FieldOptions{Packed: proto.Bool(true)})).
 //	    Build()
 //
@@ -150,7 +150,7 @@
 //  1. Import cycles are not allowed. (See above for more details.)
 //  2. Within a single file, symbols are not allowed to have naming conflicts.
 //     This means that is not legal to create a message and an extension with
-//     the same name in the same file.
+//     the same path in the same file.
 //  3. Messages are not allowed to have multiple fields with the same tag. Note
 //     that only non-extension fields are checked when using builders. So
 //     builders will allow tag collisions for extensions. (Use caution.)

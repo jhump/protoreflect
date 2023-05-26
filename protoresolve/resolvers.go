@@ -1,9 +1,11 @@
 package protoresolve
 
 import (
+	"fmt"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
+	"strings"
 )
 
 // FileResolver can resolve file descriptors by path.
@@ -15,15 +17,35 @@ type FileResolver interface {
 type FilePool interface {
 	FileResolver
 	NumFiles() int
-	RangeFiles(f func(protoreflect.FileDescriptor) bool)
+	RangeFiles(fn func(protoreflect.FileDescriptor) bool)
 	NumFilesByPackage(name protoreflect.FullName) int
-	RangeFilesByPackage(name protoreflect.FullName, f func(protoreflect.FileDescriptor) bool)
+	RangeFilesByPackage(name protoreflect.FullName, fn func(protoreflect.FileDescriptor) bool)
 }
 
 // DescriptorResolver can resolve descriptors by full name.
 type DescriptorResolver interface {
 	FindDescriptorByName(protoreflect.FullName) (protoreflect.Descriptor, error)
 }
+
+// DescriptorPool is a FilePool that also functions as a DescriptorResolver.
+type DescriptorPool interface {
+	FilePool
+	DescriptorResolver
+}
+
+var _ DescriptorPool = (*Registry)(nil)
+var _ DescriptorPool = (*protoregistry.Files)(nil)
+
+// DescriptorRegistry is a file and descriptor resolver that allows the caller to add files
+// (and their contained descriptors) to the set of files and descriptors it can resolve.
+type DescriptorRegistry interface {
+	FileResolver
+	DescriptorResolver
+	RegisterFile(protoreflect.FileDescriptor) error
+}
+
+var _ DescriptorRegistry = (*Registry)(nil)
+var _ DescriptorRegistry = (*protoregistry.Files)(nil)
 
 // TypedDescriptorResolver can resolve descriptors by full name and provides strongly-typed methods
 // for each kind of descriptor. Note that FindFieldByName may return normal fields and may return
@@ -42,6 +64,12 @@ type TypedDescriptorResolver interface {
 // ExtensionResolver can resolve extensions based on the containing message name and field number.
 type ExtensionResolver interface {
 	FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error)
+}
+
+// ExtensionPool is an ExtensionResolver that also allows iteration over all extensions for a message.
+type ExtensionPool interface {
+	ExtensionResolver
+	RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionDescriptor) bool)
 }
 
 // MessageURLResolver can resolve messages based on their type URL. This URL must include the
@@ -90,11 +118,11 @@ type EnumTypeResolver interface {
 // unmarshalling the JSON and text formats.
 //
 // This type can be assigned to the following fields:
-//   - proto.UnmarshalOptions.Resolver
-//   - protojson.MarshalOptions.Resolver
-//   - protojson.UnmarshalOptions.Resolver
-//   - prototext.MarshalOptions.Resolver
-//   - prototext.UnmarshalOptions.Resolver
+//   - proto.UnmarshalOptions.resolver
+//   - protojson.MarshalOptions.resolver
+//   - protojson.UnmarshalOptions.resolver
+//   - prototext.MarshalOptions.resolver
+//   - prototext.UnmarshalOptions.resolver
 type SerializationResolver interface {
 	ExtensionTypeResolver
 	MessageTypeResolver
@@ -108,10 +136,9 @@ type TypeResolver interface {
 }
 
 // DependencyResolver can resolve dependencies, which is needed when
-// constructing a protoreflect.FileDescriptor from a
-// *descriptorpb.FileDescriptorProto.
+// constructing a [protoreflect.FileDescriptor] from a FileDescriptorProto.
 //
-// This interface is the same as protodesc.Resolver.
+// This interface is the same as [protodesc.Resolver].
 type DependencyResolver interface {
 	FileResolver
 	DescriptorResolver
@@ -121,16 +148,322 @@ var _ protodesc.Resolver = DependencyResolver(nil)
 var _ DependencyResolver = protodesc.Resolver(nil)
 
 // Resolver is a comprehensive resolver interface with methods for resolving all kinds
-// of descriptors. The AsTypeResolver method returns a view of the resolver as a
-// TypeResolver. In most cases, the returned types are dynamic types constructed using
-// the resolver's descriptors and the "google.golang.org/protobuf/types/dynamicpb"
-// package.
+// of descriptors.
+//
+// The AsTypeResolver method returns a view of the resolver as a TypeResolver. In most
+// cases, the returned types are dynamic types constructed using the resolver's
+// descriptors and the "google.golang.org/protobuf/types/dynamicpb" package.
 type Resolver interface {
-	FileResolver
-	FilePool
-	DescriptorResolver
+	DescriptorPool
 	TypedDescriptorResolver
-	ExtensionResolver
+	ExtensionPool
 	MessageURLResolver
 	AsTypeResolver() TypeResolver
+}
+
+// FindExtensionByNumber searches the given descriptor pool for the requested extension.
+// This performs an inefficient search through all files and extensions in the pool.
+func FindExtensionByNumber(res DescriptorPool, message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error) {
+	var ext protoreflect.ExtensionDescriptor
+	res.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
+		ext = FindExtensionByNumberInFile(fd, message, field)
+		return ext == nil
+	})
+	if ext == nil {
+		return nil, protoregistry.NotFound
+	}
+	return ext, nil
+}
+
+// FindExtensionByNumberInFile searches all extension in the given file for the requested
+// extension. It returns nil if the extension is not found in the file.
+func FindExtensionByNumberInFile(file protoreflect.FileDescriptor, message protoreflect.FullName, field protoreflect.FieldNumber) protoreflect.ExtensionDescriptor {
+	return findExtension(file, message, field)
+}
+
+func findExtension(container TypeContainer, message protoreflect.FullName, field protoreflect.FieldNumber) protoreflect.FieldDescriptor {
+	// search extensions in this scope
+	exts := container.Extensions()
+	for i, length := 0, exts.Len(); i < length; i++ {
+		ext := exts.Get(i)
+		if ext.Number() == field && ext.ContainingMessage().FullName() == message {
+			return ext
+		}
+	}
+
+	// if not found, search nested scopes
+	msgs := container.Messages()
+	for i, length := 0, msgs.Len(); i < length; i++ {
+		msg := msgs.Get(i)
+		ext := findExtension(msg, message, field)
+		if ext != nil {
+			return ext
+		}
+	}
+	return nil
+}
+
+// RangeExtensionsByMessage enumerates all extensions in the given descriptor pool that
+// extend the given message. It stops early if the given function returns false.
+func RangeExtensionsByMessage(res DescriptorPool, message protoreflect.FullName, fn func(descriptor protoreflect.ExtensionDescriptor) bool) {
+	var rangeInContext func(container TypeContainer, fn func(protoreflect.ExtensionDescriptor) bool) bool
+	rangeInContext = func(container TypeContainer, fn func(protoreflect.ExtensionDescriptor) bool) bool {
+		exts := container.Extensions()
+		for i, length := 0, exts.Len(); i < length; i++ {
+			ext := exts.Get(i)
+			if ext.ContainingMessage().FullName() == message {
+				if !fn(ext) {
+					return false
+				}
+			}
+		}
+		msgs := container.Messages()
+		for i, length := 0, msgs.Len(); i < length; i++ {
+			msg := msgs.Get(i)
+			if !rangeInContext(msg, fn) {
+				return false
+			}
+		}
+		return true
+	}
+	res.RangeFiles(func(file protoreflect.FileDescriptor) bool {
+		return rangeInContext(file, fn)
+	})
+}
+
+// FindDescriptorByNameInFile searches the given file for the element with the given
+// fully-qualified name. This could be used to implement the
+// [DescriptorResolver.FindDescriptorByName] method for a resolver that doesn't want
+// to create an index of all descriptors. This returns nil if no element with the
+// given name belongs to this file.
+//
+// This does not perform a brute-force search of all elements to find the given name.
+// It breaks up the given name into components and then descends the descriptor
+// hierarchy one element at a time. If the given name does not start with the file's
+// package, it immediately returns nil.
+func FindDescriptorByNameInFile(file protoreflect.FileDescriptor, sym protoreflect.FullName) protoreflect.Descriptor {
+	symNoPkg := string(sym)
+	if file.Package() != "" {
+		symNoPkg = strings.TrimPrefix(string(sym), string(file.Package())+".")
+		if symNoPkg == string(sym) {
+			// symbol is not in this file's package
+			return nil
+		}
+	}
+	parts := strings.Split(symNoPkg, ".")
+	return findSymbolInFile(parts, file)
+}
+
+func findSymbolInFile(symbolParts []string, fd protoreflect.FileDescriptor) protoreflect.Descriptor {
+	// ==1 name means it's a direct child of this file
+	if len(symbolParts) == 1 {
+		n := protoreflect.Name(symbolParts[0])
+		if d := fd.Messages().ByName(n); d != nil {
+			return d
+		}
+		if d := fd.Enums().ByName(n); d != nil {
+			return d
+		}
+		if d := fd.Extensions().ByName(n); d != nil {
+			return d
+		}
+		if d := fd.Services().ByName(n); d != nil {
+			return d
+		}
+		// enum values are defined in the scope that encloses the enum, so
+		// we have to look in all enums to find top-level enum values
+		enums := fd.Enums()
+		for i, length := 0, enums.Len(); i < length; i++ {
+			enum := enums.Get(i)
+			if d := enum.Values().ByName(n); d != nil {
+				return d
+			}
+		}
+		// not in this file
+		return nil
+	}
+
+	// >1 name means it's inside a message or (if ==2) a method inside a service
+	first := protoreflect.Name(symbolParts[0])
+	if len(symbolParts) == 2 {
+		second := protoreflect.Name(symbolParts[1])
+		if svc := fd.Services().ByName(first); svc != nil {
+			if d := svc.Methods().ByName(second); d != nil {
+				return d
+			}
+			return nil
+		}
+	}
+	rest := symbolParts[1:]
+	if msg := fd.Messages().ByName(first); msg != nil {
+		return findSymbolInMessage(rest, msg)
+	}
+
+	// no other option; can't be in this file
+	return nil
+}
+
+func findSymbolInMessage(symbolParts []string, md protoreflect.MessageDescriptor) protoreflect.Descriptor {
+	// ==1 name means it's a direct child of this message
+	if len(symbolParts) == 1 {
+		n := protoreflect.Name(symbolParts[0])
+		if d := md.Fields().ByName(n); d != nil {
+			return d
+		}
+		if d := md.Oneofs().ByName(n); d != nil {
+			return d
+		}
+		if d := md.Messages().ByName(n); d != nil {
+			return d
+		}
+		if d := md.Enums().ByName(n); d != nil {
+			return d
+		}
+		if d := md.Extensions().ByName(n); d != nil {
+			return d
+		}
+		// enum values are defined in the scope that encloses the enum, so
+		// we have to look in all enums to find enum values at this level
+		enums := md.Enums()
+		for i, length := 0, enums.Len(); i < length; i++ {
+			enum := enums.Get(i)
+			if d := enum.Values().ByName(n); d != nil {
+				return d
+			}
+		}
+		// not in this file
+		return nil
+	}
+
+	// >1 name means it's inside a nested message
+	first := protoreflect.Name(symbolParts[0])
+	rest := symbolParts[1:]
+	if nested := md.Messages().ByName(first); nested != nil {
+		return findSymbolInMessage(rest, nested)
+	}
+
+	// no other option; can't be in this message
+	return nil
+}
+
+// ResolverFromPool implements the full Resolver interface on top of the
+// given DescriptorPool. This can be used to upgrade a *[protoregistry.Files]
+// to the Resolver interface
+func ResolverFromPool(pool DescriptorPool) Resolver {
+	return &resolverFromPool{DescriptorPool: pool}
+}
+
+type resolverFromPool struct {
+	DescriptorPool
+}
+
+func (r *resolverFromPool) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageDescriptor, error) {
+	d, err := r.DescriptorPool.FindDescriptorByName(name)
+	if err != nil {
+		return nil, err
+	}
+	msg, ok := d.(protoreflect.MessageDescriptor)
+	if !ok {
+		return nil, fmt.Errorf("%s is %s, not a message", name, descType(d))
+	}
+	return msg, nil
+}
+
+func (r *resolverFromPool) FindFieldByName(name protoreflect.FullName) (protoreflect.FieldDescriptor, error) {
+	d, err := r.DescriptorPool.FindDescriptorByName(name)
+	if err != nil {
+		return nil, err
+	}
+	field, ok := d.(protoreflect.FieldDescriptor)
+	if !ok {
+		return nil, fmt.Errorf("%s is %s, not a field", name, descType(d))
+	}
+	return field, nil
+}
+
+func (r *resolverFromPool) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
+	field, err := r.FindFieldByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if !field.IsExtension() {
+		return nil, fmt.Errorf("%s is a normal field, not an extension", name)
+	}
+	return field, nil
+}
+
+func (r *resolverFromPool) FindOneofByName(name protoreflect.FullName) (protoreflect.OneofDescriptor, error) {
+	d, err := r.DescriptorPool.FindDescriptorByName(name)
+	if err != nil {
+		return nil, err
+	}
+	oneof, ok := d.(protoreflect.OneofDescriptor)
+	if !ok {
+		return nil, fmt.Errorf("%s is %s, not a oneof", name, descType(d))
+	}
+	return oneof, nil
+}
+
+func (r *resolverFromPool) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumDescriptor, error) {
+	d, err := r.DescriptorPool.FindDescriptorByName(name)
+	if err != nil {
+		return nil, err
+	}
+	enum, ok := d.(protoreflect.EnumDescriptor)
+	if !ok {
+		return nil, fmt.Errorf("%s is %s, not an enum", name, descType(d))
+	}
+	return enum, nil
+}
+
+func (r *resolverFromPool) FindEnumValueByName(name protoreflect.FullName) (protoreflect.EnumValueDescriptor, error) {
+	d, err := r.DescriptorPool.FindDescriptorByName(name)
+	if err != nil {
+		return nil, err
+	}
+	enumVal, ok := d.(protoreflect.EnumValueDescriptor)
+	if !ok {
+		return nil, fmt.Errorf("%s is %s, not an enum value", name, descType(d))
+	}
+	return enumVal, nil
+}
+
+func (r *resolverFromPool) FindServiceByName(name protoreflect.FullName) (protoreflect.ServiceDescriptor, error) {
+	d, err := r.DescriptorPool.FindDescriptorByName(name)
+	if err != nil {
+		return nil, err
+	}
+	svc, ok := d.(protoreflect.ServiceDescriptor)
+	if !ok {
+		return nil, fmt.Errorf("%s is %s, not a service", name, descType(d))
+	}
+	return svc, nil
+}
+
+func (r *resolverFromPool) FindMethodByName(name protoreflect.FullName) (protoreflect.MethodDescriptor, error) {
+	d, err := r.DescriptorPool.FindDescriptorByName(name)
+	if err != nil {
+		return nil, err
+	}
+	mtd, ok := d.(protoreflect.MethodDescriptor)
+	if !ok {
+		return nil, fmt.Errorf("%s is %s, not a method", name, descType(d))
+	}
+	return mtd, nil
+}
+
+func (r *resolverFromPool) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error) {
+	return FindExtensionByNumber(r.DescriptorPool, message, field)
+}
+
+func (r *resolverFromPool) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionDescriptor) bool) {
+	RangeExtensionsByMessage(r.DescriptorPool, message, fn)
+}
+
+func (r *resolverFromPool) FindMessageByURL(url string) (protoreflect.MessageDescriptor, error) {
+	return r.FindMessageByName(TypeNameFromURL(url))
+}
+
+func (r *resolverFromPool) AsTypeResolver() TypeResolver {
+	return TypesFromResolver(r)
 }

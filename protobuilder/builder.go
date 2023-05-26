@@ -3,14 +3,13 @@ package protobuilder
 import (
 	"bytes"
 	"fmt"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"reflect"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 // Builder is the core interface implemented by all descriptor builders. It
@@ -20,37 +19,37 @@ import (
 // interface because its return type varies with the type of descriptor that
 // is built.
 type Builder interface {
-	// GetName returns this element's name. The name returned is a simple name,
-	// not a qualified name.
-	GetName() string
+	// Name returns this element's path. The path returned is a simple path,
+	// not a qualified path. This is blank for *FileBuilder instances.
+	Name() protoreflect.Name
 
-	// TrySetName attempts to set this element's name. If the rename cannot
+	// TrySetName attempts to set this element's path. If the rename cannot
 	// proceed (e.g. this element's parent already has an element with that
-	// name) then an error is returned.
+	// path) then an error is returned.
 	//
 	// All builders also have a method named SetName that panics on error and
 	// returns the builder itself (for method chaining). But that isn't defined
 	// on this interface because its return type varies with the type of the
 	// descriptor builder.
-	TrySetName(newName string) error
+	TrySetName(newName protoreflect.Name) error
 
-	// GetParent returns this element's parent element. It returns nil if there
+	// Parent returns this element's parent element. It returns nil if there
 	// is no parent element. File builders never have parent elements.
-	GetParent() Builder
+	Parent() Builder
 
-	// GetFile returns this element's file. This returns nil if the element has
+	// ParentFile returns this element's file. This returns nil if the element has
 	// not yet been assigned to a file.
-	GetFile() *FileBuilder
+	ParentFile() *FileBuilder
 
-	// GetChildren returns all of this element's child elements. A file will
+	// Children returns all of this element's child elements. A file will
 	// return all of its top-level messages, enums, extensions, and services. A
 	// message will return all of its fields as well as nested messages, enums,
 	// and extensions, etc. Children will generally be grouped by type and,
 	// within a group, in the same order as the children were added to their
 	// parent.
-	GetChildren() []Builder
+	Children() []Builder
 
-	// GetComments returns the comments for this element. If the element has no
+	// Comments returns the comments for this element. If the element has no
 	// comments then the returned struct will have all empty fields. Comments
 	// can be added to the element by setting fields of the returned struct.
 	//
@@ -58,7 +57,7 @@ type Builder interface {
 	// and returns the builder itself (for method chaining). But that isn't
 	// defined on this interface because its return type varies with the type of
 	// the descriptor builder.
-	GetComments() *Comments
+	Comments() *Comments
 
 	// BuildDescriptor is a generic form of the Build method. Its declared
 	// return type is general so that it can be included in this interface and
@@ -70,9 +69,9 @@ type Builder interface {
 	// custom options, use BuilderOptions.Build instead.
 	BuildDescriptor() (protoreflect.Descriptor, error)
 
-	// findChild returns the child builder with the given name or nil if this
+	// findChild returns the child builder with the given path or nil if this
 	// builder has no such child.
-	findChild(string) Builder
+	findChild(protoreflect.Name) Builder
 
 	// removeChild removes the given child builder from this element. If the
 	// given element is not a child, it should do nothing.
@@ -81,11 +80,11 @@ type Builder interface {
 	// after removing references to the child from this element.
 	removeChild(Builder)
 
-	// renamedChild updates references by-name references to the given child and
-	// validates its name. The given string is the child's old name. If the
-	// rename can proceed, no error should be returned and any by-name
-	// references to the old name should be removed.
-	renamedChild(Builder, string) error
+	// renamedChild updates references by-path references to the given child and
+	// validates its path. The given string is the child's old path. If the
+	// rename can proceed, no error should be returned and any by-path
+	// references to the old path should be removed.
+	renamedChild(Builder, protoreflect.Name) error
 
 	// setParent simply updates the up-link (from child to parent) so that the
 	// this element's parent is up-to-date. It does NOT try to remove references
@@ -95,15 +94,15 @@ type Builder interface {
 
 // BuilderOptions includes additional options to use when building descriptors.
 type BuilderOptions struct {
-	// This registry provides definitions for custom options. If a builder
+	// This resolver provides definitions for custom options. If a builder
 	// refers to an option that is not known by this registry, it can still be
 	// interpreted if the extension is "known" to the calling program (i.e.
 	// linked in and registered with the proto package).
-	Extensions *dynamic.ExtensionRegistry
+	Resolver protoresolve.ExtensionTypeResolver
 
 	// If this option is true, then all options referred to in builders must
 	// be interpreted. That means that if an option is present that is neither
-	// recognized by Extenions nor known to the calling program, trying to build
+	// known to the calling program nor recognized by Resolver, trying to build
 	// the descriptor will fail.
 	RequireInterpretedOptions bool
 }
@@ -111,7 +110,7 @@ type BuilderOptions struct {
 // Build processes the given builder into a descriptor using these options.
 // Using the builder's Build() or BuildDescriptor() method is equivalent to
 // building with a zero-value BuilderOptions.
-func (opts BuilderOptions) Build(b Builder) (desc.Descriptor, error) {
+func (opts BuilderOptions) Build(b Builder) (protoreflect.Descriptor, error) {
 	return doBuild(b, opts)
 }
 
@@ -126,10 +125,10 @@ type Comments struct {
 	TrailingComment         string
 }
 
-func setComments(c *Comments, loc *descriptorpb.SourceCodeInfo_Location) {
-	c.LeadingDetachedComments = loc.GetLeadingDetachedComments()
-	c.LeadingComment = loc.GetLeadingComments()
-	c.TrailingComment = loc.GetTrailingComments()
+func setComments(c *Comments, loc protoreflect.SourceLocation) {
+	c.LeadingDetachedComments = loc.LeadingDetachedComments
+	c.LeadingComment = loc.LeadingComments
+	c.TrailingComment = loc.TrailingComments
 }
 
 func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Comments) {
@@ -172,11 +171,11 @@ func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Com
  *
  * Renaming an element is initiated via Builder.TrySetName. Implementations
  * should do the following:
- *  1. Validate the new name using any local constraints and naming rules.
+ *  1. Validate the new path using any local constraints and naming rules.
  *  2. If there are child elements whose names should be kept in sync in some
  *     way, rename them.
- *  3. Invoke baseBuilder.setName. This changes this element's name and then
- *     invokes Builder.renamedChild(child, oldName) to update any by-name
+ *  3. Invoke baseBuilder.setName. This changes this element's path and then
+ *     invokes Builder.renamedChild(child, oldName) to update any by-path
  *     references from the parent to the child.
  *  4. If step #3 failed, any other element names that were changed to keep
  *     them in sync (from step #2) should be reverted.
@@ -184,17 +183,17 @@ func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Com
  * A key part of this flow is how parents react to child elements being renamed.
  * This is done in Builder.renamedChild. Implementations should do the
  * following:
- *  1. Validate the name using any local constraints. (Often there are no new
+ *  1. Validate the path using any local constraints. (Often there are no new
  *     constraints and any checks already done by Builder.TrySetName should
  *     suffice.)
  *  2. If the parent element should be renamed to keep it in sync with the
- *     child's name, rename it.
- *  3. Register references to the element using the new name. A possible cause
+ *     child's path, rename it.
+ *  3. Register references to the element using the new path. A possible cause
  *     of error in this step is a uniqueness constraint, e.g. the element's new
- *     name collides with a sibling element's name.
- *  4. If step #3 failed and this element name was changed to keep it in sync
+ *     path collides with a sibling element's path.
+ *  4. If step #3 failed and this element path was changed to keep it in sync
  *     (from step #2), it should be reverted.
- *  5. Finally, remove references to the element for the old name. This step
+ *  5. Finally, remove references to the element for the old path. This step
  *     should always succeed.
  *
  * Changing the tag number for a non-extension field has a similar flow since it
@@ -202,8 +201,8 @@ func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Com
  * conflict with another existing field.
  *
  * Note that TrySetName and renamedChild methods both can return an error, which
- * should indicate why the element could not be renamed (e.g. name is invalid,
- * new name conflicts with existing sibling names, etc).
+ * should indicate why the element could not be renamed (e.g. path is invalid,
+ * new path conflicts with existing sibling names, etc).
  *
  *
  * MOVING/REMOVING AN ELEMENT
@@ -228,7 +227,7 @@ func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Com
  *
  * The "Add" methods typically have a "Try" form which can return an error. This
  * could happen if the new child is not legal to add (including, for example,
- * that its name collides with an existing child element).
+ * that its path collides with an existing child element).
  *
  * The removeChild and setParent methods, on the other hand, cannot return an
  * error and thus must always succeed.
@@ -238,39 +237,31 @@ func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Com
 // and provides a kernel of builder-wiring support (to reduce boiler-plate in
 // each implementation).
 type baseBuilder struct {
-	name     string
+	name     protoreflect.Name
 	parent   Builder
 	comments Comments
 }
 
-func baseBuilderWithName(name string) baseBuilder {
+func baseBuilderWithName(name protoreflect.Name) baseBuilder {
 	if err := checkName(name); err != nil {
 		panic(err)
 	}
 	return baseBuilder{name: name}
 }
 
-func checkName(name string) error {
-	for i, ch := range name {
-		if i == 0 {
-			if ch != '_' && (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') {
-				return fmt.Errorf("name %q is invalid; It must start with an underscore or letter", name)
-			}
-		} else {
-			if ch != '_' && (ch < '0' || ch > '9') && (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') {
-				return fmt.Errorf("name %q contains invalid character %q; only underscores, letters, and numbers are allowed", name, string(ch))
-			}
-		}
+func checkName(name protoreflect.Name) error {
+	if !name.IsValid() {
+		return fmt.Errorf("path %q is invalid: it must start with an underscore or letter and contain only underscores, letters, and numbers", name)
 	}
 	return nil
 }
 
-// GetName returns the name of the element that will be built by this builder.
-func (b *baseBuilder) GetName() string {
+// Name returns the path of the element that will be built by this builder.
+func (b *baseBuilder) Name() protoreflect.Name {
 	return b.name
 }
 
-func (b *baseBuilder) setName(fullBuilder Builder, newName string) error {
+func (b *baseBuilder) setName(fullBuilder Builder, newName protoreflect.Name) error {
 	if newName == b.name {
 		return nil // no change
 	}
@@ -289,7 +280,7 @@ func (b *baseBuilder) setName(fullBuilder Builder, newName string) error {
 	return nil
 }
 
-// GetParent returns the parent builder to which this builder has been added. If
+// Parent returns the parent builder to which this builder has been added. If
 // the builder has not been added to another, this returns nil.
 //
 // The parents of message builders will be file builders or other message
@@ -298,7 +289,7 @@ func (b *baseBuilder) setName(fullBuilder Builder, newName string) error {
 // builder. Method builders' parents are service builders; enum value builders'
 // parents are enum builders. Finally, service builders will always return file
 // builders as their parent.
-func (b *baseBuilder) GetParent() Builder {
+func (b *baseBuilder) Parent() Builder {
 	return b.parent
 }
 
@@ -306,79 +297,81 @@ func (b *baseBuilder) setParent(newParent Builder) {
 	b.parent = newParent
 }
 
-// GetFile returns the file to which this builder is assigned. This examines the
+// ParentFile returns the file to which this builder is assigned. This examines the
 // builder's parent, and its parent, and so on, until it reaches a file builder
 // or nil.
 //
 // If the builder is not assigned to a file (even transitively), this method
 // returns nil.
-func (b *baseBuilder) GetFile() *FileBuilder {
+func (b *baseBuilder) ParentFile() *FileBuilder {
 	p := b.parent
 	for p != nil {
 		if fb, ok := p.(*FileBuilder); ok {
 			return fb
 		}
-		p = p.GetParent()
+		p = p.Parent()
 	}
 	return nil
 }
 
-// GetComments returns comments associated with the element that will be built
+// Comments returns comments associated with the element that will be built
 // by this builder.
-func (b *baseBuilder) GetComments() *Comments {
+func (b *baseBuilder) Comments() *Comments {
 	return &b.comments
 }
 
 // doBuild is a helper for implementing the Build() method that each builder
 // exposes. It is used for all builders except for the root FileBuilder type.
-func doBuild(b Builder, opts BuilderOptions) (desc.Descriptor, error) {
-	fd, err := newResolver(opts).resolveElement(b, nil)
+func doBuild(b Builder, opts BuilderOptions) (protoreflect.Descriptor, error) {
+	res := newResolver(opts)
+	fd, err := res.resolveElement(b, nil)
 	if err != nil {
 		return nil, err
 	}
 	if _, ok := b.(*FileBuilder); ok {
 		return fd, nil
 	}
-	return fd.FindSymbol(GetFullyQualifiedName(b)), nil
+	return res.registry.FindDescriptorByName(FullName(b))
 }
 
-func getFullyQualifiedName(b Builder, buf *bytes.Buffer) {
+func fullName(b Builder, buf *bytes.Buffer) {
 	if fb, ok := b.(*FileBuilder); ok {
-		buf.WriteString(fb.Package)
+		buf.WriteString(string(fb.Package))
 	} else if b != nil {
-		p := b.GetParent()
+		p := b.Parent()
 		if _, ok := p.(*FieldBuilder); ok {
 			// field can be the parent of a message (if it's
 			// the field's map entry or group type), but its
-			// name is not part of message's fqn; so skip
-			p = p.GetParent()
+			// path is not part of message's fqn; so skip
+			p = p.Parent()
 		}
-		if _, ok := p.(*OneOfBuilder); ok {
+		if _, ok := p.(*OneofBuilder); ok {
 			// one-of can be the parent of a field, but its
-			// name is not part of field's fqn; so skip
-			p = p.GetParent()
+			// path is not part of field's fqn; so skip
+			p = p.Parent()
 		}
-		getFullyQualifiedName(p, buf)
+		fullName(p, buf)
 		if buf.Len() > 0 {
 			buf.WriteByte('.')
 		}
-		buf.WriteString(b.GetName())
+		buf.WriteString(string(b.Name()))
 	}
 }
 
-// GetFullyQualifiedName returns the given builder's fully-qualified name. This
-// name is based on the parent elements the builder may be linked to, which
+// FullName returns the given builder's fully-qualified path. This
+// path is based on the parent elements the builder may be linked to, which
 // provide context like package and (optional) enclosing message names.
-func GetFullyQualifiedName(b Builder) string {
+// For *FileBuilder instances, this returns the file's package.
+func FullName(b Builder) protoreflect.FullName {
 	var buf bytes.Buffer
-	getFullyQualifiedName(b, &buf)
-	return buf.String()
+	fullName(b, &buf)
+	return protoreflect.FullName(buf.String())
 }
 
 // Unlink removes the given builder from its parent. The parent will no longer
 // refer to the builder and vice versa.
 func Unlink(b Builder) {
-	if p := b.GetParent(); p != nil {
+	if p := b.Parent(); p != nil {
 		p.removeChild(b)
 	}
 }
@@ -387,7 +380,7 @@ func Unlink(b Builder) {
 // instance.
 func getRoot(b Builder) Builder {
 	for {
-		p := b.GetParent()
+		p := b.Parent()
 		if p == nil {
 			return b
 		}
@@ -395,15 +388,15 @@ func getRoot(b Builder) Builder {
 	}
 }
 
-// deleteBuilder will delete a descriptor builder with the given name from the
+// deleteBuilder will delete a descriptor builder with the given path from the
 // given slice. The slice's elements can be any builder type. The parameter has
 // type interface{} so it can accept []*MessageBuilder or []*FieldBuilder, for
 // example. It returns a value of the same type with the named builder omitted.
-func deleteBuilder(name string, descs interface{}) interface{} {
+func deleteBuilder(name protoreflect.Name, descs interface{}) interface{} {
 	rv := reflect.ValueOf(descs)
 	for i := 0; i < rv.Len(); i++ {
 		c := rv.Index(i).Interface().(Builder)
-		if c.GetName() == name {
+		if c.Name() == name {
 			head := rv.Slice(0, i)
 			tail := rv.Slice(i+1, rv.Len())
 			return reflect.AppendSlice(head, tail).Interface()

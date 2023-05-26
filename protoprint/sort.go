@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
-
-	"github.com/jhump/protoreflect/desc"
 )
 
 // ElementKind is an enumeration of the types of elements in a protobuf
@@ -71,17 +70,17 @@ func asElement(v interface{}) Element {
 		return resvdRangeElement(v)
 	case string:
 		return resvdNameElement(v)
-	case *desc.FieldDescriptor:
+	case protoreflect.FieldDescriptor:
 		return (*fieldElement)(v)
-	case *desc.MessageDescriptor:
+	case protoreflect.MessageDescriptor:
 		return (*msgElement)(v)
-	case *desc.EnumDescriptor:
+	case protoreflect.EnumDescriptor:
 		return (*enumElement)(v)
-	case *desc.EnumValueDescriptor:
+	case protoreflect.EnumValueDescriptor:
 		return (*enumValElement)(v)
-	case *desc.ServiceDescriptor:
+	case protoreflect.ServiceDescriptor:
 		return (*svcElement)(v)
-	case *desc.MethodDescriptor:
+	case protoreflect.MethodDescriptor:
 		return (*methodElement)(v)
 	case *descriptorpb.DescriptorProto_ExtensionRange:
 		return (*extRangeElement)(v)
@@ -234,23 +233,25 @@ func (r resvdNameElement) IsCustomOption() bool {
 	return false
 }
 
-type fieldElement desc.FieldDescriptor
+type fieldElement struct {
+	fd protoreflect.FieldDescriptor
+}
 
 var _ Element = (*fieldElement)(nil)
 
 func (f *fieldElement) Kind() ElementKind {
-	if (*desc.FieldDescriptor)(f).IsExtension() {
+	if (protoreflect.FieldDescriptor)(f).IsExtension() {
 		return KindExtension
 	}
 	return KindField
 }
 
 func (f *fieldElement) Name() string {
-	return (*desc.FieldDescriptor)(f).GetName()
+	return (protoreflect.FieldDescriptor)(f).GetName()
 }
 
 func (f *fieldElement) Number() int32 {
-	return (*desc.FieldDescriptor)(f).GetNumber()
+	return (protoreflect.FieldDescriptor)(f).GetNumber()
 }
 
 func (f *fieldElement) NumberRange() (int32, int32) {
@@ -258,7 +259,7 @@ func (f *fieldElement) NumberRange() (int32, int32) {
 }
 
 func (f *fieldElement) Extendee() string {
-	fd := (*desc.FieldDescriptor)(f)
+	fd := (protoreflect.FieldDescriptor)(f)
 	if fd.IsExtension() {
 		fd.GetOwner().GetFullyQualifiedName()
 	}
@@ -269,7 +270,9 @@ func (f *fieldElement) IsCustomOption() bool {
 	return false
 }
 
-type msgElement desc.MessageDescriptor
+type msgElement struct {
+	md protoreflect.MessageDescriptor
+}
 
 var _ Element = (*msgElement)(nil)
 
@@ -278,7 +281,7 @@ func (m *msgElement) Kind() ElementKind {
 }
 
 func (m *msgElement) Name() string {
-	return (*desc.MessageDescriptor)(m).GetName()
+	return (protoreflect.MessageDescriptor)(m).GetName()
 }
 
 func (m *msgElement) Number() int32 {
@@ -297,7 +300,9 @@ func (m *msgElement) IsCustomOption() bool {
 	return false
 }
 
-type enumElement desc.EnumDescriptor
+type enumElement struct {
+	ed protoreflect.EnumDescriptor
+}
 
 var _ Element = (*enumElement)(nil)
 
@@ -306,7 +311,7 @@ func (e *enumElement) Kind() ElementKind {
 }
 
 func (e *enumElement) Name() string {
-	return (*desc.EnumDescriptor)(e).GetName()
+	return (protoreflect.EnumDescriptor)(e).GetName()
 }
 
 func (e *enumElement) Number() int32 {
@@ -325,7 +330,9 @@ func (e *enumElement) IsCustomOption() bool {
 	return false
 }
 
-type enumValElement desc.EnumValueDescriptor
+type enumValElement struct {
+	evd protoreflect.EnumValueDescriptor
+}
 
 var _ Element = (*enumValElement)(nil)
 
@@ -334,11 +341,11 @@ func (e *enumValElement) Kind() ElementKind {
 }
 
 func (e *enumValElement) Name() string {
-	return (*desc.EnumValueDescriptor)(e).GetName()
+	return (protoreflect.EnumValueDescriptor)(e).GetName()
 }
 
 func (e *enumValElement) Number() int32 {
-	return (*desc.EnumValueDescriptor)(e).GetNumber()
+	return (protoreflect.EnumValueDescriptor)(e).GetNumber()
 }
 
 func (e *enumValElement) NumberRange() (int32, int32) {
@@ -353,7 +360,9 @@ func (e *enumValElement) IsCustomOption() bool {
 	return false
 }
 
-type svcElement desc.ServiceDescriptor
+type svcElement struct {
+	sd protoreflect.ServiceDescriptor
+}
 
 var _ Element = (*svcElement)(nil)
 
@@ -362,7 +371,7 @@ func (s *svcElement) Kind() ElementKind {
 }
 
 func (s *svcElement) Name() string {
-	return (*desc.ServiceDescriptor)(s).GetName()
+	return (protoreflect.ServiceDescriptor)(s).GetName()
 }
 
 func (s *svcElement) Number() int32 {
@@ -381,7 +390,9 @@ func (s *svcElement) IsCustomOption() bool {
 	return false
 }
 
-type methodElement desc.MethodDescriptor
+type methodElement struct {
+	mtd protoreflect.MethodDescriptor
+}
 
 var _ Element = (*methodElement)(nil)
 
@@ -390,7 +401,7 @@ func (m *methodElement) Kind() ElementKind {
 }
 
 func (m *methodElement) Name() string {
-	return (*desc.MethodDescriptor)(m).GetName()
+	return (protoreflect.MethodDescriptor)(m).GetName()
 }
 
 func (m *methodElement) Number() int32 {
