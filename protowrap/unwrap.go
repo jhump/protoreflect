@@ -168,3 +168,172 @@ func ProtoFromMethodDescriptor(d protoreflect.MethodDescriptor) *descriptorpb.Me
 	}
 	return protodesc.ToMethodDescriptorProto(d)
 }
+
+// WrappedDescriptor represents a descriptor that has been wrapped or decorated.
+// Its sole method allows recovery of the underlying, original descriptor.
+type WrappedDescriptor interface {
+	Unwrap() protoreflect.Descriptor
+}
+
+// Unwrap unwraps the given descriptor. If it implements WrappedDescriptor,
+// the underlying descriptor is returned. Otherwise, d is returned as is.
+func Unwrap(d protoreflect.Descriptor) protoreflect.Descriptor {
+	w, ok := d.(WrappedDescriptor)
+	if !ok {
+		// not wrapped
+		return d
+	}
+	wrapped := w.Unwrap()
+	if wrapped == nil {
+		return d
+	}
+	// try to make sure that the wrapped descriptor matches the incoming type
+	switch d.(type) {
+	case protoreflect.FileDescriptor:
+		return wrapped.(protoreflect.FileDescriptor)
+	case protoreflect.MessageDescriptor:
+		return wrapped.(protoreflect.MessageDescriptor)
+	case protoreflect.FieldDescriptor:
+		return wrapped.(protoreflect.FieldDescriptor)
+	case protoreflect.OneofDescriptor:
+		return wrapped.(protoreflect.OneofDescriptor)
+	case protoreflect.EnumDescriptor:
+		return wrapped.(protoreflect.EnumDescriptor)
+	case protoreflect.EnumValueDescriptor:
+		return wrapped.(protoreflect.EnumValueDescriptor)
+	case protoreflect.ServiceDescriptor:
+		return wrapped.(protoreflect.ServiceDescriptor)
+	case protoreflect.MethodDescriptor:
+		return wrapped.(protoreflect.MethodDescriptor)
+	default:
+		return wrapped
+	}
+}
+
+// UnwrapFile unwraps the given file descriptor. If it implements
+// WrappedDescriptor, the underlying descriptor is returned. Otherwise,
+// fd is returned as is.
+func UnwrapFile(fd protoreflect.FileDescriptor) protoreflect.FileDescriptor {
+	w, ok := fd.(WrappedDescriptor)
+	if !ok {
+		// not wrapped
+		return fd
+	}
+	wrapped := w.Unwrap()
+	if wrapped == nil {
+		return fd
+	}
+	return wrapped.(protoreflect.FileDescriptor)
+}
+
+// UnwrapMessage unwraps the given message descriptor. If it implements
+// WrappedDescriptor, the underlying descriptor is returned. Otherwise,
+// md is returned as is.
+func UnwrapMessage(md protoreflect.MessageDescriptor) protoreflect.MessageDescriptor {
+	w, ok := md.(WrappedDescriptor)
+	if !ok {
+		// not wrapped
+		return md
+	}
+	wrapped := w.Unwrap()
+	if wrapped == nil {
+		return md
+	}
+	return wrapped.(protoreflect.MessageDescriptor)
+}
+
+// UnwrapField unwraps the given field descriptor. If it implements
+// WrappedDescriptor, the underlying descriptor is returned. Otherwise,
+// fld is returned as is.
+func UnwrapField(fld protoreflect.FieldDescriptor) protoreflect.FieldDescriptor {
+	w, ok := fld.(WrappedDescriptor)
+	if !ok {
+		// not wrapped
+		return fld
+	}
+	wrapped := w.Unwrap()
+	if wrapped == nil {
+		return fld
+	}
+	return wrapped.(protoreflect.FieldDescriptor)
+}
+
+// UnwrapOneof unwraps the given oneof descriptor. If it implements
+// WrappedDescriptor, the underlying descriptor is returned. Otherwise,
+// ood is returned as is.
+func UnwrapOneof(ood protoreflect.OneofDescriptor) protoreflect.OneofDescriptor {
+	w, ok := ood.(WrappedDescriptor)
+	if !ok {
+		// not wrapped
+		return ood
+	}
+	wrapped := w.Unwrap()
+	if wrapped == nil {
+		return ood
+	}
+	return wrapped.(protoreflect.OneofDescriptor)
+}
+
+// UnwrapEnum unwraps the given enum descriptor. If it implements
+// WrappedDescriptor, the underlying descriptor is returned. Otherwise,
+// ed is returned as is.
+func UnwrapEnum(ed protoreflect.EnumDescriptor) protoreflect.EnumDescriptor {
+	w, ok := ed.(WrappedDescriptor)
+	if !ok {
+		// not wrapped
+		return ed
+	}
+	wrapped := w.Unwrap()
+	if wrapped == nil {
+		return ed
+	}
+	return wrapped.(protoreflect.EnumDescriptor)
+}
+
+// UnwrapEnumValue unwraps the given enum value descriptor. If it implements
+// WrappedDescriptor, the underlying descriptor is returned. Otherwise,
+// evd is returned as is.
+func UnwrapEnumValue(evd protoreflect.EnumValueDescriptor) protoreflect.EnumValueDescriptor {
+	w, ok := evd.(WrappedDescriptor)
+	if !ok {
+		// not wrapped
+		return evd
+	}
+	wrapped := w.Unwrap()
+	if wrapped == nil {
+		return evd
+	}
+	return wrapped.(protoreflect.EnumValueDescriptor)
+}
+
+// UnwrapService unwraps the given service descriptor. If it implements
+// WrappedDescriptor, the underlying descriptor is returned. Otherwise,
+// sd is returned as is.
+func UnwrapService(sd protoreflect.ServiceDescriptor) protoreflect.ServiceDescriptor {
+	w, ok := sd.(WrappedDescriptor)
+	if !ok {
+		// not wrapped
+		return sd
+	}
+	wrapped := w.Unwrap()
+	if wrapped == nil {
+		return sd
+	}
+	return wrapped.(protoreflect.ServiceDescriptor)
+}
+
+// UnwrapMethod unwraps the given method descriptor. If it implements
+// WrappedDescriptor, the underlying descriptor is returned. Otherwise,
+// mtd is returned as is.
+func UnwrapMethod(mtd protoreflect.MethodDescriptors) protoreflect.MethodDescriptors {
+	w, ok := mtd.(WrappedDescriptor)
+	if !ok {
+		// not wrapped
+		return mtd
+	}
+	wrapped := w.Unwrap()
+	if wrapped == nil {
+		return mtd
+	}
+	return wrapped.(protoreflect.MethodDescriptors)
+}

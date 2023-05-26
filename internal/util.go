@@ -4,6 +4,8 @@ import (
 	"math"
 	"unicode"
 	"unicode/utf8"
+
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 const (
@@ -222,7 +224,7 @@ const (
 // This mirrors the algorithm in protoc:
 //
 //	https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L95
-func JsonName(name string) string {
+func JsonName(name protoreflect.Name) string {
 	var js []rune
 	nextUpper := false
 	for _, r := range name {
@@ -246,46 +248,9 @@ func InitCap(name string) string {
 	return string(unicode.ToUpper(r)) + name[sz:]
 }
 
-// CreatePrefixList returns a list of package prefixes to search when resolving
-// a symbol name. If the given package is blank, it returns only the empty
-// string. If the given package contains only one token, e.g. "foo", it returns
-// that token and the empty string, e.g. ["foo", ""]. Otherwise, it returns
-// successively shorter prefixes of the package and then the empty string. For
-// example, for a package named "foo.bar.baz" it will return the following list:
-//
-//	["foo.bar.baz", "foo.bar", "foo", ""]
-func CreatePrefixList(pkg string) []string {
-	if pkg == "" {
-		return []string{""}
-	}
-
-	numDots := 0
-	// one pass to pre-allocate the returned slice
-	for i := 0; i < len(pkg); i++ {
-		if pkg[i] == '.' {
-			numDots++
-		}
-	}
-	if numDots == 0 {
-		return []string{pkg, ""}
-	}
-
-	prefixes := make([]string, numDots+2)
-	// second pass to fill in returned slice
-	for i := 0; i < len(pkg); i++ {
-		if pkg[i] == '.' {
-			prefixes[numDots] = pkg[:i]
-			numDots--
-		}
-	}
-	prefixes[0] = pkg
-
-	return prefixes
-}
-
 // GetMaxTag returns the max tag number allowed, based on whether a message uses
 // message set wire format or not.
-func GetMaxTag(isMessageSet bool) int32 {
+func GetMaxTag(isMessageSet bool) protoreflect.FieldNumber {
 	if isMessageSet {
 		return MaxMessageSetTag
 	}

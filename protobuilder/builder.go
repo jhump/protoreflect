@@ -350,6 +350,11 @@ func fullName(b Builder, buf *bytes.Buffer) {
 			// path is not part of field's fqn; so skip
 			p = p.Parent()
 		}
+		if _, ok := p.(*EnumBuilder); ok {
+			// enum can be the parent of an enum value, but
+			// its path is not part of the value's fqn; so skip
+			p = p.Parent()
+		}
 		fullName(p, buf)
 		if buf.Len() > 0 {
 			buf.WriteByte('.')

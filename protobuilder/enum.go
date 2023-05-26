@@ -67,14 +67,28 @@ func FromEnum(ed protoreflect.EnumDescriptor) (*EnumBuilder, error) {
 
 func fromEnum(ed protoreflect.EnumDescriptor, localEnums map[protoreflect.EnumDescriptor]*EnumBuilder) (*EnumBuilder, error) {
 	eb := NewEnum(ed.Name())
-	eb.Options = ed.GetEnumOptions()
-	eb.ReservedRanges = ed.AsEnumDescriptorProto().GetReservedRange()
-	eb.ReservedNames = ed.AsEnumDescriptorProto().GetReservedName()
-	setComments(&eb.comments, ed.GetSourceInfo())
+	var err error
+	eb.Options, err = as[*descriptorpb.EnumOptions](ed.Options())
+	if err != nil {
+		return nil, err
+	}
+	ranges := ed.ReservedRanges()
+	eb.ReservedRanges = make([]EnumRange, ranges.Len())
+	for i, length := 0, ranges.Len(); i < length; i++ {
+		eb.ReservedRanges[i] = ranges.Get(i)
+	}
+	names := ed.ReservedNames()
+	eb.ReservedNames = make([]protoreflect.Name, names.Len())
+	for i, length := 0, names.Len(); i < length; i++ {
+		eb.ReservedNames[i] = names.Get(i)
+	}
+	setComments(&eb.comments, ed.ParentFile().SourceLocations().ByDescriptor(ed))
 
 	localEnums[ed] = eb
 
-	for _, evd := range ed.GetValues() {
+	vals := ed.Values()
+	for i, length := 0, vals.Len(); i < length; i++ {
+		evd := vals.Get(i)
 		if evb, err := fromEnumValue(evd); err != nil {
 			return nil, err
 		} else if err := eb.TryAddValue(evb); err != nil {
@@ -210,11 +224,7 @@ func (eb *EnumBuilder) TryAddValue(evb *EnumValueBuilder) error {
 // inclusive of both the start and end, just like defining a range in proto IDL
 // source. This returns the message, for method chaining.
 func (eb *EnumBuilder) AddReservedRange(start, end protoreflect.EnumNumber) *EnumBuilder {
-	rr := &descriptorpb.EnumDescriptorProto_EnumReservedRange{
-		Start: proto.Int32(start),
-		End:   proto.Int32(end),
-	}
-	eb.ReservedRanges = append(eb.ReservedRanges, rr)
+	eb.ReservedRanges = append(eb.ReservedRanges, EnumRange{start, end})
 	return eb
 }
 
@@ -284,12 +294,24 @@ func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceC
 		}
 	}
 
+	resRanges := make([]*descriptorpb.EnumDescriptorProto_EnumReservedRange, len(eb.ReservedRanges))
+	for i, r := range eb.ReservedRanges {
+		resRanges[i] = &descriptorpb.EnumDescriptorProto_EnumReservedRange{
+			Start: proto.Int32(int32(r[0])),
+			End:   proto.Int32(int32(r[1])),
+		}
+	}
+	resNames := make([]string, len(eb.ReservedNames))
+	for i, name := range eb.ReservedNames {
+		resNames[i] = string(name)
+	}
+
 	return &descriptorpb.EnumDescriptorProto{
-		Name:          proto.String(eb.name),
+		Name:          proto.String(string(eb.name)),
 		Options:       eb.Options,
 		Value:         values,
-		ReservedRange: eb.ReservedRanges,
-		ReservedName:  eb.ReservedNames,
+		ReservedRange: resRanges,
+		ReservedName:  resNames,
 	}, nil
 }
 
@@ -359,10 +381,14 @@ func FromEnumValue(evd protoreflect.EnumValueDescriptor) (*EnumValueBuilder, err
 
 func fromEnumValue(evd protoreflect.EnumValueDescriptor) (*EnumValueBuilder, error) {
 	evb := NewEnumValue(evd.Name())
-	evb.Options = evd.GetEnumValueOptions()
-	evb.number = evd.GetNumber()
+	var err error
+	evb.Options, err = as[*descriptorpb.EnumValueOptions](evd.Options())
+	if err != nil {
+		return nil, err
+	}
+	evb.number = evd.Number()
 	evb.numberSet = true
-	setComments(&evb.comments, evd.GetSourceInfo())
+	setComments(&evb.comments, evd.ParentFile().SourceLocations().ByDescriptor(evd))
 
 	return evb, nil
 }
@@ -398,16 +424,16 @@ func (evb *EnumValueBuilder) Children() []Builder {
 	return nil
 }
 
-func (evb *EnumValueBuilder) findChild(name protoreflect.Name) Builder {
+func (evb *EnumValueBuilder) findChild(_ protoreflect.Name) Builder {
 	// enum values do not have children
 	return nil
 }
 
-func (evb *EnumValueBuilder) removeChild(b Builder) {
+func (evb *EnumValueBuilder) removeChild(_ Builder) {
 	// enum values do not have children
 }
 
-func (evb *EnumValueBuilder) renamedChild(b Builder, oldName protoreflect.Name) error {
+func (evb *EnumValueBuilder) renamedChild(_ Builder, _ protoreflect.Name) error {
 	// enum values do not have children
 	return nil
 }
@@ -453,8 +479,8 @@ func (evb *EnumValueBuilder) buildProto(path []int32, sourceInfo *descriptorpb.S
 	addCommentsTo(sourceInfo, path, &evb.comments)
 
 	return &descriptorpb.EnumValueDescriptorProto{
-		Name:    proto.String(evb.name),
-		Number:  proto.Int32(evb.number),
+		Name:    proto.String(string(evb.name)),
+		Number:  proto.Int32(int32(evb.number)),
 		Options: evb.Options,
 	}, nil
 }

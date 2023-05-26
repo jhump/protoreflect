@@ -2,10 +2,11 @@ package protoresolve
 
 import (
 	"fmt"
+	"strings"
+
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
-	"strings"
 )
 
 // TypeRegistry is a type resolver that allows the caller to add elements to

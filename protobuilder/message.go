@@ -247,7 +247,20 @@ func (mb *MessageBuilder) Children() []Builder {
 }
 
 func (mb *MessageBuilder) findChild(name protoreflect.Name) Builder {
-	return mb.symbols[name]
+	child := mb.symbols[name]
+	if child != nil {
+		return child
+	}
+	// Enum values are in the scope of the enclosing element, not the
+	// enum itself. So we have to look here in the file for values of
+	// any top-level enums
+	for _, eb := range mb.nestedEnums {
+		child = eb.findChild(name)
+		if child != nil {
+			return child
+		}
+	}
+	return nil
 }
 
 func (mb *MessageBuilder) removeChild(b Builder) {
@@ -393,7 +406,7 @@ func (mb *MessageBuilder) TryAddField(flb *FieldBuilder) error {
 		if err := mb.registerField(flb); err != nil {
 			// Should never happen since, before above Unlink, it was already
 			// registered with this message (just indirectly, via a oneof).
-			// But if some it DOES happen, the field will now be orphaned :(
+			// But if somehow it DOES happen, the field will now be orphaned :(
 			return err
 		}
 	} else {

@@ -1,6 +1,7 @@
 package protobuilder
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -8,18 +9,26 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bufbuild/protocompile"
+	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	_ "github.com/jhump/protoreflect/v2/internal/testdata"
+	"github.com/jhump/protoreflect/v2/protoresolve"
+	"github.com/jhump/protoreflect/v2/protowrap"
 )
 
 func TestSimpleDescriptorsFromScratch(t *testing.T) {
-	md, err := desc.LoadMessageDescriptorForMessage((*emptypb.Empty)(nil))
-	testutil.Ok(t, err)
+	md := (*emptypb.Empty)(nil).ProtoReflect().Descriptor()
 
 	file := NewFile("foo/bar.proto").SetPackageName("foo.bar")
 	en := NewEnum("Options").
@@ -41,33 +50,36 @@ func TestSimpleDescriptorsFromScratch(t *testing.T) {
 	file.AddService(sb)
 
 	fd, err := file.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
-	testutil.Eq(t, []*desc.FileDescriptor{md.GetFile()}, fd.GetDependencies())
-	testutil.Require(t, fd.FindEnum("foo.bar.Options") != nil)
-	testutil.Eq(t, 3, len(fd.FindEnum("foo.bar.Options").GetValues()))
-	testutil.Require(t, fd.FindMessage("foo.bar.FooRequest") != nil)
-	testutil.Eq(t, 3, len(fd.FindMessage("foo.bar.FooRequest").GetFields()))
-	testutil.Require(t, fd.FindService("foo.bar.FooService") != nil)
-	testutil.Eq(t, 2, len(fd.FindService("foo.bar.FooService").GetMethods()))
+	require.Equal(t, 1, fd.Imports().Len())
+	require.Equal(t, md.ParentFile(), fd.Imports().Get(0).FileDescriptor)
+	require.NotNil(t, fd.Enums().ByName("Options"))
+	require.Equal(t, 3, fd.Enums().ByName("Options").Values().Len())
+	require.NotNil(t, fd.Messages().ByName("FooRequest"))
+	require.Equal(t, 3, fd.Messages().ByName("FooRequest").Fields().Len())
+	require.NotNil(t, fd.Services().ByName("FooService"))
+	require.Equal(t, 2, fd.Services().ByName("FooService").Methods().Len())
 
 	// building the others produces same results
 	ed, err := en.Build()
-	testutil.Ok(t, err)
-	testutil.Require(t, proto.Equal(ed.AsProto(), fd.FindEnum("foo.bar.Options").AsProto()))
+	require.NoError(t, err)
+	diff := cmp.Diff(protowrap.ProtoFromDescriptor(ed), protowrap.ProtoFromDescriptor(fd.Enums().ByName("Options")), protocmp.Transform())
+	require.Empty(t, diff)
 
 	md, err = msg.Build()
-	testutil.Ok(t, err)
-	testutil.Require(t, proto.Equal(md.AsProto(), fd.FindMessage("foo.bar.FooRequest").AsProto()))
+	require.NoError(t, err)
+	diff = cmp.Diff(protowrap.ProtoFromDescriptor(md), protowrap.ProtoFromDescriptor(fd.Messages().ByName("FooRequest")), protocmp.Transform())
+	require.Empty(t, diff)
 
 	sd, err := sb.Build()
-	testutil.Ok(t, err)
-	testutil.Require(t, proto.Equal(sd.AsProto(), fd.FindService("foo.bar.FooService").AsProto()))
+	require.NoError(t, err)
+	diff = cmp.Diff(protowrap.ProtoFromDescriptor(sd), protowrap.ProtoFromDescriptor(fd.Services().ByName("FooService")), protocmp.Transform())
+	require.Empty(t, diff)
 }
 
 func TestSimpleDescriptorsFromScratch_SyntheticFiles(t *testing.T) {
-	md, err := desc.LoadMessageDescriptorForMessage((*emptypb.Empty)(nil))
-	testutil.Ok(t, err)
+	md := (*emptypb.Empty)(nil).ProtoReflect().Descriptor()
 
 	en := NewEnum("Options")
 	en.AddValue(NewEnumValue("OPTION_1"))
@@ -85,45 +97,45 @@ func TestSimpleDescriptorsFromScratch_SyntheticFiles(t *testing.T) {
 	sb.AddMethod(NewMethod("ReturnThings", RpcTypeImportedMessage(md, false), RpcTypeMessage(msg, true)))
 
 	sd, err := sb.Build()
-	testutil.Ok(t, err)
-	testutil.Eq(t, "FooService", sd.GetFullyQualifiedName())
-	testutil.Eq(t, 2, len(sd.GetMethods()))
+	require.NoError(t, err)
+	require.Equal(t, protoreflect.FullName("FooService"), sd.FullName())
+	require.Equal(t, 2, sd.Methods().Len())
 
 	// it imports google/protobuf/empty.proto and a synthetic file that has message
-	testutil.Eq(t, 2, len(sd.GetFile().GetDependencies()))
-	fd := sd.GetFile().GetDependencies()[0]
-	testutil.Eq(t, "google/protobuf/empty.proto", fd.GetName())
-	testutil.Eq(t, md.GetFile(), fd)
-	fd = sd.GetFile().GetDependencies()[1]
-	testutil.Require(t, strings.Contains(fd.GetName(), "generated"))
-	testutil.Require(t, fd.FindMessage("FooRequest") != nil)
-	testutil.Eq(t, 3, len(fd.FindMessage("FooRequest").GetFields()))
+	require.Equal(t, 2, sd.ParentFile().Imports().Len())
+	fd := sd.ParentFile().Imports().Get(0).FileDescriptor
+	require.Equal(t, "google/protobuf/empty.proto", fd.Path())
+	require.Equal(t, md.ParentFile(), fd)
+	fd = sd.ParentFile().Imports().Get(1).FileDescriptor
+	require.True(t, strings.Contains(fd.Path(), "generated"))
+	require.NotNil(t, fd.Messages().ByName("FooRequest"))
+	require.Equal(t, 3, fd.Messages().ByName("FooRequest").Fields().Len())
 
 	// this one imports only a synthetic file that has enum
-	testutil.Eq(t, 1, len(fd.GetDependencies()))
-	fd2 := fd.GetDependencies()[0]
-	testutil.Require(t, fd2.FindEnum("Options") != nil)
-	testutil.Eq(t, 3, len(fd2.FindEnum("Options").GetValues()))
+	require.Equal(t, 1, fd.Imports().Len())
+	fd2 := fd.Imports().Get(0).FileDescriptor
+	require.NotNil(t, fd2.Enums().ByName("Options"))
+	require.Equal(t, 3, fd2.Enums().ByName("Options").Values().Len())
 
 	// building the others produces same results
 	ed, err := en.Build()
-	testutil.Ok(t, err)
-	testutil.Require(t, proto.Equal(ed.AsProto(), fd2.FindEnum("Options").AsProto()))
+	require.NoError(t, err)
+	diff := cmp.Diff(protowrap.ProtoFromDescriptor(ed), protowrap.ProtoFromDescriptor(fd2.Enums().ByName("Options")), protocmp.Transform())
+	require.Empty(t, diff)
 
 	md, err = msg.Build()
-	testutil.Ok(t, err)
-	testutil.Require(t, proto.Equal(md.AsProto(), fd.FindMessage("FooRequest").AsProto()))
+	require.NoError(t, err)
+	diff = cmp.Diff(protowrap.ProtoFromDescriptor(md), protowrap.ProtoFromDescriptor(fd.Messages().ByName("FooRequest")), protocmp.Transform())
+	require.Empty(t, diff)
 }
 
 func TestComplexDescriptorsFromScratch(t *testing.T) {
-	mdEmpty, err := desc.LoadMessageDescriptorForMessage((*emptypb.Empty)(nil))
-	testutil.Ok(t, err)
-	mdAny, err := desc.LoadMessageDescriptorForMessage((*anypb.Any)(nil))
-	testutil.Ok(t, err)
-	mdTimestamp, err := desc.LoadMessageDescriptorForMessage((*timestamppb.Timestamp)(nil))
-	testutil.Ok(t, err)
+	mdEmpty := (*emptypb.Empty)(nil).ProtoReflect().Descriptor()
+	mdAny := (*anypb.Any)(nil).ProtoReflect().Descriptor()
+	mdTimestamp := (*timestamppb.Timestamp)(nil).ProtoReflect().Descriptor()
+
 	mbAny, err := FromMessage(mdAny)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
 	msgA := NewMessage("FooA").
 		AddField(NewField("id", FieldTypeUint64())).
@@ -131,7 +143,7 @@ func TestComplexDescriptorsFromScratch(t *testing.T) {
 		AddField(NewField("extras", FieldTypeImportedMessage(mdAny)).
 			SetRepeated()).
 		AddField(NewField("builder", FieldTypeMessage(mbAny))).
-		SetExtensionRanges([]*descriptorpb.DescriptorProto_ExtensionRange{{Start: proto.Int32(100), End: proto.Int32(201)}})
+		SetExtensionRanges([]ExtensionRange{{FieldRange: FieldRange{100, 201}}})
 	msgA2 := NewMessage("Nnn").
 		AddField(NewField("uid1", FieldTypeFixed64())).
 		AddField(NewField("uid2", FieldTypeFixed64()))
@@ -185,48 +197,48 @@ func TestComplexDescriptorsFromScratch(t *testing.T) {
 			AddMethod(NewMethod("Method2", RpcTypeMessage(msgB, false), RpcTypeMessage(msgC, true)))).
 		Build()
 
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
-	testutil.Eq(t, 5, len(fd.GetDependencies()))
+	require.Equal(t, 5, fd.Imports().Len())
 	// dependencies sorted; those with generated names come last
-	depEmpty := fd.GetDependencies()[0]
-	testutil.Eq(t, "google/protobuf/empty.proto", depEmpty.GetName())
-	testutil.Eq(t, mdEmpty.GetFile(), depEmpty)
-	depD := fd.GetDependencies()[1]
-	testutil.Eq(t, "some/other/path/file.proto", depD.GetName())
-	depC := fd.GetDependencies()[2]
-	testutil.Eq(t, "some/path/file.proto", depC.GetName())
-	depA := fd.GetDependencies()[3]
-	testutil.Require(t, strings.Contains(depA.GetName(), "generated"))
-	depB := fd.GetDependencies()[4]
-	testutil.Require(t, strings.Contains(depB.GetName(), "generated"))
+	depEmpty := fd.Imports().Get(0).FileDescriptor
+	require.Equal(t, "google/protobuf/empty.proto", depEmpty.Path())
+	require.Equal(t, mdEmpty.ParentFile(), depEmpty)
+	depD := fd.Imports().Get(1).FileDescriptor
+	require.Equal(t, "some/other/path/file.proto", depD.Path())
+	depC := fd.Imports().Get(2).FileDescriptor
+	require.Equal(t, "some/path/file.proto", depC.Path())
+	depA := fd.Imports().Get(3).FileDescriptor
+	require.True(t, strings.Contains(depA.Path(), "generated"))
+	depB := fd.Imports().Get(4).FileDescriptor
+	require.True(t, strings.Contains(depB.Path(), "generated"))
 
 	// check contents of files
-	testutil.Require(t, depA.FindMessage("foo.bar.FooA") != nil)
-	testutil.Eq(t, 4, len(depA.FindMessage("foo.bar.FooA").GetFields()))
-	testutil.Require(t, depA.FindMessage("foo.bar.Nnn") != nil)
-	testutil.Eq(t, 2, len(depA.FindMessage("foo.bar.Nnn").GetFields()))
-	testutil.Eq(t, 2, len(depA.GetDependencies()))
+	require.NotNil(t, depA.Messages().ByName("FooA"))
+	require.Equal(t, 4, depA.Messages().ByName("FooA").Fields().Len())
+	require.NotNil(t, depA.Messages().ByName("Nnn"))
+	require.Equal(t, 2, depA.Messages().ByName("Nnn").Fields().Len())
+	require.Equal(t, 2, depA.Imports().Len())
 
-	testutil.Require(t, depB.FindMessage("foo.bar.FooB") != nil)
-	testutil.Eq(t, 2, len(depB.FindMessage("foo.bar.FooB").GetFields()))
-	testutil.Eq(t, 1, len(depB.GetDependencies()))
+	require.NotNil(t, depB.Messages().ByName("FooB"))
+	require.Equal(t, 2, depB.Messages().ByName("FooB").Fields().Len())
+	require.Equal(t, 1, depB.Imports().Len())
 
-	testutil.Require(t, depC.FindMessage("foo.baz.BarBaz") != nil)
-	testutil.Eq(t, 3, len(depC.FindMessage("foo.baz.BarBaz").GetFields()))
-	testutil.Require(t, depC.FindEnum("foo.baz.Vals") != nil)
-	testutil.Eq(t, 4, len(depC.FindEnum("foo.baz.Vals").GetValues()))
-	testutil.Eq(t, 2, len(depC.GetDependencies()))
+	require.NotNil(t, depC.Messages().ByName("BarBaz"))
+	require.Equal(t, 3, depC.Messages().ByName("BarBaz").Fields().Len())
+	require.NotNil(t, depC.Enums().ByName("Vals"))
+	require.Equal(t, 4, depC.Enums().ByName("Vals").Values().Len())
+	require.Equal(t, 2, depC.Imports().Len())
 
-	testutil.Require(t, depD.FindEnum("foo.biz.Ppp") != nil)
-	testutil.Eq(t, 4, len(depD.FindEnum("foo.biz.Ppp").GetValues()))
-	testutil.Require(t, depD.FindExtensionByName("foo.biz.ppp") != nil)
-	testutil.Eq(t, 1, len(depD.GetDependencies()))
+	require.NotNil(t, depD.Enums().ByName("Ppp"))
+	require.Equal(t, 4, depD.Enums().ByName("Ppp").Values().Len())
+	require.NotNil(t, depD.Extensions().ByName("ppp"))
+	require.Equal(t, 1, depD.Imports().Len())
 
-	testutil.Require(t, fd.FindMessage("foo.bar.Ppp") != nil)
-	testutil.Eq(t, 2, len(fd.FindMessage("foo.bar.Ppp").GetFields()))
-	testutil.Require(t, fd.FindService("foo.bar.PppSvc") != nil)
-	testutil.Eq(t, 2, len(fd.FindService("foo.bar.PppSvc").GetMethods()))
+	require.NotNil(t, fd.Messages().ByName("Ppp"))
+	require.Equal(t, 2, fd.Messages().ByName("Ppp").Fields().Len())
+	require.NotNil(t, fd.Services().ByName("PppSvc"))
+	require.Equal(t, 2, fd.Services().ByName("PppSvc").Methods().Len())
 }
 
 func TestCreatingGroupField(t *testing.T) {
@@ -239,82 +251,82 @@ func TestCreatingGroupField(t *testing.T) {
 		AddField(NewField("foo", FieldTypeBool())).
 		AddField(grpFlb)
 	md, err := mb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
-	testutil.Require(t, md.FindFieldByName("groupa") != nil)
-	testutil.Eq(t, descriptorpb.FieldDescriptorProto_TYPE_GROUP, md.FindFieldByName("groupa").GetType())
-	nmd := md.GetNestedMessageTypes()[0]
-	testutil.Eq(t, "GroupA", nmd.GetName())
-	testutil.Eq(t, nmd, md.FindFieldByName("groupa").GetMessageType())
+	require.NotNil(t, md.Fields().ByName("groupa"))
+	require.Equal(t, protoreflect.GroupKind, md.Fields().ByName("groupa").Kind())
+	nmd := md.Messages().Get(0)
+	require.Equal(t, protoreflect.Name("GroupA"), nmd.Name())
+	require.Equal(t, nmd, md.Fields().ByName("groupa").Message())
 
 	// try a rename that will fail
 	err = grpMb.TrySetName("fooBarBaz")
-	testutil.Require(t, err != nil)
-	testutil.Eq(t, "group path fooBarBaz must start with capital letter", err.Error())
+	require.ErrorContains(t, err, "group path fooBarBaz must start with capital letter")
 	// failed rename should not have modified any state
 	md2, err := mb.Build()
-	testutil.Ok(t, err)
-	testutil.Require(t, proto.Equal(md.AsProto(), md2.AsProto()))
+	require.NoError(t, err)
+	diff := cmp.Diff(protowrap.ProtoFromDescriptor(md), protowrap.ProtoFromDescriptor(md2), protocmp.Transform())
+	require.Empty(t, diff)
 	// another attempt that will fail
 	err = grpFlb.TrySetName("foobarbaz")
-	testutil.Require(t, err != nil)
-	testutil.Eq(t, "cannot change path of group field TestMessage.groupa; change path of group instead", err.Error())
+	require.ErrorContains(t, err, "cannot change path of group field TestMessage.groupa; change path of group instead")
 	// again, no state should have been modified
 	md2, err = mb.Build()
-	testutil.Ok(t, err)
-	testutil.Require(t, proto.Equal(md.AsProto(), md2.AsProto()))
+	require.NoError(t, err)
+	diff = cmp.Diff(protowrap.ProtoFromDescriptor(md), protowrap.ProtoFromDescriptor(md2), protocmp.Transform())
+	require.Empty(t, diff)
 
 	// and a rename that succeeds
 	err = grpMb.TrySetName("FooBarBaz")
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	md, err = mb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
 	// field also renamed
-	testutil.Require(t, md.FindFieldByName("foobarbaz") != nil)
-	testutil.Eq(t, descriptorpb.FieldDescriptorProto_TYPE_GROUP, md.FindFieldByName("foobarbaz").GetType())
-	nmd = md.GetNestedMessageTypes()[0]
-	testutil.Eq(t, "FooBarBaz", nmd.GetName())
-	testutil.Eq(t, nmd, md.FindFieldByName("foobarbaz").GetMessageType())
+	require.NotNil(t, md.Fields().ByName("foobarbaz"))
+	require.Equal(t, protoreflect.GroupKind, md.Fields().ByName("foobarbaz").Kind())
+	nmd = md.Messages().Get(0)
+	require.Equal(t, protoreflect.Name("FooBarBaz"), nmd.Name())
+	require.Equal(t, nmd, md.Fields().ByName("foobarbaz").Message())
 }
 
 func TestCreatingMapField(t *testing.T) {
 	mapFlb := NewMapField("countsByName", FieldTypeString(), FieldTypeUint64())
-	testutil.Require(t, mapFlb.IsMap())
+	require.True(t, mapFlb.IsMap())
 
 	mb := NewMessage("TestMessage").
 		AddField(NewField("foo", FieldTypeBool())).
 		AddField(mapFlb)
 	md, err := mb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
-	testutil.Require(t, md.FindFieldByName("countsByName") != nil)
-	testutil.Require(t, md.FindFieldByName("countsByName").IsMap())
-	nmd := md.GetNestedMessageTypes()[0]
-	testutil.Eq(t, "CountsByNameEntry", nmd.GetName())
-	testutil.Eq(t, nmd, md.FindFieldByName("countsByName").GetMessageType())
+	require.NotNil(t, md.Fields().ByName("countsByName"))
+	require.True(t, md.Fields().ByName("countsByName").IsMap())
+	nmd := md.Messages().Get(0)
+	require.Equal(t, protoreflect.Name("CountsByNameEntry"), nmd.Name())
+	require.Equal(t, nmd, md.Fields().ByName("countsByName").Message())
 
 	// try a rename that will fail
-	err = mapFlb.GetType().localMsgType.TrySetName("fooBarBaz")
-	testutil.Require(t, err != nil)
-	testutil.Eq(t, "cannot change path of map entry TestMessage.CountsByNameEntry; change path of field instead", err.Error())
+	err = mapFlb.Type().localMsgType.TrySetName("fooBarBaz")
+	require.ErrorContains(t, err, "cannot change path of map entry TestMessage.CountsByNameEntry; change path of field instead")
 	// failed rename should not have modified any state
 	md2, err := mb.Build()
-	testutil.Ok(t, err)
-	testutil.Require(t, proto.Equal(md.AsProto(), md2.AsProto()))
+	require.NoError(t, err)
+	diff := cmp.Diff(protowrap.ProtoFromDescriptor(md), protowrap.ProtoFromDescriptor(md2), protocmp.Transform())
+	require.Empty(t, diff)
 
 	// and a rename that succeeds
 	err = mapFlb.TrySetName("fooBarBaz")
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	md, err = mb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
 	// map entry also renamed
-	testutil.Require(t, md.FindFieldByName("fooBarBaz") != nil)
-	testutil.Require(t, md.FindFieldByName("fooBarBaz").IsMap())
-	nmd = md.GetNestedMessageTypes()[0]
-	testutil.Eq(t, "FooBarBazEntry", nmd.GetName())
-	testutil.Eq(t, nmd, md.FindFieldByName("fooBarBaz").GetMessageType())
+	require.NotNil(t, md.Fields().ByName("fooBarBaz"))
+	require.True(t, md.Fields().ByName("fooBarBaz").IsMap())
+	nmd = md.Messages().Get(0)
+	require.Equal(t, protoreflect.Name("FooBarBazEntry"), nmd.Name())
+	require.Equal(t, nmd, md.Fields().ByName("fooBarBaz").Message())
 }
 
 func TestProto3Optional(t *testing.T) {
@@ -323,34 +335,36 @@ func TestProto3Optional(t *testing.T) {
 	mb.AddField(flb)
 
 	_, err := flb.Build()
-	testutil.Nok(t, err) // file does not have proto3 syntax
+	require.NotNil(t, err) // file does not have proto3 syntax
 
-	fb := NewFile("foo.proto").SetProto3(true)
+	fb := NewFile("foo.proto").SetSyntax(protoreflect.Proto3)
 	fb.AddMessage(mb)
 
 	fld, err := flb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
-	testutil.Require(t, fld.IsProto3Optional())
-	testutil.Require(t, fld.GetOneOf() != nil)
-	testutil.Require(t, fld.GetOneOf().IsSynthetic())
-	testutil.Eq(t, "_bar", fld.GetOneOf().GetName())
+	require.True(t, fld.HasPresence())
+	require.NotNil(t, fld.ContainingOneof())
+	require.True(t, fld.ContainingOneof().IsSynthetic())
+	require.Equal(t, protoreflect.Name("_bar"), fld.ContainingOneof().Name())
 }
 
 func TestBuildersFromDescriptors(t *testing.T) {
 	for _, s := range []string{"desc_test1.proto", "desc_test2.proto", "desc_test_defaults.proto", "desc_test_options.proto", "desc_test_proto3.proto", "desc_test_wellknowntypes.proto", "nopkg/desc_test_nopkg.proto", "nopkg/desc_test_nopkg_new.proto", "pkg/desc_test_pkg.proto"} {
-		fd, err := desc.LoadFileDescriptor(s)
-		testutil.Ok(t, err)
+		fd, err := protoregistry.GlobalFiles.FindFileByPath(s)
+		require.NoError(t, err)
 		roundTripFile(t, fd)
 	}
 }
 
 func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
-	fd, err := loadProtoset("../../internal/testprotos/desc_test1.protoset")
-	testutil.Ok(t, err)
+	files, err := loadProtoset("../internal/testdata/desc_test1.protoset")
+	require.NoError(t, err)
+	fd, err := files.FindFileByPath("desc_test1.proto")
+	require.NoError(t, err)
 
 	fb, err := FromFile(fd)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
 	count := 0
 	var checkBuilderComments func(b Builder)
@@ -361,7 +375,7 @@ func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
 			hasComment = false
 		case *FieldBuilder:
 			// comments for groups are on the message, not the field
-			hasComment = b.GetType().Kind() != descriptorpb.FieldDescriptorProto_TYPE_GROUP
+			hasComment = b.Type().Kind() != protoreflect.GroupKind
 		case *MessageBuilder:
 			// comments for maps are on the field, not the entry message
 			if b.Options.GetMapEntry() {
@@ -373,83 +387,96 @@ func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
 
 		if hasComment {
 			count++
-			testutil.Eq(t, fmt.Sprintf(" Comment for %s\n", b.GetName()), b.GetComments().LeadingComment,
+			require.Equal(t, fmt.Sprintf(" Comment for %s\n", b.Name()), b.Comments().LeadingComment,
 				"wrong comment for builder %s", FullName(b))
 		}
-		for _, ch := range b.GetChildren() {
+		for _, ch := range b.Children() {
 			checkBuilderComments(ch)
 		}
 	}
 
 	checkBuilderComments(fb)
 	// sanity check that we didn't accidentally short-circuit above and fail to check comments
-	testutil.Require(t, count > 30, "too few elements checked")
+	require.True(t, count > 30, "too few elements checked")
 
 	// now check that they also come out in the resulting descriptor
 	fd, err = fb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
 	descCount := 0
-	var checkDescriptorComments func(d desc.Descriptor)
-	checkDescriptorComments = func(d desc.Descriptor) {
+	var checkDescriptorComments func(d protoreflect.Descriptor)
+	checkDescriptorComments = func(d protoreflect.Descriptor) {
 		switch d := d.(type) {
-		case *desc.FileDescriptor:
-			for _, ch := range d.GetMessageTypes() {
-				checkDescriptorComments(ch)
+		case protoreflect.FileDescriptor:
+			msgs := d.Messages()
+			for i, length := 0, msgs.Len(); i < length; i++ {
+				checkDescriptorComments(msgs.Get(i))
 			}
-			for _, ch := range d.GetEnumTypes() {
-				checkDescriptorComments(ch)
+			enums := d.Enums()
+			for i, length := 0, enums.Len(); i < length; i++ {
+				checkDescriptorComments(enums.Get(i))
 			}
-			for _, ch := range d.GetExtensions() {
-				checkDescriptorComments(ch)
+			exts := d.Extensions()
+			for i, length := 0, exts.Len(); i < length; i++ {
+				checkDescriptorComments(exts.Get(i))
 			}
-			for _, ch := range d.GetServices() {
-				checkDescriptorComments(ch)
+			svcs := d.Services()
+			for i, length := 0, svcs.Len(); i < length; i++ {
+				checkDescriptorComments(svcs.Get(i))
 			}
 			// files don't have comments, so bail out before check below
 			return
-		case *desc.MessageDescriptor:
+		case protoreflect.MessageDescriptor:
 			if d.IsMapEntry() {
 				// map entry messages have no comments (and neither do their child fields)
 				return
 			}
-			for _, ch := range d.GetFields() {
-				checkDescriptorComments(ch)
+			fields := d.Fields()
+			for i, length := 0, fields.Len(); i < length; i++ {
+				checkDescriptorComments(fields.Get(i))
 			}
-			for _, ch := range d.GetNestedMessageTypes() {
-				checkDescriptorComments(ch)
+			msgs := d.Messages()
+			for i, length := 0, msgs.Len(); i < length; i++ {
+				checkDescriptorComments(msgs.Get(i))
 			}
-			for _, ch := range d.GetNestedEnumTypes() {
-				checkDescriptorComments(ch)
+			enums := d.Enums()
+			for i, length := 0, enums.Len(); i < length; i++ {
+				checkDescriptorComments(enums.Get(i))
 			}
-			for _, ch := range d.GetNestedExtensions() {
-				checkDescriptorComments(ch)
+			exts := d.Extensions()
+			for i, length := 0, exts.Len(); i < length; i++ {
+				checkDescriptorComments(exts.Get(i))
 			}
-			for _, ch := range d.GetOneOfs() {
-				checkDescriptorComments(ch)
+			oneofs := d.Oneofs()
+			for i, length := 0, oneofs.Len(); i < length; i++ {
+				checkDescriptorComments(oneofs.Get(i))
 			}
-		case *desc.FieldDescriptor:
-			if d.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
-				// groups comments are on the message, not hte field; so bail out before check below
+		case protoreflect.FieldDescriptor:
+			if d.Kind() == protoreflect.GroupKind {
+				// groups comments are on the message, not the field; so bail out before check below
 				return
 			}
-		case *desc.EnumDescriptor:
-			for _, ch := range d.GetValues() {
-				checkDescriptorComments(ch)
+		case protoreflect.EnumDescriptor:
+			vals := d.Values()
+			for i, length := 0, vals.Len(); i < length; i++ {
+				checkDescriptorComments(vals.Get(i))
 			}
-		case *desc.ServiceDescriptor:
-			for _, ch := range d.GetMethods() {
-				checkDescriptorComments(ch)
+		case protoreflect.ServiceDescriptor:
+			methods := d.Methods()
+			for i, length := 0, methods.Len(); i < length; i++ {
+				checkDescriptorComments(methods.Get(i))
 			}
 		}
 
 		descCount++
-		testutil.Eq(t, fmt.Sprintf(" Comment for %s\n", d.GetName()), d.GetSourceInfo().GetLeadingComments(),
-			"wrong comment for descriptor %s", d.GetFullyQualifiedName())
+		require.Equal(t,
+			fmt.Sprintf(" Comment for %s\n", d.Name()),
+			d.ParentFile().SourceLocations().ByDescriptor(d).LeadingComments,
+			"wrong comment for descriptor %s", d.FullName())
 	}
 
 	checkDescriptorComments(fd)
-	testutil.Eq(t, count, descCount)
+	require.Equal(t, count, descCount)
 }
 
 func TestBuilder_PreserveAllCommentsAfterBuild(t *testing.T) {
@@ -481,70 +508,86 @@ message SimpleMessage {
 }
 `}
 
-	pa := &protoparse.Parser{
-		Accessor:              protoparse.FileContentsFromMap(files),
-		IncludeSourceCodeInfo: true,
+	pa := &protocompile.Compiler{
+		Resolver: &protocompile.SourceResolver{
+			Accessor: protocompile.SourceAccessorFromMap(files),
+		},
+		SourceInfoMode: protocompile.SourceInfoStandard,
 	}
-	fds, err := pa.ParseFiles("test.proto")
-	testutil.Ok(t, err)
+	fds, err := pa.Compile(context.Background(), "test.proto")
+	require.NoError(t, err)
 
 	fb, err := FromFile(fds[0])
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
 	fd, err := fb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
-	var checkDescriptorComments func(d desc.Descriptor)
-	checkDescriptorComments = func(d desc.Descriptor) {
+	var checkDescriptorComments func(d protoreflect.Descriptor)
+	checkDescriptorComments = func(d protoreflect.Descriptor) {
 		// fmt.Println(d.FullName(), d.GetSourceInfo().GetLeadingDetachedComments(), d.GetSourceInfo().GetLeadingComments(), d.GetSourceInfo().GetTrailingComments())
 		switch d := d.(type) {
-		case *desc.FileDescriptor:
-			for _, ch := range d.GetMessageTypes() {
-				checkDescriptorComments(ch)
+		case protoreflect.FileDescriptor:
+			msgs := d.Messages()
+			for i, length := 0, msgs.Len(); i < length; i++ {
+				checkDescriptorComments(msgs.Get(i))
 			}
-			for _, ch := range d.GetEnumTypes() {
-				checkDescriptorComments(ch)
+			enums := d.Enums()
+			for i, length := 0, enums.Len(); i < length; i++ {
+				checkDescriptorComments(enums.Get(i))
 			}
 			// files don't have comments, so bail out before check below
 			return
-		case *desc.MessageDescriptor:
+		case protoreflect.MessageDescriptor:
 			if d.IsMapEntry() {
 				// map entry messages have no comments (and neither do their child fields)
 				return
 			}
-			for _, ch := range d.GetFields() {
-				checkDescriptorComments(ch)
+			fields := d.Fields()
+			for i, length := 0, fields.Len(); i < length; i++ {
+				checkDescriptorComments(fields.Get(i))
 			}
-		case *desc.FieldDescriptor:
-			if d.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
-				// groups comments are on the message, not hte field; so bail out before check below
+		case protoreflect.FieldDescriptor:
+			if d.Kind() == protoreflect.GroupKind {
+				// groups comments are on the message, not the field; so bail out before check below
 				return
 			}
-		case *desc.EnumDescriptor:
-			for _, ch := range d.GetValues() {
-				checkDescriptorComments(ch)
+		case protoreflect.EnumDescriptor:
+			vals := d.Values()
+			for i, length := 0, vals.Len(); i < length; i++ {
+				checkDescriptorComments(vals.Get(i))
 			}
 		}
-		testutil.Eq(t, 1, len(d.GetSourceInfo().GetLeadingDetachedComments()),
-			"wrong number of leading detached comments for %s", d.GetFullyQualifiedName())
-		testutil.Eq(t, fmt.Sprintf(" Leading detached comment for %s\n", d.GetName()), d.GetSourceInfo().GetLeadingDetachedComments()[0],
-			"wrong leading detached comment for descriptor %s", d.GetFullyQualifiedName())
-		testutil.Eq(t, fmt.Sprintf(" Leading comment for %s\n", d.GetName()), d.GetSourceInfo().GetLeadingComments(),
-			"wrong leading comment for descriptor %s", d.GetFullyQualifiedName())
-		testutil.Eq(t, fmt.Sprintf(" Trailing comment for %s\n", d.GetName()), d.GetSourceInfo().GetTrailingComments(),
-			"wrong trailing comment for descriptor %s", d.GetFullyQualifiedName())
+		require.Equal(t,
+			1,
+			len(d.ParentFile().SourceLocations().ByDescriptor(d).LeadingDetachedComments),
+			"wrong number of leading detached comments for %s", d.FullName())
+		require.Equal(t,
+			fmt.Sprintf(" Leading detached comment for %s\n", d.Name()),
+			d.ParentFile().SourceLocations().ByDescriptor(d).LeadingDetachedComments[0],
+			"wrong leading detached comment for descriptor %s", d.FullName())
+		require.Equal(t,
+			fmt.Sprintf(" Leading comment for %s\n", d.Name()),
+			d.ParentFile().SourceLocations().ByDescriptor(d).LeadingComments,
+			"wrong leading comment for descriptor %s", d.FullName())
+		require.Equal(t,
+			fmt.Sprintf(" Trailing comment for %s\n", d.Name()),
+			d.ParentFile().SourceLocations().ByDescriptor(d).TrailingComments,
+			"wrong trailing comment for descriptor %s", d.FullName())
 	}
 
 	checkDescriptorComments(fd)
 }
 
-func loadProtoset(path string) (*desc.FileDescriptor, error) {
+func loadProtoset(path string) (protoresolve.Resolver, error) {
 	var fds descriptorpb.FileDescriptorSet
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 	bb, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
@@ -552,31 +595,35 @@ func loadProtoset(path string) (*desc.FileDescriptor, error) {
 	if err = proto.Unmarshal(bb, &fds); err != nil {
 		return nil, err
 	}
-	return desc.CreateFileDescriptorFromSet(&fds)
+	return protowrap.FromFileDescriptorSet(&fds)
 }
 
-func roundTripFile(t *testing.T, fd *desc.FileDescriptor) {
+func roundTripFile(t *testing.T, fd protoreflect.FileDescriptor) {
 	// First, recursively verify that every child element can be converted to a
 	// Builder and back without loss of fidelity.
-	for _, md := range fd.GetMessageTypes() {
-		roundTripMessage(t, md)
+	msgs := fd.Messages()
+	for i, length := 0, msgs.Len(); i < length; i++ {
+		roundTripMessage(t, msgs.Get(0))
 	}
-	for _, ed := range fd.GetEnumTypes() {
-		roundTripEnum(t, ed)
+	enums := fd.Enums()
+	for i, length := 0, enums.Len(); i < length; i++ {
+		roundTripEnum(t, enums.Get(0))
 	}
-	for _, exd := range fd.GetExtensions() {
-		roundTripField(t, exd)
+	exts := fd.Extensions()
+	for i, length := 0, exts.Len(); i < length; i++ {
+		roundTripField(t, exts.Get(0))
 	}
-	for _, sd := range fd.GetServices() {
-		roundTripService(t, sd)
+	svcs := fd.Services()
+	for i, length := 0, svcs.Len(); i < length; i++ {
+		roundTripService(t, svcs.Get(0))
 	}
 
 	// Finally, we check the whole file itself.
 	fb, err := FromFile(fd)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
 	roundTripped, err := fb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
 	// Round tripping from a file descriptor to a builder and back will
 	// experience some minor changes (that do not impact the semantics of
@@ -607,7 +654,7 @@ func roundTripFile(t *testing.T, fd *desc.FileDescriptor) {
 	// nopkg/desc_test_nopkg_new.proto. So any file that depends on the
 	// former will be updated to instead depend on the latter (since it is
 	// the actual file that declares used elements).
-	fdp := fd.AsFileDescriptorProto()
+	fdp := protowrap.ProtoFromFileDescriptor(fd)
 	needsNopkgNew := false
 	hasNoPkgNew := false
 	for _, dep := range fdp.Dependency {
@@ -632,96 +679,112 @@ func roundTripFile(t *testing.T, fd *desc.FileDescriptor) {
 	if fdp.GetPackage() == "" {
 		fdp.Package = nil
 	}
+	// Fix the one we loaded so it has syntax set instead of unset, since
+	// that is what builders produce.
+	if fdp.Syntax == nil {
+		fdp.Syntax = proto.String("proto2")
+	}
 
 	// Remove source code info: what the builder generates is not expected to
 	// match the original source.
 	fdp.SourceCodeInfo = nil
-	roundTripped.AsFileDescriptorProto().SourceCodeInfo = nil
+	roundTrippedProto := protowrap.ProtoFromFileDescriptor(roundTripped)
+	roundTrippedProto.SourceCodeInfo = nil
 
 	// Finally, sort the imports. That way they match the built result (which
 	// is always sorted).
 	sort.Strings(fdp.Dependency)
 
 	// Now (after tweaking) the original should match the round-tripped descriptor:
-	testutil.Require(t, proto.Equal(fdp, roundTripped.AsProto()), "File %q failed round trip.\nExpecting: %s\nGot: %s\n",
-		fd.GetName(), proto.MarshalTextString(fdp), proto.MarshalTextString(roundTripped.AsProto()))
+	diff := cmp.Diff(fdp, roundTrippedProto, protocmp.Transform())
+	require.Empty(t, diff)
 }
 
-func roundTripMessage(t *testing.T, md *desc.MessageDescriptor) {
+func roundTripMessage(t *testing.T, md protoreflect.MessageDescriptor) {
 	// first recursively validate all nested elements
-	for _, fld := range md.GetFields() {
-		roundTripField(t, fld)
+	fields := md.Fields()
+	for i, length := 0, fields.Len(); i < length; i++ {
+		roundTripField(t, fields.Get(i))
 	}
-	for _, ood := range md.GetOneOfs() {
+	oneofs := md.Oneofs()
+	for i, length := 0, oneofs.Len(); i < length; i++ {
+		ood := oneofs.Get(i)
 		oob, err := FromOneof(ood)
-		testutil.Ok(t, err)
+		require.NoError(t, err)
 		roundTripped, err := oob.Build()
-		testutil.Ok(t, err)
+		require.NoError(t, err)
 		checkDescriptors(t, ood, roundTripped)
 	}
-	for _, nmd := range md.GetNestedMessageTypes() {
-		roundTripMessage(t, nmd)
+	msgs := md.Messages()
+	for i, length := 0, msgs.Len(); i < length; i++ {
+		roundTripMessage(t, msgs.Get(i))
 	}
-	for _, ed := range md.GetNestedEnumTypes() {
-		roundTripEnum(t, ed)
+	enums := md.Enums()
+	for i, length := 0, enums.Len(); i < length; i++ {
+		roundTripEnum(t, enums.Get(i))
 	}
-	for _, exd := range md.GetNestedExtensions() {
-		roundTripField(t, exd)
+	exts := md.Extensions()
+	for i, length := 0, exts.Len(); i < length; i++ {
+		roundTripField(t, exts.Get(i))
 	}
 
 	mb, err := FromMessage(md)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	roundTripped, err := mb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	checkDescriptors(t, md, roundTripped)
 }
 
-func roundTripEnum(t *testing.T, ed *desc.EnumDescriptor) {
+func roundTripEnum(t *testing.T, ed protoreflect.EnumDescriptor) {
 	// first recursively validate all nested elements
-	for _, evd := range ed.GetValues() {
+	vals := ed.Values()
+	for i, length := 0, vals.Len(); i < length; i++ {
+		evd := vals.Get(i)
 		evb, err := FromEnumValue(evd)
-		testutil.Ok(t, err)
+		require.NoError(t, err)
 		roundTripped, err := evb.Build()
-		testutil.Ok(t, err)
+		require.NoError(t, err)
 		checkDescriptors(t, evd, roundTripped)
 	}
 
 	eb, err := FromEnum(ed)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	roundTripped, err := eb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	checkDescriptors(t, ed, roundTripped)
 }
 
-func roundTripField(t *testing.T, fld *desc.FieldDescriptor) {
+func roundTripField(t *testing.T, fld protoreflect.FieldDescriptor) {
 	flb, err := FromField(fld)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	roundTripped, err := flb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	checkDescriptors(t, fld, roundTripped)
 }
 
-func roundTripService(t *testing.T, sd *desc.ServiceDescriptor) {
+func roundTripService(t *testing.T, sd protoreflect.ServiceDescriptor) {
 	// first recursively validate all nested elements
-	for _, mtd := range sd.GetMethods() {
+	methods := sd.Methods()
+	for i, length := 0, methods.Len(); i < length; i++ {
+		mtd := methods.Get(i)
 		mtb, err := FromMethod(mtd)
-		testutil.Ok(t, err)
+		require.NoError(t, err)
 		roundTripped, err := mtb.Build()
-		testutil.Ok(t, err)
+		require.NoError(t, err)
 		checkDescriptors(t, mtd, roundTripped)
 	}
 
 	sb, err := FromService(sd)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	roundTripped, err := sb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	checkDescriptors(t, sd, roundTripped)
 }
 
-func checkDescriptors(t *testing.T, d1, d2 desc.Descriptor) {
-	testutil.Eq(t, d1.GetFullyQualifiedName(), d2.GetFullyQualifiedName())
-	testutil.Require(t, proto.Equal(d1.AsProto(), d2.AsProto()), "%s failed round trip.\nExpecting: %s\nGot: %s\n",
-		d1.GetFullyQualifiedName(), proto.MarshalTextString(d1.AsProto()), proto.MarshalTextString(d2.AsProto()))
+func checkDescriptors(t *testing.T, d1, d2 protoreflect.Descriptor) {
+	require.Equal(t, d1.FullName(), d2.FullName())
+	diff := cmp.Diff(protowrap.ProtoFromDescriptor(d1), protowrap.ProtoFromDescriptor(d2), protocmp.Transform())
+	require.Empty(t, diff)
 }
 
 func TestAddRemoveMoveBuilders(t *testing.T) {
@@ -730,31 +793,31 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	oo1 := NewOneof("oofoo")
 	oo1.AddChoice(fld1)
 	checkChildren(t, oo1, fld1)
-	testutil.Eq(t, oo1.GetChoice("foo"), fld1)
+	require.Equal(t, oo1.GetChoice("foo"), fld1)
 
 	// add one-of w/ field to a message
 	msg1 := NewMessage("foo")
 	msg1.AddOneOf(oo1)
 	checkChildren(t, msg1, oo1)
-	testutil.Eq(t, msg1.GetOneOf("oofoo"), oo1)
+	require.Equal(t, msg1.GetOneOf("oofoo"), oo1)
 	// field remains unchanged
-	testutil.Eq(t, fld1.GetParent(), oo1)
-	testutil.Eq(t, oo1.GetChoice("foo"), fld1)
+	require.Equal(t, fld1.Parent(), oo1)
+	require.Equal(t, oo1.GetChoice("foo"), fld1)
 	// field also now registered with msg1
-	testutil.Eq(t, msg1.GetField("foo"), fld1)
+	require.Equal(t, msg1.GetField("foo"), fld1)
 
 	// add empty one-of to message
 	oo2 := NewOneof("oobar")
 	msg1.AddOneOf(oo2)
 	checkChildren(t, msg1, oo1, oo2)
-	testutil.Eq(t, msg1.GetOneOf("oobar"), oo2)
+	require.Equal(t, msg1.GetOneOf("oobar"), oo2)
 	// now add field to that one-of
 	fld2 := NewField("bar", FieldTypeInt32())
 	oo2.AddChoice(fld2)
 	checkChildren(t, oo2, fld2)
-	testutil.Eq(t, oo2.GetChoice("bar"), fld2)
+	require.Equal(t, oo2.GetChoice("bar"), fld2)
 	// field also now registered with msg1
-	testutil.Eq(t, msg1.GetField("bar"), fld2)
+	require.Equal(t, msg1.GetField("bar"), fld2)
 
 	// add fails due to path collisions
 	fld1dup := NewField("foo", FieldTypeInt32())
@@ -772,7 +835,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	msg2 = NewMessage("baz")
 	msg1.AddNestedMessage(msg2)
 	checkChildren(t, msg1, oo1, oo2, msg2)
-	testutil.Eq(t, msg1.GetNestedMessage("baz"), msg2)
+	require.Equal(t, msg1.GetNestedMessage("baz"), msg2)
 
 	// can't add extension or map fields to one-of
 	ext1 := NewExtension("abc", 123, FieldTypeInt32(), msg1)
@@ -794,8 +857,8 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	checkChildren(t, msg1, oo1, oo2, msg2, groupField, mapField)
 	// messages associated with map and group fields are not children of the
 	// message, but are in its scope and accessible via GetNestedMessage
-	testutil.Eq(t, msg1.GetNestedMessage("Group"), groupMsg)
-	testutil.Eq(t, msg1.GetNestedMessage("AbcEntry"), mapField.GetType().localMsgType)
+	require.Equal(t, msg1.GetNestedMessage("Group"), groupMsg)
+	require.Equal(t, msg1.GetNestedMessage("AbcEntry"), mapField.Type().localMsgType)
 
 	// adding extension to message
 	ext2 := NewExtension("xyz", 234, FieldTypeInt32(), msg1)
@@ -812,11 +875,11 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	enum1 := NewEnum("bazel")
 	enum1.AddValue(enumVal1)
 	checkChildren(t, enum1, enumVal1)
-	testutil.Eq(t, enum1.GetValue("A"), enumVal1)
+	require.Equal(t, enum1.GetValue("A"), enumVal1)
 	enumVal2 := NewEnumValue("B")
 	enum1.AddValue(enumVal2)
 	checkChildren(t, enum1, enumVal1, enumVal2)
-	testutil.Eq(t, enum1.GetValue("B"), enumVal2)
+	require.Equal(t, enum1.GetValue("B"), enumVal2)
 	// fail w/ path collision
 	enumVal3 := NewEnumValue("B")
 	err = enum1.TryAddValue(enumVal3)
@@ -824,7 +887,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 
 	msg2.AddNestedEnum(enum1)
 	checkChildren(t, msg2, enum1)
-	testutil.Eq(t, msg2.GetNestedEnum("bazel"), enum1)
+	require.Equal(t, msg2.GetNestedEnum("bazel"), enum1)
 	ext3 := NewExtension("bazel", 987, FieldTypeString(), msg2)
 	err = msg2.TryAddNestedExtension(ext3)
 	checkFailedAdd(t, err, msg2, ext3, "already contains element")
@@ -834,7 +897,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	svc1 := NewService("FooService")
 	svc1.AddMethod(mtd1)
 	checkChildren(t, svc1, mtd1)
-	testutil.Eq(t, svc1.GetMethod("foo"), mtd1)
+	require.Equal(t, svc1.GetMethod("foo"), mtd1)
 	mtd2 := NewMethod("foo", RpcTypeMessage(msg1, false), RpcTypeMessage(msg1, false))
 	err = svc1.TryAddMethod(mtd2)
 	checkFailedAdd(t, err, svc1, mtd2, "already contains method")
@@ -843,18 +906,18 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	fb := NewFile("")
 	fb.AddMessage(msg1)
 	checkChildren(t, fb, msg1)
-	testutil.Eq(t, fb.GetMessage("foo"), msg1)
+	require.Equal(t, fb.GetMessage("foo"), msg1)
 	fb.AddService(svc1)
 	checkChildren(t, fb, msg1, svc1)
-	testutil.Eq(t, fb.GetService("FooService"), svc1)
+	require.Equal(t, fb.GetService("FooService"), svc1)
 	enum2 := NewEnum("fizzle")
 	fb.AddEnum(enum2)
 	checkChildren(t, fb, msg1, svc1, enum2)
-	testutil.Eq(t, fb.GetEnum("fizzle"), enum2)
+	require.Equal(t, fb.GetEnum("fizzle"), enum2)
 	ext3 = NewExtension("foosball", 123, FieldTypeInt32(), msg1)
 	fb.AddExtension(ext3)
 	checkChildren(t, fb, msg1, svc1, enum2, ext3)
-	testutil.Eq(t, fb.GetExtension("foosball"), ext3)
+	require.Equal(t, fb.GetExtension("foosball"), ext3)
 
 	// errors and path collisions
 	err = fb.TryAddExtension(fld3)
@@ -870,24 +933,23 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 }
 
 func checkChildren(t *testing.T, parent Builder, children ...Builder) {
-	testutil.Eq(t, len(children), len(parent.GetChildren()), "Wrong number of children for %s (%T)", FullName(parent), parent)
+	require.Equal(t, len(children), len(parent.Children()), "Wrong number of children for %s (%T)", FullName(parent), parent)
 	ch := map[Builder]struct{}{}
 	for _, child := range children {
-		testutil.Eq(t, child.GetParent(), parent, "Child %s (%T) does not report %s (%T) as its parent", child.GetName(), child, FullName(parent), parent)
+		require.Equal(t, child.Parent(), parent, "Child %s (%T) does not report %s (%T) as its parent", child.Name(), child, FullName(parent), parent)
 		ch[child] = struct{}{}
 	}
-	for _, child := range parent.GetChildren() {
+	for _, child := range parent.Children() {
 		_, ok := ch[child]
-		testutil.Require(t, ok, "Child %s (%T) does appear in list of children for %s (%T)", child.GetName(), child, FullName(parent), parent)
+		require.True(t, ok, "Child %s (%T) does appear in list of children for %s (%T)", child.Name(), child, FullName(parent), parent)
 	}
 }
 
 func checkFailedAdd(t *testing.T, err error, parent Builder, child Builder, errorMsg string) {
-	testutil.Require(t, err != nil, "Expecting error assigning %s (%T) to %s (%T)", child.GetName(), child, FullName(parent), parent)
-	testutil.Require(t, strings.Contains(err.Error(), errorMsg), "Expecting error assigning %s (%T) to %s (%T) to contain text %q: %q", child.GetName(), child, FullName(parent), parent, errorMsg, err.Error())
-	testutil.Eq(t, nil, child.GetParent(), "Child %s (%T) should not have a parent after failed add", child.GetName(), child)
-	for _, ch := range parent.GetChildren() {
-		testutil.Require(t, ch != child, "Child %s (%T) should not appear in list of children for %s (%T) but does", child.GetName(), child, FullName(parent), parent)
+	require.ErrorContains(t, err, errorMsg, "Expecting error assigning %s (%T) to %s (%T)", child.Name(), child, FullName(parent), parent)
+	require.Equal(t, nil, child.Parent(), "Child %s (%T) should not have a parent after failed add", child.Name(), child)
+	for _, ch := range parent.Children() {
+		require.True(t, ch != child, "Child %s (%T) should not appear in list of children for %s (%T) but does", child.Name(), child, FullName(parent), parent)
 	}
 }
 
@@ -900,49 +962,16 @@ func TestRenumberingFields(t *testing.T) {
 }
 
 var (
-	fileOptionsDesc, msgOptionsDesc, fieldOptionsDesc, oneofOptionsDesc, extRangeOptionsDesc,
-	enumOptionsDesc, enumValOptionsDesc, svcOptionsDesc, mtdOptionsDesc *desc.MessageDescriptor
+	fileOptionsDesc     = (*descriptorpb.FileOptions)(nil).ProtoReflect().Descriptor()
+	msgOptionsDesc      = (*descriptorpb.MessageOptions)(nil).ProtoReflect().Descriptor()
+	fieldOptionsDesc    = (*descriptorpb.FieldOptions)(nil).ProtoReflect().Descriptor()
+	oneofOptionsDesc    = (*descriptorpb.OneofOptions)(nil).ProtoReflect().Descriptor()
+	extRangeOptionsDesc = (*descriptorpb.ExtensionRangeOptions)(nil).ProtoReflect().Descriptor()
+	enumOptionsDesc     = (*descriptorpb.EnumOptions)(nil).ProtoReflect().Descriptor()
+	enumValOptionsDesc  = (*descriptorpb.EnumValueOptions)(nil).ProtoReflect().Descriptor()
+	svcOptionsDesc      = (*descriptorpb.ServiceOptions)(nil).ProtoReflect().Descriptor()
+	mtdOptionsDesc      = (*descriptorpb.MethodOptions)(nil).ProtoReflect().Descriptor()
 )
-
-func init() {
-	var err error
-	fileOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.FileOptions)(nil))
-	if err != nil {
-		panic(err)
-	}
-	msgOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.MessageOptions)(nil))
-	if err != nil {
-		panic(err)
-	}
-	fieldOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.FieldOptions)(nil))
-	if err != nil {
-		panic(err)
-	}
-	oneofOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.OneofOptions)(nil))
-	if err != nil {
-		panic(err)
-	}
-	extRangeOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.ExtensionRangeOptions)(nil))
-	if err != nil {
-		panic(err)
-	}
-	enumOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.EnumOptions)(nil))
-	if err != nil {
-		panic(err)
-	}
-	enumValOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.EnumValueOptions)(nil))
-	if err != nil {
-		panic(err)
-	}
-	svcOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.ServiceOptions)(nil))
-	if err != nil {
-		panic(err)
-	}
-	mtdOptionsDesc, err = desc.LoadMessageDescriptorForMessage((*descriptorpb.MethodOptions)(nil))
-	if err != nil {
-		panic(err)
-	}
-}
 
 func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 	// Add option for every type to file
@@ -982,9 +1011,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		fb := clone(t, file)
 		fb.Options = &descriptorpb.FileOptions{}
 		ext, err := fileOpt.Build()
-		testutil.Ok(t, err)
-		err = dynamic.SetExtension(fb.Options, ext, "fubar")
-		testutil.Ok(t, err)
+		require.NoError(t, err)
+		fb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 		checkBuildWithLocalExtensions(t, fb)
 	})
 
@@ -992,9 +1020,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		mb := NewMessage("Foo")
 		mb.Options = &descriptorpb.MessageOptions{}
 		ext, err := msgOpt.Build()
-		testutil.Ok(t, err)
-		err = dynamic.SetExtension(mb.Options, ext, "fubar")
-		testutil.Ok(t, err)
+		require.NoError(t, err)
+		mb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 		fb := clone(t, file)
 		fb.AddMessage(mb)
@@ -1007,9 +1034,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		// fields must be connected to a message
 		mb := NewMessage("Foo").AddField(flb)
 		ext, err := fieldOpt.Build()
-		testutil.Ok(t, err)
-		err = dynamic.SetExtension(flb.Options, ext, "fubar")
-		testutil.Ok(t, err)
+		require.NoError(t, err)
+		flb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 		fb := clone(t, file)
 		fb.AddMessage(mb)
@@ -1023,9 +1049,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		// oneofs must be connected to a message
 		mb := NewMessage("Foo").AddOneOf(oob)
 		ext, err := oneofOpt.Build()
-		testutil.Ok(t, err)
-		err = dynamic.SetExtension(oob.Options, ext, "fubar")
-		testutil.Ok(t, err)
+		require.NoError(t, err)
+		oob.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 		fb := clone(t, file)
 		fb.AddMessage(mb)
@@ -1035,9 +1060,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 	t.Run("extension range options", func(t *testing.T) {
 		var erOpts descriptorpb.ExtensionRangeOptions
 		ext, err := extRangeOpt.Build()
-		testutil.Ok(t, err)
-		err = dynamic.SetExtension(&erOpts, ext, "fubar")
-		testutil.Ok(t, err)
+		require.NoError(t, err)
+		erOpts.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 		mb := NewMessage("foo").AddExtensionRangeWithOptions(100, 200, &erOpts)
 
 		fb := clone(t, file)
@@ -1050,9 +1074,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		eb.AddValue(NewEnumValue("FOO"))
 		eb.Options = &descriptorpb.EnumOptions{}
 		ext, err := enumOpt.Build()
-		testutil.Ok(t, err)
-		err = dynamic.SetExtension(eb.Options, ext, "fubar")
-		testutil.Ok(t, err)
+		require.NoError(t, err)
+		eb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 		fb := clone(t, file)
 		fb.AddEnum(eb)
@@ -1065,9 +1088,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		eb := NewEnum("Foo").AddValue(evb)
 		evb.Options = &descriptorpb.EnumValueOptions{}
 		ext, err := enumValOpt.Build()
-		testutil.Ok(t, err)
-		err = dynamic.SetExtension(evb.Options, ext, "fubar")
-		testutil.Ok(t, err)
+		require.NoError(t, err)
+		evb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 		fb := clone(t, file)
 		fb.AddEnum(eb)
@@ -1078,9 +1100,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		sb := NewService("Foo")
 		sb.Options = &descriptorpb.ServiceOptions{}
 		ext, err := svcOpt.Build()
-		testutil.Ok(t, err)
-		err = dynamic.SetExtension(sb.Options, ext, "fubar")
-		testutil.Ok(t, err)
+		require.NoError(t, err)
+		sb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 		fb := clone(t, file)
 		fb.AddService(sb)
@@ -1097,9 +1118,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		sb := NewService("Bar").AddMethod(mtb)
 		mtb.Options = &descriptorpb.MethodOptions{}
 		ext, err := mtdOpt.Build()
-		testutil.Ok(t, err)
-		err = dynamic.SetExtension(mtb.Options, ext, "fubar")
-		testutil.Ok(t, err)
+		require.NoError(t, err)
+		mtb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 		fb := clone(t, file)
 		fb.AddService(sb).AddMessage(req).AddMessage(resp)
@@ -1112,9 +1132,10 @@ func checkBuildWithLocalExtensions(t *testing.T, builder Builder) {
 	var opts BuilderOptions
 	opts.RequireInterpretedOptions = true
 	d, err := opts.Build(builder)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	// since they are defined locally, no extra imports
-	testutil.Eq(t, []string{"google/protobuf/descriptor.proto"}, d.GetFile().AsFileDescriptorProto().GetDependency())
+	require.Equal(t, 1, d.ParentFile().Imports().Len())
+	require.Equal(t, "google/protobuf/descriptor.proto", d.ParentFile().Imports().Get(0).Path())
 }
 
 func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
@@ -1149,7 +1170,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 	file.AddExtension(mtdOpt)
 
 	fileDesc, err := file.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
 	// Now we can test referring to these and making sure they show up correctly
 	// in built descriptors
@@ -1168,9 +1189,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 				fb := newFile()
 				fb.Options = &descriptorpb.FileOptions{}
 				ext, err := fileOpt.Build()
-				testutil.Ok(t, err)
-				err = dynamic.SetExtension(fb.Options, ext, "fubar")
-				testutil.Ok(t, err)
+				require.NoError(t, err)
+				fb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 				checkBuildWithImportedExtensions(t, fb)
 			})
 
@@ -1178,9 +1198,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 				mb := NewMessage("Foo")
 				mb.Options = &descriptorpb.MessageOptions{}
 				ext, err := msgOpt.Build()
-				testutil.Ok(t, err)
-				err = dynamic.SetExtension(mb.Options, ext, "fubar")
-				testutil.Ok(t, err)
+				require.NoError(t, err)
+				mb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 				fb := newFile()
 				fb.AddMessage(mb)
@@ -1193,9 +1212,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 				// fields must be connected to a message
 				mb := NewMessage("Foo").AddField(flb)
 				ext, err := fieldOpt.Build()
-				testutil.Ok(t, err)
-				err = dynamic.SetExtension(flb.Options, ext, "fubar")
-				testutil.Ok(t, err)
+				require.NoError(t, err)
+				flb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 				fb := newFile()
 				fb.AddMessage(mb)
@@ -1209,9 +1227,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 				// oneofs must be connected to a message
 				mb := NewMessage("Foo").AddOneOf(oob)
 				ext, err := oneofOpt.Build()
-				testutil.Ok(t, err)
-				err = dynamic.SetExtension(oob.Options, ext, "fubar")
-				testutil.Ok(t, err)
+				require.NoError(t, err)
+				oob.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 				fb := newFile()
 				fb.AddMessage(mb)
@@ -1221,9 +1238,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 			t.Run("extension range options", func(t *testing.T) {
 				var erOpts descriptorpb.ExtensionRangeOptions
 				ext, err := extRangeOpt.Build()
-				testutil.Ok(t, err)
-				err = dynamic.SetExtension(&erOpts, ext, "fubar")
-				testutil.Ok(t, err)
+				require.NoError(t, err)
+				erOpts.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 				mb := NewMessage("foo").AddExtensionRangeWithOptions(100, 200, &erOpts)
 
 				fb := newFile()
@@ -1236,9 +1252,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 				eb.AddValue(NewEnumValue("FOO"))
 				eb.Options = &descriptorpb.EnumOptions{}
 				ext, err := enumOpt.Build()
-				testutil.Ok(t, err)
-				err = dynamic.SetExtension(eb.Options, ext, "fubar")
-				testutil.Ok(t, err)
+				require.NoError(t, err)
+				eb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 				fb := newFile()
 				fb.AddEnum(eb)
@@ -1251,9 +1266,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 				eb := NewEnum("Foo").AddValue(evb)
 				evb.Options = &descriptorpb.EnumValueOptions{}
 				ext, err := enumValOpt.Build()
-				testutil.Ok(t, err)
-				err = dynamic.SetExtension(evb.Options, ext, "fubar")
-				testutil.Ok(t, err)
+				require.NoError(t, err)
+				evb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 				fb := newFile()
 				fb.AddEnum(eb)
@@ -1264,9 +1278,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 				sb := NewService("Foo")
 				sb.Options = &descriptorpb.ServiceOptions{}
 				ext, err := svcOpt.Build()
-				testutil.Ok(t, err)
-				err = dynamic.SetExtension(sb.Options, ext, "fubar")
-				testutil.Ok(t, err)
+				require.NoError(t, err)
+				sb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 				fb := newFile()
 				fb.AddService(sb)
@@ -1283,9 +1296,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 				sb := NewService("Bar").AddMethod(mtb)
 				mtb.Options = &descriptorpb.MethodOptions{}
 				ext, err := mtdOpt.Build()
-				testutil.Ok(t, err)
-				err = dynamic.SetExtension(mtb.Options, ext, "fubar")
-				testutil.Ok(t, err)
+				require.NoError(t, err)
+				mtb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
 				fb := newFile()
 				fb.AddService(sb).AddMessage(req).AddMessage(resp)
@@ -1300,59 +1312,60 @@ func checkBuildWithImportedExtensions(t *testing.T, builder Builder) {
 	var opts BuilderOptions
 	opts.RequireInterpretedOptions = true
 	d, err := opts.Build(builder)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	// the only import is for the custom options
-	testutil.Eq(t, []string{"options.proto"}, d.GetFile().AsFileDescriptorProto().GetDependency())
+	require.Equal(t, 1, d.ParentFile().Imports().Len())
+	require.Equal(t, "options.proto", d.ParentFile().Imports().Get(0).Path())
 }
 
 func TestUseOfExtensionRegistry(t *testing.T) {
 	// Add option for every type to extension registry
-	var exts dynamic.ExtensionRegistry
+	var exts protoregistry.Types
 
 	fileOpt, err := NewExtensionImported("file_foo", 54321, FieldTypeString(), fileOptionsDesc).Build()
-	testutil.Ok(t, err)
-	err = exts.AddExtension(fileOpt)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
+	err = exts.RegisterExtension(protoresolve.ExtensionType(fileOpt))
+	require.NoError(t, err)
 
 	msgOpt, err := NewExtensionImported("msg_foo", 54321, FieldTypeString(), msgOptionsDesc).Build()
-	testutil.Ok(t, err)
-	err = exts.AddExtension(msgOpt)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
+	err = exts.RegisterExtension(protoresolve.ExtensionType(msgOpt))
+	require.NoError(t, err)
 
 	fieldOpt, err := NewExtensionImported("field_foo", 54321, FieldTypeString(), fieldOptionsDesc).Build()
-	testutil.Ok(t, err)
-	err = exts.AddExtension(fieldOpt)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
+	err = exts.RegisterExtension(protoresolve.ExtensionType(fieldOpt))
+	require.NoError(t, err)
 
 	oneofOpt, err := NewExtensionImported("oneof_foo", 54321, FieldTypeString(), oneofOptionsDesc).Build()
-	testutil.Ok(t, err)
-	err = exts.AddExtension(oneofOpt)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
+	err = exts.RegisterExtension(protoresolve.ExtensionType(oneofOpt))
+	require.NoError(t, err)
 
 	extRangeOpt, err := NewExtensionImported("ext_range_foo", 54321, FieldTypeString(), extRangeOptionsDesc).Build()
-	testutil.Ok(t, err)
-	err = exts.AddExtension(extRangeOpt)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
+	err = exts.RegisterExtension(protoresolve.ExtensionType(extRangeOpt))
+	require.NoError(t, err)
 
 	enumOpt, err := NewExtensionImported("enum_foo", 54321, FieldTypeString(), enumOptionsDesc).Build()
-	testutil.Ok(t, err)
-	err = exts.AddExtension(enumOpt)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
+	err = exts.RegisterExtension(protoresolve.ExtensionType(enumOpt))
+	require.NoError(t, err)
 
 	enumValOpt, err := NewExtensionImported("enum_val_foo", 54321, FieldTypeString(), enumValOptionsDesc).Build()
-	testutil.Ok(t, err)
-	err = exts.AddExtension(enumValOpt)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
+	err = exts.RegisterExtension(protoresolve.ExtensionType(enumValOpt))
+	require.NoError(t, err)
 
 	svcOpt, err := NewExtensionImported("svc_foo", 54321, FieldTypeString(), svcOptionsDesc).Build()
-	testutil.Ok(t, err)
-	err = exts.AddExtension(svcOpt)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
+	err = exts.RegisterExtension(protoresolve.ExtensionType(svcOpt))
+	require.NoError(t, err)
 
 	mtdOpt, err := NewExtensionImported("mtd_foo", 54321, FieldTypeString(), mtdOptionsDesc).Build()
-	testutil.Ok(t, err)
-	err = exts.AddExtension(mtdOpt)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
+	err = exts.RegisterExtension(protoresolve.ExtensionType(mtdOpt))
+	require.NoError(t, err)
 
 	// Now we can test referring to these and making sure they show up correctly
 	// in built descriptors
@@ -1360,17 +1373,15 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 	t.Run("file options", func(t *testing.T) {
 		fb := NewFile("foo.proto")
 		fb.Options = &descriptorpb.FileOptions{}
-		err = dynamic.SetExtension(fb.Options, fileOpt, "fubar")
-		testutil.Ok(t, err)
-		checkBuildWithExtensions(t, &exts, fileOpt.GetFile(), fb)
+		fb.Options.ProtoReflect().SetUnknown(unrecognizedFieldString(fileOpt, "fubar"))
+		checkBuildWithExtensions(t, &exts, fileOpt.ParentFile(), fb)
 	})
 
 	t.Run("message options", func(t *testing.T) {
 		mb := NewMessage("Foo")
 		mb.Options = &descriptorpb.MessageOptions{}
-		err = dynamic.SetExtension(mb.Options, msgOpt, "fubar")
-		testutil.Ok(t, err)
-		checkBuildWithExtensions(t, &exts, msgOpt.GetFile(), mb)
+		mb.Options.ProtoReflect().SetUnknown(unrecognizedFieldString(msgOpt, "fubar"))
+		checkBuildWithExtensions(t, &exts, msgOpt.ParentFile(), mb)
 	})
 
 	t.Run("field options", func(t *testing.T) {
@@ -1378,9 +1389,8 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 		flb.Options = &descriptorpb.FieldOptions{}
 		// fields must be connected to a message
 		NewMessage("Foo").AddField(flb)
-		err = dynamic.SetExtension(flb.Options, fieldOpt, "fubar")
-		testutil.Ok(t, err)
-		checkBuildWithExtensions(t, &exts, fieldOpt.GetFile(), flb)
+		flb.Options.ProtoReflect().SetUnknown(unrecognizedFieldString(fieldOpt, "fubar"))
+		checkBuildWithExtensions(t, &exts, fieldOpt.ParentFile(), flb)
 	})
 
 	t.Run("oneof options", func(t *testing.T) {
@@ -1389,26 +1399,23 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 		oob.Options = &descriptorpb.OneofOptions{}
 		// oneofs must be connected to a message
 		NewMessage("Foo").AddOneOf(oob)
-		err = dynamic.SetExtension(oob.Options, oneofOpt, "fubar")
-		testutil.Ok(t, err)
-		checkBuildWithExtensions(t, &exts, oneofOpt.GetFile(), oob)
+		oob.Options.ProtoReflect().SetUnknown(unrecognizedFieldString(oneofOpt, "fubar"))
+		checkBuildWithExtensions(t, &exts, oneofOpt.ParentFile(), oob)
 	})
 
 	t.Run("extension range options", func(t *testing.T) {
 		var erOpts descriptorpb.ExtensionRangeOptions
-		err = dynamic.SetExtension(&erOpts, extRangeOpt, "fubar")
-		testutil.Ok(t, err)
+		erOpts.ProtoReflect().SetUnknown(unrecognizedFieldString(extRangeOpt, "fubar"))
 		mb := NewMessage("foo").AddExtensionRangeWithOptions(100, 200, &erOpts)
-		checkBuildWithExtensions(t, &exts, extRangeOpt.GetFile(), mb)
+		checkBuildWithExtensions(t, &exts, extRangeOpt.ParentFile(), mb)
 	})
 
 	t.Run("enum options", func(t *testing.T) {
 		eb := NewEnum("Foo")
 		eb.AddValue(NewEnumValue("FOO"))
 		eb.Options = &descriptorpb.EnumOptions{}
-		err = dynamic.SetExtension(eb.Options, enumOpt, "fubar")
-		testutil.Ok(t, err)
-		checkBuildWithExtensions(t, &exts, enumOpt.GetFile(), eb)
+		eb.Options.ProtoReflect().SetUnknown(unrecognizedFieldString(enumOpt, "fubar"))
+		checkBuildWithExtensions(t, &exts, enumOpt.ParentFile(), eb)
 	})
 
 	t.Run("enum val options", func(t *testing.T) {
@@ -1416,17 +1423,15 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 		// enum values must be connected to an enum
 		NewEnum("Foo").AddValue(evb)
 		evb.Options = &descriptorpb.EnumValueOptions{}
-		err = dynamic.SetExtension(evb.Options, enumValOpt, "fubar")
-		testutil.Ok(t, err)
-		checkBuildWithExtensions(t, &exts, enumValOpt.GetFile(), evb)
+		evb.Options.ProtoReflect().SetUnknown(unrecognizedFieldString(enumValOpt, "fubar"))
+		checkBuildWithExtensions(t, &exts, enumValOpt.ParentFile(), evb)
 	})
 
 	t.Run("service options", func(t *testing.T) {
 		sb := NewService("Foo")
 		sb.Options = &descriptorpb.ServiceOptions{}
-		err = dynamic.SetExtension(sb.Options, svcOpt, "fubar")
-		testutil.Ok(t, err)
-		checkBuildWithExtensions(t, &exts, svcOpt.GetFile(), sb)
+		sb.Options.ProtoReflect().SetUnknown(unrecognizedFieldString(svcOpt, "fubar"))
+		checkBuildWithExtensions(t, &exts, svcOpt.ParentFile(), sb)
 	})
 
 	t.Run("method options", func(t *testing.T) {
@@ -1436,40 +1441,49 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 		// methods must be connected to a service
 		NewService("Bar").AddMethod(mtb)
 		mtb.Options = &descriptorpb.MethodOptions{}
-		err = dynamic.SetExtension(mtb.Options, mtdOpt, "fubar")
-		testutil.Ok(t, err)
-		checkBuildWithExtensions(t, &exts, mtdOpt.GetFile(), mtb)
+		mtb.Options.ProtoReflect().SetUnknown(unrecognizedFieldString(mtdOpt, "fubar"))
+		checkBuildWithExtensions(t, &exts, mtdOpt.ParentFile(), mtb)
 	})
 }
 
-func checkBuildWithExtensions(t *testing.T, exts *dynamic.ExtensionRegistry, expected *desc.FileDescriptor, builder Builder) {
+func unrecognizedFieldString(ext protoreflect.FieldDescriptor, str string) protoreflect.RawFields {
+	var f protoreflect.RawFields
+	f = protowire.AppendTag(f, ext.Number(), protowire.BytesType)
+	return protowire.AppendString(f, str)
+}
+
+func checkBuildWithExtensions(t *testing.T, exts protoresolve.ExtensionTypeResolver, expected protoreflect.FileDescriptor, builder Builder) {
 	// without interpreting custom option
 	d, err := builder.BuildDescriptor()
-	testutil.Ok(t, err)
-	for _, dep := range d.GetFile().GetDependencies() {
-		testutil.Neq(t, expected, dep)
+	require.NoError(t, err)
+	deps := d.ParentFile().Imports()
+	for i, length := 0, deps.Len(); i < length; i++ {
+		dep := deps.Get(i)
+		require.NotEqual(t, expected, dep)
 	}
-	numDeps := len(d.GetFile().GetDependencies())
+	numDeps := d.ParentFile().Imports().Len()
 
 	// requiring options (and failing)
 	var opts BuilderOptions
 	opts.RequireInterpretedOptions = true
 	_, err = opts.Build(builder)
-	testutil.Require(t, err != nil)
+	require.NotNil(t, err)
 
 	// able to interpret options via extension registry
-	opts.Extensions = exts
+	opts.Resolver = exts
 	d, err = opts.Build(builder)
-	testutil.Ok(t, err)
-	testutil.Eq(t, numDeps+1, len(d.GetFile().GetDependencies()))
+	require.NoError(t, err)
+	require.Equal(t, numDeps+1, d.ParentFile().Imports().Len())
 	found := false
-	for _, dep := range d.GetFile().GetDependencies() {
+	deps = d.ParentFile().Imports()
+	for i, length := 0, deps.Len(); i < length; i++ {
+		dep := deps.Get(i).FileDescriptor
 		if expected == dep {
 			found = true
 			break
 		}
 	}
-	testutil.Require(t, found)
+	require.True(t, found)
 }
 
 func TestRemoveField(t *testing.T) {
@@ -1479,12 +1493,12 @@ func TestRemoveField(t *testing.T) {
 		AddField(NewField("three", FieldTypeString()))
 
 	ok := msg.TryRemoveField("two")
-	children := msg.GetChildren()
+	children := msg.Children()
 
-	testutil.Require(t, ok)
-	testutil.Eq(t, 2, len(children))
-	testutil.Eq(t, "one", children[0].GetName())
-	testutil.Eq(t, "three", children[1].GetName())
+	require.True(t, ok)
+	require.Equal(t, 2, len(children))
+	require.Equal(t, protoreflect.Name("one"), children[0].Name())
+	require.Equal(t, protoreflect.Name("three"), children[1].Name())
 }
 
 func TestInterleavedFieldNumbers(t *testing.T) {
@@ -1496,112 +1510,75 @@ func TestInterleavedFieldNumbers(t *testing.T) {
 		AddField(NewField("five", FieldTypeString()).SetNumber(5))
 
 	md, err := msg.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
-	testutil.Require(t, md.FindFieldByName("one") != nil)
-	testutil.Eq(t, int32(1), md.FindFieldByName("one").GetNumber())
+	require.NotNil(t, md.Fields().ByName("one"))
+	require.Equal(t, protoreflect.FieldNumber(1), md.Fields().ByName("one").Number())
 
-	testutil.Require(t, md.FindFieldByName("two") != nil)
-	testutil.Eq(t, int32(2), md.FindFieldByName("two").GetNumber())
+	require.NotNil(t, md.Fields().ByName("two"))
+	require.Equal(t, protoreflect.FieldNumber(2), md.Fields().ByName("two").Number())
 
-	testutil.Require(t, md.FindFieldByName("three") != nil)
-	testutil.Eq(t, int32(3), md.FindFieldByName("three").GetNumber())
+	require.NotNil(t, md.Fields().ByName("three"))
+	require.Equal(t, protoreflect.FieldNumber(3), md.Fields().ByName("three").Number())
 
-	testutil.Require(t, md.FindFieldByName("four") != nil)
-	testutil.Eq(t, int32(4), md.FindFieldByName("four").GetNumber())
+	require.NotNil(t, md.Fields().ByName("four"))
+	require.Equal(t, protoreflect.FieldNumber(4), md.Fields().ByName("four").Number())
 
-	testutil.Require(t, md.FindFieldByName("five") != nil)
-	testutil.Eq(t, int32(5), md.FindFieldByName("five").GetNumber())
+	require.NotNil(t, md.Fields().ByName("five"))
+	require.Equal(t, protoreflect.FieldNumber(5), md.Fields().ByName("five").Number())
 }
 
 func clone(t *testing.T, fb *FileBuilder) *FileBuilder {
 	fd, err := fb.Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	fb, err = FromFile(fd)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	return fb
 }
 
 func TestPruneDependencies(t *testing.T) {
+	extDesc, err := NewExtensionImported("foo", 20001, FieldTypeString(), msgOptionsDesc).Build()
+	require.NoError(t, err)
+
 	msgOpts := &descriptorpb.MessageOptions{}
-	msgOptsDesc, err := desc.LoadMessageDescriptorForMessage(msgOpts)
-	testutil.Ok(t, err)
-	extDesc, err := NewExtensionImported("foo", 20001, FieldTypeString(), msgOptsDesc).Build()
-	testutil.Ok(t, err)
+	msgOpts.ProtoReflect().Set(extDesc, protoreflect.ValueOfString("bar"))
 
-	dm := dynamic.NewMessage(msgOptsDesc)
-	dm.SetField(extDesc, "bar")
-	err = dm.ConvertTo(msgOpts)
-	testutil.Ok(t, err)
-
-	emptyDesc, err := desc.LoadMessageDescriptorForMessage(&emptypb.Empty{})
-	testutil.Ok(t, err)
+	emptyDesc := (*emptypb.Empty)(nil).ProtoReflect().Descriptor()
 
 	// we have to explicitly import the file for the custom option
-	fileB := NewFile("").AddImportedDependency(extDesc.GetFile())
+	fileB := NewFile("").AddImportedDependency(extDesc.ParentFile())
 	msgB := NewMessage("Foo").
 		AddField(NewField("a", FieldTypeImportedMessage(emptyDesc))).
 		SetOptions(msgOpts)
 	fileDesc, err := fileB.AddMessage(msgB).Build()
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 
 	// The file for msgDesc should have two imports: one for the custom option and
 	//   one for empty.proto.
-	testutil.Eq(t, 2, len(fileDesc.GetDependencies()))
-	testutil.Eq(t, "google/protobuf/empty.proto", fileDesc.GetDependencies()[0].GetName())
-	testutil.Eq(t, extDesc.GetFile().GetName(), fileDesc.GetDependencies()[1].GetName())
+	require.Equal(t, 2, fileDesc.Imports().Len())
+	require.Equal(t, "google/protobuf/empty.proto", fileDesc.Imports().Get(0).Path())
+	require.Equal(t, extDesc.ParentFile().Path(), fileDesc.Imports().Get(1).Path())
 
 	// If we now remove the message's field, both imports are still there even
 	// though the import for empty.proto is now unused.
 	fileB, err = FromFile(fileDesc)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	fileB.GetMessage("Foo").RemoveField("a")
 	newFileDesc, err := fileB.Build()
-	testutil.Ok(t, err)
-	testutil.Eq(t, 2, len(newFileDesc.GetDependencies()))
-	testutil.Eq(t, "google/protobuf/empty.proto", newFileDesc.GetDependencies()[0].GetName())
-	testutil.Eq(t, extDesc.GetFile().GetName(), newFileDesc.GetDependencies()[1].GetName())
+	require.NoError(t, err)
+	require.Equal(t, 2, newFileDesc.Imports().Len())
+	require.Equal(t, "google/protobuf/empty.proto", newFileDesc.Imports().Get(0).Path())
+	require.Equal(t, extDesc.ParentFile().Path(), newFileDesc.Imports().Get(1).Path())
 
 	// But if we prune unused dependencies, we'll see the import for empty.proto
 	// gone. The other import for the custom option should be preserved.
 	fileB, err = FromFile(fileDesc)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	fileB.GetMessage("Foo").RemoveField("a")
 	newFileDesc, err = fileB.PruneUnusedDependencies().Build()
-	testutil.Ok(t, err)
-	testutil.Eq(t, 1, len(newFileDesc.GetDependencies()))
-	testutil.Eq(t, extDesc.GetFile().GetName(), newFileDesc.GetDependencies()[0].GetName())
-}
-
-func TestInterleavedEnumNumbers(t *testing.T) {
-	en := NewEnum("Options").
-		AddValue(NewEnumValue("OPTION_1").SetNumber(-1)).
-		AddValue(NewEnumValue("OPTION_2")).
-		AddValue(NewEnumValue("OPTION_3").SetNumber(2)).
-		AddValue(NewEnumValue("OPTION_4").SetNumber(1)).
-		AddValue(NewEnumValue("OPTION_5")).
-		AddValue(NewEnumValue("OPTION_6").SetNumber(100))
-
-	ed, err := en.Build()
-	testutil.Ok(t, err)
-
-	testutil.Require(t, ed.FindValueByName("OPTION_1") != nil)
-	testutil.Eq(t, int32(-1), ed.FindValueByName("OPTION_1").GetNumber())
-
-	testutil.Require(t, ed.FindValueByName("OPTION_2") != nil)
-	testutil.Eq(t, int32(0), ed.FindValueByName("OPTION_2").GetNumber())
-
-	testutil.Require(t, ed.FindValueByName("OPTION_3") != nil)
-	testutil.Eq(t, int32(2), ed.FindValueByName("OPTION_3").GetNumber())
-
-	testutil.Require(t, ed.FindValueByName("OPTION_4") != nil)
-	testutil.Eq(t, int32(1), ed.FindValueByName("OPTION_4").GetNumber())
-
-	testutil.Require(t, ed.FindValueByName("OPTION_5") != nil)
-	testutil.Eq(t, int32(3), ed.FindValueByName("OPTION_5").GetNumber())
-
-	testutil.Require(t, ed.FindValueByName("OPTION_6") != nil)
-	testutil.Eq(t, int32(100), ed.FindValueByName("OPTION_6").GetNumber())
+	require.NoError(t, err)
+	require.Equal(t, 1, newFileDesc.Imports().Len())
+	require.Equal(t, extDesc.ParentFile().Path(), newFileDesc.Imports().Get(0).Path())
 }
 
 func TestInvalid(t *testing.T) {
@@ -1613,7 +1590,8 @@ func TestInvalid(t *testing.T) {
 		{
 			name: "required in proto3",
 			builder: func() Builder {
-				return NewFile("foo.proto").SetProto3(true).
+				return NewFile("foo.proto").
+					SetSyntax(protoreflect.Proto3).
 					AddMessage(
 						NewMessage("Foo").AddField(NewField("foo", FieldTypeBool()).SetRequired()),
 					)
@@ -1623,7 +1601,8 @@ func TestInvalid(t *testing.T) {
 		{
 			name: "extension range in proto3",
 			builder: func() Builder {
-				return NewFile("foo.proto").SetProto3(true).
+				return NewFile("foo.proto").
+					SetSyntax(protoreflect.Proto3).
 					AddMessage(
 						NewMessage("Foo").AddExtensionRange(100, 1000),
 					)
@@ -1633,7 +1612,8 @@ func TestInvalid(t *testing.T) {
 		{
 			name: "group in proto3",
 			builder: func() Builder {
-				return NewFile("foo.proto").SetProto3(true).
+				return NewFile("foo.proto").
+					SetSyntax(protoreflect.Proto3).
 					AddMessage(
 						NewMessage("Foo").AddField(NewGroupField(NewMessage("Bar"))),
 					)
@@ -1645,7 +1625,8 @@ func TestInvalid(t *testing.T) {
 		{
 			name: "default value in proto3",
 			builder: func() Builder {
-				return NewFile("foo.proto").SetProto3(true).
+				return NewFile("foo.proto").
+					SetSyntax(protoreflect.Proto3).
 					AddMessage(
 						NewMessage("Foo").AddField(NewField("foo", FieldTypeString()).SetDefaultValue("abc")),
 					)
@@ -1690,7 +1671,7 @@ func TestInvalid(t *testing.T) {
 						AddField(NewField("foo", FieldTypeBool())).
 						AddReservedName("foo"))
 			},
-			expectedError: "must not use reserved path",
+			expectedError: "must not use reserved name",
 		},
 		{
 			name: "ranges overlap",
@@ -1706,8 +1687,7 @@ func TestInvalid(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			_, err := testCase.builder().BuildDescriptor()
-			testutil.Nok(t, err)
-			testutil.Require(t, strings.Contains(err.Error(), testCase.expectedError), "unexpected error: want %q, got %q", testCase.expectedError, err.Error())
+			require.ErrorContains(t, err, testCase.expectedError, "unexpected error: want %q, got %q", testCase.expectedError, err.Error())
 		})
 	}
 }

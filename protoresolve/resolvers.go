@@ -2,10 +2,11 @@ package protoresolve
 
 import (
 	"fmt"
+	"strings"
+
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
-	"strings"
 )
 
 // FileResolver can resolve file descriptors by path.

@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/protowrap"
 )
 
 // FieldBuilder is a builder used to construct a protoreflect.FieldDescriptor. A field
@@ -97,8 +98,7 @@ func NewMapField(name protoreflect.Name, keyTyp, valTyp *FieldType) *FieldBuilde
 	entryMsg.AddField(valFlb)
 	entryMsg.Options = &descriptorpb.MessageOptions{MapEntry: proto.Bool(true)}
 
-	flb := NewField(name, FieldTypeMessage(entryMsg)).
-		SetCardinality(descriptorpb.FieldDescriptorProto_LABEL_REPEATED)
+	flb := NewField(name, FieldTypeMessage(entryMsg)).SetCardinality(protoreflect.Repeated)
 	flb.msgType = entryMsg
 	entryMsg.setParent(flb)
 	return flb
@@ -127,7 +127,7 @@ func NewGroupField(mb *MessageBuilder) *FieldBuilder {
 		fieldType:    descriptorpb.FieldDescriptorProto_TYPE_GROUP,
 		localMsgType: mb,
 	}
-	fieldName := strings.ToLower(mb.GetName())
+	fieldName := protoreflect.Name(strings.ToLower(string(mb.Name())))
 	flb := NewField(fieldName, ft)
 	flb.msgType = mb
 	mb.setParent(flb)
@@ -187,17 +187,24 @@ func FromField(fld protoreflect.FieldDescriptor) (*FieldBuilder, error) {
 func fromField(fld protoreflect.FieldDescriptor) (*FieldBuilder, error) {
 	ft := fieldTypeFromDescriptor(fld)
 	flb := NewField(fld.Name(), ft)
-	flb.Options = fld.GetFieldOptions()
-	flb.Cardinality = fld.GetLabel()
-	flb.Proto3Optional = fld.IsProto3Optional()
-	flb.Default = fld.AsFieldDescriptorProto().GetDefaultValue()
-	flb.JsonName = fld.GetJSONName()
-	setComments(&flb.comments, fld.GetSourceInfo())
+	var err error
+	flb.Options, err = as[*descriptorpb.FieldOptions](fld.Options())
+	if err != nil {
+		return nil, err
+	}
+	flb.Cardinality = fld.Cardinality()
+	flb.Proto3Optional = fld.ContainingOneof() != nil && fld.ContainingOneof().IsSynthetic()
+	fldProto := protowrap.ProtoFromFieldDescriptor(fld)
+	flb.Default = fldProto.GetDefaultValue()
+	if !fld.IsExtension() {
+		flb.JsonName = fld.JSONName()
+	}
+	setComments(&flb.comments, fld.ParentFile().SourceLocations().ByDescriptor(fld))
 
 	if fld.IsExtension() {
-		flb.foreignExtendee = fld.GetOwner()
+		flb.foreignExtendee = fld.ContainingMessage()
 	}
-	if err := flb.TrySetNumber(fld.GetNumber()); err != nil {
+	if err := flb.TrySetNumber(fld.Number()); err != nil {
 		return nil, err
 	}
 	return flb, nil
@@ -222,7 +229,7 @@ func (flb *FieldBuilder) SetName(newName protoreflect.Name) *FieldBuilder {
 // the fact that one-of choices are modeled as children of the one-of builder,
 // in the protobuf IDL they are actually all defined in the message's namespace.
 func (flb *FieldBuilder) TrySetName(newName protoreflect.Name) error {
-	var oldMsgName string
+	var oldMsgName protoreflect.Name
 	if flb.msgType != nil {
 		if flb.fieldType.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 			return fmt.Errorf("cannot change path of group field %s; change path of group instead", FullName(flb))
@@ -286,21 +293,22 @@ func (flb *FieldBuilder) removeChild(b Builder) {
 	if mb, ok := b.(*MessageBuilder); ok && mb == flb.msgType {
 		flb.msgType = nil
 		if p, ok := flb.parent.(*MessageBuilder); ok {
-			delete(p.symbols, mb.GetName())
+			delete(p.symbols, mb.Name())
 		}
 	}
 }
 
-func (flb *FieldBuilder) renamedChild(b Builder, oldName protoreflect.Name) error {
+func (flb *FieldBuilder) renamedChild(b Builder, _ protoreflect.Name) error {
 	if flb.msgType != nil {
-		var oldFieldName string
+		var oldFieldName protoreflect.Name
 		if flb.fieldType.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
-			if !unicode.IsUpper(rune(b.GetName()[0])) {
-				return fmt.Errorf("group path %s must start with capital letter", b.GetName())
+			// For groups, we need to rename the field according to the group message's new name
+			if !unicode.IsUpper(rune(b.Name()[0])) {
+				return fmt.Errorf("group path %s must start with capital letter", b.Name())
 			}
 			// change field path to be lower-case form of group path
 			oldFieldName = flb.name
-			fieldName := strings.ToLower(b.GetName())
+			fieldName := protoreflect.Name(strings.ToLower(string(b.Name())))
 			if err := flb.trySetNameInternal(fieldName); err != nil {
 				return err
 			}
@@ -308,7 +316,7 @@ func (flb *FieldBuilder) renamedChild(b Builder, oldName protoreflect.Name) erro
 		if p, ok := flb.parent.(*MessageBuilder); ok {
 			if err := p.addSymbol(b); err != nil {
 				if flb.fieldType.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
-					// revert the field rename
+					// revert the above field rename
 					flb.setNameInternal(oldFieldName)
 				}
 				return err
@@ -528,7 +536,7 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 	}
 	jsName := flb.JsonName
 	if jsName == "" {
-		jsName = internal.JsonName(string(flb.name))
+		jsName = internal.JsonName(flb.name)
 	}
 	var def *string
 	if flb.Default != "" {
@@ -545,8 +553,8 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 	}
 
 	fd := &descriptorpb.FieldDescriptorProto{
-		Name:           proto.String(flb.name),
-		Number:         proto.Int32(flb.number),
+		Name:           proto.String(string(flb.name)),
+		Number:         proto.Int32(int32(flb.number)),
 		Options:        flb.Options,
 		Label:          lbl,
 		Type:           flb.fieldType.fieldType.Enum(),
@@ -589,7 +597,7 @@ type OneofBuilder struct {
 	Options *descriptorpb.OneofOptions
 
 	choices []*FieldBuilder
-	symbols map[string]*FieldBuilder
+	symbols map[protoreflect.Name]*FieldBuilder
 }
 
 var _ Builder = (*OneofBuilder)(nil)
@@ -598,7 +606,7 @@ var _ Builder = (*OneofBuilder)(nil)
 func NewOneof(name protoreflect.Name) *OneofBuilder {
 	return &OneofBuilder{
 		baseBuilder: baseBuilderWithName(name),
-		symbols:     map[string]*FieldBuilder{},
+		symbols:     map[protoreflect.Name]*FieldBuilder{},
 	}
 }
 
@@ -617,23 +625,29 @@ func NewOneof(name protoreflect.Name) *OneofBuilder {
 // This function returns an error if the given descriptor is synthetic.
 func FromOneof(ood protoreflect.OneofDescriptor) (*OneofBuilder, error) {
 	if ood.IsSynthetic() {
-		return nil, fmt.Errorf("one-of %s is synthetic", ood.GetFullyQualifiedName())
+		return nil, fmt.Errorf("one-of %s is synthetic", ood.FullName())
 	}
-	if fb, err := FromFile(ood.GetFile()); err != nil {
+	if fb, err := FromFile(ood.ParentFile()); err != nil {
 		return nil, err
-	} else if oob, ok := fb.findFullyQualifiedElement(ood.GetFullyQualifiedName()).(*OneofBuilder); ok {
+	} else if oob, ok := fb.findFullyQualifiedElement(ood.FullName()).(*OneofBuilder); ok {
 		return oob, nil
 	} else {
-		return nil, fmt.Errorf("could not find one-of %s after converting file %q to builder", ood.GetFullyQualifiedName(), ood.GetFile().GetName())
+		return nil, fmt.Errorf("could not find one-of %s after converting file %q to builder", ood.FullName(), ood.ParentFile().Path())
 	}
 }
 
 func fromOneof(ood protoreflect.OneofDescriptor) (*OneofBuilder, error) {
-	oob := NewOneof(ood.GetName())
-	oob.Options = ood.GetOneOfOptions()
-	setComments(&oob.comments, ood.GetSourceInfo())
+	oob := NewOneof(ood.Name())
+	var err error
+	oob.Options, err = as[*descriptorpb.OneofOptions](ood.Options())
+	if err != nil {
+		return nil, err
+	}
+	setComments(&oob.comments, ood.ParentFile().SourceLocations().ByDescriptor(ood))
 
-	for _, fld := range ood.GetChoices() {
+	fields := ood.Fields()
+	for i, length := 0, fields.Len(); i < length; i++ {
+		fld := fields.Get(i)
 		if flb, err := fromField(fld); err != nil {
 			return nil, err
 		} else if err := oob.TryAddChoice(flb); err != nil {
@@ -685,31 +699,34 @@ func (oob *OneofBuilder) parent() *MessageBuilder {
 	return oob.baseBuilder.parent.(*MessageBuilder)
 }
 
-func (oob *OneofBuilder) findChild(name protoreflect.Name) Builder {
+func (oob *OneofBuilder) findChild(_ protoreflect.Name) Builder {
 	// in terms of finding a child by qualified path, fields in the
 	// one-of are considered children of the message, not the one-of
 	return nil
 }
 
 func (oob *OneofBuilder) removeChild(b Builder) {
-	if p, ok := b.GetParent().(*OneofBuilder); !ok || p != oob {
+	if p, ok := b.Parent().(*OneofBuilder); !ok || p != oob {
 		return
 	}
 
 	if oob.parent() != nil {
 		// remove from message's path and tag maps
 		flb := b.(*FieldBuilder)
-		delete(oob.parent().fieldTags, flb.GetNumber())
-		delete(oob.parent().symbols, flb.GetName())
+		delete(oob.parent().fieldTags, flb.Number())
+		delete(oob.parent().symbols, flb.Name())
+		if flb.msgType != nil {
+			delete(oob.parent().symbols, flb.msgType.Name())
+		}
 	}
 
-	oob.choices = deleteBuilder(b.GetName(), oob.choices).([]*FieldBuilder)
-	delete(oob.symbols, b.GetName())
+	oob.choices = deleteBuilder(b.Name(), oob.choices).([]*FieldBuilder)
+	delete(oob.symbols, b.Name())
 	b.setParent(nil)
 }
 
 func (oob *OneofBuilder) renamedChild(b Builder, oldName protoreflect.Name) error {
-	if p, ok := b.GetParent().(*OneofBuilder); !ok || p != oob {
+	if p, ok := b.Parent().(*OneofBuilder); !ok || p != oob {
 		return nil
 	}
 
@@ -721,7 +738,7 @@ func (oob *OneofBuilder) renamedChild(b Builder, oldName protoreflect.Name) erro
 	// collide with other kinds of elements in the message)
 	if oob.parent() != nil {
 		if err := oob.parent().addSymbol(b); err != nil {
-			delete(oob.symbols, b.GetName())
+			delete(oob.symbols, b.Name())
 			return err
 		}
 		delete(oob.parent().symbols, oldName)
@@ -732,10 +749,10 @@ func (oob *OneofBuilder) renamedChild(b Builder, oldName protoreflect.Name) erro
 }
 
 func (oob *OneofBuilder) addSymbol(b *FieldBuilder) error {
-	if _, ok := oob.symbols[b.GetName()]; ok {
-		return fmt.Errorf("one-of %s already contains field named %q", FullName(oob), b.GetName())
+	if _, ok := oob.symbols[b.Name()]; ok {
+		return fmt.Errorf("one-of %s already contains field named %q", FullName(oob), b.Name())
 	}
-	oob.symbols[b.GetName()] = b
+	oob.symbols[b.Name()] = b
 	return nil
 }
 
@@ -782,7 +799,7 @@ func (oob *OneofBuilder) AddChoice(flb *FieldBuilder) *OneofBuilder {
 // required.
 func (oob *OneofBuilder) TryAddChoice(flb *FieldBuilder) error {
 	if flb.IsExtension() {
-		return fmt.Errorf("field %s is an extension, not a regular field", flb.GetName())
+		return fmt.Errorf("field %s is an extension, not a regular field", flb.Name())
 	}
 	if flb.msgType != nil && flb.fieldType.fieldType != descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 		return fmt.Errorf("cannot add a map field %q to one-of %s", flb.name, FullName(oob))
@@ -803,10 +820,15 @@ func (oob *OneofBuilder) TryAddChoice(flb *FieldBuilder) error {
 		needToUnlinkFirst := mb.isPresentButNotChild(flb)
 		if needToUnlinkFirst {
 			Unlink(flb)
-			mb.registerField(flb)
+			if err := mb.registerField(flb); err != nil {
+				// Should never happen since, before above Unlink, it was already
+				// registered with this message.
+				// But if somehow it DOES happen, the field will now be orphaned :(
+				return err
+			}
 		} else {
 			if err := mb.registerField(flb); err != nil {
-				delete(oob.symbols, flb.GetName())
+				delete(oob.symbols, flb.Name())
 				return err
 			}
 			Unlink(flb)
@@ -834,7 +856,7 @@ func (oob *OneofBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 	}
 
 	return &descriptorpb.OneofDescriptorProto{
-		Name:    proto.String(oob.name),
+		Name:    proto.String(string(oob.name)),
 		Options: oob.Options,
 	}, nil
 }
@@ -859,6 +881,6 @@ func (oob *OneofBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(oob, BuilderOptions{})
 }
 
-func entryTypeName(fieldName string) string {
-	return internal.InitCap(internal.JsonName(fieldName)) + "Entry"
+func entryTypeName(fieldName protoreflect.Name) protoreflect.Name {
+	return protoreflect.Name(internal.InitCap(internal.JsonName(fieldName)) + "Entry")
 }

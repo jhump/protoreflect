@@ -3,13 +3,13 @@ package protobuilder
 import (
 	"errors"
 	"fmt"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"sort"
 	"strings"
 	"sync/atomic"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
@@ -92,7 +92,7 @@ func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
 	if err != nil {
 		return nil, err
 	}
-	setComments(&fb.comments, fd.SourceLocations().ByPath(nil))
+	setComments(&fb.comments, fd.SourceLocations().ByPath(protoreflect.SourcePath{}))
 
 	path := []int32{internal.File_syntaxTag}
 	setComments(&fb.SyntaxComments, fd.SourceLocations().ByPath(path))
@@ -122,7 +122,7 @@ func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
 		}
 	}
 	enums := fd.Enums()
-	for i, length := 0, msgs.Len(); i < length; i++ {
+	for i, length := 0, enums.Len(); i < length; i++ {
 		enum := enums.Get(i)
 		if eb, err := fromEnum(enum, localEnums); err != nil {
 			return nil, err
@@ -131,7 +131,7 @@ func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
 		}
 	}
 	exts := fd.Extensions()
-	for i, length := 0, msgs.Len(); i < length; i++ {
+	for i, length := 0, exts.Len(); i < length; i++ {
 		ext := exts.Get(i)
 		if exb, err := fromField(ext); err != nil {
 			return nil, err
@@ -140,7 +140,7 @@ func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
 		}
 	}
 	svcs := fd.Services()
-	for i, length := 0, msgs.Len(); i < length; i++ {
+	for i, length := 0, svcs.Len(); i < length; i++ {
 		svc := svcs.Get(i)
 		if sb, err := fromService(svc); err != nil {
 			return nil, err
@@ -318,7 +318,20 @@ func (fb *FileBuilder) Children() []Builder {
 }
 
 func (fb *FileBuilder) findChild(name protoreflect.Name) Builder {
-	return fb.symbols[name]
+	child := fb.symbols[name]
+	if child != nil {
+		return child
+	}
+	// Enum values are in the scope of the enclosing element, not the
+	// enum itself. So we have to look here in the file for values of
+	// any top-level enums
+	for _, eb := range fb.enums {
+		child = eb.findChild(name)
+		if child != nil {
+			return child
+		}
+	}
+	return nil
 }
 
 func (fb *FileBuilder) removeChild(b Builder) {

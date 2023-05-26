@@ -19,7 +19,7 @@ func FromFileDescriptorProto(fd *descriptorpb.FileDescriptorProto, deps protores
 	if err != nil {
 		return nil, err
 	}
-	return &fileWrapper{FileDescriptor: file, proto: fd}, nil
+	return &fileWrapper{FileDescriptor: file, proto: fd, srcLocs: srcLocsWrapper{SourceLocations: file.SourceLocations()}}, nil
 }
 
 // AddToRegistry converts the given proto to a FileWrapper, using reg to resolve
@@ -75,15 +75,21 @@ func resolveFile(fd *descriptorpb.FileDescriptorProto, protosByPath map[string]*
 
 type fileWrapper struct {
 	protoreflect.FileDescriptor
-	proto *descriptorpb.FileDescriptorProto
-	msgs  msgsWrapper
-	enums enumsWrapper
-	exts  extsWrapper
-	svcs  svcsWrapper
+	proto   *descriptorpb.FileDescriptorProto
+	srcLocs srcLocsWrapper
+	msgs    msgsWrapper
+	enums   enumsWrapper
+	exts    extsWrapper
+	svcs    svcsWrapper
 }
 
 var _ ProtoWrapper = &fileWrapper{}
 var _ FileWrapper = &fileWrapper{}
+var _ WrappedDescriptor = &fileWrapper{}
+
+func (w *fileWrapper) Unwrap() protoreflect.Descriptor {
+	return w.FileDescriptor
+}
 
 func (w *fileWrapper) ParentFile() protoreflect.FileDescriptor {
 	return w
@@ -123,6 +129,21 @@ func (w *fileWrapper) Extensions() protoreflect.ExtensionDescriptors {
 func (w *fileWrapper) Services() protoreflect.ServiceDescriptors {
 	w.svcs.initFromFile(w)
 	return &w.svcs
+}
+
+func (w *fileWrapper) SourceLocations() protoreflect.SourceLocations {
+	return &w.srcLocs
+}
+
+type srcLocsWrapper struct {
+	protoreflect.SourceLocations
+}
+
+func (w *srcLocsWrapper) ByDescriptor(d protoreflect.Descriptor) protoreflect.SourceLocation {
+	// The underlying SourceLocations makes a check that the given descriptor belongs to
+	// the same file. But if the descriptor is wrapped, its file will be different (its
+	// file will be the wrapper, but compared against unwrapped original).
+	return w.SourceLocations.ByDescriptor(Unwrap(d))
 }
 
 type msgsWrapper struct {
@@ -230,11 +251,7 @@ func (w *extsWrapper) doInit(parent ProtoWrapper, exts protoreflect.ExtensionDes
 	for i := 0; i < length; i++ {
 		ext := exts.Get(i)
 		fld := &fieldWrapper{FieldDescriptor: ext, parent: parent, proto: protos[i]}
-		if etd, ok := ext.(protoreflect.ExtensionTypeDescriptor); ok {
-			w.exts[i] = &extWrapper{fieldWrapper: fld, typeDesc: etd}
-		} else {
-			w.exts[i] = fld
-		}
+		w.exts[i] = &extWrapper{fieldWrapper: fld, extType: protoresolve.ExtensionType(ext)}
 	}
 }
 
@@ -303,6 +320,7 @@ func (w *fieldsWrapper) initFromMessage(parent *msgWrapper) {
 func (w *fieldsWrapper) initFromOneof(parent *oneofWrapper) {
 	w.init.Do(func() {
 		w.FieldDescriptors = parent.OneofDescriptor.Fields()
+		parent.parent.fields.initFromMessage(parent.parent)
 		w.fields = parent.parent.fields.fields
 	})
 }
@@ -466,6 +484,11 @@ type msgWrapper struct {
 
 var _ ProtoWrapper = &msgWrapper{}
 var _ MessageWrapper = &msgWrapper{}
+var _ WrappedDescriptor = &msgWrapper{}
+
+func (w *msgWrapper) Unwrap() protoreflect.Descriptor {
+	return w.MessageDescriptor
+}
 
 func (w *msgWrapper) Parent() protoreflect.Descriptor {
 	return w.parent
@@ -528,6 +551,11 @@ type fieldWrapper struct {
 
 var _ ProtoWrapper = &fieldWrapper{}
 var _ FieldWrapper = &fieldWrapper{}
+var _ WrappedDescriptor = &fieldWrapper{}
+
+func (w *fieldWrapper) Unwrap() protoreflect.Descriptor {
+	return w.FieldDescriptor
+}
 
 func (w *fieldWrapper) Parent() protoreflect.Descriptor {
 	return w.parent
@@ -615,15 +643,21 @@ func (w *fieldWrapper) doInit() {
 
 type extWrapper struct {
 	*fieldWrapper
-	typeDesc protoreflect.ExtensionTypeDescriptor
+	extType protoreflect.ExtensionType
 }
 
+var _ ProtoWrapper = &extWrapper{}
+var _ FieldWrapper = &extWrapper{}
+var _ WrappedDescriptor = &extWrapper{}
+var _ protoreflect.ExtensionTypeDescriptor = &extWrapper{}
+var _ protoreflect.ExtensionType = &extWrapper{}
+
 func (w *extWrapper) New() protoreflect.Value {
-	return w.typeDesc.Type().New()
+	return w.extType.New()
 }
 
 func (w *extWrapper) Zero() protoreflect.Value {
-	return w.typeDesc.Type().Zero()
+	return w.extType.Zero()
 }
 
 func (w *extWrapper) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {
@@ -631,23 +665,20 @@ func (w *extWrapper) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {
 }
 
 func (w *extWrapper) ValueOf(i interface{}) protoreflect.Value {
-	return w.typeDesc.Type().ValueOf(i)
+	return w.extType.ValueOf(i)
 }
 
 func (w *extWrapper) InterfaceOf(value protoreflect.Value) interface{} {
-	return w.typeDesc.Type().InterfaceOf(value)
+	return w.extType.InterfaceOf(value)
 }
 
 func (w *extWrapper) IsValidValue(value protoreflect.Value) bool {
-	return w.typeDesc.Type().IsValidValue(value)
+	return w.extType.IsValidValue(value)
 }
 
 func (w *extWrapper) IsValidInterface(i interface{}) bool {
-	return w.typeDesc.Type().IsValidInterface(i)
+	return w.extType.IsValidInterface(i)
 }
-
-var _ ProtoWrapper = &extWrapper{}
-var _ FieldWrapper = &extWrapper{}
 
 func (w *extWrapper) AsProto() proto.Message {
 	return w.proto
@@ -674,6 +705,11 @@ type oneofWrapper struct {
 
 var _ ProtoWrapper = &oneofWrapper{}
 var _ OneofWrapper = &oneofWrapper{}
+var _ WrappedDescriptor = &oneofWrapper{}
+
+func (w *oneofWrapper) Unwrap() protoreflect.Descriptor {
+	return w.OneofDescriptor
+}
 
 func (w *oneofWrapper) Parent() protoreflect.Descriptor {
 	return w.parent
@@ -709,6 +745,11 @@ type enumWrapper struct {
 
 var _ ProtoWrapper = &enumWrapper{}
 var _ EnumWrapper = &enumWrapper{}
+var _ WrappedDescriptor = &enumWrapper{}
+
+func (w *enumWrapper) Unwrap() protoreflect.Descriptor {
+	return w.EnumDescriptor
+}
 
 func (w *enumWrapper) Parent() protoreflect.Descriptor {
 	return w.parent
@@ -743,6 +784,11 @@ type enumValueWrapper struct {
 
 var _ ProtoWrapper = &enumValueWrapper{}
 var _ EnumValueWrapper = &enumValueWrapper{}
+var _ WrappedDescriptor = &enumValueWrapper{}
+
+func (w *enumValueWrapper) Unwrap() protoreflect.Descriptor {
+	return w.EnumValueDescriptor
+}
 
 func (w *enumValueWrapper) Parent() protoreflect.Descriptor {
 	return w.parent
@@ -773,6 +819,11 @@ type svcWrapper struct {
 
 var _ ProtoWrapper = &svcWrapper{}
 var _ ServiceWrapper = &svcWrapper{}
+var _ WrappedDescriptor = &svcWrapper{}
+
+func (w *svcWrapper) Unwrap() protoreflect.Descriptor {
+	return w.ServiceDescriptor
+}
 
 func (w *svcWrapper) Parent() protoreflect.Descriptor {
 	return w.parent
@@ -810,6 +861,11 @@ type mtdWrapper struct {
 
 var _ ProtoWrapper = &mtdWrapper{}
 var _ MethodWrapper = &mtdWrapper{}
+var _ WrappedDescriptor = &mtdWrapper{}
+
+func (w *mtdWrapper) Unwrap() protoreflect.Descriptor {
+	return w.MethodDescriptor
+}
 
 func (w *mtdWrapper) Parent() protoreflect.Descriptor {
 	return w.parent

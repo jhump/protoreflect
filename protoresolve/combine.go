@@ -2,6 +2,7 @@ package protoresolve
 
 import (
 	"errors"
+
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"

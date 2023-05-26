@@ -190,7 +190,7 @@ func (d filesByPath) FindFileByPath(path string) (protoreflect.FileDescriptor, e
 // isDuplicateDependency checks for duplicate descriptors
 func isDuplicateDependency(dep protoreflect.FileDescriptor, files protoresolve.FileResolver) (bool, error) {
 	existing, err := files.FindFileByPath(dep.Path())
-	if err == nil {
+	if err != nil {
 		return false, nil
 	}
 	prevFDP := protowrap.ProtoFromFileDescriptor(existing)
@@ -517,12 +517,14 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts protor
 			continue
 		}
 		// see if configured extension registry knows about it
-		if extd, err := r.opts.Resolver.FindExtensionByNumber(msgName, tag); err == nil {
-			// extension registry recognized it!
-			if err := deps.add(extd.TypeDescriptor().ParentFile()); err != nil {
-				return err
+		if r.opts.Resolver != nil {
+			if extd, err := r.opts.Resolver.FindExtensionByNumber(msgName, tag); err == nil {
+				// extension registry recognized it!
+				if err := deps.add(extd.TypeDescriptor().ParentFile()); err != nil {
+					return err
+				}
+				continue
 			}
-			continue
 		}
 		// see if given file extensions knows about it
 		if fileExts != nil {
