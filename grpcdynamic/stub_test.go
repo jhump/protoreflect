@@ -8,10 +8,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/jhump/protoreflect/v2/grpcreflect"
 	grpc_testdata "github.com/jhump/protoreflect/v2/internal/testdata/grpc"
@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 	defer func() {
 		p := recover()
 		if p != nil {
-			fmt.Fprintf(os.Stderr, "PANIC: %v\n", p)
+			_, _ = fmt.Fprintf(os.Stderr, "PANIC: %v\n", p)
 		}
 		os.Exit(code)
 	}()
@@ -43,7 +43,9 @@ func TestMain(m *testing.M) {
 	}
 	svr := grpc.NewServer()
 	grpc_testdata.RegisterTestServiceServer(svr, grpc_testing.TestService{})
-	go svr.Serve(l)
+	go func() {
+		_ = svr.Serve(l)
+	}()
 	defer svr.Stop()
 
 	svcs, err := grpcreflect.LoadServiceDescriptors(svr)
@@ -61,7 +63,9 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create client to %s: %s", l.Addr().String(), err.Error()))
 	}
-	defer cc.Close()
+	defer func() {
+		_ = cc.Close()
+	}()
 
 	stub = NewStub(cc)
 
@@ -75,28 +79,28 @@ var payload = &grpc_testdata.Payload{
 
 func TestUnaryRpc(t *testing.T) {
 	resp, err := stub.InvokeRpc(context.Background(), unaryMd, &grpc_testdata.SimpleRequest{Payload: payload})
-	testutil.Ok(t, err, "Failed to invoke unary RPC")
-	dm := resp.(*dynamicpb.Message)
-	fd := dm.GetMessageDescriptor().FindFieldByName("payload")
-	p := dm.GetField(fd)
-	testutil.Require(t, dynamicpb.MessagesEqual(p.(proto.Message), payload), "Incorrect payload returned from RPC: %v != %v", p, payload)
+	require.NoError(t, err, "Failed to invoke unary RPC")
+	refMsg := resp.ProtoReflect()
+	fd := refMsg.Descriptor().Fields().ByName("payload")
+	p := refMsg.Get(fd)
+	require.True(t, proto.Equal(p.Message().Interface(), payload), "Incorrect payload returned from RPC: %v != %v", p, payload)
 }
 
 func TestClientStreamingRpc(t *testing.T) {
 	cs, err := stub.InvokeRpcClientStream(context.Background(), clientStreamingMd)
-	testutil.Ok(t, err, "Failed to invoke client-streaming RPC")
+	require.NoError(t, err, "Failed to invoke client-streaming RPC")
 	req := &grpc_testdata.StreamingInputCallRequest{Payload: payload}
 	for i := 0; i < 3; i++ {
 		err = cs.SendMsg(req)
-		testutil.Ok(t, err, "Failed to send request message")
+		require.NoError(t, err, "Failed to send request message")
 	}
 	resp, err := cs.CloseAndReceive()
-	testutil.Ok(t, err, "Failed to receive response")
-	dm := resp.(*dynamicpb.Message)
-	fd := dm.GetMessageDescriptor().FindFieldByName("aggregated_payload_size")
-	sz := dm.GetField(fd)
+	require.NoError(t, err, "Failed to receive response")
+	refMsg := resp.ProtoReflect()
+	fd := refMsg.Descriptor().Fields().ByName("aggregated_payload_size")
+	sz := refMsg.Get(fd)
 	expectedSz := 3 * len(payload.Body)
-	testutil.Eq(t, expectedSz, int(sz.(int32)), "Incorrect response returned from RPC")
+	require.Equal(t, expectedSz, int(sz.Int()), "Incorrect response returned from RPC")
 }
 
 func TestServerStreamingRpc(t *testing.T) {
@@ -106,35 +110,35 @@ func TestServerStreamingRpc(t *testing.T) {
 			{}, {}, {}, // three entries means we'll get back three responses
 		},
 	})
-	testutil.Ok(t, err, "Failed to invoke server-streaming RPC")
+	require.NoError(t, err, "Failed to invoke server-streaming RPC")
 	for i := 0; i < 3; i++ {
 		resp, err := ss.RecvMsg()
-		testutil.Ok(t, err, "Failed to receive response message")
-		dm := resp.(*dynamicpb.Message)
-		fd := dm.GetMessageDescriptor().FindFieldByName("payload")
-		p := dm.GetField(fd)
-		testutil.Require(t, dynamicpb.MessagesEqual(p.(proto.Message), payload), "Incorrect payload returned from RPC: %v != %v", p, payload)
+		require.NoError(t, err, "Failed to receive response message")
+		refMsg := resp.ProtoReflect()
+		fd := refMsg.Descriptor().Fields().ByName("payload")
+		p := refMsg.Get(fd)
+		require.True(t, proto.Equal(p.Message().Interface(), payload), "Incorrect payload returned from RPC: %v != %v", p, payload)
 	}
 	_, err = ss.RecvMsg()
-	testutil.Eq(t, io.EOF, err, "Incorrect number of messages in response")
+	require.Equal(t, io.EOF, err, "Incorrect number of messages in response")
 }
 
 func TestBidiStreamingRpc(t *testing.T) {
 	bds, err := stub.InvokeRpcBidiStream(context.Background(), bidiStreamingMd)
-	testutil.Ok(t, err)
+	require.NoError(t, err)
 	req := &grpc_testdata.StreamingOutputCallRequest{Payload: payload}
 	for i := 0; i < 3; i++ {
 		err = bds.SendMsg(req)
-		testutil.Ok(t, err, "Failed to send request message")
+		require.NoError(t, err, "Failed to send request message")
 		resp, err := bds.RecvMsg()
-		testutil.Ok(t, err, "Failed to receive response message")
-		dm := resp.(*dynamicpb.Message)
-		fd := dm.GetMessageDescriptor().FindFieldByName("payload")
-		p := dm.GetField(fd)
-		testutil.Require(t, dynamicpb.MessagesEqual(p.(proto.Message), payload), "Incorrect payload returned from RPC: %v != %v", p, payload)
+		require.NoError(t, err, "Failed to receive response message")
+		refMsg := resp.ProtoReflect()
+		fd := refMsg.Descriptor().Fields().ByName("payload")
+		p := refMsg.Get(fd)
+		require.True(t, proto.Equal(p.Message().Interface(), payload), "Incorrect payload returned from RPC: %v != %v", p, payload)
 	}
 	err = bds.CloseSend()
-	testutil.Ok(t, err, "Failed to receive response")
+	require.NoError(t, err, "Failed to receive response")
 	_, err = bds.RecvMsg()
-	testutil.Eq(t, io.EOF, err, "Incorrect number of messages in response")
+	require.Equal(t, io.EOF, err, "Incorrect number of messages in response")
 }
