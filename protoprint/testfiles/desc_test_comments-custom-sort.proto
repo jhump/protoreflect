@@ -167,7 +167,7 @@ message AnEmptyMessage {
 }
 
 // option comments FTW!!!
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testdata";
 
 import public "google/protobuf/empty.proto";
 

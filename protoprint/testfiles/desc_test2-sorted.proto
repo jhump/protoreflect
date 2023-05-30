@@ -12,7 +12,7 @@ option cc_enable_arenas = true;
 
 option csharp_namespace = "jhump.protoreflect.testprotos";
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testdata";
 
 option java_generate_equals_and_hash = true;
 

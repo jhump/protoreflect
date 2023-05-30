@@ -913,7 +913,7 @@ func findField(fld protoreflect.FieldDescriptor, root protoreflect.FileDescripto
 			msg := findMessage(parent, root)
 			return msg.Extensions().Get(fld.Index())
 		default:
-			panic(fmt.Sprint("unsupported type of parent for field: %T", parent))
+			panic(fmt.Sprintf("unsupported type of parent for field: %T", parent))
 		}
 	}
 	msg := findMessage(fld.Parent().(protoreflect.MessageDescriptor), root)
@@ -928,7 +928,7 @@ func findMessage(msg protoreflect.MessageDescriptor, root protoreflect.FileDescr
 		p := findMessage(parent, root)
 		return p.Messages().Get(msg.Index())
 	default:
-		panic(fmt.Sprint("unsupported type of parent for message: %T", parent))
+		panic(fmt.Sprintf("unsupported type of parent for message: %T", parent))
 	}
 }
 
@@ -940,7 +940,7 @@ func findEnum(en protoreflect.EnumDescriptor, root protoreflect.FileDescriptor) 
 		p := findMessage(parent, root)
 		return p.Enums().Get(en.Index())
 	default:
-		panic(fmt.Sprint("unsupported type of parent for enum: %T", parent))
+		panic(fmt.Sprintf("unsupported type of parent for enum: %T", parent))
 	}
 }
 

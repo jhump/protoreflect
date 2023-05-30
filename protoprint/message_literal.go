@@ -13,13 +13,18 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func (p *Printer) printMessageLiteralCompact(msg protoreflect.Message, res *protoregistry.Types, pkg, scope string) string {
+func (p *Printer) printMessageLiteralCompact(msg protoreflect.Message, res *protoregistry.Types, pkg, scope protoreflect.FullName) string {
 	var buf bytes.Buffer
 	p.printMessageLiteralToBuffer(&buf, msg, res, pkg, scope, 0, -1)
 	return buf.String()
 }
 
-func (p *Printer) printMessageLiteral(msg protoreflect.Message, res *protoregistry.Types, pkg, scope string, threshold, indent int) string {
+func (p *Printer) printMessageLiteral(
+	msg protoreflect.Message,
+	res *protoregistry.Types,
+	pkg, scope protoreflect.FullName,
+	threshold, indent int,
+) string {
 	var buf bytes.Buffer
 	p.printMessageLiteralToBuffer(&buf, msg, res, pkg, scope, threshold, indent)
 	return buf.String()
@@ -34,7 +39,13 @@ const (
 	anyValueTag   = 2
 )
 
-func (p *Printer) printMessageLiteralToBuffer(buf *bytes.Buffer, msg protoreflect.Message, res *protoregistry.Types, pkg, scope string, threshold, indent int) {
+func (p *Printer) printMessageLiteralToBuffer(
+	buf *bytes.Buffer,
+	msg protoreflect.Message,
+	res *protoregistry.Types,
+	pkg, scope protoreflect.FullName,
+	threshold, indent int,
+) {
 	if p.maybePrintAnyMessageToBuffer(buf, msg, res, pkg, scope, threshold, indent) {
 		return
 	}
@@ -65,7 +76,7 @@ func (p *Printer) printMessageLiteralToBuffer(buf *bytes.Buffer, msg protoreflec
 		p.maybeNewline(buf, indent)
 		if fld.IsExtension() {
 			buf.WriteRune('[')
-			buf.WriteString(p.qualifyExtensionLiteralName(pkg, scope, string(fld.FullName())))
+			buf.WriteString(p.qualifyExtensionLiteralName(pkg, scope, fld.FullName()))
 			buf.WriteRune(']')
 		} else {
 			buf.WriteString(string(fld.Name()))
@@ -90,7 +101,13 @@ func (p *Printer) printMessageLiteralToBuffer(buf *bytes.Buffer, msg protoreflec
 	buf.WriteRune('}')
 }
 
-func (p *Printer) printMessageLiteralToBufferMaybeCompact(buf *bytes.Buffer, msg protoreflect.Message, res *protoregistry.Types, pkg, scope string, threshold, indent int) {
+func (p *Printer) printMessageLiteralToBufferMaybeCompact(
+	buf *bytes.Buffer,
+	msg protoreflect.Message,
+	res *protoregistry.Types,
+	pkg, scope protoreflect.FullName,
+	threshold, indent int,
+) {
 	if indent >= 0 {
 		// first see if the message is compact enough to fit on one line
 		str := p.printMessageLiteralCompact(msg, res, pkg, scope)
@@ -110,7 +127,13 @@ func (p *Printer) printMessageLiteralToBufferMaybeCompact(buf *bytes.Buffer, msg
 	p.printMessageLiteralToBuffer(buf, msg, res, pkg, scope, threshold, indent)
 }
 
-func (p *Printer) maybePrintAnyMessageToBuffer(buf *bytes.Buffer, msg protoreflect.Message, res *protoregistry.Types, pkg, scope string, threshold, indent int) bool {
+func (p *Printer) maybePrintAnyMessageToBuffer(
+	buf *bytes.Buffer,
+	msg protoreflect.Message,
+	res *protoregistry.Types,
+	pkg, scope protoreflect.FullName,
+	threshold, indent int,
+) bool {
 	md := msg.Descriptor()
 	if md.FullName() != anyTypeName {
 		return false
@@ -189,7 +212,14 @@ func (p *Printer) maybeNewline(buf *bytes.Buffer, indent int) {
 	p.indent(buf, indent)
 }
 
-func (p *Printer) printArrayLiteralToBufferMaybeCompact(buf *bytes.Buffer, fld protoreflect.FieldDescriptor, val protoreflect.List, res *protoregistry.Types, pkg, scope string, threshold, indent int) {
+func (p *Printer) printArrayLiteralToBufferMaybeCompact(
+	buf *bytes.Buffer,
+	fld protoreflect.FieldDescriptor,
+	val protoreflect.List,
+	res *protoregistry.Types,
+	pkg, scope protoreflect.FullName,
+	threshold, indent int,
+) {
 	if indent >= 0 {
 		// first see if the array is compact enough to fit on one line
 		str := p.printArrayLiteralCompact(fld, val, res, pkg, scope)
@@ -209,13 +239,25 @@ func (p *Printer) printArrayLiteralToBufferMaybeCompact(buf *bytes.Buffer, fld p
 	p.printArrayLiteralToBuffer(buf, fld, val, res, pkg, scope, threshold, indent)
 }
 
-func (p *Printer) printArrayLiteralCompact(fld protoreflect.FieldDescriptor, val protoreflect.List, res *protoregistry.Types, pkg, scope string) string {
+func (p *Printer) printArrayLiteralCompact(
+	fld protoreflect.FieldDescriptor,
+	val protoreflect.List,
+	res *protoregistry.Types,
+	pkg, scope protoreflect.FullName,
+) string {
 	var buf bytes.Buffer
 	p.printArrayLiteralToBuffer(&buf, fld, val, res, pkg, scope, 0, -1)
 	return buf.String()
 }
 
-func (p *Printer) printArrayLiteralToBuffer(buf *bytes.Buffer, fld protoreflect.FieldDescriptor, val protoreflect.List, res *protoregistry.Types, pkg, scope string, threshold, indent int) {
+func (p *Printer) printArrayLiteralToBuffer(
+	buf *bytes.Buffer,
+	fld protoreflect.FieldDescriptor,
+	val protoreflect.List,
+	res *protoregistry.Types,
+	pkg, scope protoreflect.FullName,
+	threshold, indent int,
+) {
 	buf.WriteRune('[')
 	if indent >= 0 {
 		indent++
@@ -240,7 +282,14 @@ func (p *Printer) printArrayLiteralToBuffer(buf *bytes.Buffer, fld protoreflect.
 	buf.WriteRune(']')
 }
 
-func (p *Printer) printMapLiteralToBufferMaybeCompact(buf *bytes.Buffer, fld protoreflect.FieldDescriptor, val protoreflect.Map, res *protoregistry.Types, pkg, scope string, threshold, indent int) {
+func (p *Printer) printMapLiteralToBufferMaybeCompact(
+	buf *bytes.Buffer,
+	fld protoreflect.FieldDescriptor,
+	val protoreflect.Map,
+	res *protoregistry.Types,
+	pkg, scope protoreflect.FullName,
+	threshold, indent int,
+) {
 	if indent >= 0 {
 		// first see if the map is compact enough to fit on one line
 		str := p.printMapLiteralCompact(fld, val, res, pkg, scope)
@@ -252,13 +301,25 @@ func (p *Printer) printMapLiteralToBufferMaybeCompact(buf *bytes.Buffer, fld pro
 	p.printMapLiteralToBuffer(buf, fld, val, res, pkg, scope, threshold, indent)
 }
 
-func (p *Printer) printMapLiteralCompact(fld protoreflect.FieldDescriptor, val protoreflect.Map, res *protoregistry.Types, pkg, scope string) string {
+func (p *Printer) printMapLiteralCompact(
+	fld protoreflect.FieldDescriptor,
+	val protoreflect.Map,
+	res *protoregistry.Types,
+	pkg, scope protoreflect.FullName,
+) string {
 	var buf bytes.Buffer
 	p.printMapLiteralToBuffer(&buf, fld, val, res, pkg, scope, 0, -1)
 	return buf.String()
 }
 
-func (p *Printer) printMapLiteralToBuffer(buf *bytes.Buffer, fld protoreflect.FieldDescriptor, val protoreflect.Map, res *protoregistry.Types, pkg, scope string, threshold, indent int) {
+func (p *Printer) printMapLiteralToBuffer(
+	buf *bytes.Buffer,
+	fld protoreflect.FieldDescriptor,
+	val protoreflect.Map,
+	res *protoregistry.Types,
+	pkg, scope protoreflect.FullName,
+	threshold, indent int,
+) {
 	keys := sortKeys(val)
 	l := &mapAsList{
 		m:      val,
@@ -290,7 +351,7 @@ func (m *mapAsList) Get(i int) protoreflect.Value {
 	return protoreflect.ValueOfMessage(msg)
 }
 
-func (m *mapAsList) Set(_i int, _ protoreflect.Value) {
+func (m *mapAsList) Set(_ int, _ protoreflect.Value) {
 	panic("Set is not implemented")
 }
 

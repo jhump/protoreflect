@@ -1,9 +1,9 @@
--------- desc_test_comments.proto (*desc.FileDescriptor) --------
+-------- foo.bar (*linker.result) --------
 syntax = "proto2";
 package foo.bar;
 import "desc_test_options.proto";
 import public "google/protobuf/empty.proto";
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testdata";
 message AnEmptyMessage {
 }
 // We need a request for our RPC service below.
@@ -90,7 +90,7 @@ extend .foo.bar.Request {
   // ... and a comment for guid2
   optional uint64 guid2 = 124;
 }
--------- foo.bar.Request (*desc.MessageDescriptor) --------
+-------- foo.bar.Request (*linker.msgDescriptor) --------
 // We need a request for our RPC service below.
 message Request {
   option deprecated = true;
@@ -156,7 +156,7 @@ message Request {
   reserved 10 to 20, 30 to 50;
   reserved "bar", "baz", "foo";
 }
--------- foo.bar.Request.ids (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.ids (*linker.fldDescriptor) --------
 // A field comment
 repeated int32 ids = 1 [
   json_name = "|foo|",
@@ -164,10 +164,10 @@ repeated int32 ids = 1 [
   (.testprotos.ffubar) = "abc",
   (.testprotos.ffubarb) = "xyz"
 ];
--------- foo.bar.Request.name (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.name (*linker.fldDescriptor) --------
 // label comment
 optional string name = 2 [default = "fubar"];
--------- foo.bar.Request.extras (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.extras (*linker.fldDescriptor) --------
 // Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
 optional group Extras = 3 {
   option no_standard_descriptor_accessor = false;
@@ -177,29 +177,29 @@ optional group Extras = 3 {
   // Leading comment...
   optional string str = 3;
 }
--------- foo.bar.Request.this (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.this (*linker.fldDescriptor) --------
 string this = 4;
--------- foo.bar.Request.that (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.that (*linker.fldDescriptor) --------
 int32 that = 5;
--------- foo.bar.Request.these (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.these (*linker.fldDescriptor) --------
 string these = 6;
--------- foo.bar.Request.those (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.those (*linker.fldDescriptor) --------
 int32 those = 7;
--------- foo.bar.Request.things (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.things (*linker.fldDescriptor) --------
 // map field
 map<string, string> things = 8;
--------- foo.bar.Request.abc (*desc.OneOfDescriptor) --------
+-------- foo.bar.Request.abc (*linker.oneofDescriptor) --------
 oneof abc {
   string this = 4;
   int32 that = 5;
 }
--------- foo.bar.Request.xyz (*desc.OneOfDescriptor) --------
+-------- foo.bar.Request.xyz (*linker.oneofDescriptor) --------
 oneof xyz {
   option (.testprotos.oofubar) = "whoops, this has invalid UTF8! \274\377";
   string these = 6;
   int32 those = 7;
 }
--------- foo.bar.Request.Extras (*desc.MessageDescriptor) --------
+-------- foo.bar.Request.Extras (*linker.msgDescriptor) --------
 // Group comment with emoji 😀 😍 👻 ❤ 💯 💥 🐶 🦂 🥑 🍻 🌍 🚕 🪐
 message Extras {
   option no_standard_descriptor_accessor = false;
@@ -209,24 +209,24 @@ message Extras {
   // Leading comment...
   optional string str = 3;
 }
--------- foo.bar.Request.Extras.dbl (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.Extras.dbl (*linker.fldDescriptor) --------
 optional double dbl = 1;
--------- foo.bar.Request.Extras.flt (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.Extras.flt (*linker.fldDescriptor) --------
 optional float flt = 2;
--------- foo.bar.Request.Extras.str (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.Extras.str (*linker.fldDescriptor) --------
 // Leading comment...
 optional string str = 3;
--------- foo.bar.Request.ThingsEntry (*desc.MessageDescriptor) --------
+-------- foo.bar.Request.ThingsEntry (*linker.msgDescriptor) --------
 message ThingsEntry {
   option map_entry = true;
   optional string key = 1;
   optional string value = 2;
 }
--------- foo.bar.Request.ThingsEntry.key (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.ThingsEntry.key (*linker.fldDescriptor) --------
 optional string key = 1;
--------- foo.bar.Request.ThingsEntry.value (*desc.FieldDescriptor) --------
+-------- foo.bar.Request.ThingsEntry.value (*linker.fldDescriptor) --------
 optional string value = 2;
--------- foo.bar.Request.MarioCharacters (*desc.EnumDescriptor) --------
+-------- foo.bar.Request.MarioCharacters (*linker.enumDescriptor) --------
 enum MarioCharacters {
   option allow_alias = true;
   option (.testprotos.efubar) = 123;
@@ -249,48 +249,48 @@ enum MarioCharacters {
   KAMEK = 8;
   MAGIKOOPA = 8;
 }
--------- foo.bar.Request.MarioCharacters.MARIO (*desc.EnumValueDescriptor) --------
+-------- foo.bar.Request.MARIO (*linker.enValDescriptor) --------
 MARIO = 1 [
   (.testprotos.evfubar) = 278,
   (.testprotos.evfubars) = -314
 ];
--------- foo.bar.Request.MarioCharacters.LUIGI (*desc.EnumValueDescriptor) --------
+-------- foo.bar.Request.LUIGI (*linker.enValDescriptor) --------
 LUIGI = 2 [
   (.testprotos.evfubaru) = 200,
   (.testprotos.evfubaruf) = 100
 ];
--------- foo.bar.Request.MarioCharacters.PEACH (*desc.EnumValueDescriptor) --------
+-------- foo.bar.Request.PEACH (*linker.enValDescriptor) --------
 PEACH = 3;
--------- foo.bar.Request.MarioCharacters.BOWSER (*desc.EnumValueDescriptor) --------
+-------- foo.bar.Request.BOWSER (*linker.enValDescriptor) --------
 BOWSER = 4;
--------- foo.bar.Request.MarioCharacters.WARIO (*desc.EnumValueDescriptor) --------
+-------- foo.bar.Request.WARIO (*linker.enValDescriptor) --------
 WARIO = 5;
--------- foo.bar.Request.MarioCharacters.WALUIGI (*desc.EnumValueDescriptor) --------
+-------- foo.bar.Request.WALUIGI (*linker.enValDescriptor) --------
 WALUIGI = 6;
--------- foo.bar.Request.MarioCharacters.SHY_GUY (*desc.EnumValueDescriptor) --------
+-------- foo.bar.Request.SHY_GUY (*linker.enValDescriptor) --------
 SHY_GUY = 7 [(.testprotos.evfubarsf) = 10101];
--------- foo.bar.Request.MarioCharacters.HEY_HO (*desc.EnumValueDescriptor) --------
+-------- foo.bar.Request.HEY_HO (*linker.enValDescriptor) --------
 HEY_HO = 7;
--------- foo.bar.Request.MarioCharacters.MAGIKOOPA (*desc.EnumValueDescriptor) --------
+-------- foo.bar.Request.MAGIKOOPA (*linker.enValDescriptor) --------
 MAGIKOOPA = 8;
--------- foo.bar.Request.MarioCharacters.KAMEK (*desc.EnumValueDescriptor) --------
+-------- foo.bar.Request.KAMEK (*linker.enValDescriptor) --------
 KAMEK = 8;
--------- foo.bar.Request.MarioCharacters.SNIFIT (*desc.EnumValueDescriptor) --------
+-------- foo.bar.Request.SNIFIT (*linker.enValDescriptor) --------
 SNIFIT = -101;
--------- foo.bar.AnEmptyMessage (*desc.MessageDescriptor) --------
+-------- foo.bar.AnEmptyMessage (*linker.msgDescriptor) --------
 message AnEmptyMessage {
 }
--------- foo.bar.guid1 (*desc.FieldDescriptor) --------
+-------- foo.bar.guid1 (*linker.extTypeDescriptor) --------
 extend .foo.bar.Request {
   // comment for guid1
   optional uint64 guid1 = 123;
 }
--------- foo.bar.guid2 (*desc.FieldDescriptor) --------
+-------- foo.bar.guid2 (*linker.extTypeDescriptor) --------
 extend .foo.bar.Request {
   // ... and a comment for guid2
   optional uint64 guid2 = 124;
 }
--------- foo.bar.RpcService (*desc.ServiceDescriptor) --------
+-------- foo.bar.RpcService (*linker.svcDescriptor) --------
 // Service comment
 service RpcService {
   option deprecated = false;
@@ -304,10 +304,10 @@ service RpcService {
     option (.testprotos.mtfubard) = 123.456000;
   }
 }
--------- foo.bar.RpcService.StreamingRpc (*desc.MethodDescriptor) --------
+-------- foo.bar.RpcService.StreamingRpc (*linker.mtdDescriptor) --------
 // Method comment
 rpc StreamingRpc ( stream .foo.bar.Request ) returns ( .foo.bar.Request );
--------- foo.bar.RpcService.UnaryRpc (*desc.MethodDescriptor) --------
+-------- foo.bar.RpcService.UnaryRpc (*linker.mtdDescriptor) --------
 rpc UnaryRpc ( .foo.bar.Request ) returns ( .google.protobuf.Empty ) {
   option deprecated = true;
   option (.testprotos.mtfubar) = 12.340000;

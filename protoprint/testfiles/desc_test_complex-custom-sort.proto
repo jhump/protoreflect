@@ -1,5 +1,19 @@
 syntax = "proto2";
 
+extend google.protobuf.MethodOptions {
+  optional Validator validator = 12345;
+}
+
+extend google.protobuf.MessageOptions {
+  repeated Test rept = 20002;
+
+  optional MessageWithMap map_vals = 20030;
+
+  optional Test.Nested._NestedNested.EEE eee = 20010;
+
+  optional Another a = 20020;
+}
+
 extend google.protobuf.FieldOptions {
   optional bool weak = 20004;
 
@@ -74,22 +88,8 @@ extend google.protobuf.FieldOptions {
   optional bool bool = 20018;
 }
 
-extend google.protobuf.MethodOptions {
-  optional Validator validator = 12345;
-}
-
 extend google.protobuf.FieldOptions {
   optional Rule rules = 1234;
-}
-
-extend google.protobuf.MessageOptions {
-  repeated Test rept = 20002;
-
-  optional MessageWithMap map_vals = 20030;
-
-  optional Test.Nested._NestedNested.EEE eee = 20010;
-
-  optional Another a = 20020;
 }
 
 extend google.protobuf.ExtensionRangeOptions {
@@ -474,7 +474,7 @@ message Another {
   };
 }
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testdata";
 
 import "google/protobuf/descriptor.proto";
 

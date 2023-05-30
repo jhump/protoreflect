@@ -88,7 +88,7 @@ func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
 	fb.Syntax = fd.Syntax()
 	fb.Package = fd.Package()
 	var err error
-	fb.Options, err = as[*descriptorpb.FileOptions](fd.Options())
+	fb.Options, err = protoresolve.As[*descriptorpb.FileOptions](fd.Options())
 	if err != nil {
 		return nil, err
 	}
@@ -788,7 +788,7 @@ func isExtendeeMessageSet(flb *FieldBuilder) bool {
 	if flb.localExtendee != nil {
 		return flb.localExtendee.Options.GetMessageSetWireFormat()
 	}
-	opts, _ := as[*descriptorpb.MessageOptions](flb.foreignExtendee.Options())
+	opts, _ := protoresolve.As[*descriptorpb.MessageOptions](flb.foreignExtendee.Options())
 	return opts.GetMessageSetWireFormat()
 }
 

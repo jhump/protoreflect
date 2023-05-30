@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "google/protobuf/descriptor.proto";
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testdata";
 
 message MessageWithOptionalFields {
   optional string foo = 1;
@@ -11,5 +11,5 @@ message MessageWithOptionalFields {
 }
 
 extend google.protobuf.MessageOptions {
-  optional string some_custom_options = 44444;
+  string some_custom_options = 44444;
 }

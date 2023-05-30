@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 // FieldRange is a range of field numbers. The first element is the start
@@ -89,14 +90,14 @@ func fromMessage(md protoreflect.MessageDescriptor,
 
 	mb := NewMessage(md.Name())
 	var err error
-	mb.Options, err = as[*descriptorpb.MessageOptions](md.Options())
+	mb.Options, err = protoresolve.As[*descriptorpb.MessageOptions](md.Options())
 	if err != nil {
 		return nil, err
 	}
 	ranges := md.ExtensionRanges()
 	mb.ExtensionRanges = make([]ExtensionRange, ranges.Len())
 	for i, length := 0, ranges.Len(); i < length; i++ {
-		opts, err := as[*descriptorpb.ExtensionRangeOptions](md.ExtensionRangeOptions(i))
+		opts, err := protoresolve.As[*descriptorpb.ExtensionRangeOptions](md.ExtensionRangeOptions(i))
 		if err != nil {
 			return nil, err
 		}

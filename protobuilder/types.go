@@ -3,12 +3,8 @@ package protobuilder
 import (
 	"fmt"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
-
-	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 // FieldType represents the type of a field or extension. It can represent a
@@ -238,42 +234,4 @@ func (rt *RpcType) TypeName() protoreflect.FullName {
 	} else {
 		return FullName(rt.localType)
 	}
-}
-
-type pointerMsg[T any] interface {
-	*T
-	proto.Message
-}
-
-func as[M pointerMsg[T], T any](msg proto.Message) (M, error) {
-	dest, ok := msg.(M)
-	if ok {
-		return dest, nil
-	}
-	var exts *protoregistry.Types
-	var err error
-	msg.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
-		if fd.IsExtension() {
-			if exts == nil {
-				exts = &protoregistry.Types{}
-			}
-			err = exts.RegisterExtension(protoresolve.ExtensionType(fd))
-			return err == nil
-		}
-		return true
-	})
-	if err != nil {
-		return nil, err
-	}
-	dest = new(T)
-	var opts proto.UnmarshalOptions
-	if exts != nil {
-		opts.Resolver = exts
-	}
-	if data, err := proto.Marshal(msg); err != nil {
-		return nil, err
-	} else if err = (proto.UnmarshalOptions{Resolver: exts}).Unmarshal(data, dest); err != nil {
-		return nil, err
-	}
-	return dest, nil
 }

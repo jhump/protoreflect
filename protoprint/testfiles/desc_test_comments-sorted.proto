@@ -9,7 +9,7 @@ import "desc_test_options.proto";
 import public "google/protobuf/empty.proto";
 
 // option comments FTW!!!
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testdata";
 
 message AnEmptyMessage {
 }

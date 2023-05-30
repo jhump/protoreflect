@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 // ElementKind is an enumeration of the types of elements in a protobuf
@@ -62,28 +61,28 @@ func asElement(v interface{}) Element {
 	switch v := v.(type) {
 	case pkg:
 		return pkgElement(v)
-	case imp:
-		return impElement(v)
+	case protoreflect.FileImport:
+		return impElement(v.Path())
 	case []option:
 		return (*optionElement)(&v[0])
 	case reservedRange:
 		return resvdRangeElement(v)
-	case string:
+	case protoreflect.Name:
 		return resvdNameElement(v)
 	case protoreflect.FieldDescriptor:
-		return (*fieldElement)(v)
+		return &fieldElement{fd: v}
 	case protoreflect.MessageDescriptor:
-		return (*msgElement)(v)
+		return &msgElement{md: v}
 	case protoreflect.EnumDescriptor:
-		return (*enumElement)(v)
+		return &enumElement{ed: v}
 	case protoreflect.EnumValueDescriptor:
-		return (*enumValElement)(v)
+		return &enumValElement{evd: v}
 	case protoreflect.ServiceDescriptor:
-		return (*svcElement)(v)
+		return &svcElement{sd: v}
 	case protoreflect.MethodDescriptor:
-		return (*methodElement)(v)
-	case *descriptorpb.DescriptorProto_ExtensionRange:
-		return (*extRangeElement)(v)
+		return &methodElement{mtd: v}
+	case extensionRange:
+		return (*extRangeElement)(&v)
 	default:
 		panic(fmt.Sprintf("unexpected type of element: %T", v))
 	}
@@ -117,7 +116,7 @@ func (p pkgElement) IsCustomOption() bool {
 	return false
 }
 
-type impElement imp
+type impElement string
 
 var _ Element = impElement("")
 
@@ -240,18 +239,18 @@ type fieldElement struct {
 var _ Element = (*fieldElement)(nil)
 
 func (f *fieldElement) Kind() ElementKind {
-	if (protoreflect.FieldDescriptor)(f).IsExtension() {
+	if f.fd.IsExtension() {
 		return KindExtension
 	}
 	return KindField
 }
 
 func (f *fieldElement) Name() string {
-	return (protoreflect.FieldDescriptor)(f).GetName()
+	return string(f.fd.Name())
 }
 
 func (f *fieldElement) Number() int32 {
-	return (protoreflect.FieldDescriptor)(f).GetNumber()
+	return int32(f.fd.Number())
 }
 
 func (f *fieldElement) NumberRange() (int32, int32) {
@@ -259,9 +258,8 @@ func (f *fieldElement) NumberRange() (int32, int32) {
 }
 
 func (f *fieldElement) Extendee() string {
-	fd := (protoreflect.FieldDescriptor)(f)
-	if fd.IsExtension() {
-		fd.GetOwner().GetFullyQualifiedName()
+	if f.fd.IsExtension() {
+		return string(f.fd.ContainingMessage().FullName())
 	}
 	return ""
 }
@@ -281,7 +279,7 @@ func (m *msgElement) Kind() ElementKind {
 }
 
 func (m *msgElement) Name() string {
-	return (protoreflect.MessageDescriptor)(m).GetName()
+	return string(m.md.Name())
 }
 
 func (m *msgElement) Number() int32 {
@@ -311,7 +309,7 @@ func (e *enumElement) Kind() ElementKind {
 }
 
 func (e *enumElement) Name() string {
-	return (protoreflect.EnumDescriptor)(e).GetName()
+	return string(e.ed.Name())
 }
 
 func (e *enumElement) Number() int32 {
@@ -341,11 +339,11 @@ func (e *enumValElement) Kind() ElementKind {
 }
 
 func (e *enumValElement) Name() string {
-	return (protoreflect.EnumValueDescriptor)(e).GetName()
+	return string(e.evd.Name())
 }
 
 func (e *enumValElement) Number() int32 {
-	return (protoreflect.EnumValueDescriptor)(e).GetNumber()
+	return int32(e.evd.Number())
 }
 
 func (e *enumValElement) NumberRange() (int32, int32) {
@@ -371,7 +369,7 @@ func (s *svcElement) Kind() ElementKind {
 }
 
 func (s *svcElement) Name() string {
-	return (protoreflect.ServiceDescriptor)(s).GetName()
+	return string(s.sd.Name())
 }
 
 func (s *svcElement) Number() int32 {
@@ -401,7 +399,7 @@ func (m *methodElement) Kind() ElementKind {
 }
 
 func (m *methodElement) Name() string {
-	return (protoreflect.MethodDescriptor)(m).GetName()
+	return string(m.mtd.Name())
 }
 
 func (m *methodElement) Number() int32 {
@@ -420,7 +418,7 @@ func (m *methodElement) IsCustomOption() bool {
 	return false
 }
 
-type extRangeElement descriptorpb.DescriptorProto_ExtensionRange
+type extRangeElement extensionRange
 
 var _ Element = (*extRangeElement)(nil)
 
@@ -437,8 +435,8 @@ func (e *extRangeElement) Number() int32 {
 }
 
 func (e *extRangeElement) NumberRange() (int32, int32) {
-	ext := (*descriptorpb.DescriptorProto_ExtensionRange)(e)
-	return ext.GetStart(), ext.GetEnd()
+	ext := (*extensionRange)(e)
+	return int32(ext.start), int32(ext.end - 1)
 }
 
 func (e *extRangeElement) Extendee() string {

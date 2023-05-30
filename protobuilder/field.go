@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/protoresolve"
 	"github.com/jhump/protoreflect/v2/protowrap"
 )
 
@@ -188,7 +189,7 @@ func fromField(fld protoreflect.FieldDescriptor) (*FieldBuilder, error) {
 	ft := fieldTypeFromDescriptor(fld)
 	flb := NewField(fld.Name(), ft)
 	var err error
-	flb.Options, err = as[*descriptorpb.FieldOptions](fld.Options())
+	flb.Options, err = protoresolve.As[*descriptorpb.FieldOptions](fld.Options())
 	if err != nil {
 		return nil, err
 	}
@@ -639,7 +640,7 @@ func FromOneof(ood protoreflect.OneofDescriptor) (*OneofBuilder, error) {
 func fromOneof(ood protoreflect.OneofDescriptor) (*OneofBuilder, error) {
 	oob := NewOneof(ood.Name())
 	var err error
-	oob.Options, err = as[*descriptorpb.OneofOptions](ood.Options())
+	oob.Options, err = protoresolve.As[*descriptorpb.OneofOptions](ood.Options())
 	if err != nil {
 		return nil, err
 	}

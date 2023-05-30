@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 // ServiceBuilder is a builder used to construct a protoreflect.ServiceDescriptor.
@@ -56,7 +57,7 @@ func FromService(sd protoreflect.ServiceDescriptor) (*ServiceBuilder, error) {
 func fromService(sd protoreflect.ServiceDescriptor) (*ServiceBuilder, error) {
 	sb := NewService(sd.Name())
 	var err error
-	sb.Options, err = as[*descriptorpb.ServiceOptions](sd.Options())
+	sb.Options, err = protoresolve.As[*descriptorpb.ServiceOptions](sd.Options())
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +288,7 @@ func fromMethod(mtd protoreflect.MethodDescriptor) (*MethodBuilder, error) {
 	resp := RpcTypeImportedMessage(mtd.Output(), mtd.IsStreamingServer())
 	mtb := NewMethod(mtd.Name(), req, resp)
 	var err error
-	mtb.Options, err = as[*descriptorpb.MethodOptions](mtd.Options())
+	mtb.Options, err = protoresolve.As[*descriptorpb.MethodOptions](mtd.Options())
 	if err != nil {
 		return nil, err
 	}

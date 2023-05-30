@@ -31,14 +31,15 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"github.com/jhump/protoreflect/v2/protoresolve"
-	"google.golang.org/protobuf/proto"
 	"io"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
+
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 var (

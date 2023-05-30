@@ -2,7 +2,7 @@ syntax = "proto2";
 
 package testprotos;
 
-option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testdata";
 
 // Comment for AnotherTestMessage
 message AnotherTestMessage {
