@@ -222,7 +222,6 @@ func (p *Printer) PrintProtoFiles(fds []protoreflect.FileDescriptor, open func(n
 			}()
 			return p.PrintProtoFile(fd, w)
 		}()
-		err = p.PrintProtoFile(fd, w)
 		if err != nil {
 			return fmt.Errorf("failed to write %s: %v", fd.Path(), err)
 		}
