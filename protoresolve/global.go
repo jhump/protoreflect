@@ -8,7 +8,7 @@ import (
 )
 
 // GlobalDescriptors provides a view of protoregistry.GlobalFiles and protoregistry.GlobalTypes
-// As a Resolver.
+// as a Resolver.
 var GlobalDescriptors Resolver = globalResolver{}
 
 type globalResolver struct{}

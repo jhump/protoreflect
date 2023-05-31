@@ -25,7 +25,7 @@ type ServiceBuilder struct {
 
 var _ Builder = (*ServiceBuilder)(nil)
 
-// NewService creates a new ServiceBuilder for a service with the given path.
+// NewService creates a new ServiceBuilder for a service with the given name.
 func NewService(name protoreflect.Name) *ServiceBuilder {
 	return &ServiceBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -43,7 +43,7 @@ func NewService(name protoreflect.Name) *ServiceBuilder {
 //
 // This means that service builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original service's
-// package path.
+// package name.
 func FromService(sd protoreflect.ServiceDescriptor) (*ServiceBuilder, error) {
 	if fb, err := FromFile(sd.ParentFile()); err != nil {
 		return nil, err
@@ -76,8 +76,8 @@ func fromService(sd protoreflect.ServiceDescriptor) (*ServiceBuilder, error) {
 	return sb, nil
 }
 
-// SetName changes this service's path, returning the service builder for method
-// chaining. If the given new path is not valid (e.g. TrySetName would have
+// SetName changes this service's name, returning the service builder for method
+// chaining. If the given new name is not valid (e.g. TrySetName would have
 // returned an error) then this method will panic.
 func (sb *ServiceBuilder) SetName(newName protoreflect.Name) *ServiceBuilder {
 	if err := sb.TrySetName(newName); err != nil {
@@ -86,9 +86,9 @@ func (sb *ServiceBuilder) SetName(newName protoreflect.Name) *ServiceBuilder {
 	return sb
 }
 
-// TrySetName changes this service's path. It will return an error if the given
-// new path is not a valid protobuf identifier or if the parent file builder
-// already has an element with the given path.
+// TrySetName changes this service's name. It will return an error if the given
+// new name is not a valid protobuf identifier or if the parent file builder
+// already has an element with the given name.
 func (sb *ServiceBuilder) TrySetName(newName protoreflect.Name) error {
 	return sb.baseBuilder.setName(sb, newName)
 }
@@ -143,13 +143,13 @@ func (sb *ServiceBuilder) addSymbol(b *MethodBuilder) error {
 	return nil
 }
 
-// GetMethod returns the method with the given path. If no such method exists in
+// GetMethod returns the method with the given name. If no such method exists in
 // the service, nil is returned.
 func (sb *ServiceBuilder) GetMethod(name protoreflect.Name) *MethodBuilder {
 	return sb.symbols[name]
 }
 
-// RemoveMethod removes the method with the given path. If no such method exists
+// RemoveMethod removes the method with the given name. If no such method exists
 // in the service, this is a no-op. This returns the service builder, for method
 // chaining.
 func (sb *ServiceBuilder) RemoveMethod(name protoreflect.Name) *ServiceBuilder {
@@ -157,7 +157,7 @@ func (sb *ServiceBuilder) RemoveMethod(name protoreflect.Name) *ServiceBuilder {
 	return sb
 }
 
-// TryRemoveMethod removes the method with the given path and returns false if
+// TryRemoveMethod removes the method with the given name and returns false if
 // the service has no such method.
 func (sb *ServiceBuilder) TryRemoveMethod(name protoreflect.Name) bool {
 	if mtb, ok := sb.symbols[name]; ok {
@@ -178,7 +178,7 @@ func (sb *ServiceBuilder) AddMethod(mtb *MethodBuilder) *ServiceBuilder {
 }
 
 // TryAddMethod adds the given field to this service, returning any error that
-// prevents the field from being added (such as a path collision with another
+// prevents the field from being added (such as a name collision with another
 // method already added to the service).
 func (sb *ServiceBuilder) TryAddMethod(mtb *MethodBuilder) error {
 	if err := sb.addSymbol(mtb); err != nil {
@@ -202,12 +202,12 @@ func (sb *ServiceBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 
 	methods := make([]*descriptorpb.MethodDescriptorProto, 0, len(sb.methods))
 	for _, mtb := range sb.methods {
-		path := append(path, internal.Service_methodsTag, int32(len(methods)))
-		if mtd, err := mtb.buildProto(path, sourceInfo); err != nil {
+		path := append(path, internal.ServiceMethodsTag, int32(len(methods)))
+		mtd, err := mtb.buildProto(path, sourceInfo)
+		if err != nil {
 			return nil, err
-		} else {
-			methods = append(methods, mtd)
 		}
+		methods = append(methods, mtd)
 	}
 
 	return &descriptorpb.ServiceDescriptorProto{
@@ -252,7 +252,7 @@ type MethodBuilder struct {
 
 var _ Builder = (*MethodBuilder)(nil)
 
-// NewMethod creates a new MethodBuilder for a method with the given path and
+// NewMethod creates a new MethodBuilder for a method with the given name and
 // request and response types.
 func NewMethod(name protoreflect.Name, req, resp *RpcType) *MethodBuilder {
 	return &MethodBuilder{
@@ -272,7 +272,7 @@ func NewMethod(name protoreflect.Name, req, resp *RpcType) *MethodBuilder {
 //
 // This means that method builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original method's
-// package path.
+// package name.
 func FromMethod(mtd protoreflect.MethodDescriptor) (*MethodBuilder, error) {
 	if fb, err := FromFile(mtd.ParentFile()); err != nil {
 		return nil, err
@@ -297,8 +297,8 @@ func fromMethod(mtd protoreflect.MethodDescriptor) (*MethodBuilder, error) {
 	return mtb, nil
 }
 
-// SetName changes this method's path, returning the method builder for method
-// chaining. If the given new path is not valid (e.g. TrySetName would have
+// SetName changes this method's name, returning the method builder for method
+// chaining. If the given new name is not valid (e.g. TrySetName would have
 // returned an error) then this method will panic.
 func (mtb *MethodBuilder) SetName(newName protoreflect.Name) *MethodBuilder {
 	if err := mtb.TrySetName(newName); err != nil {
@@ -307,9 +307,9 @@ func (mtb *MethodBuilder) SetName(newName protoreflect.Name) *MethodBuilder {
 	return mtb
 }
 
-// TrySetName changes this method's path. It will return an error if the given
-// new path is not a valid protobuf identifier or if the parent service builder
-// already has a method with the given path.
+// TrySetName changes this method's name. It will return an error if the given
+// new name is not a valid protobuf identifier or if the parent service builder
+// already has a method with the given name.
 func (mtb *MethodBuilder) TrySetName(newName protoreflect.Name) error {
 	return mtb.baseBuilder.setName(mtb, newName)
 }

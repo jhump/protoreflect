@@ -374,7 +374,7 @@ func (r *Registry) AsTypeResolver() TypeResolver {
 	return r.AsTypePool()
 }
 
-// AsTypePool returns a view of this registry As a TypePool. This offers more methods
+// AsTypePool returns a view of this registry as a TypePool. This offers more methods
 // than AsTypeResolver, providing the ability to enumerate types.
 func (r *Registry) AsTypePool() TypePool {
 	return (*dynamicTypeResolver)(r)

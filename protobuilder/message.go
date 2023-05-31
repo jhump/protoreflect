@@ -51,10 +51,10 @@ type MessageBuilder struct {
 
 var _ Builder = (*MessageBuilder)(nil)
 
-// NewMessage creates a new MessageBuilder for a message with the given path.
-// Since the new message has no parent element, it also has no package path
+// NewMessage creates a new MessageBuilder for a message with the given name.
+// Since the new message has no parent element, it also has no package name
 // (e.g. it is in the unnamed package, until it is assigned to a file builder
-// that defines a package path).
+// that defines a package name).
 func NewMessage(name protoreflect.Name) *MessageBuilder {
 	return &MessageBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -73,7 +73,7 @@ func NewMessage(name protoreflect.Name) *MessageBuilder {
 //
 // This means that message builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original message's
-// package path.
+// package name.
 func FromMessage(md protoreflect.MessageDescriptor) (*MessageBuilder, error) {
 	if fb, err := FromFile(md.ParentFile()); err != nil {
 		return nil, err
@@ -127,11 +127,11 @@ func fromMessage(md protoreflect.MessageDescriptor,
 		if ood.IsSynthetic() {
 			continue
 		}
-		if oob, err := fromOneof(ood); err != nil {
+		oob, err := fromOneof(ood)
+		if err != nil {
 			return nil, err
-		} else {
-			oneofs[i] = oob
 		}
+		oneofs[i] = oob
 	}
 
 	srcFields := md.Fields()
@@ -149,9 +149,11 @@ func fromMessage(md protoreflect.MessageDescriptor,
 			}
 			continue
 		}
-		if flb, err := fromField(fld); err != nil {
+		flb, err := fromField(fld)
+		if err != nil {
 			return nil, err
-		} else if err := mb.TryAddField(flb); err != nil {
+		}
+		if err := mb.TryAddField(flb); err != nil {
 			return nil, err
 		}
 	}
@@ -159,27 +161,33 @@ func fromMessage(md protoreflect.MessageDescriptor,
 	nestedMsgs := md.Messages()
 	for i, length := 0, nestedMsgs.Len(); i < length; i++ {
 		nmd := nestedMsgs.Get(i)
-		if nmb, err := fromMessage(nmd, localMessages, localEnums); err != nil {
+		nmb, err := fromMessage(nmd, localMessages, localEnums)
+		if err != nil {
 			return nil, err
-		} else if err := mb.TryAddNestedMessage(nmb); err != nil {
+		}
+		if err := mb.TryAddNestedMessage(nmb); err != nil {
 			return nil, err
 		}
 	}
 	nestedEnums := md.Enums()
 	for i, length := 0, nestedEnums.Len(); i < length; i++ {
 		ed := nestedEnums.Get(i)
-		if eb, err := fromEnum(ed, localEnums); err != nil {
+		eb, err := fromEnum(ed, localEnums)
+		if err != nil {
 			return nil, err
-		} else if err := mb.TryAddNestedEnum(eb); err != nil {
+		}
+		if err := mb.TryAddNestedEnum(eb); err != nil {
 			return nil, err
 		}
 	}
 	nestedExts := md.Extensions()
 	for i, length := 0, nestedExts.Len(); i < length; i++ {
 		exd := nestedExts.Get(i)
-		if exb, err := fromField(exd); err != nil {
+		exb, err := fromField(exd)
+		if err != nil {
 			return nil, err
-		} else if err := mb.TryAddNestedExtension(exb); err != nil {
+		}
+		if err := mb.TryAddNestedExtension(exb); err != nil {
 			return nil, err
 		}
 	}
@@ -187,8 +195,8 @@ func fromMessage(md protoreflect.MessageDescriptor,
 	return mb, nil
 }
 
-// SetName changes this message's path, returning the message builder for method
-// chaining. If the given new path is not valid (e.g. TrySetName would have
+// SetName changes this message's name, returning the message builder for method
+// chaining. If the given new name is not valid (e.g. TrySetName would have
 // returned an error) then this method will panic.
 func (mb *MessageBuilder) SetName(newName protoreflect.Name) *MessageBuilder {
 	if err := mb.TrySetName(newName); err != nil {
@@ -197,18 +205,18 @@ func (mb *MessageBuilder) SetName(newName protoreflect.Name) *MessageBuilder {
 	return mb
 }
 
-// TrySetName changes this message's path. It will return an error if the given
-// new path is not a valid protobuf identifier or if the parent builder already
-// has an element with the given path.
+// TrySetName changes this message's name. It will return an error if the given
+// new name is not a valid protobuf identifier or if the parent builder already
+// has an element with the given name.
 //
 // If the message is a map or group type whose parent is the corresponding map
 // or group field, the parent field's enclosing message is checked for elements
-// with a conflicting path. Despite the fact that these message types are
+// with a conflicting name. Despite the fact that these message types are
 // modeled as children of their associated field builder, in the protobuf IDL
 // they are actually all defined in the enclosing message's namespace.
 func (mb *MessageBuilder) TrySetName(newName protoreflect.Name) error {
 	if p, ok := mb.parent.(*FieldBuilder); ok && p.fieldType.fieldType != descriptorpb.FieldDescriptorProto_TYPE_GROUP {
-		return fmt.Errorf("cannot change path of map entry %s; change path of field instead", FullName(mb))
+		return fmt.Errorf("cannot change name of map entry %s; change name of field instead", FullName(mb))
 	}
 	return mb.trySetNameInternal(newName)
 }
@@ -344,19 +352,18 @@ func (mb *MessageBuilder) registerField(flb *FieldBuilder) error {
 	return nil
 }
 
-// GetField returns the field with the given path. If no such field exists in
+// GetField returns the field with the given name. If no such field exists in
 // the message, nil is returned. The field does not have to be an immediate
 // child of this message but could instead be an indirect child via a one-of.
 func (mb *MessageBuilder) GetField(name protoreflect.Name) *FieldBuilder {
 	b := mb.symbols[name]
 	if flb, ok := b.(*FieldBuilder); ok && !flb.IsExtension() {
 		return flb
-	} else {
-		return nil
 	}
+	return nil
 }
 
-// RemoveField removes the field with the given path. If no such field exists in
+// RemoveField removes the field with the given name. If no such field exists in
 // the message, this is a no-op. If the field is part of a one-of, the one-of
 // remains assigned to this message and the field is removed from it. This
 // returns the message builder, for method chaining.
@@ -365,7 +372,7 @@ func (mb *MessageBuilder) RemoveField(name protoreflect.Name) *MessageBuilder {
 	return mb
 }
 
-// TryRemoveField removes the field with the given path and returns false if the
+// TryRemoveField removes the field with the given name and returns false if the
 // message has no such field. If the field is part of a one-of, the one-of
 // remains assigned to this message and the field is removed from it.
 func (mb *MessageBuilder) TryRemoveField(name protoreflect.Name) bool {
@@ -389,7 +396,7 @@ func (mb *MessageBuilder) AddField(flb *FieldBuilder) *MessageBuilder {
 }
 
 // TryAddField adds the given field to this message, returning any error that
-// prevents the field from being added (such as a path collision with another
+// prevents the field from being added (such as a name collision with another
 // element already added to the message). An error is returned if the given
 // field is an extension field.
 func (mb *MessageBuilder) TryAddField(flb *FieldBuilder) error {
@@ -421,18 +428,17 @@ func (mb *MessageBuilder) TryAddField(flb *FieldBuilder) error {
 	return nil
 }
 
-// GetOneOf returns the one-of with the given path. If no such one-of exists in
+// GetOneOf returns the one-of with the given name. If no such one-of exists in
 // the message, nil is returned.
 func (mb *MessageBuilder) GetOneOf(name protoreflect.Name) *OneofBuilder {
 	b := mb.symbols[name]
 	if oob, ok := b.(*OneofBuilder); ok {
 		return oob
-	} else {
-		return nil
 	}
+	return nil
 }
 
-// RemoveOneOf removes the one-of with the given path. If no such one-of exists
+// RemoveOneOf removes the one-of with the given name. If no such one-of exists
 // in the message, this is a no-op. This returns the message builder, for method
 // chaining.
 func (mb *MessageBuilder) RemoveOneOf(name protoreflect.Name) *MessageBuilder {
@@ -440,7 +446,7 @@ func (mb *MessageBuilder) RemoveOneOf(name protoreflect.Name) *MessageBuilder {
 	return mb
 }
 
-// TryRemoveOneOf removes the one-of with the given path and returns false if
+// TryRemoveOneOf removes the one-of with the given name and returns false if
 // the message has no such one-of.
 func (mb *MessageBuilder) TryRemoveOneOf(name protoreflect.Name) bool {
 	b := mb.symbols[name]
@@ -462,7 +468,7 @@ func (mb *MessageBuilder) AddOneOf(oob *OneofBuilder) *MessageBuilder {
 }
 
 // TryAddOneOf adds the given one-of to this message, returning any error that
-// prevents the one-of from being added (such as a path collision with another
+// prevents the one-of from being added (such as a name collision with another
 // element already added to the message).
 func (mb *MessageBuilder) TryAddOneOf(oob *OneofBuilder) error {
 	if err := mb.addSymbol(oob); err != nil {
@@ -488,7 +494,7 @@ func (mb *MessageBuilder) TryAddOneOf(oob *OneofBuilder) error {
 	return nil
 }
 
-// GetNestedMessage returns the nested message with the given path. If no such
+// GetNestedMessage returns the nested message with the given name. If no such
 // message exists, nil is returned. The named message must be in this message's
 // scope. If the message is nested more deeply, this will return nil. This means
 // the message must be a direct child of this message or a child of one of this
@@ -498,12 +504,11 @@ func (mb *MessageBuilder) GetNestedMessage(name protoreflect.Name) *MessageBuild
 	b := mb.symbols[name]
 	if nmb, ok := b.(*MessageBuilder); ok {
 		return nmb
-	} else {
-		return nil
 	}
+	return nil
 }
 
-// RemoveNestedMessage removes the nested message with the given path. If no
+// RemoveNestedMessage removes the nested message with the given name. If no
 // such message exists, this is a no-op. This returns the message builder, for
 // method chaining.
 func (mb *MessageBuilder) RemoveNestedMessage(name protoreflect.Name) *MessageBuilder {
@@ -511,8 +516,8 @@ func (mb *MessageBuilder) RemoveNestedMessage(name protoreflect.Name) *MessageBu
 	return mb
 }
 
-// TryRemoveNestedMessage removes the nested message with the given path and
-// returns false if this message has no nested message with that path. If the
+// TryRemoveNestedMessage removes the nested message with the given name and
+// returns false if this message has no nested message with that name. If the
 // named message is a child of a field (e.g. the group type for a group field or
 // the map entry for a map field), it is removed from that field and thus
 // removed from this message's scope.
@@ -539,7 +544,7 @@ func (mb *MessageBuilder) AddNestedMessage(nmb *MessageBuilder) *MessageBuilder 
 
 // TryAddNestedMessage adds the given message as a nested child of this message,
 // returning any error that prevents the message from being added (such as a
-// path collision with another element already added to the message).
+// name collision with another element already added to the message).
 func (mb *MessageBuilder) TryAddNestedMessage(nmb *MessageBuilder) error {
 	// If we are moving nested message from field (map entry or group type)
 	// directly to this message, we have to use different order of operations
@@ -570,7 +575,7 @@ func (mb *MessageBuilder) isPresentButNotChild(b Builder) bool {
 	return mb.symbols[b.Name()] == b
 }
 
-// GetNestedExtension returns the nested extension with the given path. If no
+// GetNestedExtension returns the nested extension with the given name. If no
 // such extension exists, nil is returned. The named extension must be in this
 // message's scope. If the extension is nested more deeply, this will return
 // nil. This means the extension must be a direct child of this message.
@@ -578,12 +583,11 @@ func (mb *MessageBuilder) GetNestedExtension(name protoreflect.Name) *FieldBuild
 	b := mb.symbols[name]
 	if exb, ok := b.(*FieldBuilder); ok && exb.IsExtension() {
 		return exb
-	} else {
-		return nil
 	}
+	return nil
 }
 
-// RemoveNestedExtension removes the nested extension with the given path. If no
+// RemoveNestedExtension removes the nested extension with the given name. If no
 // such extension exists, this is a no-op. This returns the message builder, for
 // method chaining.
 func (mb *MessageBuilder) RemoveNestedExtension(name protoreflect.Name) *MessageBuilder {
@@ -591,8 +595,8 @@ func (mb *MessageBuilder) RemoveNestedExtension(name protoreflect.Name) *Message
 	return mb
 }
 
-// TryRemoveNestedExtension removes the nested extension with the given path and
-// returns false if this message has no nested extension with that path.
+// TryRemoveNestedExtension removes the nested extension with the given name and
+// returns false if this message has no nested extension with that name.
 func (mb *MessageBuilder) TryRemoveNestedExtension(name protoreflect.Name) bool {
 	b := mb.symbols[name]
 	if exb, ok := b.(*FieldBuilder); ok && exb.IsExtension() {
@@ -614,7 +618,7 @@ func (mb *MessageBuilder) AddNestedExtension(exb *FieldBuilder) *MessageBuilder 
 
 // TryAddNestedExtension adds the given extension as a nested child of this
 // message, returning any error that prevents the extension from being added
-// (such as a path collision with another element already added to the message).
+// (such as a name collision with another element already added to the message).
 func (mb *MessageBuilder) TryAddNestedExtension(exb *FieldBuilder) error {
 	if !exb.IsExtension() {
 		return fmt.Errorf("field %s is not an extension", exb.Name())
@@ -628,7 +632,7 @@ func (mb *MessageBuilder) TryAddNestedExtension(exb *FieldBuilder) error {
 	return nil
 }
 
-// GetNestedEnum returns the nested enum with the given path. If no such enum
+// GetNestedEnum returns the nested enum with the given name. If no such enum
 // exists, nil is returned. The named enum must be in this message's scope. If
 // the enum is nested more deeply, this will return nil. This means the enum
 // must be a direct child of this message.
@@ -636,12 +640,11 @@ func (mb *MessageBuilder) GetNestedEnum(name protoreflect.Name) *EnumBuilder {
 	b := mb.symbols[name]
 	if eb, ok := b.(*EnumBuilder); ok {
 		return eb
-	} else {
-		return nil
 	}
+	return nil
 }
 
-// RemoveNestedEnum removes the nested enum with the given path. If no such enum
+// RemoveNestedEnum removes the nested enum with the given name. If no such enum
 // exists, this is a no-op. This returns the message builder, for method
 // chaining.
 func (mb *MessageBuilder) RemoveNestedEnum(name protoreflect.Name) *MessageBuilder {
@@ -649,8 +652,8 @@ func (mb *MessageBuilder) RemoveNestedEnum(name protoreflect.Name) *MessageBuild
 	return mb
 }
 
-// TryRemoveNestedEnum removes the nested enum with the given path and returns
-// false if this message has no nested enum with that path.
+// TryRemoveNestedEnum removes the nested enum with the given name and returns
+// false if this message has no nested enum with that name.
 func (mb *MessageBuilder) TryRemoveNestedEnum(name protoreflect.Name) bool {
 	b := mb.symbols[name]
 	if eb, ok := b.(*EnumBuilder); ok {
@@ -671,7 +674,7 @@ func (mb *MessageBuilder) AddNestedEnum(eb *EnumBuilder) *MessageBuilder {
 }
 
 // TryAddNestedEnum adds the given enum as a nested child of this message,
-// returning any error that prevents the enum from being added (such as a path
+// returning any error that prevents the enum from being added (such as a name
 // collision with another element already added to the message).
 func (mb *MessageBuilder) TryAddNestedEnum(eb *EnumBuilder) error {
 	if err := mb.addSymbol(eb); err != nil {
@@ -732,7 +735,7 @@ func (mb *MessageBuilder) SetReservedRanges(ranges []FieldRange) *MessageBuilder
 	return mb
 }
 
-// AddReservedName adds the given path to the list of reserved field names for
+// AddReservedName adds the given name to the list of reserved field names for
 // this message. This returns the message, for method chaining.
 func (mb *MessageBuilder) AddReservedName(name protoreflect.Name) *MessageBuilder {
 	mb.ReservedNames = append(mb.ReservedNames, name)
@@ -767,19 +770,19 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 			needTagsAssigned = append(needTagsAssigned, fld)
 		}
 		if flb.msgType != nil {
-			nmpath := append(path, internal.Message_nestedMessagesTag, int32(len(nestedMessages)))
-			if entry, err := flb.msgType.buildProto(nmpath, sourceInfo); err != nil {
+			nmpath := append(path, internal.MessageNestedMessagesTag, int32(len(nestedMessages)))
+			entry, err := flb.msgType.buildProto(nmpath, sourceInfo)
+			if err != nil {
 				return err
-			} else {
-				nestedMessages = append(nestedMessages, entry)
 			}
+			nestedMessages = append(nestedMessages, entry)
 		}
 		return nil
 	}
 
 	for _, b := range mb.fieldsAndOneOfs {
 		if flb, ok := b.(*FieldBuilder); ok {
-			fldpath := append(path, internal.Message_fieldsTag, int32(len(fields)))
+			fldpath := append(path, internal.MessageFieldsTag, int32(len(fields)))
 			fld, err := flb.buildProto(fldpath, sourceInfo, mb.Options.GetMessageSetWireFormat())
 			if err != nil {
 				return nil, err
@@ -788,7 +791,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 				return nil, err
 			}
 		} else {
-			oopath := append(path, internal.Message_oneOfsTag, int32(len(oneOfs)))
+			oopath := append(path, internal.MessageOneofsTag, int32(len(oneOfs)))
 			oob := b.(*OneofBuilder)
 			oobIndex := len(oneOfs)
 			ood, err := oob.buildProto(oopath, sourceInfo)
@@ -797,7 +800,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 			}
 			oneOfs = append(oneOfs, ood)
 			for _, flb := range oob.choices {
-				path := append(path, internal.Message_fieldsTag, int32(len(fields)))
+				path := append(path, internal.MessageFieldsTag, int32(len(fields)))
 				fld, err := flb.buildProto(path, sourceInfo, mb.Options.GetMessageSetWireFormat())
 				if err != nil {
 					return nil, err
@@ -834,32 +837,32 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 	}
 
 	for _, nmb := range mb.nestedMessages {
-		path := append(path, internal.Message_nestedMessagesTag, int32(len(nestedMessages)))
-		if nmd, err := nmb.buildProto(path, sourceInfo); err != nil {
+		path := append(path, internal.MessageNestedMessagesTag, int32(len(nestedMessages)))
+		nmd, err := nmb.buildProto(path, sourceInfo)
+		if err != nil {
 			return nil, err
-		} else {
-			nestedMessages = append(nestedMessages, nmd)
 		}
+		nestedMessages = append(nestedMessages, nmd)
 	}
 
 	nestedExtensions := make([]*descriptorpb.FieldDescriptorProto, 0, len(mb.nestedExtensions))
 	for _, exb := range mb.nestedExtensions {
-		path := append(path, internal.Message_extensionsTag, int32(len(nestedExtensions)))
-		if exd, err := exb.buildProto(path, sourceInfo, isExtendeeMessageSet(exb)); err != nil {
+		path := append(path, internal.MessageExtensionsTag, int32(len(nestedExtensions)))
+		exd, err := exb.buildProto(path, sourceInfo, isExtendeeMessageSet(exb))
+		if err != nil {
 			return nil, err
-		} else {
-			nestedExtensions = append(nestedExtensions, exd)
 		}
+		nestedExtensions = append(nestedExtensions, exd)
 	}
 
 	nestedEnums := make([]*descriptorpb.EnumDescriptorProto, 0, len(mb.nestedEnums))
 	for _, eb := range mb.nestedEnums {
-		path := append(path, internal.Message_enumsTag, int32(len(nestedEnums)))
-		if ed, err := eb.buildProto(path, sourceInfo); err != nil {
+		path := append(path, internal.MessageEnumsTag, int32(len(nestedEnums)))
+		ed, err := eb.buildProto(path, sourceInfo)
+		if err != nil {
 			return nil, err
-		} else {
-			nestedEnums = append(nestedEnums, ed)
 		}
+		nestedEnums = append(nestedEnums, ed)
 	}
 
 	extRanges := make([]*descriptorpb.DescriptorProto_ExtensionRange, len(mb.ExtensionRanges))

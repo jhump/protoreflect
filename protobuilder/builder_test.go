@@ -261,7 +261,7 @@ func TestCreatingGroupField(t *testing.T) {
 
 	// try a rename that will fail
 	err = grpMb.TrySetName("fooBarBaz")
-	require.ErrorContains(t, err, "group path fooBarBaz must start with capital letter")
+	require.ErrorContains(t, err, "group name fooBarBaz must start with capital letter")
 	// failed rename should not have modified any state
 	md2, err := mb.Build()
 	require.NoError(t, err)
@@ -269,7 +269,7 @@ func TestCreatingGroupField(t *testing.T) {
 	require.Empty(t, diff)
 	// another attempt that will fail
 	err = grpFlb.TrySetName("foobarbaz")
-	require.ErrorContains(t, err, "cannot change path of group field TestMessage.groupa; change path of group instead")
+	require.ErrorContains(t, err, "cannot change name of group field TestMessage.groupa; change name of group instead")
 	// again, no state should have been modified
 	md2, err = mb.Build()
 	require.NoError(t, err)
@@ -308,7 +308,7 @@ func TestCreatingMapField(t *testing.T) {
 
 	// try a rename that will fail
 	err = mapFlb.Type().localMsgType.TrySetName("fooBarBaz")
-	require.ErrorContains(t, err, "cannot change path of map entry TestMessage.CountsByNameEntry; change path of field instead")
+	require.ErrorContains(t, err, "cannot change name of map entry TestMessage.CountsByNameEntry; change name of field instead")
 	// failed rename should not have modified any state
 	md2, err := mb.Build()
 	require.NoError(t, err)
@@ -788,14 +788,14 @@ func checkDescriptors(t *testing.T, d1, d2 protoreflect.Descriptor) {
 }
 
 func TestAddRemoveMoveBuilders(t *testing.T) {
-	// add field to one-of
+	// add field to oneof
 	fld1 := NewField("foo", FieldTypeInt32())
 	oo1 := NewOneof("oofoo")
 	oo1.AddChoice(fld1)
 	checkChildren(t, oo1, fld1)
 	require.Equal(t, oo1.GetChoice("foo"), fld1)
 
-	// add one-of w/ field to a message
+	// add oneof w/ field to a message
 	msg1 := NewMessage("foo")
 	msg1.AddOneOf(oo1)
 	checkChildren(t, msg1, oo1)
@@ -806,12 +806,12 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	// field also now registered with msg1
 	require.Equal(t, msg1.GetField("foo"), fld1)
 
-	// add empty one-of to message
+	// add empty oneof to message
 	oo2 := NewOneof("oobar")
 	msg1.AddOneOf(oo2)
 	checkChildren(t, msg1, oo1, oo2)
 	require.Equal(t, msg1.GetOneOf("oobar"), oo2)
-	// now add field to that one-of
+	// now add field to that oneof
 	fld2 := NewField("bar", FieldTypeInt32())
 	oo2.AddChoice(fld2)
 	checkChildren(t, oo2, fld2)
@@ -819,7 +819,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	// field also now registered with msg1
 	require.Equal(t, msg1.GetField("bar"), fld2)
 
-	// add fails due to path collisions
+	// add fails due to name collisions
 	fld1dup := NewField("foo", FieldTypeInt32())
 	err := oo1.TryAddChoice(fld1dup)
 	checkFailedAdd(t, err, oo1, fld1dup, "already contains field")
@@ -827,8 +827,8 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	err = msg1.TryAddField(fld2)
 	checkFailedAdd(t, err, msg1, fld2, "already contains element")
 	msg2 := NewMessage("oofoo")
-	// path collision can be different type
-	// (here, nested message conflicts with a one-of)
+	// name collision can be different type
+	// (here, nested message conflicts with a oneof)
 	err = msg1.TryAddNestedMessage(msg2)
 	checkFailedAdd(t, err, msg1, msg2, "already contains element")
 
@@ -837,7 +837,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	checkChildren(t, msg1, oo1, oo2, msg2)
 	require.Equal(t, msg1.GetNestedMessage("baz"), msg2)
 
-	// can't add extension or map fields to one-of
+	// can't add extension or map fields to oneof
 	ext1 := NewExtension("abc", 123, FieldTypeInt32(), msg1)
 	err = oo1.TryAddChoice(ext1)
 	checkFailedAdd(t, err, oo1, ext1, "is an extension, not a regular field")
@@ -864,7 +864,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	ext2 := NewExtension("xyz", 234, FieldTypeInt32(), msg1)
 	msg1.AddNestedExtension(ext2)
 	checkChildren(t, msg1, oo1, oo2, msg2, groupField, mapField, ext2)
-	err = msg1.TryAddNestedExtension(ext1) // path collision
+	err = msg1.TryAddNestedExtension(ext1) // name collision
 	checkFailedAdd(t, err, msg1, ext1, "already contains element")
 	fld3 := NewField("ijk", FieldTypeString())
 	err = msg1.TryAddNestedExtension(fld3)
@@ -880,7 +880,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	enum1.AddValue(enumVal2)
 	checkChildren(t, enum1, enumVal1, enumVal2)
 	require.Equal(t, enum1.GetValue("B"), enumVal2)
-	// fail w/ path collision
+	// fail w/ name collision
 	enumVal3 := NewEnumValue("B")
 	err = enum1.TryAddValue(enumVal3)
 	checkFailedAdd(t, err, enum1, enumVal3, "already contains value")
@@ -919,7 +919,7 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	checkChildren(t, fb, msg1, svc1, enum2, ext3)
 	require.Equal(t, fb.GetExtension("foosball"), ext3)
 
-	// errors and path collisions
+	// errors and name collisions
 	err = fb.TryAddExtension(fld3)
 	checkFailedAdd(t, err, fb, fld3, "is not an extension")
 	msg3 := NewMessage("fizzle")
@@ -1664,7 +1664,7 @@ func TestInvalid(t *testing.T) {
 			expectedError: "must not use reserved number 100",
 		},
 		{
-			name: "field has reserved path",
+			name: "field has reserved name",
 			builder: func() Builder {
 				return NewFile("foo.proto").
 					AddMessage(NewMessage("Foo").

@@ -334,7 +334,7 @@ func (p *Printer) printProto(dsc protoreflect.Descriptor, out io.Writer) error {
 		}
 		if d.IsExtension() {
 			_, _ = fmt.Fprint(w, "extend ")
-			extNameSi := sourceInfo.ByPath(append(path, internal.Field_extendeeTag))
+			extNameSi := sourceInfo.ByPath(append(path, internal.FieldExtendeeTag))
 			p.printElementString(extNameSi, w, 0, p.qualifyName(d.ParentFile().Package(), scope, d.ContainingMessage().FullName()))
 			_, _ = fmt.Fprintln(w, "{")
 
@@ -349,7 +349,7 @@ func (p *Printer) printProto(dsc protoreflect.Descriptor, out io.Writer) error {
 		elements := elementAddrs{dsc: md}
 		fields := md.Fields()
 		for i, length := 0, fields.Len(); i < length; i++ {
-			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_fieldsTag, elementIndex: i})
+			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.MessageFieldsTag, elementIndex: i})
 		}
 		p.printOneOf(d, elements, 0, &reg, w, sourceInfo, path[:len(path)-1], 0, int(path[len(path)-1]))
 	case protoreflect.EnumDescriptor:
@@ -375,40 +375,40 @@ func findElement(dsc protoreflect.Descriptor) protoreflect.SourcePath {
 		switch d := dsc.(type) {
 		case protoreflect.MessageDescriptor:
 			if _, ok := parent.(protoreflect.MessageDescriptor); ok {
-				path = append(path, internal.Message_nestedMessagesTag)
+				path = append(path, internal.MessageNestedMessagesTag)
 			} else {
-				path = append(path, internal.File_messagesTag)
+				path = append(path, internal.FileMessagesTag)
 			}
 
 		case protoreflect.FieldDescriptor:
 			if d.IsExtension() {
 				if _, ok := parent.(protoreflect.MessageDescriptor); ok {
-					path = append(path, internal.Message_extensionsTag)
+					path = append(path, internal.MessageExtensionsTag)
 				} else {
-					path = append(path, internal.File_extensionsTag)
+					path = append(path, internal.FileExtensionsTag)
 				}
 			} else {
-				path = append(path, internal.Message_fieldsTag)
+				path = append(path, internal.MessageFieldsTag)
 			}
 
 		case protoreflect.OneofDescriptor:
-			path = append(path, internal.Message_oneOfsTag)
+			path = append(path, internal.MessageOneofsTag)
 
 		case protoreflect.EnumDescriptor:
 			if _, ok := parent.(protoreflect.MessageDescriptor); ok {
-				path = append(path, internal.Message_enumsTag)
+				path = append(path, internal.MessageEnumsTag)
 			} else {
-				path = append(path, internal.File_enumsTag)
+				path = append(path, internal.FileEnumsTag)
 			}
 
 		case protoreflect.EnumValueDescriptor:
-			path = append(path, internal.Enum_valuesTag)
+			path = append(path, internal.EnumValuesTag)
 
 		case protoreflect.ServiceDescriptor:
-			path = append(path, internal.File_servicesTag)
+			path = append(path, internal.FileServicesTag)
 
 		case protoreflect.MethodDescriptor:
-			path = append(path, internal.Service_methodsTag)
+			path = append(path, internal.ServiceMethodsTag)
 
 		default:
 			panic(fmt.Sprintf("unexpected descriptor type: %T", dsc))
@@ -441,7 +441,7 @@ func (p *Printer) printFile(
 
 	path := make(protoreflect.SourcePath, 1)
 
-	path[0] = internal.File_syntaxTag
+	path[0] = internal.FileSyntaxTag
 	si := sourceInfo.ByPath(path)
 	p.printElement(false, si, w, 0, func(w *writer) {
 		syn := fd.Syntax()
@@ -453,26 +453,26 @@ func (p *Printer) printFile(
 
 	elements := elementAddrs{dsc: fd, opts: opts}
 	if fd.Package() != "" {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_packageTag, elementIndex: 0, order: -3})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.FilePackageTag, elementIndex: 0, order: -3})
 	}
 	imps := fd.Imports()
 	for i, length := 0, imps.Len(); i < length; i++ {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_dependencyTag, elementIndex: i, order: -2})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.FileDependencyTag, elementIndex: i, order: -2})
 	}
-	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.File_optionsTag, -1, opts)...)
+	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.FileOptionsTag, -1, opts)...)
 	msgs := fd.Messages()
 	for i, length := 0, msgs.Len(); i < length; i++ {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_messagesTag, elementIndex: i})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.FileMessagesTag, elementIndex: i})
 	}
 	enums := fd.Enums()
 	for i, length := 0, enums.Len(); i < length; i++ {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_enumsTag, elementIndex: i})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.FileEnumsTag, elementIndex: i})
 	}
 	svcs := fd.Services()
 	for i, length := 0, svcs.Len(); i < length; i++ {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_servicesTag, elementIndex: i})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.FileServicesTag, elementIndex: i})
 	}
-	extensions := p.computeExtensions(sourceInfo, fd.Extensions(), []int32{internal.File_extensionsTag})
+	extensions := p.computeExtensions(sourceInfo, fd.Extensions(), []int32{internal.FileExtensionsTag})
 	exts := fd.Extensions()
 	for i, length := 0, exts.Len(); i < length; i++ {
 		extd := exts.Get(i)
@@ -481,7 +481,7 @@ func (p *Printer) printFile(
 			// they get special treatment
 			skip[extd.Message()] = true
 		}
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_extensionsTag, elementIndex: i})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.FileExtensionsTag, elementIndex: i})
 	}
 
 	p.sort(elements, sourceInfo, nil)
@@ -532,7 +532,7 @@ func (p *Printer) printFile(
 			p.printService(d, reg, w, sourceInfo, path, 0)
 		case protoreflect.FieldDescriptor:
 			extDecl := extensions[d]
-			p.printExtensions(extDecl, extensions, elements, i, reg, w, sourceInfo, nil, internal.File_extensionsTag, pkgName, pkgName, 0)
+			p.printExtensions(extDecl, extensions, elements, i, reg, w, sourceInfo, nil, internal.FileExtensionsTag, pkgName, pkgName, 0)
 			// we printed all extensions in the group, so we can skip the others
 			for _, fld := range extDecl.fields {
 				skip[fld] = true
@@ -717,7 +717,7 @@ func (p *Printer) printMessage(
 		p.indent(w, indent)
 
 		_, _ = fmt.Fprint(w, "message ")
-		nameSi := sourceInfo.ByPath(append(path, internal.Message_nameTag))
+		nameSi := sourceInfo.ByPath(append(path, internal.MessageNameTag))
 		p.printElementString(nameSi, w, indent, string(md.Name()))
 		_, _ = fmt.Fprintln(w, "{")
 		trailer(indent+1, true)
@@ -748,18 +748,18 @@ func (p *Printer) printMessageBody(
 	maxTag := internal.GetMaxTag(isMessageSet(md))
 
 	elements := elementAddrs{dsc: md, opts: opts}
-	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.Message_optionsTag, -1, opts)...)
+	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.MessageOptionsTag, -1, opts)...)
 	resRanges := md.ReservedRanges()
 	for i, length := 0, resRanges.Len(); i < length; i++ {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_reservedRangeTag, elementIndex: i})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.MessageReservedRangeTag, elementIndex: i})
 	}
 	resNames := md.ReservedNames()
 	for i, length := 0, resNames.Len(); i < length; i++ {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_reservedNameTag, elementIndex: i})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.MessageReservedNameTag, elementIndex: i})
 	}
 	extRanges := md.ExtensionRanges()
 	for i, length := 0, extRanges.Len(); i < length; i++ {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_extensionRangeTag, elementIndex: i})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.MessageExtensionRangeTag, elementIndex: i})
 	}
 	fields := md.Fields()
 	for i, length := 0, fields.Len(); i < length; i++ {
@@ -769,17 +769,17 @@ func (p *Printer) printMessageBody(
 			// they get special treatment
 			skip[fld.Message()] = true
 		}
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_fieldsTag, elementIndex: i})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.MessageFieldsTag, elementIndex: i})
 	}
 	nestedMsgs := md.Messages()
 	for i, length := 0, nestedMsgs.Len(); i < length; i++ {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_nestedMessagesTag, elementIndex: i})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.MessageNestedMessagesTag, elementIndex: i})
 	}
 	nestedEnums := md.Enums()
 	for i, length := 0, nestedEnums.Len(); i < length; i++ {
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_enumsTag, elementIndex: i})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.MessageEnumsTag, elementIndex: i})
 	}
-	extensions := p.computeExtensions(sourceInfo, md.Extensions(), append(path, internal.Message_extensionsTag))
+	extensions := p.computeExtensions(sourceInfo, md.Extensions(), append(path, internal.MessageExtensionsTag))
 	exts := md.Extensions()
 	for i, length := 0, exts.Len(); i < length; i++ {
 		extd := exts.Get(i)
@@ -788,7 +788,7 @@ func (p *Printer) printMessageBody(
 			// they get special treatment
 			skip[extd.Message()] = true
 		}
-		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_extensionsTag, elementIndex: i})
+		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.MessageExtensionsTag, elementIndex: i})
 	}
 
 	p.sort(elements, sourceInfo, path)
@@ -818,7 +818,7 @@ func (p *Printer) printMessageBody(
 		case protoreflect.FieldDescriptor:
 			if d.IsExtension() {
 				extDecl := extensions[d]
-				p.printExtensions(extDecl, extensions, elements, i, reg, w, sourceInfo, path, internal.Message_extensionsTag, pkg, scope, indent)
+				p.printExtensions(extDecl, extensions, elements, i, reg, w, sourceInfo, path, internal.MessageExtensionsTag, pkg, scope, indent)
 				// we printed all extensions in the group, so we can skip the others
 				for _, fld := range extDecl.fields {
 					skip[fld] = true
@@ -922,11 +922,11 @@ func (p *Printer) printField(
 		case protoreflect.MessageDescriptor:
 			// group in a message
 			candidates = parent.Messages()
-			parentTag = internal.Message_nestedMessagesTag
+			parentTag = internal.MessageNestedMessagesTag
 		case protoreflect.FileDescriptor:
 			// group that is a top-level extension
 			candidates = parent.Messages()
-			parentTag = internal.File_messagesTag
+			parentTag = internal.FileMessagesTag
 		}
 
 		var groupMsgIndex int32
@@ -949,7 +949,7 @@ func (p *Printer) printField(
 	p.printBlockElement(true, si, w, indent, func(w *writer, trailer func(int, bool)) {
 		p.indent(w, indent)
 		if shouldEmitLabel(fld) {
-			locSi := sourceInfo.ByPath(append(path, internal.Field_labelTag))
+			locSi := sourceInfo.ByPath(append(path, internal.FieldLabelTag))
 			p.printElementString(locSi, w, indent, fld.Cardinality().String())
 		}
 
@@ -957,16 +957,23 @@ func (p *Printer) printField(
 			_, _ = fmt.Fprint(w, "group ")
 		}
 
-		typeSi := sourceInfo.ByPath(append(path, internal.Field_typeTag))
+		var tag int32
+		switch fld.Kind() {
+		case protoreflect.EnumKind, protoreflect.GroupKind, protoreflect.MessageKind:
+			tag = internal.FieldTypeNameTag
+		default:
+			tag = internal.FieldTypeTag
+		}
+		typeSi := sourceInfo.ByPath(append(path, tag))
 		p.printElementString(typeSi, w, indent, p.typeString(fld, scope))
 
 		if !group {
-			nameSi := sourceInfo.ByPath(append(path, internal.Field_nameTag))
+			nameSi := sourceInfo.ByPath(append(path, internal.FieldNameTag))
 			p.printElementString(nameSi, w, indent, string(fld.Name()))
 		}
 
 		_, _ = fmt.Fprint(w, "= ")
-		numSi := sourceInfo.ByPath(append(path, internal.Field_numberTag))
+		numSi := sourceInfo.ByPath(append(path, internal.FieldNumberTag))
 		p.printElementString(numSi, w, indent, fmt.Sprintf("%d", fld.Number()))
 
 		opts, err := p.extractOptions(fld, reg, fld.Options())
@@ -987,15 +994,15 @@ func (p *Printer) printField(
 			} else {
 				defVal = fld.Default().Interface()
 			}
-			opts[-internal.Field_defaultTag] = []option{{name: "default", val: defVal}}
+			opts[-internal.FieldDefaultTag] = []option{{name: "default", val: defVal}}
 		}
 
 		jsn := fld.JSONName()
 		if !fld.IsExtension() && jsn != "" && jsn != internal.JsonName(fld.Name()) {
-			opts[-internal.Field_jsonNameTag] = []option{{name: "json_name", val: jsn}}
+			opts[-internal.FieldJSONNameTag] = []option{{name: "json_name", val: jsn}}
 		}
 
-		p.printOptionsShort(fld, opts, internal.Field_optionsTag, reg, w, sourceInfo, path, indent)
+		p.printOptionsShort(fld, opts, internal.FieldOptionsTag, reg, w, sourceInfo, path, indent)
 
 		if group {
 			_, _ = fmt.Fprintln(w, "{")
@@ -1030,12 +1037,12 @@ func (p *Printer) printOneOf(
 	indent int,
 	ooIndex int,
 ) {
-	oopath := append(parentPath, internal.Message_oneOfsTag, int32(ooIndex))
+	oopath := append(parentPath, internal.MessageOneofsTag, int32(ooIndex))
 	oosi := sourceInfo.ByPath(oopath)
 	p.printBlockElement(true, oosi, w, indent, func(w *writer, trailer func(int, bool)) {
 		p.indent(w, indent)
 		_, _ = fmt.Fprint(w, "oneof ")
-		extNameSi := sourceInfo.ByPath(append(oopath, internal.OneOf_nameTag))
+		extNameSi := sourceInfo.ByPath(append(oopath, internal.OneofNameTag))
 		p.printElementString(extNameSi, w, indent, string(ood.Name()))
 		_, _ = fmt.Fprintln(w, "{")
 		indent++
@@ -1050,17 +1057,17 @@ func (p *Printer) printOneOf(
 		}
 
 		elements := elementAddrs{dsc: ood, opts: opts}
-		elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.OneOf_optionsTag, -1, opts)...)
+		elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.OneofOptionsTag, -1, opts)...)
 
 		count := ood.Fields().Len()
 		for idx := startFieldIndex; count > 0 && idx < len(parentElements.addrs); idx++ {
 			el := parentElements.addrs[idx]
-			if el.elementType != internal.Message_fieldsTag {
+			if el.elementType != internal.MessageFieldsTag {
 				continue
 			}
 			if parentElements.at(el).(protoreflect.FieldDescriptor).ContainingOneof() == ood {
 				// negative tag indicates that this element is actually a sibling, not a child
-				elements.addrs = append(elements.addrs, elementAddr{elementType: -internal.Message_fieldsTag, elementIndex: el.elementIndex})
+				elements.addrs = append(elements.addrs, elementAddr{elementType: -internal.MessageFieldsTag, elementIndex: el.elementIndex})
 				count--
 			}
 		}
@@ -1108,7 +1115,7 @@ func (p *Printer) printExtensions(
 	p.printLeadingComments(exts.sourceInfo, w, indent)
 	p.indent(w, indent)
 	_, _ = fmt.Fprint(w, "extend ")
-	extNameSi := sourceInfo.ByPath(append(path, 0, internal.Field_extendeeTag))
+	extNameSi := sourceInfo.ByPath(append(path, 0, internal.FieldExtendeeTag))
 	p.printElementString(extNameSi, w, indent, p.qualifyName(pkg, scope, exts.extendee))
 	_, _ = fmt.Fprintln(w, "{")
 
@@ -1179,7 +1186,7 @@ func (p *Printer) printExtensionRanges(
 		})
 	}
 	dsc := extensionRangeMarker{owner: parent}
-	p.extractAndPrintOptionsShort(dsc, opts, reg, internal.ExtensionRange_optionsTag, w, sourceInfo, elPath, indent)
+	p.extractAndPrintOptionsShort(dsc, opts, reg, internal.ExtensionRangeOptionsTag, w, sourceInfo, elPath, indent)
 
 	_, _ = fmt.Fprintln(w, ";")
 }
@@ -1258,7 +1265,7 @@ func (p *Printer) printEnum(
 		p.indent(w, indent)
 
 		_, _ = fmt.Fprint(w, "enum ")
-		nameSi := sourceInfo.ByPath(append(path, internal.Enum_nameTag))
+		nameSi := sourceInfo.ByPath(append(path, internal.EnumNameTag))
 		p.printElementString(nameSi, w, indent, string(ed.Name()))
 		_, _ = fmt.Fprintln(w, "{")
 		indent++
@@ -1275,18 +1282,18 @@ func (p *Printer) printEnum(
 		skip := map[interface{}]bool{}
 
 		elements := elementAddrs{dsc: ed, opts: opts}
-		elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.Enum_optionsTag, -1, opts)...)
+		elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.EnumOptionsTag, -1, opts)...)
 		vals := ed.Values()
 		for i, length := 0, vals.Len(); i < length; i++ {
-			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Enum_valuesTag, elementIndex: i})
+			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.EnumValuesTag, elementIndex: i})
 		}
 		resRanges := ed.ReservedRanges()
 		for i, length := 0, resRanges.Len(); i < length; i++ {
-			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Enum_reservedRangeTag, elementIndex: i})
+			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.EnumReservedRangeTag, elementIndex: i})
 		}
 		resNames := ed.ReservedNames()
 		for i, length := 0, resNames.Len(); i < length; i++ {
-			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Enum_reservedNameTag, elementIndex: i})
+			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.EnumReservedNameTag, elementIndex: i})
 		}
 
 		p.sort(elements, sourceInfo, path)
@@ -1362,14 +1369,14 @@ func (p *Printer) printEnumValue(
 	p.printElement(true, si, w, indent, func(w *writer) {
 		p.indent(w, indent)
 
-		nameSi := sourceInfo.ByPath(append(path, internal.EnumVal_nameTag))
+		nameSi := sourceInfo.ByPath(append(path, internal.EnumValueNameTag))
 		p.printElementString(nameSi, w, indent, string(evd.Name()))
 		_, _ = fmt.Fprint(w, "= ")
 
-		numSi := sourceInfo.ByPath(append(path, internal.EnumVal_numberTag))
+		numSi := sourceInfo.ByPath(append(path, internal.EnumValueNumberTag))
 		p.printElementString(numSi, w, indent, fmt.Sprintf("%d", evd.Number()))
 
-		p.extractAndPrintOptionsShort(evd, evd.Options(), reg, internal.EnumVal_optionsTag, w, sourceInfo, path, indent)
+		p.extractAndPrintOptionsShort(evd, evd.Options(), reg, internal.EnumValueOptionsTag, w, sourceInfo, path, indent)
 
 		_, _ = fmt.Fprint(w, ";")
 	})
@@ -1388,7 +1395,7 @@ func (p *Printer) printService(
 		p.indent(w, indent)
 
 		_, _ = fmt.Fprint(w, "service ")
-		nameSi := sourceInfo.ByPath(append(path, internal.Service_nameTag))
+		nameSi := sourceInfo.ByPath(append(path, internal.ServiceNameTag))
 		p.printElementString(nameSi, w, indent, string(sd.Name()))
 		_, _ = fmt.Fprintln(w, "{")
 		indent++
@@ -1403,10 +1410,10 @@ func (p *Printer) printService(
 		}
 
 		elements := elementAddrs{dsc: sd, opts: opts}
-		elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.Service_optionsTag, -1, opts)...)
+		elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.ServiceOptionsTag, -1, opts)...)
 		methods := sd.Methods()
 		for i, length := 0, methods.Len(); i < length; i++ {
-			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Service_methodsTag, elementIndex: i})
+			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.ServiceMethodsTag, elementIndex: i})
 		}
 
 		p.sort(elements, sourceInfo, path)
@@ -1445,11 +1452,11 @@ func (p *Printer) printMethod(
 		p.indent(w, indent)
 
 		_, _ = fmt.Fprint(w, "rpc ")
-		nameSi := sourceInfo.ByPath(append(path, internal.Method_nameTag))
+		nameSi := sourceInfo.ByPath(append(path, internal.MethodNameTag))
 		p.printElementString(nameSi, w, indent, string(mtd.Name()))
 
 		_, _ = fmt.Fprint(w, "( ")
-		inSi := sourceInfo.ByPath(append(path, internal.Method_inputTag))
+		inSi := sourceInfo.ByPath(append(path, internal.MethodInputTag))
 		inName := p.qualifyName(pkg, pkg, mtd.Input().FullName())
 		if mtd.IsStreamingClient() {
 			inName = "stream " + inName
@@ -1458,7 +1465,7 @@ func (p *Printer) printMethod(
 
 		_, _ = fmt.Fprint(w, ") returns ( ")
 
-		outSi := sourceInfo.ByPath(append(path, internal.Method_outputTag))
+		outSi := sourceInfo.ByPath(append(path, internal.MethodOutputTag))
 		outName := p.qualifyName(pkg, pkg, mtd.Output().FullName())
 		if mtd.IsStreamingServer() {
 			outName = "stream " + outName
@@ -1480,7 +1487,7 @@ func (p *Printer) printMethod(
 			trailer(indent, true)
 
 			elements := elementAddrs{dsc: mtd, opts: opts}
-			elements.addrs = optionsAsElementAddrs(internal.Method_optionsTag, 0, opts)
+			elements.addrs = optionsAsElementAddrs(internal.MethodOptionsTag, 0, opts)
 			p.sort(elements, sourceInfo, path)
 
 			for i, el := range elements.addrs {
@@ -1770,47 +1777,47 @@ const (
 // the full path from original source)
 var edges = map[edgeKind]map[int32]edgeKind{
 	edgeKindFile: {
-		internal.File_optionsTag:    edgeKindOption,
-		internal.File_messagesTag:   edgeKindMessage,
-		internal.File_enumsTag:      edgeKindEnum,
-		internal.File_extensionsTag: edgeKindField,
-		internal.File_servicesTag:   edgeKindService,
+		internal.FileOptionsTag:    edgeKindOption,
+		internal.FileMessagesTag:   edgeKindMessage,
+		internal.FileEnumsTag:      edgeKindEnum,
+		internal.FileExtensionsTag: edgeKindField,
+		internal.FileServicesTag:   edgeKindService,
 	},
 	edgeKindMessage: {
-		internal.Message_optionsTag:        edgeKindOption,
-		internal.Message_fieldsTag:         edgeKindField,
-		internal.Message_oneOfsTag:         edgeKindOneOf,
-		internal.Message_nestedMessagesTag: edgeKindMessage,
-		internal.Message_enumsTag:          edgeKindEnum,
-		internal.Message_extensionsTag:     edgeKindField,
-		internal.Message_extensionRangeTag: edgeKindExtensionRange,
-		internal.Message_reservedRangeTag:  edgeKindReservedRange,
-		internal.Message_reservedNameTag:   edgeKindReservedName,
+		internal.MessageOptionsTag:        edgeKindOption,
+		internal.MessageFieldsTag:         edgeKindField,
+		internal.MessageOneofsTag:         edgeKindOneOf,
+		internal.MessageNestedMessagesTag: edgeKindMessage,
+		internal.MessageEnumsTag:          edgeKindEnum,
+		internal.MessageExtensionsTag:     edgeKindField,
+		internal.MessageExtensionRangeTag: edgeKindExtensionRange,
+		internal.MessageReservedRangeTag:  edgeKindReservedRange,
+		internal.MessageReservedNameTag:   edgeKindReservedName,
 	},
 	edgeKindField: {
-		internal.Field_optionsTag: edgeKindOption,
+		internal.FieldOptionsTag: edgeKindOption,
 	},
 	edgeKindOneOf: {
-		internal.OneOf_optionsTag: edgeKindOption,
+		internal.OneofOptionsTag: edgeKindOption,
 	},
 	edgeKindExtensionRange: {
-		internal.ExtensionRange_optionsTag: edgeKindOption,
+		internal.ExtensionRangeOptionsTag: edgeKindOption,
 	},
 	edgeKindEnum: {
-		internal.Enum_optionsTag:       edgeKindOption,
-		internal.Enum_valuesTag:        edgeKindEnumVal,
-		internal.Enum_reservedRangeTag: edgeKindReservedRange,
-		internal.Enum_reservedNameTag:  edgeKindReservedName,
+		internal.EnumOptionsTag:       edgeKindOption,
+		internal.EnumValuesTag:        edgeKindEnumVal,
+		internal.EnumReservedRangeTag: edgeKindReservedRange,
+		internal.EnumReservedNameTag:  edgeKindReservedName,
 	},
 	edgeKindEnumVal: {
-		internal.EnumVal_optionsTag: edgeKindOption,
+		internal.EnumValueOptionsTag: edgeKindOption,
 	},
 	edgeKindService: {
-		internal.Service_optionsTag: edgeKindOption,
-		internal.Service_methodsTag: edgeKindMethod,
+		internal.ServiceOptionsTag: edgeKindOption,
+		internal.ServiceMethodsTag: edgeKindMethod,
 	},
 	edgeKindMethod: {
-		internal.Method_optionsTag: edgeKindOption,
+		internal.MethodOptionsTag: edgeKindOption,
 	},
 }
 
@@ -1861,8 +1868,8 @@ func extendOptionLocations(fd protoreflect.FileDescriptor) protoreflect.SourceLo
 	}
 
 	// we also extend the package location with a synthetic zero index
-	pkgPath := protoreflect.SourcePath{internal.File_packageTag}
-	pkgLoc := srcLocs.ByPath(protoreflect.SourcePath{internal.File_packageTag})
+	pkgPath := protoreflect.SourcePath{internal.FilePackageTag}
+	pkgLoc := srcLocs.ByPath(protoreflect.SourcePath{internal.FilePackageTag})
 	if pkgLoc.Path != nil {
 		srcLocs.putIfAbsent(append(pkgPath, 0), pkgLoc)
 	}
@@ -2231,86 +2238,86 @@ func (a elementAddrs) at(addr elementAddr) interface{} {
 	switch dsc := a.dsc.(type) {
 	case protoreflect.FileDescriptor:
 		switch addr.elementType {
-		case internal.File_packageTag:
+		case internal.FilePackageTag:
 			return pkg(dsc.Package())
-		case internal.File_dependencyTag:
+		case internal.FileDependencyTag:
 			return dsc.Imports().Get(addr.elementIndex)
-		case internal.File_optionsTag:
+		case internal.FileOptionsTag:
 			return a.opts[protoreflect.FieldNumber(addr.elementIndex)]
-		case internal.File_messagesTag:
+		case internal.FileMessagesTag:
 			return dsc.Messages().Get(addr.elementIndex)
-		case internal.File_enumsTag:
+		case internal.FileEnumsTag:
 			return dsc.Enums().Get(addr.elementIndex)
-		case internal.File_servicesTag:
+		case internal.FileServicesTag:
 			return dsc.Services().Get(addr.elementIndex)
-		case internal.File_extensionsTag:
+		case internal.FileExtensionsTag:
 			return dsc.Extensions().Get(addr.elementIndex)
 		}
 	case protoreflect.MessageDescriptor:
 		switch addr.elementType {
-		case internal.Message_optionsTag:
+		case internal.MessageOptionsTag:
 			return a.opts[protoreflect.FieldNumber(addr.elementIndex)]
-		case internal.Message_fieldsTag:
+		case internal.MessageFieldsTag:
 			return dsc.Fields().Get(addr.elementIndex)
-		case internal.Message_nestedMessagesTag:
+		case internal.MessageNestedMessagesTag:
 			return dsc.Messages().Get(addr.elementIndex)
-		case internal.Message_enumsTag:
+		case internal.MessageEnumsTag:
 			return dsc.Enums().Get(addr.elementIndex)
-		case internal.Message_extensionsTag:
+		case internal.MessageExtensionsTag:
 			return dsc.Extensions().Get(addr.elementIndex)
-		case internal.Message_extensionRangeTag:
+		case internal.MessageExtensionRangeTag:
 			extr := dsc.ExtensionRanges().Get(addr.elementIndex)
 			return extensionRange{
 				start: extr[0],
 				end:   extr[1],
 				opts:  dsc.ExtensionRangeOptions(addr.elementIndex),
 			}
-		case internal.Message_reservedRangeTag:
+		case internal.MessageReservedRangeTag:
 			rng := dsc.ReservedRanges().Get(addr.elementIndex)
 			return reservedRange{start: int32(rng[0]), end: int32(rng[1]) - 1}
-		case internal.Message_reservedNameTag:
+		case internal.MessageReservedNameTag:
 			return dsc.ReservedNames().Get(addr.elementIndex)
 		}
 	case protoreflect.FieldDescriptor:
-		if addr.elementType == internal.Field_optionsTag {
+		if addr.elementType == internal.FieldOptionsTag {
 			return a.opts[protoreflect.FieldNumber(addr.elementIndex)]
 		}
 	case protoreflect.OneofDescriptor:
 		switch addr.elementType {
-		case internal.OneOf_optionsTag:
+		case internal.OneofOptionsTag:
 			return a.opts[protoreflect.FieldNumber(addr.elementIndex)]
-		case -internal.Message_fieldsTag:
+		case -internal.MessageFieldsTag:
 			return dsc.Parent().(protoreflect.MessageDescriptor).Fields().Get(addr.elementIndex)
 		}
 	case protoreflect.EnumDescriptor:
 		switch addr.elementType {
-		case internal.Enum_optionsTag:
+		case internal.EnumOptionsTag:
 			return a.opts[protoreflect.FieldNumber(addr.elementIndex)]
-		case internal.Enum_valuesTag:
+		case internal.EnumValuesTag:
 			return dsc.Values().Get(addr.elementIndex)
-		case internal.Enum_reservedRangeTag:
+		case internal.EnumReservedRangeTag:
 			rng := dsc.ReservedRanges().Get(addr.elementIndex)
 			return reservedRange{start: int32(rng[0]), end: int32(rng[1])}
-		case internal.Enum_reservedNameTag:
+		case internal.EnumReservedNameTag:
 			return dsc.ReservedNames().Get(addr.elementIndex)
 		}
 	case protoreflect.EnumValueDescriptor:
-		if addr.elementType == internal.EnumVal_optionsTag {
+		if addr.elementType == internal.EnumValueOptionsTag {
 			return a.opts[protoreflect.FieldNumber(addr.elementIndex)]
 		}
 	case protoreflect.ServiceDescriptor:
 		switch addr.elementType {
-		case internal.Service_optionsTag:
+		case internal.ServiceOptionsTag:
 			return a.opts[protoreflect.FieldNumber(addr.elementIndex)]
-		case internal.Service_methodsTag:
+		case internal.ServiceMethodsTag:
 			return dsc.Methods().Get(addr.elementIndex)
 		}
 	case protoreflect.MethodDescriptor:
-		if addr.elementType == internal.Method_optionsTag {
+		if addr.elementType == internal.MethodOptionsTag {
 			return a.opts[protoreflect.FieldNumber(addr.elementIndex)]
 		}
 	case extensionRangeMarker:
-		if addr.elementType == internal.ExtensionRange_optionsTag {
+		if addr.elementType == internal.ExtensionRangeOptionsTag {
 			return a.opts[protoreflect.FieldNumber(addr.elementIndex)]
 		}
 	}
@@ -2386,33 +2393,33 @@ func (a elementSrcOrder) Less(i, j int) bool {
 			// Well-formed descriptors should instead have consistent source
 			// info: either all elements have source info or none do. So this
 			// should not be an issue in practice.
-			if ti == internal.File_packageTag {
+			if ti == internal.FilePackageTag {
 				return !swapped
 			}
-			if ti == internal.File_dependencyTag {
-				if tj == internal.File_packageTag {
+			if ti == internal.FileDependencyTag {
+				if tj == internal.FilePackageTag {
 					// imports will come *after* package
 					return swapped
 				}
 				return !swapped
 			}
-			if ti == internal.File_optionsTag {
-				if tj == internal.File_packageTag || tj == internal.File_dependencyTag {
+			if ti == internal.FileOptionsTag {
+				if tj == internal.FilePackageTag || tj == internal.FileDependencyTag {
 					// options will come *after* package and imports
 					return swapped
 				}
 				return !swapped
 			}
 		case protoreflect.MessageDescriptor:
-			if ti == internal.Message_optionsTag {
+			if ti == internal.MessageOptionsTag {
 				return !swapped
 			}
 		case protoreflect.EnumDescriptor:
-			if ti == internal.Enum_optionsTag {
+			if ti == internal.EnumOptionsTag {
 				return !swapped
 			}
 		case protoreflect.ServiceDescriptor:
-			if ti == internal.Service_optionsTag {
+			if ti == internal.ServiceOptionsTag {
 				return !swapped
 			}
 		}

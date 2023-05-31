@@ -56,6 +56,7 @@ func TypeNameFromURL(url string) protoreflect.FullName {
 // bitwise-OR).
 type TypeKind int
 
+// The various supported TypeKind values.
 const (
 	TypeKindMessage   = TypeKind(1 << iota)
 	TypeKindEnum      = TypeKind(1 << iota)
@@ -65,13 +66,13 @@ const (
 	TypeKindsAll = TypeKindMessage | TypeKindEnum | TypeKindExtension
 	// TypeKindsSerialization includes the kinds of types needed for serialization
 	// and de-serialization: messages (for interpreting google.protobuf.Any messages)
-	// and extensions. These are the same types As supported in a SerializationResolver.
+	// and extensions. These are the same types as supported in a SerializationResolver.
 	TypeKindsSerialization = TypeKindMessage | TypeKindExtension
 )
 
 // RegisterTypesInFile registers all the types (with kinds that match kindMask) with
 // the given registry. Only the types directly in file are registered. This will result
-// in an error if any of the types in the given file are already registered As belonging
+// in an error if any of the types in the given file are already registered as belonging
 // to a different file.
 //
 // All types will be dynamic types, created with the "google.golang.org/protobuf/types/dynamicpb"
@@ -84,7 +85,7 @@ func RegisterTypesInFile(file protoreflect.FileDescriptor, reg TypeRegistry, kin
 // RegisterTypesInFileRecursive registers all the types (with kinds that match kindMask)
 // with the given registry, for the given file and all of its transitive dependencies (i.e.
 // its imports, and their imports, etc.). This will result in an error if any of the types in
-// the given file are already registered As belonging to a different file.
+// the given file are already registered as belonging to a different file.
 //
 // All types will be dynamic types, created with the "google.golang.org/protobuf/types/dynamicpb"
 // package. The only exception is for extension descriptors that als implement

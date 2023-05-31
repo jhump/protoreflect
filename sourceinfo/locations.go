@@ -61,9 +61,9 @@ func (p *sourceLocations) ByDescriptor(desc protoreflect.Descriptor) protoreflec
 			desc = desc.Parent()
 			switch desc.(type) {
 			case protoreflect.FileDescriptor:
-				path = append(path, int32(internal.File_messagesTag))
+				path = append(path, int32(internal.FileMessagesTag))
 			case protoreflect.MessageDescriptor:
-				path = append(path, int32(internal.Message_nestedMessagesTag))
+				path = append(path, int32(internal.MessageNestedMessagesTag))
 			default:
 				return protoreflect.SourceLocation{}
 			}
@@ -74,16 +74,16 @@ func (p *sourceLocations) ByDescriptor(desc protoreflect.Descriptor) protoreflec
 			if isExtension {
 				switch desc.(type) {
 				case protoreflect.FileDescriptor:
-					path = append(path, int32(internal.File_extensionsTag))
+					path = append(path, int32(internal.FileExtensionsTag))
 				case protoreflect.MessageDescriptor:
-					path = append(path, int32(internal.Message_extensionsTag))
+					path = append(path, int32(internal.MessageExtensionsTag))
 				default:
 					return protoreflect.SourceLocation{}
 				}
 			} else {
 				switch desc.(type) {
 				case protoreflect.MessageDescriptor:
-					path = append(path, int32(internal.Message_fieldsTag))
+					path = append(path, int32(internal.MessageFieldsTag))
 				default:
 					return protoreflect.SourceLocation{}
 				}
@@ -93,7 +93,7 @@ func (p *sourceLocations) ByDescriptor(desc protoreflect.Descriptor) protoreflec
 			desc = desc.Parent()
 			switch desc.(type) {
 			case protoreflect.MessageDescriptor:
-				path = append(path, int32(internal.Message_oneOfsTag))
+				path = append(path, int32(internal.MessageOneofsTag))
 			default:
 				return protoreflect.SourceLocation{}
 			}
@@ -102,9 +102,9 @@ func (p *sourceLocations) ByDescriptor(desc protoreflect.Descriptor) protoreflec
 			desc = desc.Parent()
 			switch desc.(type) {
 			case protoreflect.FileDescriptor:
-				path = append(path, int32(internal.File_enumsTag))
+				path = append(path, int32(internal.FileEnumsTag))
 			case protoreflect.MessageDescriptor:
-				path = append(path, int32(internal.Message_enumsTag))
+				path = append(path, int32(internal.MessageEnumsTag))
 			default:
 				return protoreflect.SourceLocation{}
 			}
@@ -113,7 +113,7 @@ func (p *sourceLocations) ByDescriptor(desc protoreflect.Descriptor) protoreflec
 			desc = desc.Parent()
 			switch desc.(type) {
 			case protoreflect.EnumDescriptor:
-				path = append(path, int32(internal.Enum_valuesTag))
+				path = append(path, int32(internal.EnumValuesTag))
 			default:
 				return protoreflect.SourceLocation{}
 			}
@@ -122,7 +122,7 @@ func (p *sourceLocations) ByDescriptor(desc protoreflect.Descriptor) protoreflec
 			desc = desc.Parent()
 			switch desc.(type) {
 			case protoreflect.FileDescriptor:
-				path = append(path, int32(internal.File_servicesTag))
+				path = append(path, int32(internal.FileServicesTag))
 			default:
 				return protoreflect.SourceLocation{}
 			}
@@ -131,7 +131,7 @@ func (p *sourceLocations) ByDescriptor(desc protoreflect.Descriptor) protoreflec
 			desc = desc.Parent()
 			switch desc.(type) {
 			case protoreflect.ServiceDescriptor:
-				path = append(path, int32(internal.Service_methodsTag))
+				path = append(path, int32(internal.ServiceMethodsTag))
 			default:
 				return protoreflect.SourceLocation{}
 			}

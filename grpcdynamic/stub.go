@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/jhump/protoreflect/v2/protoresolve"
@@ -32,6 +33,7 @@ func NewStub(channel grpc.ClientConnInterface, opts ...StubOption) *Stub {
 	return stub
 }
 
+// StubOption is an option that can be used to customize behavior when creating a Stub.
 type StubOption interface {
 	apply(*Stub)
 }
@@ -42,6 +44,11 @@ func (s stubOptionFunc) apply(stub *Stub) {
 	s(stub)
 }
 
+// WithResolver returns a StubOption that causes a Stub to use the given resolver for
+// de-serializing response messages. If not specified, [protoregistry.GlobalTypes] is
+// used. If the given resolver does not support the response message type, a dynamic
+// message is used. The given resolver is also used for recognizing extensions in
+// response messages.
 func WithResolver(res protoresolve.SerializationResolver) StubOption {
 	return stubOptionFunc(func(s *Stub) {
 		s.resolver = res
@@ -84,27 +91,27 @@ func (s *Stub) InvokeRpcServerStream(ctx context.Context, method protoreflect.Me
 		ServerStreams: method.IsStreamingServer(),
 		ClientStreams: method.IsStreamingClient(),
 	}
-	if cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...); err != nil {
+	cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...)
+	if err != nil {
 		cancel()
 		return nil, err
-	} else {
-		err = cs.SendMsg(request)
-		if err != nil {
-			cancel()
-			return nil, err
-		}
-		err = cs.CloseSend()
-		if err != nil {
-			cancel()
-			return nil, err
-		}
-		go func() {
-			// when the new stream is finished, also cleanup the parent context
-			<-cs.Context().Done()
-			cancel()
-		}()
-		return &ServerStream{cs, method.Output(), s.resolver}, nil
 	}
+	err = cs.SendMsg(request)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	err = cs.CloseSend()
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	go func() {
+		// when the new stream is finished, also cleanup the parent context
+		<-cs.Context().Done()
+		cancel()
+	}()
+	return &ServerStream{cs, method.Output(), s.resolver}, nil
 }
 
 // InvokeRpcClientStream creates a new stream that is used to send request messages and, at the end,
@@ -119,17 +126,17 @@ func (s *Stub) InvokeRpcClientStream(ctx context.Context, method protoreflect.Me
 		ServerStreams: method.IsStreamingServer(),
 		ClientStreams: method.IsStreamingClient(),
 	}
-	if cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...); err != nil {
+	cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...)
+	if err != nil {
 		cancel()
 		return nil, err
-	} else {
-		go func() {
-			// when the new stream is finished, also cleanup the parent context
-			<-cs.Context().Done()
-			cancel()
-		}()
-		return &ClientStream{cs, method, s.resolver, cancel}, nil
 	}
+	go func() {
+		// when the new stream is finished, also cleanup the parent context
+		<-cs.Context().Done()
+		cancel()
+	}()
+	return &ClientStream{cs, method, s.resolver, cancel}, nil
 }
 
 // InvokeRpcBidiStream creates a new stream that is used to both send request messages and receive response
@@ -143,11 +150,11 @@ func (s *Stub) InvokeRpcBidiStream(ctx context.Context, method protoreflect.Meth
 		ServerStreams: method.IsStreamingServer(),
 		ClientStreams: method.IsStreamingClient(),
 	}
-	if cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...); err != nil {
+	cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...)
+	if err != nil {
 		return nil, err
-	} else {
-		return &BidiStream{cs, method.Input(), method.Output(), s.resolver}, nil
 	}
+	return &BidiStream{cs, method.Input(), method.Output(), s.resolver}, nil
 }
 
 func methodType(md protoreflect.MethodDescriptor) string {
@@ -262,9 +269,8 @@ func (s *ClientStream) CloseAndReceive() (proto.Message, error) {
 		if err == nil {
 			s.cancel()
 			return nil, fmt.Errorf("client-streaming method %q returned more than one response message", s.method.FullName())
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return resp, nil
 }
@@ -326,7 +332,7 @@ func (s *BidiStream) RecvMsg() (proto.Message, error) {
 
 func newMessage(md protoreflect.MessageDescriptor, resolver protoresolve.SerializationResolver) proto.Message {
 	if resolver == nil {
-		resolver = protoresolve.GlobalDescriptors.AsTypeResolver()
+		resolver = protoregistry.GlobalTypes
 	}
 	msgType, err := resolver.FindMessageByName(md.FullName())
 	if err == nil {

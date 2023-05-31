@@ -322,8 +322,8 @@ func TestMultipleFiles(t *testing.T) {
 type testReflectionServer struct{}
 
 func (t testReflectionServer) ServerReflectionInfo(server refv1alpha.ServerReflection_ServerReflectionInfoServer) error {
-	const svcA_file = "ChdzYW5kYm94L3NlcnZpY2VfQS5wcm90bxIHc2FuZGJveCIWCghSZXF1ZXN0QRIKCgJpZBgBIAEoBSIYCglSZXNwb25zZUESCwoDc3RyGAEgASgJMj0KCVNlcnZpY2VfQRIwCgdFeGVjdXRlEhEuc2FuZGJveC5SZXF1ZXN0QRoSLnNhbmRib3guUmVzcG9uc2VBYgZwcm90bzM="
-	const svcB_file = "ChdzYW5kYm94L1NlcnZpY2VfQi5wcm90bxIHc2FuZGJveCIWCghSZXF1ZXN0QhIKCgJpZBgBIAEoBSIYCglSZXNwb25zZUISCwoDc3RyGAEgASgJMj0KCVNlcnZpY2VfQhIwCgdFeGVjdXRlEhEuc2FuZGJveC5SZXF1ZXN0QhoSLnNhbmRib3guUmVzcG9uc2VCYgZwcm90bzM="
+	const svcAfile = "ChdzYW5kYm94L3NlcnZpY2VfQS5wcm90bxIHc2FuZGJveCIWCghSZXF1ZXN0QRIKCgJpZBgBIAEoBSIYCglSZXNwb25zZUESCwoDc3RyGAEgASgJMj0KCVNlcnZpY2VfQRIwCgdFeGVjdXRlEhEuc2FuZGJveC5SZXF1ZXN0QRoSLnNhbmRib3guUmVzcG9uc2VBYgZwcm90bzM="
+	const svcBfile = "ChdzYW5kYm94L1NlcnZpY2VfQi5wcm90bxIHc2FuZGJveCIWCghSZXF1ZXN0QhIKCgJpZBgBIAEoBSIYCglSZXNwb25zZUISCwoDc3RyGAEgASgJMj0KCVNlcnZpY2VfQhIwCgdFeGVjdXRlEhEuc2FuZGJveC5SZXF1ZXN0QhoSLnNhbmRib3guUmVzcG9uc2VCYgZwcm90bzM="
 
 	for {
 		req, err := server.Recv()
@@ -338,9 +338,9 @@ func (t testReflectionServer) ServerReflectionInfo(server refv1alpha.ServerRefle
 		case *refv1alpha.ServerReflectionRequest_FileByFilename:
 			switch req.FileByFilename {
 			case "sandbox/service_A.proto":
-				resp.MessageResponse = msgResponseForFiles(svcA_file)
+				resp.MessageResponse = msgResponseForFiles(svcAfile)
 			case "sandbox/service_B.proto":
-				resp.MessageResponse = msgResponseForFiles(svcB_file)
+				resp.MessageResponse = msgResponseForFiles(svcBfile)
 			default:
 				resp.MessageResponse = &refv1alpha.ServerReflectionResponse_ErrorResponse{
 					ErrorResponse: &refv1alpha.ErrorResponse{
@@ -352,10 +352,10 @@ func (t testReflectionServer) ServerReflectionInfo(server refv1alpha.ServerRefle
 		case *refv1alpha.ServerReflectionRequest_FileContainingSymbol:
 			switch req.FileContainingSymbol {
 			case "sandbox.Service_A":
-				resp.MessageResponse = msgResponseForFiles(svcA_file)
+				resp.MessageResponse = msgResponseForFiles(svcAfile)
 			case "sandbox.Service_B":
 				// HERE is where we return two files instead of one
-				resp.MessageResponse = msgResponseForFiles(svcA_file, svcB_file)
+				resp.MessageResponse = msgResponseForFiles(svcAfile, svcBfile)
 			default:
 				resp.MessageResponse = &refv1alpha.ServerReflectionResponse_ErrorResponse{
 					ErrorResponse: &refv1alpha.ErrorResponse{

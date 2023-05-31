@@ -150,7 +150,7 @@
 //  1. Import cycles are not allowed. (See above for more details.)
 //  2. Within a single file, symbols are not allowed to have naming conflicts.
 //     This means that is not legal to create a message and an extension with
-//     the same path in the same file.
+//     the same name in the same file.
 //  3. Messages are not allowed to have multiple fields with the same tag. Note
 //     that only non-extension fields are checked when using builders. So
 //     builders will allow tag collisions for extensions. (Use caution.)

@@ -19,13 +19,13 @@ import (
 // interface because its return type varies with the type of descriptor that
 // is built.
 type Builder interface {
-	// Name returns this element's path. The path returned is a simple path,
-	// not a qualified path. This is blank for *FileBuilder instances.
+	// Name returns this element's name. The name returned is a simple name,
+	// not a qualified name. This is blank for *FileBuilder instances.
 	Name() protoreflect.Name
 
-	// TrySetName attempts to set this element's path. If the rename cannot
+	// TrySetName attempts to set this element's name. If the rename cannot
 	// proceed (e.g. this element's parent already has an element with that
-	// path) then an error is returned.
+	// name) then an error is returned.
 	//
 	// All builders also have a method named SetName that panics on error and
 	// returns the builder itself (for method chaining). But that isn't defined
@@ -69,7 +69,7 @@ type Builder interface {
 	// custom options, use BuilderOptions.Build instead.
 	BuildDescriptor() (protoreflect.Descriptor, error)
 
-	// findChild returns the child builder with the given path or nil if this
+	// findChild returns the child builder with the given name or nil if this
 	// builder has no such child.
 	findChild(protoreflect.Name) Builder
 
@@ -80,10 +80,10 @@ type Builder interface {
 	// after removing references to the child from this element.
 	removeChild(Builder)
 
-	// renamedChild updates references by-path references to the given child and
-	// validates its path. The given string is the child's old path. If the
-	// rename can proceed, no error should be returned and any by-path
-	// references to the old path should be removed.
+	// renamedChild updates by-name references to the given child and
+	// validates its new name. The given string is the child's old name. If
+	// the rename can proceed, no error should be returned and any by-name
+	// references to the old name should be removed.
 	renamedChild(Builder, protoreflect.Name) error
 
 	// setParent simply updates the up-link (from child to parent) so that the
@@ -171,11 +171,11 @@ func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Com
  *
  * Renaming an element is initiated via Builder.TrySetName. Implementations
  * should do the following:
- *  1. Validate the new path using any local constraints and naming rules.
+ *  1. Validate the new name using any local constraints and naming rules.
  *  2. If there are child elements whose names should be kept in sync in some
  *     way, rename them.
- *  3. Invoke baseBuilder.setName. This changes this element's path and then
- *     invokes Builder.renamedChild(child, oldName) to update any by-path
+ *  3. Invoke baseBuilder.setName. This changes this element's name and then
+ *     invokes Builder.renamedChild(child, oldName) to update any by-name
  *     references from the parent to the child.
  *  4. If step #3 failed, any other element names that were changed to keep
  *     them in sync (from step #2) should be reverted.
@@ -183,17 +183,17 @@ func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Com
  * A key part of this flow is how parents react to child elements being renamed.
  * This is done in Builder.renamedChild. Implementations should do the
  * following:
- *  1. Validate the path using any local constraints. (Often there are no new
+ *  1. Validate the name using any local constraints. (Often there are no new
  *     constraints and any checks already done by Builder.TrySetName should
  *     suffice.)
  *  2. If the parent element should be renamed to keep it in sync with the
- *     child's path, rename it.
- *  3. Register references to the element using the new path. A possible cause
+ *     child's name, rename it.
+ *  3. Register references to the element using the new name. A possible cause
  *     of error in this step is a uniqueness constraint, e.g. the element's new
- *     path collides with a sibling element's path.
- *  4. If step #3 failed and this element path was changed to keep it in sync
+ *     name collides with a sibling element's name.
+ *  4. If step #3 failed and this element name was changed to keep it in sync
  *     (from step #2), it should be reverted.
- *  5. Finally, remove references to the element for the old path. This step
+ *  5. Finally, remove references to the element for the old name. This step
  *     should always succeed.
  *
  * Changing the tag number for a non-extension field has a similar flow since it
@@ -201,8 +201,8 @@ func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Com
  * conflict with another existing field.
  *
  * Note that TrySetName and renamedChild methods both can return an error, which
- * should indicate why the element could not be renamed (e.g. path is invalid,
- * new path conflicts with existing sibling names, etc).
+ * should indicate why the element could not be renamed (e.g. name is invalid,
+ * new name conflicts with existing sibling names, etc).
  *
  *
  * MOVING/REMOVING AN ELEMENT
@@ -227,7 +227,7 @@ func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Com
  *
  * The "Add" methods typically have a "Try" form which can return an error. This
  * could happen if the new child is not legal to add (including, for example,
- * that its path collides with an existing child element).
+ * that its name collides with an existing child element).
  *
  * The removeChild and setParent methods, on the other hand, cannot return an
  * error and thus must always succeed.
@@ -251,12 +251,12 @@ func baseBuilderWithName(name protoreflect.Name) baseBuilder {
 
 func checkName(name protoreflect.Name) error {
 	if !name.IsValid() {
-		return fmt.Errorf("path %q is invalid: it must start with an underscore or letter and contain only underscores, letters, and numbers", name)
+		return fmt.Errorf("name %q is invalid: it must start with an underscore or letter and contain only underscores, letters, and numbers", name)
 	}
 	return nil
 }
 
-// Name returns the path of the element that will be built by this builder.
+// Name returns the name of the element that will be built by this builder.
 func (b *baseBuilder) Name() protoreflect.Name {
 	return b.name
 }
@@ -342,17 +342,17 @@ func fullName(b Builder, buf *bytes.Buffer) {
 		if _, ok := p.(*FieldBuilder); ok {
 			// field can be the parent of a message (if it's
 			// the field's map entry or group type), but its
-			// path is not part of message's fqn; so skip
+			// name is not part of message's fqn; so skip
 			p = p.Parent()
 		}
 		if _, ok := p.(*OneofBuilder); ok {
 			// one-of can be the parent of a field, but its
-			// path is not part of field's fqn; so skip
+			// name is not part of field's fqn; so skip
 			p = p.Parent()
 		}
 		if _, ok := p.(*EnumBuilder); ok {
 			// enum can be the parent of an enum value, but
-			// its path is not part of the value's fqn; so skip
+			// its name is not part of the value's fqn; so skip
 			p = p.Parent()
 		}
 		fullName(p, buf)
@@ -363,8 +363,8 @@ func fullName(b Builder, buf *bytes.Buffer) {
 	}
 }
 
-// FullName returns the given builder's fully-qualified path. This
-// path is based on the parent elements the builder may be linked to, which
+// FullName returns the given builder's fully-qualified name. This
+// name is based on the parent elements the builder may be linked to, which
 // provide context like package and (optional) enclosing message names.
 // For *FileBuilder instances, this returns the file's package.
 func FullName(b Builder) protoreflect.FullName {
@@ -393,7 +393,7 @@ func getRoot(b Builder) Builder {
 	}
 }
 
-// deleteBuilder will delete a descriptor builder with the given path from the
+// deleteBuilder will delete a descriptor builder with the given name from the
 // given slice. The slice's elements can be any builder type. The parameter has
 // type interface{} so it can accept []*MessageBuilder or []*FieldBuilder, for
 // example. It returns a value of the same type with the named builder omitted.

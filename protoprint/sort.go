@@ -12,6 +12,7 @@ import (
 // printing a file using a custom ordering of elements.
 type ElementKind int
 
+// The various supported ElementKind values.
 const (
 	KindPackage = ElementKind(iota) + 1
 	KindImport

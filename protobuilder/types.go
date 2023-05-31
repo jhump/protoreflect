@@ -23,12 +23,12 @@ type FieldType struct {
 }
 
 // Kind returns the kind of this field type. If the kind is a message (or group)
-// or enum, TypeName() provides the path of the referenced type.
+// or enum, TypeName() provides the name of the referenced type.
 func (ft *FieldType) Kind() protoreflect.Kind {
 	return protoreflect.Kind(ft.fieldType)
 }
 
-// TypeName returns the fully-qualified path of the referenced message or
+// TypeName returns the fully-qualified name of the referenced message or
 // enum type. It returns an empty string if this type does not represent a
 // message or enum type.
 func (ft *FieldType) TypeName() protoreflect.FullName {
@@ -226,12 +226,11 @@ func RpcTypeImportedMessage(md protoreflect.MessageDescriptor, stream bool) *Rpc
 	}
 }
 
-// TypeName returns the fully qualified path of the message type to which
+// TypeName returns the fully qualified name of the message type to which
 // this RpcType refers.
 func (rt *RpcType) TypeName() protoreflect.FullName {
 	if rt.foreignType != nil {
 		return rt.foreignType.FullName()
-	} else {
-		return FullName(rt.localType)
 	}
+	return FullName(rt.localType)
 }

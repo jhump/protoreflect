@@ -32,192 +32,192 @@ const (
 	// anywhere. The only places they appear in generated code are struct tags
 	// on fields of the generated descriptor protos.
 
-	// File_packageTag is the tag number of the package element in a file
+	// FilePackageTag is the tag number of the package element in a file
 	// descriptor proto.
-	File_packageTag = 2
-	// File_dependencyTag is the tag number of the dependencies element in a
+	FilePackageTag = 2
+	// FileDependencyTag is the tag number of the dependencies element in a
 	// file descriptor proto.
-	File_dependencyTag = 3
-	// File_messagesTag is the tag number of the messages element in a file
+	FileDependencyTag = 3
+	// FileMessagesTag is the tag number of the messages element in a file
 	// descriptor proto.
-	File_messagesTag = 4
-	// File_enumsTag is the tag number of the enums element in a file descriptor
+	FileMessagesTag = 4
+	// FileEnumsTag is the tag number of the enums element in a file descriptor
 	// proto.
-	File_enumsTag = 5
-	// File_servicesTag is the tag number of the services element in a file
+	FileEnumsTag = 5
+	// FileServicesTag is the tag number of the services element in a file
 	// descriptor proto.
-	File_servicesTag = 6
-	// File_extensionsTag is the tag number of the extensions element in a file
+	FileServicesTag = 6
+	// FileExtensionsTag is the tag number of the extensions element in a file
 	// descriptor proto.
-	File_extensionsTag = 7
-	// File_optionsTag is the tag number of the options element in a file
+	FileExtensionsTag = 7
+	// FileOptionsTag is the tag number of the options element in a file
 	// descriptor proto.
-	File_optionsTag = 8
-	// File_syntaxTag is the tag number of the syntax element in a file
+	FileOptionsTag = 8
+	// FileSyntaxTag is the tag number of the syntax element in a file
 	// descriptor proto.
-	File_syntaxTag = 12
-	// Message_nameTag is the tag number of the name element in a message
+	FileSyntaxTag = 12
+	// MessageNameTag is the tag number of the name element in a message
 	// descriptor proto.
-	Message_nameTag = 1
-	// Message_fieldsTag is the tag number of the fields element in a message
+	MessageNameTag = 1
+	// MessageFieldsTag is the tag number of the fields element in a message
 	// descriptor proto.
-	Message_fieldsTag = 2
-	// Message_nestedMessagesTag is the tag number of the nested messages
+	MessageFieldsTag = 2
+	// MessageNestedMessagesTag is the tag number of the nested messages
 	// element in a message descriptor proto.
-	Message_nestedMessagesTag = 3
-	// Message_enumsTag is the tag number of the enums element in a message
+	MessageNestedMessagesTag = 3
+	// MessageEnumsTag is the tag number of the enums element in a message
 	// descriptor proto.
-	Message_enumsTag = 4
-	// Message_extensionRangeTag is the tag number of the extension ranges
+	MessageEnumsTag = 4
+	// MessageExtensionRangeTag is the tag number of the extension ranges
 	// element in a message descriptor proto.
-	Message_extensionRangeTag = 5
-	// Message_extensionsTag is the tag number of the extensions element in a
+	MessageExtensionRangeTag = 5
+	// MessageExtensionsTag is the tag number of the extensions element in a
 	// message descriptor proto.
-	Message_extensionsTag = 6
-	// Message_optionsTag is the tag number of the options element in a message
+	MessageExtensionsTag = 6
+	// MessageOptionsTag is the tag number of the options element in a message
 	// descriptor proto.
-	Message_optionsTag = 7
-	// Message_oneOfsTag is the tag number of the one-ofs element in a message
+	MessageOptionsTag = 7
+	// MessageOneofsTag is the tag number of the one-ofs element in a message
 	// descriptor proto.
-	Message_oneOfsTag = 8
-	// Message_reservedRangeTag is the tag number of the reserved ranges element
+	MessageOneofsTag = 8
+	// MessageReservedRangeTag is the tag number of the reserved ranges element
 	// in a message descriptor proto.
-	Message_reservedRangeTag = 9
-	// Message_reservedNameTag is the tag number of the reserved names element
+	MessageReservedRangeTag = 9
+	// MessageReservedNameTag is the tag number of the reserved names element
 	// in a message descriptor proto.
-	Message_reservedNameTag = 10
-	// ExtensionRange_startTag is the tag number of the start index in an
+	MessageReservedNameTag = 10
+	// ExtensionRangeStartTag is the tag number of the start index in an
 	// extension range proto.
-	ExtensionRange_startTag = 1
-	// ExtensionRange_endTag is the tag number of the end index in an
+	ExtensionRangeStartTag = 1
+	// ExtensionRangeEndTag is the tag number of the end index in an
 	// extension range proto.
-	ExtensionRange_endTag = 2
-	// ExtensionRange_optionsTag is the tag number of the options element in an
+	ExtensionRangeEndTag = 2
+	// ExtensionRangeOptionsTag is the tag number of the options element in an
 	// extension range proto.
-	ExtensionRange_optionsTag = 3
-	// ReservedRange_startTag is the tag number of the start index in a reserved
+	ExtensionRangeOptionsTag = 3
+	// ReservedRangeStartTag is the tag number of the start index in a reserved
 	// range proto.
-	ReservedRange_startTag = 1
-	// ReservedRange_endTag is the tag number of the end index in a reserved
+	ReservedRangeStartTag = 1
+	// ReservedRangeEndTag is the tag number of the end index in a reserved
 	// range proto.
-	ReservedRange_endTag = 2
-	// Field_nameTag is the tag number of the name element in a field descriptor
+	ReservedRangeEndTag = 2
+	// FieldNameTag is the tag number of the name element in a field descriptor
 	// proto.
-	Field_nameTag = 1
-	// Field_extendeeTag is the tag number of the extendee element in a field
+	FieldNameTag = 1
+	// FieldExtendeeTag is the tag number of the extendee element in a field
 	// descriptor proto.
-	Field_extendeeTag = 2
-	// Field_numberTag is the tag number of the number element in a field
+	FieldExtendeeTag = 2
+	// FieldNumberTag is the tag number of the number element in a field
 	// descriptor proto.
-	Field_numberTag = 3
-	// Field_labelTag is the tag number of the label element in a field
+	FieldNumberTag = 3
+	// FieldLabelTag is the tag number of the label element in a field
 	// descriptor proto.
-	Field_labelTag = 4
-	// Field_typeTag is the tag number of the type element in a field descriptor
+	FieldLabelTag = 4
+	// FieldTypeTag is the tag number of the type element in a field descriptor
 	// proto.
-	Field_typeTag = 5
-	// Field_typeNameTag is the tag number of the type name element in a field
+	FieldTypeTag = 5
+	// FieldTypeNameTag is the tag number of the type name element in a field
 	// descriptor proto.
-	Field_typeNameTag = 6
-	// Field_defaultTag is the tag number of the default value element in a
+	FieldTypeNameTag = 6
+	// FieldDefaultTag is the tag number of the default value element in a
 	// field descriptor proto.
-	Field_defaultTag = 7
-	// Field_optionsTag is the tag number of the options element in a field
+	FieldDefaultTag = 7
+	// FieldOptionsTag is the tag number of the options element in a field
 	// descriptor proto.
-	Field_optionsTag = 8
-	// Field_jsonNameTag is the tag number of the JSON name element in a field
+	FieldOptionsTag = 8
+	// FieldJSONNameTag is the tag number of the JSON name element in a field
 	// descriptor proto.
-	Field_jsonNameTag = 10
-	// Field_proto3OptionalTag is the tag number of the proto3_optional element
+	FieldJSONNameTag = 10
+	// FieldProto3OptionalTag is the tag number of the proto3_optional element
 	// in a descriptor proto.
-	Field_proto3OptionalTag = 17
-	// OneOf_nameTag is the tag number of the name element in a one-of
+	FieldProto3OptionalTag = 17
+	// OneofNameTag is the tag number of the name element in a one-of
 	// descriptor proto.
-	OneOf_nameTag = 1
-	// OneOf_optionsTag is the tag number of the options element in a one-of
+	OneofNameTag = 1
+	// OneofOptionsTag is the tag number of the options element in a one-of
 	// descriptor proto.
-	OneOf_optionsTag = 2
-	// Enum_nameTag is the tag number of the name element in an enum descriptor
+	OneofOptionsTag = 2
+	// EnumNameTag is the tag number of the name element in an enum descriptor
 	// proto.
-	Enum_nameTag = 1
-	// Enum_valuesTag is the tag number of the values element in an enum
+	EnumNameTag = 1
+	// EnumValuesTag is the tag number of the values element in an enum
 	// descriptor proto.
-	Enum_valuesTag = 2
-	// Enum_optionsTag is the tag number of the options element in an enum
+	EnumValuesTag = 2
+	// EnumOptionsTag is the tag number of the options element in an enum
 	// descriptor proto.
-	Enum_optionsTag = 3
-	// Enum_reservedRangeTag is the tag number of the reserved ranges element in
+	EnumOptionsTag = 3
+	// EnumReservedRangeTag is the tag number of the reserved ranges element in
 	// an enum descriptor proto.
-	Enum_reservedRangeTag = 4
-	// Enum_reservedNameTag is the tag number of the reserved names element in
+	EnumReservedRangeTag = 4
+	// EnumReservedNameTag is the tag number of the reserved names element in
 	// an enum descriptor proto.
-	Enum_reservedNameTag = 5
-	// EnumVal_nameTag is the tag number of the name element in an enum value
+	EnumReservedNameTag = 5
+	// EnumValueNameTag is the tag number of the name element in an enum value
 	// descriptor proto.
-	EnumVal_nameTag = 1
-	// EnumVal_numberTag is the tag number of the number element in an enum
+	EnumValueNameTag = 1
+	// EnumValueNumberTag is the tag number of the number element in an enum
 	// value descriptor proto.
-	EnumVal_numberTag = 2
-	// EnumVal_optionsTag is the tag number of the options element in an enum
+	EnumValueNumberTag = 2
+	// EnumValueOptionsTag is the tag number of the options element in an enum
 	// value descriptor proto.
-	EnumVal_optionsTag = 3
-	// Service_nameTag is the tag number of the name element in a service
+	EnumValueOptionsTag = 3
+	// ServiceNameTag is the tag number of the name element in a service
 	// descriptor proto.
-	Service_nameTag = 1
-	// Service_methodsTag is the tag number of the methods element in a service
+	ServiceNameTag = 1
+	// ServiceMethodsTag is the tag number of the methods element in a service
 	// descriptor proto.
-	Service_methodsTag = 2
-	// Service_optionsTag is the tag number of the options element in a service
+	ServiceMethodsTag = 2
+	// ServiceOptionsTag is the tag number of the options element in a service
 	// descriptor proto.
-	Service_optionsTag = 3
-	// Method_nameTag is the tag number of the name element in a method
+	ServiceOptionsTag = 3
+	// MethodNameTag is the tag number of the name element in a method
 	// descriptor proto.
-	Method_nameTag = 1
-	// Method_inputTag is the tag number of the input type element in a method
+	MethodNameTag = 1
+	// MethodInputTag is the tag number of the input type element in a method
 	// descriptor proto.
-	Method_inputTag = 2
-	// Method_outputTag is the tag number of the output type element in a method
+	MethodInputTag = 2
+	// MethodOutputTag is the tag number of the output type element in a method
 	// descriptor proto.
-	Method_outputTag = 3
-	// Method_optionsTag is the tag number of the options element in a method
+	MethodOutputTag = 3
+	// MethodOptionsTag is the tag number of the options element in a method
 	// descriptor proto.
-	Method_optionsTag = 4
-	// Method_inputStreamTag is the tag number of the input stream flag in a
+	MethodOptionsTag = 4
+	// MethodInputStreamTag is the tag number of the input stream flag in a
 	// method descriptor proto.
-	Method_inputStreamTag = 5
-	// Method_outputStreamTag is the tag number of the output stream flag in a
+	MethodInputStreamTag = 5
+	// MethodOutputStreamTag is the tag number of the output stream flag in a
 	// method descriptor proto.
-	Method_outputStreamTag = 6
+	MethodOutputStreamTag = 6
 
 	// UninterpretedOptionsTag is the tag number of the uninterpreted options
 	// element. All *Options messages use the same tag for the field that stores
 	// uninterpreted options.
 	UninterpretedOptionsTag = 999
 
-	// Uninterpreted_nameTag is the tag number of the name element in an
+	// UninterpretedOptionNameTag is the tag number of the name element in an
 	// uninterpreted options proto.
-	Uninterpreted_nameTag = 2
-	// Uninterpreted_identTag is the tag number of the identifier value in an
+	UninterpretedOptionNameTag = 2
+	// UninterpretedOptionIdentTag is the tag number of the identifier value in an
 	// uninterpreted options proto.
-	Uninterpreted_identTag = 3
-	// Uninterpreted_posIntTag is the tag number of the positive int value in an
+	UninterpretedOptionIdentTag = 3
+	// UninterpretedOptionPosIntTag is the tag number of the positive int value in an
 	// uninterpreted options proto.
-	Uninterpreted_posIntTag = 4
-	// Uninterpreted_negIntTag is the tag number of the negative int value in an
+	UninterpretedOptionPosIntTag = 4
+	// UninterpretedOptionNegIntTag is the tag number of the negative int value in an
 	// uninterpreted options proto.
-	Uninterpreted_negIntTag = 5
-	// Uninterpreted_doubleTag is the tag number of the double value in an
+	UninterpretedOptionNegIntTag = 5
+	// UninterpretedOptionDoubleTag is the tag number of the double value in an
 	// uninterpreted options proto.
-	Uninterpreted_doubleTag = 6
-	// Uninterpreted_stringTag is the tag number of the string value in an
+	UninterpretedOptionDoubleTag = 6
+	// UninterpretedOptionStringTag is the tag number of the string value in an
 	// uninterpreted options proto.
-	Uninterpreted_stringTag = 7
-	// Uninterpreted_aggregateTag is the tag number of the aggregate value in an
+	UninterpretedOptionStringTag = 7
+	// UninterpretedOptionAggregateTag is the tag number of the aggregate value in an
 	// uninterpreted options proto.
-	Uninterpreted_aggregateTag = 8
-	// UninterpretedName_nameTag is the tag number of the name element in an
+	UninterpretedOptionAggregateTag = 8
+	// UninterpretedNameNameTag is the tag number of the name element in an
 	// uninterpreted option name proto.
-	UninterpretedName_nameTag = 1
+	UninterpretedNameNameTag = 1
 )
 
 // JsonName returns the default JSON name for a field with the given name.

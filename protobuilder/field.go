@@ -47,7 +47,7 @@ type FieldBuilder struct {
 var _ Builder = (*FieldBuilder)(nil)
 
 // NewField creates a new FieldBuilder for a non-extension field with the given
-// path and type. To create a map or group field, see NewMapField or
+// name and type. To create a map or group field, see NewMapField or
 // NewGroupField respectively.
 //
 // The new field will be optional. See SetCardinality, SetRepeated, and SetRequired
@@ -63,7 +63,7 @@ func NewField(name protoreflect.Name, typ *FieldType) *FieldBuilder {
 }
 
 // NewMapField creates a new FieldBuilder for a non-extension field with the
-// given path and whose type is a map of the given key and value types. Map keys
+// given name and whose type is a map of the given key and value types. Map keys
 // can be any of the scalar integer types, booleans, or strings. If any other
 // type is specified, this function will panic. Map values cannot be groups: if
 // a group type is specified, this function will panic.
@@ -106,9 +106,9 @@ func NewMapField(name protoreflect.Name, keyTyp, valTyp *FieldType) *FieldBuilde
 }
 
 // NewGroupField creates a new FieldBuilder for a non-extension field whose type
-// is a group with the given definition. The given message's path must start
-// with a capital letter, and the resulting field will have the same path but
-// converted to all lower-case. If a message is given with a path that starts
+// is a group with the given definition. The given message's name must start
+// with a capital letter, and the resulting field will have the same name but
+// converted to all lower-case. If a message is given with a name that starts
 // with a lower-case letter, this function will panic.
 //
 // When this field is added to a message, the associated group message type will
@@ -120,7 +120,7 @@ func NewMapField(name protoreflect.Name, keyTyp, valTyp *FieldType) *FieldBuilde
 // SetNumber or TrySetNumber to assign an explicit tag number.
 func NewGroupField(mb *MessageBuilder) *FieldBuilder {
 	if !unicode.IsUpper(rune(mb.name[0])) {
-		panic(fmt.Sprintf("group path %s must start with a capital letter", mb.name))
+		panic(fmt.Sprintf("group name %s must start with a capital letter", mb.name))
 	}
 	Unlink(mb)
 
@@ -136,7 +136,7 @@ func NewGroupField(mb *MessageBuilder) *FieldBuilder {
 }
 
 // NewExtension creates a new FieldBuilder for an extension field with the given
-// path, tag, type, and extendee. The extendee given is a message builder.
+// name, tag, type, and extendee. The extendee given is a message builder.
 //
 // The new field will be optional. See SetCardinality and SetRepeated for changing
 // this aspect of the field.
@@ -150,7 +150,7 @@ func NewExtension(name protoreflect.Name, tag protoreflect.FieldNumber, typ *Fie
 }
 
 // NewExtensionImported creates a new FieldBuilder for an extension field with
-// the given path, tag, type, and extendee. The extendee given is a message
+// the given name, tag, type, and extendee. The extendee given is a message
 // descriptor.
 //
 // The new field will be optional. See SetCardinality and SetRepeated for changing
@@ -174,7 +174,7 @@ func NewExtensionImported(name protoreflect.Name, tag protoreflect.FieldNumber, 
 //
 // This means that field builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original field's
-// package path.
+// package name.
 func FromField(fld protoreflect.FieldDescriptor) (*FieldBuilder, error) {
 	if fb, err := FromFile(fld.ParentFile()); err != nil {
 		return nil, err
@@ -211,8 +211,8 @@ func fromField(fld protoreflect.FieldDescriptor) (*FieldBuilder, error) {
 	return flb, nil
 }
 
-// SetName changes this field's path, returning the field builder for method
-// chaining. If the given new path is not valid (e.g. TrySetName would have
+// SetName changes this field's name, returning the field builder for method
+// chaining. If the given new name is not valid (e.g. TrySetName would have
 // returned an error) then this method will panic.
 func (flb *FieldBuilder) SetName(newName protoreflect.Name) *FieldBuilder {
 	if err := flb.TrySetName(newName); err != nil {
@@ -221,29 +221,28 @@ func (flb *FieldBuilder) SetName(newName protoreflect.Name) *FieldBuilder {
 	return flb
 }
 
-// TrySetName changes this field's path. It will return an error if the given
-// new path is not a valid protobuf identifier or if the parent builder already
-// has an element with the given path.
+// TrySetName changes this field's name. It will return an error if the given
+// new name is not a valid protobuf identifier or if the parent builder already
+// has an element with the given name.
 //
-// If the field is a non-extension whose parent is a one-of, the one-of's
-// enclosing message is checked for elements with a conflicting path. Despite
-// the fact that one-of choices are modeled as children of the one-of builder,
+// If the field is a non-extension whose parent is a oneof, the oneof's
+// enclosing message is checked for elements with a conflicting name. Despite
+// the fact that oneof choices are modeled as children of the oneof builder,
 // in the protobuf IDL they are actually all defined in the message's namespace.
 func (flb *FieldBuilder) TrySetName(newName protoreflect.Name) error {
 	var oldMsgName protoreflect.Name
 	if flb.msgType != nil {
 		if flb.fieldType.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
-			return fmt.Errorf("cannot change path of group field %s; change path of group instead", FullName(flb))
-		} else {
-			oldMsgName = flb.msgType.name
-			msgName := entryTypeName(newName)
-			if err := flb.msgType.trySetNameInternal(msgName); err != nil {
-				return err
-			}
+			return fmt.Errorf("cannot change name of group field %s; change name of group instead", FullName(flb))
+		}
+		oldMsgName = flb.msgType.name
+		msgName := entryTypeName(newName)
+		if err := flb.msgType.trySetNameInternal(msgName); err != nil {
+			return err
 		}
 	}
 	if err := flb.baseBuilder.setName(flb, newName); err != nil {
-		// undo change to map entry path
+		// undo change to map entry name
 		if flb.msgType != nil && flb.fieldType.fieldType != descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 			flb.msgType.setNameInternal(oldMsgName)
 		}
@@ -305,9 +304,9 @@ func (flb *FieldBuilder) renamedChild(b Builder, _ protoreflect.Name) error {
 		if flb.fieldType.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 			// For groups, we need to rename the field according to the group message's new name
 			if !unicode.IsUpper(rune(b.Name()[0])) {
-				return fmt.Errorf("group path %s must start with capital letter", b.Name())
+				return fmt.Errorf("group name %s must start with capital letter", b.Name())
 			}
-			// change field path to be lower-case form of group path
+			// change field name to be lower-case form of group name
 			oldFieldName = flb.name
 			fieldName := protoreflect.Name(strings.ToLower(string(b.Name())))
 			if err := flb.trySetNameInternal(fieldName); err != nil {
@@ -479,7 +478,7 @@ func (flb *FieldBuilder) SetDefaultValue(defValue string) *FieldBuilder {
 	return flb
 }
 
-// SetJsonName sets the path used in the field's JSON representation and then
+// SetJsonName sets the name used in the field's JSON representation and then
 // returns the field builder, for method chaining.
 func (flb *FieldBuilder) SetJsonName(jsonName string) *FieldBuilder {
 	flb.JsonName = jsonName
@@ -491,7 +490,7 @@ func (flb *FieldBuilder) IsExtension() bool {
 	return flb.localExtendee != nil || flb.foreignExtendee != nil
 }
 
-// ExtendeeTypeName returns the fully qualified path of the extended message
+// ExtendeeTypeName returns the fully qualified name of the extended message
 // or it returns an empty string if this is not an extension field.
 func (flb *FieldBuilder) ExtendeeTypeName() protoreflect.FullName {
 	if flb.foreignExtendee != nil {
@@ -588,7 +587,7 @@ func (flb *FieldBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(flb, BuilderOptions{})
 }
 
-// OneofBuilder is a builder used to construct a protoreflect.OneOfDescriptor. A one-of
+// OneofBuilder is a builder used to construct a protoreflect.OneOfDescriptor. A oneof
 // builder *must* be added to a message before calling its Build() method.
 //
 // To create a new OneofBuilder, use NewOneof.
@@ -603,7 +602,7 @@ type OneofBuilder struct {
 
 var _ Builder = (*OneofBuilder)(nil)
 
-// NewOneof creates a new OneofBuilder for a one-of with the given path.
+// NewOneof creates a new OneofBuilder for a oneof with the given name.
 func NewOneof(name protoreflect.Name) *OneofBuilder {
 	return &OneofBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -614,26 +613,26 @@ func NewOneof(name protoreflect.Name) *OneofBuilder {
 // FromOneof returns a OneofBuilder that is effectively a copy of the given
 // descriptor.
 //
-// Note that it is not just the given one-of that is copied but its entire file.
+// Note that it is not just the given oneof that is copied but its entire file.
 // So the caller can get the parent element of the returned builder and the
-// result would be a builder that is effectively a copy of the one-of
+// result would be a builder that is effectively a copy of the oneof
 // descriptor's parent message.
 //
-// This means that one-of builders created from descriptors do not need to be
-// explicitly assigned to a file in order to preserve the original one-of's
-// package path.
+// This means that oneof builders created from descriptors do not need to be
+// explicitly assigned to a file in order to preserve the original oneof's
+// package name.
 //
 // This function returns an error if the given descriptor is synthetic.
 func FromOneof(ood protoreflect.OneofDescriptor) (*OneofBuilder, error) {
 	if ood.IsSynthetic() {
-		return nil, fmt.Errorf("one-of %s is synthetic", ood.FullName())
+		return nil, fmt.Errorf("oneof %s is synthetic", ood.FullName())
 	}
 	if fb, err := FromFile(ood.ParentFile()); err != nil {
 		return nil, err
 	} else if oob, ok := fb.findFullyQualifiedElement(ood.FullName()).(*OneofBuilder); ok {
 		return oob, nil
 	} else {
-		return nil, fmt.Errorf("could not find one-of %s after converting file %q to builder", ood.FullName(), ood.ParentFile().Path())
+		return nil, fmt.Errorf("could not find oneof %s after converting file %q to builder", ood.FullName(), ood.ParentFile().Path())
 	}
 }
 
@@ -659,8 +658,8 @@ func fromOneof(ood protoreflect.OneofDescriptor) (*OneofBuilder, error) {
 	return oob, nil
 }
 
-// SetName changes this one-of's path, returning the one-of builder for method
-// chaining. If the given new path is not valid (e.g. TrySetName would have
+// SetName changes this oneof's name, returning the oneof builder for method
+// chaining. If the given new name is not valid (e.g. TrySetName would have
 // returned an error) then this method will panic.
 func (oob *OneofBuilder) SetName(newName protoreflect.Name) *OneofBuilder {
 	if err := oob.TrySetName(newName); err != nil {
@@ -669,22 +668,22 @@ func (oob *OneofBuilder) SetName(newName protoreflect.Name) *OneofBuilder {
 	return oob
 }
 
-// TrySetName changes this one-of's path. It will return an error if the given
-// new path is not a valid protobuf identifier or if the parent message builder
-// already has an element with the given path.
+// TrySetName changes this oneof's name. It will return an error if the given
+// new name is not a valid protobuf identifier or if the parent message builder
+// already has an element with the given name.
 func (oob *OneofBuilder) TrySetName(newName protoreflect.Name) error {
 	return oob.baseBuilder.setName(oob, newName)
 }
 
-// SetComments sets the comments associated with the one-of. This method
-// returns the one-of builder, for method chaining.
+// SetComments sets the comments associated with the oneof. This method
+// returns the oneof builder, for method chaining.
 func (oob *OneofBuilder) SetComments(c Comments) *OneofBuilder {
 	oob.comments = c
 	return oob
 }
 
-// Children returns any builders assigned to this one-of builder. These will
-// be choices for the one-of, each of which will be a field builder.
+// Children returns any builders assigned to this oneof builder. These will
+// be choices for the oneof, each of which will be a field builder.
 func (oob *OneofBuilder) Children() []Builder {
 	var ch []Builder
 	for _, evb := range oob.choices {
@@ -701,8 +700,8 @@ func (oob *OneofBuilder) parent() *MessageBuilder {
 }
 
 func (oob *OneofBuilder) findChild(_ protoreflect.Name) Builder {
-	// in terms of finding a child by qualified path, fields in the
-	// one-of are considered children of the message, not the one-of
+	// in terms of finding a child by qualified name, fields in the
+	// oneof are considered children of the message, not the oneof
 	return nil
 }
 
@@ -712,7 +711,7 @@ func (oob *OneofBuilder) removeChild(b Builder) {
 	}
 
 	if oob.parent() != nil {
-		// remove from message's path and tag maps
+		// remove from message's name and tag maps
 		flb := b.(*FieldBuilder)
 		delete(oob.parent().fieldTags, flb.Number())
 		delete(oob.parent().symbols, flb.Name())
@@ -735,7 +734,7 @@ func (oob *OneofBuilder) renamedChild(b Builder, oldName protoreflect.Name) erro
 		return err
 	}
 
-	// update message's path map (to make sure new field path doesn't
+	// update message's name map (to make sure new field name doesn't
 	// collide with other kinds of elements in the message)
 	if oob.parent() != nil {
 		if err := oob.parent().addSymbol(b); err != nil {
@@ -751,28 +750,28 @@ func (oob *OneofBuilder) renamedChild(b Builder, oldName protoreflect.Name) erro
 
 func (oob *OneofBuilder) addSymbol(b *FieldBuilder) error {
 	if _, ok := oob.symbols[b.Name()]; ok {
-		return fmt.Errorf("one-of %s already contains field named %q", FullName(oob), b.Name())
+		return fmt.Errorf("oneof %s already contains field named %q", FullName(oob), b.Name())
 	}
 	oob.symbols[b.Name()] = b
 	return nil
 }
 
-// GetChoice returns the field with the given path. If no such field exists in
-// the one-of, nil is returned.
+// GetChoice returns the field with the given name. If no such field exists in
+// the oneof, nil is returned.
 func (oob *OneofBuilder) GetChoice(name protoreflect.Name) *FieldBuilder {
 	return oob.symbols[name]
 }
 
-// RemoveChoice removes the field with the given path. If no such field exists
-// in the one-of, this is a no-op. This returns the one-of builder, for method
+// RemoveChoice removes the field with the given name. If no such field exists
+// in the oneof, this is a no-op. This returns the oneof builder, for method
 // chaining.
 func (oob *OneofBuilder) RemoveChoice(name protoreflect.Name) *OneofBuilder {
 	oob.TryRemoveChoice(name)
 	return oob
 }
 
-// TryRemoveChoice removes the field with the given path and returns false if
-// the one-of has no such field.
+// TryRemoveChoice removes the field with the given name and returns false if
+// the oneof has no such field.
 func (oob *OneofBuilder) TryRemoveChoice(name protoreflect.Name) bool {
 	if flb, ok := oob.symbols[name]; ok {
 		oob.removeChild(flb)
@@ -781,11 +780,11 @@ func (oob *OneofBuilder) TryRemoveChoice(name protoreflect.Name) bool {
 	return false
 }
 
-// AddChoice adds the given field to this one-of. If an error prevents the field
+// AddChoice adds the given field to this oneof. If an error prevents the field
 // from being added, this method panics. If the given field is an extension,
 // this method panics. If the given field is a group or map field or if it is
 // not optional (e.g. it is required or repeated), this method panics. This
-// returns the one-of builder, for method chaining.
+// returns the oneof builder, for method chaining.
 func (oob *OneofBuilder) AddChoice(flb *FieldBuilder) *OneofBuilder {
 	if err := oob.TryAddChoice(flb); err != nil {
 		panic(err)
@@ -793,8 +792,8 @@ func (oob *OneofBuilder) AddChoice(flb *FieldBuilder) *OneofBuilder {
 	return oob
 }
 
-// TryAddChoice adds the given field to this one-of, returning any error that
-// prevents the field from being added (such as a path collision with another
+// TryAddChoice adds the given field to this oneof, returning any error that
+// prevents the field from being added (such as a name collision with another
 // element already added to the enclosing message). An error is returned if the
 // given field is an extension field, a map or group field, or repeated or
 // required.
@@ -803,21 +802,21 @@ func (oob *OneofBuilder) TryAddChoice(flb *FieldBuilder) error {
 		return fmt.Errorf("field %s is an extension, not a regular field", flb.Name())
 	}
 	if flb.msgType != nil && flb.fieldType.fieldType != descriptorpb.FieldDescriptorProto_TYPE_GROUP {
-		return fmt.Errorf("cannot add a map field %q to one-of %s", flb.name, FullName(oob))
+		return fmt.Errorf("cannot add a map field %q to oneof %s", flb.name, FullName(oob))
 	}
 	if flb.IsRepeated() || flb.IsRequired() {
-		return fmt.Errorf("fields in a one-of must be optional, %s is %v", flb.name, flb.Cardinality)
+		return fmt.Errorf("fields in a oneof must be optional, %s is %v", flb.name, flb.Cardinality)
 	}
 	if err := oob.addSymbol(flb); err != nil {
 		return err
 	}
 	mb := oob.parent()
 	if mb != nil {
-		// If we are moving field from a message to a one-of that belongs to the
+		// If we are moving field from a message to a oneof that belongs to the
 		// same message, we have to use different order of operations to prevent
 		// failure (otherwise, it looks like it's being added twice).
-		// (We do similar if moving the other direction, from the one-of into
-		// the message to which one-of belongs.)
+		// (We do similar if moving the other direction, from the oneof into
+		// the message to which oneof belongs.)
 		needToUnlinkFirst := mb.isPresentButNotChild(flb)
 		if needToUnlinkFirst {
 			Unlink(flb)
@@ -840,7 +839,7 @@ func (oob *OneofBuilder) TryAddChoice(flb *FieldBuilder) error {
 	return nil
 }
 
-// SetOptions sets the one-of options for this one-of and returns the one-of,
+// SetOptions sets the oneof options for this oneof and returns the oneof,
 // for method chaining.
 func (oob *OneofBuilder) SetOptions(options *descriptorpb.OneofOptions) *OneofBuilder {
 	oob.Options = options
@@ -852,7 +851,7 @@ func (oob *OneofBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 
 	for _, flb := range oob.choices {
 		if flb.IsRepeated() || flb.IsRequired() {
-			return nil, fmt.Errorf("fields in a one-of must be optional, %s is %v", FullName(flb), flb.Cardinality)
+			return nil, fmt.Errorf("fields in a oneof must be optional, %s is %v", FullName(flb), flb.Cardinality)
 		}
 	}
 
@@ -862,7 +861,7 @@ func (oob *OneofBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 	}, nil
 }
 
-// Build constructs a one-of descriptor based on the contents of this one-of
+// Build constructs a oneof descriptor based on the contents of this oneof
 // builder. If there are any problems constructing the descriptor, including
 // resolving symbols referenced by the builder or failing to meet certain
 // validation rules, an error is returned.
@@ -874,8 +873,8 @@ func (oob *OneofBuilder) Build() (protoreflect.OneofDescriptor, error) {
 	return ood.(protoreflect.OneofDescriptor), nil
 }
 
-// BuildDescriptor constructs a one-of descriptor based on the contents of this
-// one-of builder. Most usages will prefer Build() instead, whose return type is
+// BuildDescriptor constructs a oneof descriptor based on the contents of this
+// oneof builder. Most usages will prefer Build() instead, whose return type is
 // a concrete descriptor type. This method is present to satisfy the Builder
 // interface.
 func (oob *OneofBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {

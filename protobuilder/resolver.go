@@ -335,21 +335,21 @@ func (r *dependencyResolver) resolveRpcType(root Builder, seen []Builder, t *Rpc
 }
 
 func (r *dependencyResolver) resolveTypesInField(root Builder, seen []Builder, deps *dependencies, flb *FieldBuilder) error {
-	if flb.fieldType.foreignMsgType != nil {
+	switch {
+	case flb.fieldType.foreignMsgType != nil:
 		if err := deps.add(flb.fieldType.foreignMsgType.ParentFile()); err != nil {
 			return err
 		}
-	} else if flb.fieldType.foreignEnumType != nil {
+	case flb.fieldType.foreignEnumType != nil:
 		if err := deps.add(flb.fieldType.foreignEnumType.ParentFile()); err != nil {
 			return err
 		}
-	} else if flb.fieldType.localMsgType != nil {
+	case flb.fieldType.localMsgType != nil:
 		if flb.fieldType.localMsgType == flb.msgType {
 			return r.resolveTypesInMessage(root, seen, deps, flb.msgType)
-		} else {
-			return r.resolveType(root, seen, flb.fieldType.localMsgType, deps)
 		}
-	} else if flb.fieldType.localEnumType != nil {
+		return r.resolveType(root, seen, flb.fieldType.localMsgType, deps)
+	case flb.fieldType.localEnumType != nil:
 		return r.resolveType(root, seen, flb.fieldType.localEnumType, deps)
 	}
 	return nil
