@@ -7,6 +7,7 @@ require (
 	github.com/golang/protobuf v1.5.3
 	github.com/jhump/gopoet v0.1.0
 	github.com/jhump/goprotoc v0.5.0
+	github.com/jhump/protoreflect/v2 v2.0.0-20230530231430-4069b9c3ca43
 	google.golang.org/grpc v1.57.0
 	google.golang.org/protobuf v1.31.0
 )
