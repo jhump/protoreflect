@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/bufbuild/protocompile v0.5.1
 	github.com/google/go-cmp v0.5.9
+	github.com/jhump/protoreflect v1.15.2-0.20230531130918-5e6d88e10245
 	github.com/stretchr/testify v1.8.2
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.30.0
