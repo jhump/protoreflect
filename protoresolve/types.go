@@ -58,9 +58,9 @@ type TypeKind int
 
 // The various supported TypeKind values.
 const (
-	TypeKindMessage   = TypeKind(1 << iota)
-	TypeKindEnum      = TypeKind(1 << iota)
-	TypeKindExtension = TypeKind(1 << iota)
+	TypeKindMessage = TypeKind(1 << iota)
+	TypeKindEnum
+	TypeKindExtension
 
 	// TypeKindsAll is a bitmask that represents all types.
 	TypeKindsAll = TypeKindMessage | TypeKindEnum | TypeKindExtension

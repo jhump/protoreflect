@@ -1,6 +1,7 @@
 // Package grpcdynamic provides a dynamic RPC stub. It can be used to invoke RPC
-// method where only method descriptors are known. The actual request and response
-// messages may be dynamic messages.
+// methods that are unknown at compile time, using method descriptors to drive the
+// invocations at runtime. The actual request and response messages may be (and
+// likely often are) dynamic messages.
 package grpcdynamic
 
 import (

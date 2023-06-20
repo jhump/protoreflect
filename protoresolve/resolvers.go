@@ -152,8 +152,8 @@ var _ DependencyResolver = protodesc.Resolver(nil)
 // of descriptors.
 //
 // The AsTypeResolver method returns a view of the resolver as a TypeResolver. In most
-// cases, the returned types are dynamic types constructed using the resolver's
-// descriptors and the "google.golang.org/protobuf/types/dynamicpb" package.
+// cases, the returned types will be dynamic types constructed using the resolver's
+// descriptors and the [google.golang.org/protobuf/types/dynamicpb] package.
 type Resolver interface {
 	DescriptorPool
 	TypedDescriptorResolver
@@ -349,9 +349,20 @@ func findSymbolInMessage(symbolParts []string, md protoreflect.MessageDescriptor
 
 // ResolverFromPool implements the full Resolver interface on top of the
 // given DescriptorPool. This can be used to upgrade a *[protoregistry.Files]
-// to the Resolver interface
+// to the Resolver interface. The AsTypeResolver method uses TypesFromResolver,
+// so it returns dynamic types.
+//
+// See also ResolverFromPools.
 func ResolverFromPool(pool DescriptorPool) Resolver {
 	return &resolverFromPool{DescriptorPool: pool}
+}
+
+// ResolverFromPools (plural) is just like ResolverFromPool (singular) except it
+// also accepts a TypePool that is used to implement the AsTypeResolver method.
+// So instead of always returning dynamic types based on the given DescriptorPool,
+// it uses the given TypePool.
+func ResolverFromPools(descPool DescriptorPool, typePool TypePool) Resolver {
+	return &resolverWithTypes{Resolver: ResolverFromPool(descPool), types: typePool}
 }
 
 type resolverFromPool struct {
@@ -467,4 +478,17 @@ func (r *resolverFromPool) FindMessageByURL(url string) (protoreflect.MessageDes
 
 func (r *resolverFromPool) AsTypeResolver() TypeResolver {
 	return TypesFromResolver(r)
+}
+
+type resolverWithTypes struct {
+	Resolver
+	types TypePool
+}
+
+func (r *resolverWithTypes) AsTypeResolver() TypeResolver {
+	return r.types
+}
+
+func (r *resolverWithTypes) AsTypePool() TypePool {
+	return r.types
 }
