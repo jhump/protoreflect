@@ -1,7 +1,7 @@
 package sourceinfo
 
 import (
-	"math"
+	"github.com/jhump/protoreflect/v2/sourcelocation"
 	"sync"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -10,7 +10,12 @@ import (
 	"github.com/jhump/protoreflect/v2/internal"
 )
 
-// NB: forked from google.golang.org/protobuf/internal/filedesc
+// NB: forked from google.golang.org/protobuf/internal/filedesc/desc_list.go.
+// Changes made:
+//   * Use internal tag constants since genid is unavailable.
+//   * Use internal.PathKey instead of bespoke pathKey type and newPathKey function.
+//   * Use sourcelocation.PathFor in ByDescriptor to compute source path.
+
 type sourceLocations struct {
 	protoreflect.SourceLocations
 
@@ -26,135 +31,48 @@ type sourceLocations struct {
 	fd protoreflect.FileDescriptor
 
 	once   sync.Once
-	byPath map[pathKey]int
+	byPath map[string]int
 }
 
 func (p *sourceLocations) Len() int { return len(p.orig) }
 func (p *sourceLocations) Get(i int) protoreflect.SourceLocation {
 	return p.lazyInit().locs[i]
 }
-func (p *sourceLocations) byKey(k pathKey) protoreflect.SourceLocation {
+func (p *sourceLocations) byKey(k string) protoreflect.SourceLocation {
 	if i, ok := p.lazyInit().byPath[k]; ok {
 		return p.locs[i]
 	}
 	return protoreflect.SourceLocation{}
 }
 func (p *sourceLocations) ByPath(path protoreflect.SourcePath) protoreflect.SourceLocation {
-	return p.byKey(newPathKey(path))
+	return p.byKey(internal.PathKey(path))
 }
 func (p *sourceLocations) ByDescriptor(desc protoreflect.Descriptor) protoreflect.SourceLocation {
 	if p.fd != nil && desc != nil && p.fd != desc.ParentFile() {
 		return protoreflect.SourceLocation{} // mismatching parent imports
 	}
-	var pathArr [16]int32
-	path := pathArr[:0]
-	for {
-		switch desc.(type) {
-		case protoreflect.FileDescriptor:
-			// Reverse the path since it was constructed in reverse.
-			for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
-				path[i], path[j] = path[j], path[i]
-			}
-			return p.byKey(newPathKey(path))
-		case protoreflect.MessageDescriptor:
-			path = append(path, int32(desc.Index()))
-			desc = desc.Parent()
-			switch desc.(type) {
-			case protoreflect.FileDescriptor:
-				path = append(path, int32(internal.FileMessagesTag))
-			case protoreflect.MessageDescriptor:
-				path = append(path, int32(internal.MessageNestedMessagesTag))
-			default:
-				return protoreflect.SourceLocation{}
-			}
-		case protoreflect.FieldDescriptor:
-			isExtension := desc.(protoreflect.FieldDescriptor).IsExtension()
-			path = append(path, int32(desc.Index()))
-			desc = desc.Parent()
-			if isExtension {
-				switch desc.(type) {
-				case protoreflect.FileDescriptor:
-					path = append(path, int32(internal.FileExtensionsTag))
-				case protoreflect.MessageDescriptor:
-					path = append(path, int32(internal.MessageExtensionsTag))
-				default:
-					return protoreflect.SourceLocation{}
-				}
-			} else {
-				switch desc.(type) {
-				case protoreflect.MessageDescriptor:
-					path = append(path, int32(internal.MessageFieldsTag))
-				default:
-					return protoreflect.SourceLocation{}
-				}
-			}
-		case protoreflect.OneofDescriptor:
-			path = append(path, int32(desc.Index()))
-			desc = desc.Parent()
-			switch desc.(type) {
-			case protoreflect.MessageDescriptor:
-				path = append(path, int32(internal.MessageOneofsTag))
-			default:
-				return protoreflect.SourceLocation{}
-			}
-		case protoreflect.EnumDescriptor:
-			path = append(path, int32(desc.Index()))
-			desc = desc.Parent()
-			switch desc.(type) {
-			case protoreflect.FileDescriptor:
-				path = append(path, int32(internal.FileEnumsTag))
-			case protoreflect.MessageDescriptor:
-				path = append(path, int32(internal.MessageEnumsTag))
-			default:
-				return protoreflect.SourceLocation{}
-			}
-		case protoreflect.EnumValueDescriptor:
-			path = append(path, int32(desc.Index()))
-			desc = desc.Parent()
-			switch desc.(type) {
-			case protoreflect.EnumDescriptor:
-				path = append(path, int32(internal.EnumValuesTag))
-			default:
-				return protoreflect.SourceLocation{}
-			}
-		case protoreflect.ServiceDescriptor:
-			path = append(path, int32(desc.Index()))
-			desc = desc.Parent()
-			switch desc.(type) {
-			case protoreflect.FileDescriptor:
-				path = append(path, int32(internal.FileServicesTag))
-			default:
-				return protoreflect.SourceLocation{}
-			}
-		case protoreflect.MethodDescriptor:
-			path = append(path, int32(desc.Index()))
-			desc = desc.Parent()
-			switch desc.(type) {
-			case protoreflect.ServiceDescriptor:
-				path = append(path, int32(internal.ServiceMethodsTag))
-			default:
-				return protoreflect.SourceLocation{}
-			}
-		default:
-			return protoreflect.SourceLocation{}
-		}
+	path := sourcelocation.PathFor(desc)
+	if path == nil {
+		return protoreflect.SourceLocation{}
 	}
+	return p.byKey(internal.PathKey(path))
 }
+
 func (p *sourceLocations) lazyInit() *sourceLocations {
 	p.once.Do(func() {
 		if len(p.orig) > 0 {
 			p.locs = make([]protoreflect.SourceLocation, len(p.orig))
 			// Collect all the indexes for a given path.
-			pathIdxs := make(map[pathKey][]int, len(p.locs))
+			pathIdxs := make(map[string][]int, len(p.locs))
 			for i := range p.orig {
 				l := asSourceLocation(p.orig[i])
 				p.locs[i] = l
-				k := newPathKey(l.Path)
+				k := internal.PathKey(l.Path)
 				pathIdxs[k] = append(pathIdxs[k], i)
 			}
 
 			// Update the next index for all locations.
-			p.byPath = make(map[pathKey]int, len(p.locs))
+			p.byPath = make(map[string]int, len(p.locs))
 			for k, idxs := range pathIdxs {
 				for i := 0; i < len(idxs)-1; i++ {
 					p.locs[idxs[i]].Next = idxs[i+1]
@@ -184,24 +102,4 @@ func asSourceLocation(l *descriptorpb.SourceCodeInfo_Location) protoreflect.Sour
 		LeadingComments:         l.GetLeadingComments(),
 		TrailingComments:        l.GetTrailingComments(),
 	}
-}
-
-// pathKey is a comparable representation of protoreflect.SourcePath.
-type pathKey struct {
-	arr [16]uint8 // first n-1 path segments; last element is the length
-	str string    // used if the path does not fit in arr
-}
-
-func newPathKey(p protoreflect.SourcePath) (k pathKey) {
-	if len(p) < len(k.arr) {
-		for i, ps := range p {
-			if ps < 0 || math.MaxUint8 <= ps {
-				return pathKey{str: p.String()}
-			}
-			k.arr[i] = uint8(ps)
-		}
-		k.arr[len(k.arr)-1] = uint8(len(p))
-		return k
-	}
-	return pathKey{str: p.String()}
 }

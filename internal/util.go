@@ -256,3 +256,18 @@ func GetMaxTag(isMessageSet bool) protoreflect.FieldNumber {
 	}
 	return MaxNormalTag
 }
+
+// PathKey returns a string that corresponds to the given path that can be used
+// as a map key.
+func PathKey(path protoreflect.SourcePath) string {
+	b := make([]byte, len(path)*4)
+	j := 0
+	for _, s := range path {
+		b[j] = byte(s)
+		b[j+1] = byte(s >> 8)
+		b[j+2] = byte(s >> 16)
+		b[j+3] = byte(s >> 24)
+		j += 4
+	}
+	return string(b)
+}

@@ -1,6 +1,7 @@
 package protoprint
 
 import (
+	"github.com/jhump/protoreflect/v2/internal"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/jhump/protoreflect/v2/sourcelocation"
@@ -28,7 +29,7 @@ func (s *sourceLocations) ByPath(path protoreflect.SourcePath) protoreflect.Sour
 	if loc.Path != nil {
 		return loc
 	}
-	k := pathKey(path)
+	k := internal.PathKey(path)
 	pLoc := s.extrasByPath[k]
 	if pLoc == nil {
 		return protoreflect.SourceLocation{}
@@ -38,24 +39,11 @@ func (s *sourceLocations) ByPath(path protoreflect.SourcePath) protoreflect.Sour
 
 func (s *sourceLocations) putIfAbsent(path protoreflect.SourcePath, loc protoreflect.SourceLocation) {
 	if existing := s.ByPath(path); sourcelocation.IsZero(existing) {
-		k := pathKey(path)
+		k := internal.PathKey(path)
 		s.extras = append(s.extras, loc)
 		if s.extrasByPath == nil {
 			s.extrasByPath = map[string]*protoreflect.SourceLocation{}
 		}
 		s.extrasByPath[k] = &s.extras[len(s.extras)-1]
 	}
-}
-
-func pathKey(path protoreflect.SourcePath) string {
-	b := make([]byte, len(path)*4)
-	j := 0
-	for _, s := range path {
-		b[j] = byte(s)
-		b[j+1] = byte(s >> 8)
-		b[j+2] = byte(s >> 16)
-		b[j+3] = byte(s >> 24)
-		j += 4
-	}
-	return string(b)
 }

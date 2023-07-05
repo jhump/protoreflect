@@ -9,6 +9,10 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
+// GlobalDescriptors provides a view of protoregistry.GlobalFiles and protoregistry.GlobalTypes
+// as a Resolver.
+var GlobalDescriptors = ResolverFromPools(protoregistry.GlobalFiles, protoregistry.GlobalTypes)
+
 // Registry implements the full Resolver interface defined in this package. It is
 // thread-safe and can be used for all kinds of operations where types or descriptors
 // may need to be resolved from names or numbers.

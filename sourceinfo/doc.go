@@ -10,10 +10,6 @@
 // But the presence of comments, and the ability to show them to humans, can greatly
 // improve the utility of user agents that use the reflection service.
 //
-// When the protoc-gen-gosrcinfo plugin is used, the desc.Load* methods, which load
-// descriptors for compiled-in elements, will automatically include source code
-// info, using the data registered with this package.
-//
 // In order to make the reflection service use this functionality, you will need to
 // be using v1.45 or higher of the Go runtime for gRPC (google.golang.org/grpc). The
 // following snippet demonstrates how to do this in your server. Do this instead of

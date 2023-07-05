@@ -76,7 +76,7 @@ const (
 // to a different file.
 //
 // All types will be dynamic types, created with the "google.golang.org/protobuf/types/dynamicpb"
-// package. The only exception is for extension descriptors that als implement
+// package. The only exception is for extension descriptors that also implement
 // [protoreflect.ExtensionTypeDescriptor], in which case the corresponding extension type is used.
 func RegisterTypesInFile(file protoreflect.FileDescriptor, reg TypeRegistry, kindMask TypeKind) error {
 	return registerTypes(file, reg, kindMask)
@@ -85,10 +85,10 @@ func RegisterTypesInFile(file protoreflect.FileDescriptor, reg TypeRegistry, kin
 // RegisterTypesInFileRecursive registers all the types (with kinds that match kindMask)
 // with the given registry, for the given file and all of its transitive dependencies (i.e.
 // its imports, and their imports, etc.). This will result in an error if any of the types in
-// the given file are already registered as belonging to a different file.
+// the given file (and its dependencies) are already registered as belonging to a different file.
 //
 // All types will be dynamic types, created with the "google.golang.org/protobuf/types/dynamicpb"
-// package. The only exception is for extension descriptors that als implement
+// package. The only exception is for extension descriptors that also implement
 // [protoreflect.ExtensionTypeDescriptor], in which case the corresponding extension type is used.
 func RegisterTypesInFileRecursive(file protoreflect.FileDescriptor, reg TypeRegistry, kindMask TypeKind) error {
 	pathsSeen := map[string]struct{}{}
