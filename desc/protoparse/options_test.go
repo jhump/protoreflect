@@ -3,7 +3,6 @@ package protoparse
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -147,7 +146,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 func accessorFor(name, contents string) FileAccessor {
 	return func(n string) (io.ReadCloser, error) {
 		if n == name {
-			return ioutil.NopCloser(strings.NewReader(contents)), nil
+			return io.NopCloser(strings.NewReader(contents)), nil
 		}
 		return nil, os.ErrNotExist
 	}

@@ -7,14 +7,18 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/bufbuild/protocompile/parser"
 	"github.com/bufbuild/protocompile/reporter"
+	"github.com/golang/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
 
@@ -368,6 +372,33 @@ func TestParseFilesWithDependencies(t *testing.T) {
 			t.Error(err)
 		}
 	})
+}
+
+func TestParseFilesReturnsKnownExtensions(t *testing.T) {
+	accessor := func(filename string) (io.ReadCloser, error) {
+		if filename == "desc_test3.proto" {
+			return io.NopCloser(strings.NewReader(`
+				syntax = "proto3";
+				import "desc_test_complex.proto";
+				message Foo {
+					foo.bar.Simple field = 1;
+				}
+			`)), nil
+		}
+		return os.Open(filepath.Join("../../internal/testprotos", filename))
+	}
+	p := Parser{
+		Accessor: accessor,
+	}
+	fds, err := p.ParseFiles("desc_test3.proto")
+	testutil.Ok(t, err)
+	fd := fds[0].GetDependencies()[0]
+	md := fd.FindMessage("foo.bar.Test.Nested._NestedNested")
+	testutil.Require(t, md != nil)
+	val, err := proto.GetExtension(md.GetOptions(), testprotos.E_Rept)
+	testutil.Ok(t, err)
+	_, ok := val.([]*testprotos.Test)
+	testutil.Require(t, ok)
 }
 
 func TestParseCommentsBeforeDot(t *testing.T) {
