@@ -270,7 +270,7 @@ func (r *dependencyResolver) resolveSyntheticFile(b Builder, seen []Builder) (pr
 }
 
 func (r *dependencyResolver) resolveTypesInMessage(root Builder, seen []Builder, deps *dependencies, mb *MessageBuilder) error {
-	for _, b := range mb.fieldsAndOneOfs {
+	for _, b := range mb.fieldsAndOneofs {
 		if flb, ok := b.(*FieldBuilder); ok {
 			if err := r.resolveTypesInField(root, seen, deps, flb); err != nil {
 				return err
@@ -398,7 +398,7 @@ func (r *dependencyResolver) resolveTypesInFileOptions(root Builder, deps *depen
 }
 
 func (r *dependencyResolver) resolveTypesInMessageOptions(root Builder, fileExts protoresolve.ExtensionTypeResolver, deps *dependencies, mb *MessageBuilder) error {
-	for _, b := range mb.fieldsAndOneOfs {
+	for _, b := range mb.fieldsAndOneofs {
 		if flb, ok := b.(*FieldBuilder); ok {
 			if err := r.resolveTypesInOptions(root, fileExts, deps, flb.Options); err != nil {
 				return err

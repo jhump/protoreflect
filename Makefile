@@ -59,3 +59,4 @@ test:
 .PHONY: generate
 generate:
 	go generate ./...
+	go generate ./internal/testdata

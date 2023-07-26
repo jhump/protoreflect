@@ -159,11 +159,11 @@ func (files) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Desc
 	case protoreflect.MessageDescriptor:
 		return messageDescriptor{d}, nil
 	case protoreflect.ExtensionTypeDescriptor:
-		return extensionDescriptor{d}, nil
+		return extensionTypeDescriptor{d}, nil
 	case protoreflect.FieldDescriptor:
 		return fieldDescriptor{d}, nil
 	case protoreflect.OneofDescriptor:
-		return oneOfDescriptor{d}, nil
+		return oneofDescriptor{d}, nil
 	case protoreflect.EnumDescriptor:
 		return enumDescriptor{d}, nil
 	case protoreflect.EnumValueDescriptor:

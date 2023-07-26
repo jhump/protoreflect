@@ -168,7 +168,7 @@ func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
 }
 
 func updateLocalRefsInMessage(mb *MessageBuilder, localMessages map[protoreflect.MessageDescriptor]*MessageBuilder, localEnums map[protoreflect.EnumDescriptor]*EnumBuilder) {
-	for _, b := range mb.fieldsAndOneOfs {
+	for _, b := range mb.fieldsAndOneofs {
 		if flb, ok := b.(*FieldBuilder); ok {
 			updateLocalRefsInField(flb, localMessages, localEnums)
 		} else {

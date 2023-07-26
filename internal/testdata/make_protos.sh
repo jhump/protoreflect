@@ -23,7 +23,7 @@ fi
 
 PROTOC="${PWD}/protoc/bin/protoc"
 
-if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc 3.${PROTOC_VERSION}" ]]; then
+if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc ${PROTOC_VERSION}" ]]; then
   rm -rf ./protoc
   mkdir -p protoc
   curl -L "https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${PROTOC_OS}-${PROTOC_ARCH}.zip" > protoc/protoc.zip

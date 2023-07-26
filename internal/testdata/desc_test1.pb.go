@@ -20,6 +20,69 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Comment for SomeEnum
+type SomeEnum int32
+
+const (
+	// Comment for SOME_VAL
+	SomeEnum_SOME_VAL SomeEnum = 0
+	// Comment for ANOTHER_VAL
+	SomeEnum_ANOTHER_VAL SomeEnum = 1
+	// Comment for YET_ANOTHER_VAL
+	SomeEnum_YET_ANOTHER_VAL SomeEnum = 2
+)
+
+// Enum value maps for SomeEnum.
+var (
+	SomeEnum_name = map[int32]string{
+		0: "SOME_VAL",
+		1: "ANOTHER_VAL",
+		2: "YET_ANOTHER_VAL",
+	}
+	SomeEnum_value = map[string]int32{
+		"SOME_VAL":        0,
+		"ANOTHER_VAL":     1,
+		"YET_ANOTHER_VAL": 2,
+	}
+)
+
+func (x SomeEnum) Enum() *SomeEnum {
+	p := new(SomeEnum)
+	*p = x
+	return p
+}
+
+func (x SomeEnum) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SomeEnum) Descriptor() protoreflect.EnumDescriptor {
+	return file_desc_test1_proto_enumTypes[0].Descriptor()
+}
+
+func (SomeEnum) Type() protoreflect.EnumType {
+	return &file_desc_test1_proto_enumTypes[0]
+}
+
+func (x SomeEnum) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Do not use.
+func (x *SomeEnum) UnmarshalJSON(b []byte) error {
+	num, err := protoimpl.X.UnmarshalJSONEnum(x.Descriptor(), b)
+	if err != nil {
+		return err
+	}
+	*x = SomeEnum(num)
+	return nil
+}
+
+// Deprecated: Use SomeEnum.Descriptor instead.
+func (SomeEnum) EnumDescriptor() ([]byte, []int) {
+	return file_desc_test1_proto_rawDescGZIP(), []int{0}
+}
+
 // Comment for NestedEnum
 type TestMessage_NestedEnum int32
 
@@ -53,11 +116,11 @@ func (x TestMessage_NestedEnum) String() string {
 }
 
 func (TestMessage_NestedEnum) Descriptor() protoreflect.EnumDescriptor {
-	return file_desc_test1_proto_enumTypes[0].Descriptor()
+	return file_desc_test1_proto_enumTypes[1].Descriptor()
 }
 
 func (TestMessage_NestedEnum) Type() protoreflect.EnumType {
-	return &file_desc_test1_proto_enumTypes[0]
+	return &file_desc_test1_proto_enumTypes[1]
 }
 
 func (x TestMessage_NestedEnum) Number() protoreflect.EnumNumber {
@@ -112,11 +175,11 @@ func (x TestMessage_NestedMessage_AnotherNestedMessage_YetAnotherNestedMessage_D
 }
 
 func (TestMessage_NestedMessage_AnotherNestedMessage_YetAnotherNestedMessage_DeeplyNestedEnum) Descriptor() protoreflect.EnumDescriptor {
-	return file_desc_test1_proto_enumTypes[1].Descriptor()
+	return file_desc_test1_proto_enumTypes[2].Descriptor()
 }
 
 func (TestMessage_NestedMessage_AnotherNestedMessage_YetAnotherNestedMessage_DeeplyNestedEnum) Type() protoreflect.EnumType {
-	return &file_desc_test1_proto_enumTypes[1]
+	return &file_desc_test1_proto_enumTypes[2]
 }
 
 func (x TestMessage_NestedMessage_AnotherNestedMessage_YetAnotherNestedMessage_DeeplyNestedEnum) Number() protoreflect.EnumNumber {
@@ -889,24 +952,33 @@ var file_desc_test1_proto_rawDesc = []byte{
 	0x6f, 0x6f, 0x72, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x64, 0x6f, 0x6f, 0x72,
 	0x73, 0x1a, 0x0d, 0x0a, 0x0b, 0x57, 0x69, 0x74, 0x68, 0x4f, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x73,
 	0x2a, 0x05, 0x08, 0x64, 0x10, 0xc9, 0x01, 0x42, 0x07, 0x0a, 0x05, 0x61, 0x74, 0x6d, 0x6f, 0x6f,
-	0x3a, 0x49, 0x0a, 0x03, 0x78, 0x74, 0x6d, 0x12, 0x1e, 0x2e, 0x74, 0x65, 0x73, 0x74, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x41, 0x6e, 0x6f, 0x74, 0x68, 0x65, 0x72, 0x54, 0x65, 0x73, 0x74,
-	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x64, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x17, 0x2e,
+	0x2a, 0x3e, 0x0a, 0x08, 0x53, 0x6f, 0x6d, 0x65, 0x45, 0x6e, 0x75, 0x6d, 0x12, 0x0c, 0x0a, 0x08,
+	0x53, 0x4f, 0x4d, 0x45, 0x5f, 0x56, 0x41, 0x4c, 0x10, 0x00, 0x12, 0x0f, 0x0a, 0x0b, 0x41, 0x4e,
+	0x4f, 0x54, 0x48, 0x45, 0x52, 0x5f, 0x56, 0x41, 0x4c, 0x10, 0x01, 0x12, 0x13, 0x0a, 0x0f, 0x59,
+	0x45, 0x54, 0x5f, 0x41, 0x4e, 0x4f, 0x54, 0x48, 0x45, 0x52, 0x5f, 0x56, 0x41, 0x4c, 0x10, 0x02,
+	0x32, 0x4d, 0x0a, 0x0b, 0x53, 0x6f, 0x6d, 0x65, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12,
+	0x3e, 0x0a, 0x0a, 0x53, 0x6f, 0x6d, 0x65, 0x4d, 0x65, 0x74, 0x68, 0x6f, 0x64, 0x12, 0x17, 0x2e,
 	0x74, 0x65, 0x73, 0x74, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x54, 0x65, 0x73, 0x74, 0x4d,
-	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x52, 0x03, 0x78, 0x74, 0x6d, 0x3a, 0x2e, 0x0a, 0x02, 0x78,
-	0x73, 0x12, 0x1e, 0x2e, 0x74, 0x65, 0x73, 0x74, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x41,
-	0x6e, 0x6f, 0x74, 0x68, 0x65, 0x72, 0x54, 0x65, 0x73, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67,
-	0x65, 0x18, 0x65, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x78, 0x73, 0x3a, 0x2e, 0x0a, 0x02, 0x78,
+	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x1a, 0x17, 0x2e, 0x74, 0x65, 0x73, 0x74, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x73, 0x2e, 0x54, 0x65, 0x73, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x3a,
+	0x49, 0x0a, 0x03, 0x78, 0x74, 0x6d, 0x12, 0x1e, 0x2e, 0x74, 0x65, 0x73, 0x74, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x73, 0x2e, 0x41, 0x6e, 0x6f, 0x74, 0x68, 0x65, 0x72, 0x54, 0x65, 0x73, 0x74, 0x4d,
+	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x64, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x17, 0x2e, 0x74,
+	0x65, 0x73, 0x74, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x54, 0x65, 0x73, 0x74, 0x4d, 0x65,
+	0x73, 0x73, 0x61, 0x67, 0x65, 0x52, 0x03, 0x78, 0x74, 0x6d, 0x3a, 0x2e, 0x0a, 0x02, 0x78, 0x73,
+	0x12, 0x1e, 0x2e, 0x74, 0x65, 0x73, 0x74, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x41, 0x6e,
+	0x6f, 0x74, 0x68, 0x65, 0x72, 0x54, 0x65, 0x73, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
+	0x18, 0x65, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x78, 0x73, 0x3a, 0x2e, 0x0a, 0x02, 0x78, 0x69,
+	0x12, 0x1e, 0x2e, 0x74, 0x65, 0x73, 0x74, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x41, 0x6e,
+	0x6f, 0x74, 0x68, 0x65, 0x72, 0x54, 0x65, 0x73, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
+	0x18, 0x66, 0x20, 0x01, 0x28, 0x05, 0x52, 0x02, 0x78, 0x69, 0x3a, 0x30, 0x0a, 0x03, 0x78, 0x75,
 	0x69, 0x12, 0x1e, 0x2e, 0x74, 0x65, 0x73, 0x74, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e, 0x41,
 	0x6e, 0x6f, 0x74, 0x68, 0x65, 0x72, 0x54, 0x65, 0x73, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67,
-	0x65, 0x18, 0x66, 0x20, 0x01, 0x28, 0x05, 0x52, 0x02, 0x78, 0x69, 0x3a, 0x30, 0x0a, 0x03, 0x78,
-	0x75, 0x69, 0x12, 0x1e, 0x2e, 0x74, 0x65, 0x73, 0x74, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x73, 0x2e,
-	0x41, 0x6e, 0x6f, 0x74, 0x68, 0x65, 0x72, 0x54, 0x65, 0x73, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61,
-	0x67, 0x65, 0x18, 0x67, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x78, 0x75, 0x69, 0x42, 0x34, 0x5a,
-	0x32, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6a, 0x68, 0x75, 0x6d,
-	0x70, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x72, 0x65, 0x66, 0x6c, 0x65, 0x63, 0x74, 0x2f, 0x76,
-	0x32, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f, 0x74, 0x65, 0x73, 0x74, 0x64,
-	0x61, 0x74, 0x61,
+	0x65, 0x18, 0x67, 0x20, 0x01, 0x28, 0x04, 0x52, 0x03, 0x78, 0x75, 0x69, 0x42, 0x34, 0x5a, 0x32,
+	0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6a, 0x68, 0x75, 0x6d, 0x70,
+	0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x72, 0x65, 0x66, 0x6c, 0x65, 0x63, 0x74, 0x2f, 0x76, 0x32,
+	0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f, 0x74, 0x65, 0x73, 0x74, 0x64, 0x61,
+	0x74, 0x61,
 }
 
 var (
@@ -921,51 +993,54 @@ func file_desc_test1_proto_rawDescGZIP() []byte {
 	return file_desc_test1_proto_rawDescData
 }
 
-var file_desc_test1_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_desc_test1_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_desc_test1_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_desc_test1_proto_goTypes = []interface{}{
-	(TestMessage_NestedEnum)(0), // 0: testprotos.TestMessage.NestedEnum
-	(TestMessage_NestedMessage_AnotherNestedMessage_YetAnotherNestedMessage_DeeplyNestedEnum)(0), // 1: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum
-	(*TestMessage)(nil),                                    // 2: testprotos.TestMessage
-	(*AnotherTestMessage)(nil),                             // 3: testprotos.AnotherTestMessage
-	(*TestMessage_NestedMessage)(nil),                      // 4: testprotos.TestMessage.NestedMessage
-	(*TestMessage_NestedMessage_AnotherNestedMessage)(nil), // 5: testprotos.TestMessage.NestedMessage.AnotherNestedMessage
-	(*TestMessage_NestedMessage_AnotherNestedMessage_YetAnotherNestedMessage)(nil), // 6: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage
-	nil,                                    // 7: testprotos.AnotherTestMessage.MapField1Entry
-	nil,                                    // 8: testprotos.AnotherTestMessage.MapField2Entry
-	nil,                                    // 9: testprotos.AnotherTestMessage.MapField3Entry
-	nil,                                    // 10: testprotos.AnotherTestMessage.MapField4Entry
-	(*AnotherTestMessage_RockNRoll)(nil),   // 11: testprotos.AnotherTestMessage.RockNRoll
-	(*AnotherTestMessage_WithOptions)(nil), // 12: testprotos.AnotherTestMessage.WithOptions
+	(SomeEnum)(0),               // 0: testprotos.SomeEnum
+	(TestMessage_NestedEnum)(0), // 1: testprotos.TestMessage.NestedEnum
+	(TestMessage_NestedMessage_AnotherNestedMessage_YetAnotherNestedMessage_DeeplyNestedEnum)(0), // 2: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum
+	(*TestMessage)(nil),                                    // 3: testprotos.TestMessage
+	(*AnotherTestMessage)(nil),                             // 4: testprotos.AnotherTestMessage
+	(*TestMessage_NestedMessage)(nil),                      // 5: testprotos.TestMessage.NestedMessage
+	(*TestMessage_NestedMessage_AnotherNestedMessage)(nil), // 6: testprotos.TestMessage.NestedMessage.AnotherNestedMessage
+	(*TestMessage_NestedMessage_AnotherNestedMessage_YetAnotherNestedMessage)(nil), // 7: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage
+	nil,                                    // 8: testprotos.AnotherTestMessage.MapField1Entry
+	nil,                                    // 9: testprotos.AnotherTestMessage.MapField2Entry
+	nil,                                    // 10: testprotos.AnotherTestMessage.MapField3Entry
+	nil,                                    // 11: testprotos.AnotherTestMessage.MapField4Entry
+	(*AnotherTestMessage_RockNRoll)(nil),   // 12: testprotos.AnotherTestMessage.RockNRoll
+	(*AnotherTestMessage_WithOptions)(nil), // 13: testprotos.AnotherTestMessage.WithOptions
 }
 var file_desc_test1_proto_depIdxs = []int32{
-	4,  // 0: testprotos.TestMessage.nm:type_name -> testprotos.TestMessage.NestedMessage
-	5,  // 1: testprotos.TestMessage.anm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage
-	6,  // 2: testprotos.TestMessage.yanm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage
-	0,  // 3: testprotos.TestMessage.ne:type_name -> testprotos.TestMessage.NestedEnum
-	1,  // 4: testprotos.AnotherTestMessage.dne:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum
-	7,  // 5: testprotos.AnotherTestMessage.map_field1:type_name -> testprotos.AnotherTestMessage.MapField1Entry
-	8,  // 6: testprotos.AnotherTestMessage.map_field2:type_name -> testprotos.AnotherTestMessage.MapField2Entry
-	9,  // 7: testprotos.AnotherTestMessage.map_field3:type_name -> testprotos.AnotherTestMessage.MapField3Entry
-	10, // 8: testprotos.AnotherTestMessage.map_field4:type_name -> testprotos.AnotherTestMessage.MapField4Entry
-	11, // 9: testprotos.AnotherTestMessage.rocknroll:type_name -> testprotos.AnotherTestMessage.RockNRoll
-	12, // 10: testprotos.AnotherTestMessage.withoptions:type_name -> testprotos.AnotherTestMessage.WithOptions
-	5,  // 11: testprotos.TestMessage.NestedMessage.anm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage
-	6,  // 12: testprotos.TestMessage.NestedMessage.yanm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage
-	6,  // 13: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.yanm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage
-	1,  // 14: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.dne:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum
-	5,  // 15: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.anm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage
-	4,  // 16: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.nm:type_name -> testprotos.TestMessage.NestedMessage
-	2,  // 17: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.tm:type_name -> testprotos.TestMessage
-	3,  // 18: testprotos.AnotherTestMessage.MapField4Entry.value:type_name -> testprotos.AnotherTestMessage
-	3,  // 19: testprotos.xtm:extendee -> testprotos.AnotherTestMessage
-	3,  // 20: testprotos.xs:extendee -> testprotos.AnotherTestMessage
-	3,  // 21: testprotos.xi:extendee -> testprotos.AnotherTestMessage
-	3,  // 22: testprotos.xui:extendee -> testprotos.AnotherTestMessage
-	3,  // 23: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.flags:extendee -> testprotos.AnotherTestMessage
-	2,  // 24: testprotos.xtm:type_name -> testprotos.TestMessage
-	25, // [25:25] is the sub-list for method output_type
-	25, // [25:25] is the sub-list for method input_type
+	5,  // 0: testprotos.TestMessage.nm:type_name -> testprotos.TestMessage.NestedMessage
+	6,  // 1: testprotos.TestMessage.anm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage
+	7,  // 2: testprotos.TestMessage.yanm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage
+	1,  // 3: testprotos.TestMessage.ne:type_name -> testprotos.TestMessage.NestedEnum
+	2,  // 4: testprotos.AnotherTestMessage.dne:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum
+	8,  // 5: testprotos.AnotherTestMessage.map_field1:type_name -> testprotos.AnotherTestMessage.MapField1Entry
+	9,  // 6: testprotos.AnotherTestMessage.map_field2:type_name -> testprotos.AnotherTestMessage.MapField2Entry
+	10, // 7: testprotos.AnotherTestMessage.map_field3:type_name -> testprotos.AnotherTestMessage.MapField3Entry
+	11, // 8: testprotos.AnotherTestMessage.map_field4:type_name -> testprotos.AnotherTestMessage.MapField4Entry
+	12, // 9: testprotos.AnotherTestMessage.rocknroll:type_name -> testprotos.AnotherTestMessage.RockNRoll
+	13, // 10: testprotos.AnotherTestMessage.withoptions:type_name -> testprotos.AnotherTestMessage.WithOptions
+	6,  // 11: testprotos.TestMessage.NestedMessage.anm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage
+	7,  // 12: testprotos.TestMessage.NestedMessage.yanm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage
+	7,  // 13: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.yanm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage
+	2,  // 14: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.dne:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum
+	6,  // 15: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.anm:type_name -> testprotos.TestMessage.NestedMessage.AnotherNestedMessage
+	5,  // 16: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.nm:type_name -> testprotos.TestMessage.NestedMessage
+	3,  // 17: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.tm:type_name -> testprotos.TestMessage
+	4,  // 18: testprotos.AnotherTestMessage.MapField4Entry.value:type_name -> testprotos.AnotherTestMessage
+	4,  // 19: testprotos.xtm:extendee -> testprotos.AnotherTestMessage
+	4,  // 20: testprotos.xs:extendee -> testprotos.AnotherTestMessage
+	4,  // 21: testprotos.xi:extendee -> testprotos.AnotherTestMessage
+	4,  // 22: testprotos.xui:extendee -> testprotos.AnotherTestMessage
+	4,  // 23: testprotos.TestMessage.NestedMessage.AnotherNestedMessage.flags:extendee -> testprotos.AnotherTestMessage
+	3,  // 24: testprotos.xtm:type_name -> testprotos.TestMessage
+	3,  // 25: testprotos.SomeService.SomeMethod:input_type -> testprotos.TestMessage
+	3,  // 26: testprotos.SomeService.SomeMethod:output_type -> testprotos.TestMessage
+	26, // [26:27] is the sub-list for method output_type
+	25, // [25:26] is the sub-list for method input_type
 	24, // [24:25] is the sub-list for extension type_name
 	19, // [19:24] is the sub-list for extension extendee
 	0,  // [0:19] is the sub-list for field type_name
@@ -1073,10 +1148,10 @@ func file_desc_test1_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_desc_test1_proto_rawDesc,
-			NumEnums:      2,
+			NumEnums:      3,
 			NumMessages:   11,
 			NumExtensions: 5,
-			NumServices:   0,
+			NumServices:   1,
 		},
 		GoTypes:           file_desc_test1_proto_goTypes,
 		DependencyIndexes: file_desc_test1_proto_depIdxs,

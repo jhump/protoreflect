@@ -41,7 +41,7 @@ type MessageBuilder struct {
 	ReservedRanges  []FieldRange
 	ReservedNames   []protoreflect.Name
 
-	fieldsAndOneOfs  []Builder
+	fieldsAndOneofs  []Builder
 	fieldTags        map[protoreflect.FieldNumber]*FieldBuilder
 	nestedMessages   []*MessageBuilder
 	nestedExtensions []*FieldBuilder
@@ -242,7 +242,7 @@ func (mb *MessageBuilder) SetComments(c Comments) *MessageBuilder {
 // include the message's fields and one-ofs as well as any nested messages,
 // extensions, and enums.
 func (mb *MessageBuilder) Children() []Builder {
-	ch := append([]Builder(nil), mb.fieldsAndOneOfs...)
+	ch := append([]Builder(nil), mb.fieldsAndOneofs...)
 	for _, nmb := range mb.nestedMessages {
 		ch = append(ch, nmb)
 	}
@@ -282,14 +282,14 @@ func (mb *MessageBuilder) removeChild(b Builder) {
 		if b.IsExtension() {
 			mb.nestedExtensions = deleteBuilder(b.Name(), mb.nestedExtensions).([]*FieldBuilder)
 		} else {
-			mb.fieldsAndOneOfs = deleteBuilder(b.Name(), mb.fieldsAndOneOfs).([]Builder)
+			mb.fieldsAndOneofs = deleteBuilder(b.Name(), mb.fieldsAndOneofs).([]Builder)
 			delete(mb.fieldTags, b.Number())
 			if b.msgType != nil {
 				delete(mb.symbols, b.msgType.Name())
 			}
 		}
 	case *OneofBuilder:
-		mb.fieldsAndOneOfs = deleteBuilder(b.Name(), mb.fieldsAndOneOfs).([]Builder)
+		mb.fieldsAndOneofs = deleteBuilder(b.Name(), mb.fieldsAndOneofs).([]Builder)
 		for _, flb := range b.choices {
 			delete(mb.symbols, flb.Name())
 			delete(mb.fieldTags, flb.Number())
@@ -424,7 +424,7 @@ func (mb *MessageBuilder) TryAddField(flb *FieldBuilder) error {
 		Unlink(flb)
 	}
 	flb.setParent(mb)
-	mb.fieldsAndOneOfs = append(mb.fieldsAndOneOfs, flb)
+	mb.fieldsAndOneofs = append(mb.fieldsAndOneofs, flb)
 	return nil
 }
 
@@ -490,7 +490,7 @@ func (mb *MessageBuilder) TryAddOneOf(oob *OneofBuilder) error {
 	}
 	Unlink(oob)
 	oob.setParent(mb)
-	mb.fieldsAndOneOfs = append(mb.fieldsAndOneOfs, oob)
+	mb.fieldsAndOneofs = append(mb.fieldsAndOneofs, oob)
 	return nil
 }
 
@@ -754,15 +754,15 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 
 	var needTagsAssigned []*descriptorpb.FieldDescriptorProto
 	nestedMessages := make([]*descriptorpb.DescriptorProto, 0, len(mb.nestedMessages))
-	oneOfCount := 0
-	for _, b := range mb.fieldsAndOneOfs {
+	oneofCount := 0
+	for _, b := range mb.fieldsAndOneofs {
 		if _, ok := b.(*OneofBuilder); ok {
-			oneOfCount++
+			oneofCount++
 		}
 	}
 
-	fields := make([]*descriptorpb.FieldDescriptorProto, 0, len(mb.fieldsAndOneOfs)-oneOfCount)
-	oneOfs := make([]*descriptorpb.OneofDescriptorProto, 0, oneOfCount)
+	fields := make([]*descriptorpb.FieldDescriptorProto, 0, len(mb.fieldsAndOneofs)-oneofCount)
+	oneofs := make([]*descriptorpb.OneofDescriptorProto, 0, oneofCount)
 
 	addField := func(flb *FieldBuilder, fld *descriptorpb.FieldDescriptorProto) error {
 		fields = append(fields, fld)
@@ -780,7 +780,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 		return nil
 	}
 
-	for _, b := range mb.fieldsAndOneOfs {
+	for _, b := range mb.fieldsAndOneofs {
 		if flb, ok := b.(*FieldBuilder); ok {
 			fldpath := append(path, internal.MessageFieldsTag, int32(len(fields)))
 			fld, err := flb.buildProto(fldpath, sourceInfo, mb.Options.GetMessageSetWireFormat())
@@ -791,14 +791,14 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 				return nil, err
 			}
 		} else {
-			oopath := append(path, internal.MessageOneofsTag, int32(len(oneOfs)))
+			oopath := append(path, internal.MessageOneofsTag, int32(len(oneofs)))
 			oob := b.(*OneofBuilder)
-			oobIndex := len(oneOfs)
+			oobIndex := len(oneofs)
 			ood, err := oob.buildProto(oopath, sourceInfo)
 			if err != nil {
 				return nil, err
 			}
-			oneOfs = append(oneOfs, ood)
+			oneofs = append(oneofs, ood)
 			for _, flb := range oob.choices {
 				path := append(path, internal.MessageFieldsTag, int32(len(fields)))
 				fld, err := flb.buildProto(path, sourceInfo, mb.Options.GetMessageSetWireFormat())
@@ -889,7 +889,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 		Name:           proto.String(string(mb.name)),
 		Options:        mb.Options,
 		Field:          fields,
-		OneofDecl:      oneOfs,
+		OneofDecl:      oneofs,
 		NestedType:     nestedMessages,
 		EnumType:       nestedEnums,
 		Extension:      nestedExtensions,

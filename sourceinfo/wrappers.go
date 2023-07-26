@@ -66,11 +66,15 @@ type messages struct {
 }
 
 func (m messages) Get(i int) protoreflect.MessageDescriptor {
-	return messageDescriptor{m.MessageDescriptors.Get(i)}
+	return WrapMessage(m.MessageDescriptors.Get(i))
 }
 
 func (m messages) ByName(n protoreflect.Name) protoreflect.MessageDescriptor {
-	return messageDescriptor{m.MessageDescriptors.ByName(n)}
+	md := m.MessageDescriptors.ByName(n)
+	if md == nil {
+		return nil
+	}
+	return WrapMessage(md)
 }
 
 type enums struct {
@@ -78,11 +82,15 @@ type enums struct {
 }
 
 func (e enums) Get(i int) protoreflect.EnumDescriptor {
-	return enumDescriptor{e.EnumDescriptors.Get(i)}
+	return WrapEnum(e.EnumDescriptors.Get(i))
 }
 
 func (e enums) ByName(n protoreflect.Name) protoreflect.EnumDescriptor {
-	return enumDescriptor{e.EnumDescriptors.ByName(n)}
+	ed := e.EnumDescriptors.ByName(n)
+	if ed == nil {
+		return nil
+	}
+	return WrapEnum(ed)
 }
 
 type extensions struct {
@@ -90,19 +98,15 @@ type extensions struct {
 }
 
 func (e extensions) Get(i int) protoreflect.ExtensionDescriptor {
-	d := e.ExtensionDescriptors.Get(i)
-	if ed, ok := d.(protoreflect.ExtensionTypeDescriptor); ok {
-		return extensionDescriptor{ed}
-	}
-	return fieldDescriptor{d}
+	return WrapExtension(e.ExtensionDescriptors.Get(i))
 }
 
 func (e extensions) ByName(n protoreflect.Name) protoreflect.ExtensionDescriptor {
-	d := e.ExtensionDescriptors.ByName(n)
-	if ed, ok := d.(protoreflect.ExtensionTypeDescriptor); ok {
-		return extensionDescriptor{ed}
+	extd := e.ExtensionDescriptors.ByName(n)
+	if extd == nil {
+		return nil
 	}
-	return fieldDescriptor{d}
+	return WrapExtension(extd)
 }
 
 type services struct {
@@ -110,11 +114,15 @@ type services struct {
 }
 
 func (s services) Get(i int) protoreflect.ServiceDescriptor {
-	return serviceDescriptor{s.ServiceDescriptors.Get(i)}
+	return WrapService(s.ServiceDescriptors.Get(i))
 }
 
 func (s services) ByName(n protoreflect.Name) protoreflect.ServiceDescriptor {
-	return serviceDescriptor{s.ServiceDescriptors.ByName(n)}
+	sd := s.ServiceDescriptors.ByName(n)
+	if sd == nil {
+		return nil
+	}
+	return WrapService(sd)
 }
 
 type messageDescriptor struct {
@@ -129,7 +137,7 @@ func (m messageDescriptor) Parent() protoreflect.Descriptor {
 	d := m.MessageDescriptor.Parent()
 	switch d := d.(type) {
 	case protoreflect.MessageDescriptor:
-		return messageDescriptor{d}
+		return WrapMessage(d)
 	case protoreflect.FileDescriptor:
 		return getFile(d)
 	case nil:
@@ -144,7 +152,7 @@ func (m messageDescriptor) Fields() protoreflect.FieldDescriptors {
 }
 
 func (m messageDescriptor) Oneofs() protoreflect.OneofDescriptors {
-	return oneOfs{m.MessageDescriptor.Oneofs()}
+	return oneofs{m.MessageDescriptor.Oneofs()}
 }
 
 func (m messageDescriptor) Enums() protoreflect.EnumDescriptors {
@@ -164,35 +172,39 @@ type fields struct {
 }
 
 func (f fields) Get(i int) protoreflect.FieldDescriptor {
-	return fieldDescriptor{f.FieldDescriptors.Get(i)}
+	return wrapField(f.FieldDescriptors.Get(i))
 }
 
 func (f fields) ByName(n protoreflect.Name) protoreflect.FieldDescriptor {
-	return fieldDescriptor{f.FieldDescriptors.ByName(n)}
+	fld := f.FieldDescriptors.ByName(n)
+	if fld == nil {
+		return nil
+	}
+	return wrapField(fld)
 }
 
 func (f fields) ByJSONName(n string) protoreflect.FieldDescriptor {
-	return fieldDescriptor{f.FieldDescriptors.ByJSONName(n)}
+	fld := f.FieldDescriptors.ByJSONName(n)
+	if fld == nil {
+		return nil
+	}
+	return wrapField(fld)
 }
 
 func (f fields) ByTextName(n string) protoreflect.FieldDescriptor {
-	return fieldDescriptor{f.FieldDescriptors.ByTextName(n)}
+	fld := f.FieldDescriptors.ByTextName(n)
+	if fld == nil {
+		return nil
+	}
+	return wrapField(fld)
 }
 
 func (f fields) ByNumber(n protoreflect.FieldNumber) protoreflect.FieldDescriptor {
-	return fieldDescriptor{f.FieldDescriptors.ByNumber(n)}
-}
-
-type oneOfs struct {
-	protoreflect.OneofDescriptors
-}
-
-func (o oneOfs) Get(i int) protoreflect.OneofDescriptor {
-	return oneOfDescriptor{o.OneofDescriptors.Get(i)}
-}
-
-func (o oneOfs) ByName(n protoreflect.Name) protoreflect.OneofDescriptor {
-	return oneOfDescriptor{o.OneofDescriptors.ByName(n)}
+	fld := f.FieldDescriptors.ByNumber(n)
+	if fld == nil {
+		return nil
+	}
+	return wrapField(fld)
 }
 
 type fieldDescriptor struct {
@@ -207,7 +219,7 @@ func (f fieldDescriptor) Parent() protoreflect.Descriptor {
 	d := f.FieldDescriptor.Parent()
 	switch d := d.(type) {
 	case protoreflect.MessageDescriptor:
-		return messageDescriptor{d}
+		return WrapMessage(d)
 	case protoreflect.FileDescriptor:
 		return getFile(d)
 	case nil:
@@ -222,7 +234,7 @@ func (f fieldDescriptor) MapKey() protoreflect.FieldDescriptor {
 	if fd == nil {
 		return nil
 	}
-	return fieldDescriptor{fd}
+	return wrapField(fd)
 }
 
 func (f fieldDescriptor) MapValue() protoreflect.FieldDescriptor {
@@ -230,27 +242,27 @@ func (f fieldDescriptor) MapValue() protoreflect.FieldDescriptor {
 	if fd == nil {
 		return nil
 	}
-	return fieldDescriptor{fd}
+	return wrapField(fd)
 }
 
 func (f fieldDescriptor) DefaultEnumValue() protoreflect.EnumValueDescriptor {
-	ed := f.FieldDescriptor.DefaultEnumValue()
-	if ed == nil {
+	evd := f.FieldDescriptor.DefaultEnumValue()
+	if evd == nil {
 		return nil
 	}
-	return enumValueDescriptor{ed}
+	return wrapEnumValue(evd)
 }
 
 func (f fieldDescriptor) ContainingOneof() protoreflect.OneofDescriptor {
-	od := f.FieldDescriptor.ContainingOneof()
-	if od == nil {
+	ood := f.FieldDescriptor.ContainingOneof()
+	if ood == nil {
 		return nil
 	}
-	return oneOfDescriptor{od}
+	return wrapOneof(ood)
 }
 
 func (f fieldDescriptor) ContainingMessage() protoreflect.MessageDescriptor {
-	return messageDescriptor{f.FieldDescriptor.ContainingMessage()}
+	return WrapMessage(f.FieldDescriptor.ContainingMessage())
 }
 
 func (f fieldDescriptor) Enum() protoreflect.EnumDescriptor {
@@ -258,7 +270,7 @@ func (f fieldDescriptor) Enum() protoreflect.EnumDescriptor {
 	if ed == nil {
 		return nil
 	}
-	return enumDescriptor{ed}
+	return WrapEnum(ed)
 }
 
 func (f fieldDescriptor) Message() protoreflect.MessageDescriptor {
@@ -266,22 +278,38 @@ func (f fieldDescriptor) Message() protoreflect.MessageDescriptor {
 	if md == nil {
 		return nil
 	}
-	return messageDescriptor{md}
+	return WrapMessage(md)
 }
 
-type oneOfDescriptor struct {
+type oneofs struct {
+	protoreflect.OneofDescriptors
+}
+
+func (o oneofs) Get(i int) protoreflect.OneofDescriptor {
+	return wrapOneof(o.OneofDescriptors.Get(i))
+}
+
+func (o oneofs) ByName(n protoreflect.Name) protoreflect.OneofDescriptor {
+	ood := o.OneofDescriptors.ByName(n)
+	if ood == nil {
+		return nil
+	}
+	return wrapOneof(ood)
+}
+
+type oneofDescriptor struct {
 	protoreflect.OneofDescriptor
 }
 
-func (o oneOfDescriptor) ParentFile() protoreflect.FileDescriptor {
+func (o oneofDescriptor) ParentFile() protoreflect.FileDescriptor {
 	return getFile(o.OneofDescriptor.ParentFile())
 }
 
-func (o oneOfDescriptor) Parent() protoreflect.Descriptor {
+func (o oneofDescriptor) Parent() protoreflect.Descriptor {
 	d := o.OneofDescriptor.Parent()
 	switch d := d.(type) {
 	case protoreflect.MessageDescriptor:
-		return messageDescriptor{d}
+		return WrapMessage(d)
 	case nil:
 		return nil
 	default:
@@ -289,7 +317,7 @@ func (o oneOfDescriptor) Parent() protoreflect.Descriptor {
 	}
 }
 
-func (o oneOfDescriptor) Fields() protoreflect.FieldDescriptors {
+func (o oneofDescriptor) Fields() protoreflect.FieldDescriptors {
 	return fields{o.OneofDescriptor.Fields()}
 }
 
@@ -305,7 +333,7 @@ func (e enumDescriptor) Parent() protoreflect.Descriptor {
 	d := e.EnumDescriptor.Parent()
 	switch d := d.(type) {
 	case protoreflect.MessageDescriptor:
-		return messageDescriptor{d}
+		return WrapMessage(d)
 	case protoreflect.FileDescriptor:
 		return getFile(d)
 	case nil:
@@ -324,15 +352,23 @@ type enumValues struct {
 }
 
 func (e enumValues) Get(i int) protoreflect.EnumValueDescriptor {
-	return enumValueDescriptor{e.EnumValueDescriptors.Get(i)}
+	return wrapEnumValue(e.EnumValueDescriptors.Get(i))
 }
 
 func (e enumValues) ByName(n protoreflect.Name) protoreflect.EnumValueDescriptor {
-	return enumValueDescriptor{e.EnumValueDescriptors.ByName(n)}
+	evd := e.EnumValueDescriptors.ByName(n)
+	if evd == nil {
+		return nil
+	}
+	return wrapEnumValue(evd)
 }
 
 func (e enumValues) ByNumber(n protoreflect.EnumNumber) protoreflect.EnumValueDescriptor {
-	return enumValueDescriptor{e.EnumValueDescriptors.ByNumber(n)}
+	evd := e.EnumValueDescriptors.ByNumber(n)
+	if evd == nil {
+		return nil
+	}
+	return wrapEnumValue(evd)
 }
 
 type enumValueDescriptor struct {
@@ -347,7 +383,7 @@ func (e enumValueDescriptor) Parent() protoreflect.Descriptor {
 	d := e.EnumValueDescriptor.Parent()
 	switch d := d.(type) {
 	case protoreflect.EnumDescriptor:
-		return enumDescriptor{d}
+		return WrapEnum(d)
 	case nil:
 		return nil
 	default:
@@ -355,19 +391,19 @@ func (e enumValueDescriptor) Parent() protoreflect.Descriptor {
 	}
 }
 
-type extensionDescriptor struct {
+type extensionTypeDescriptor struct {
 	protoreflect.ExtensionTypeDescriptor
 }
 
-func (e extensionDescriptor) ParentFile() protoreflect.FileDescriptor {
+func (e extensionTypeDescriptor) ParentFile() protoreflect.FileDescriptor {
 	return getFile(e.ExtensionTypeDescriptor.ParentFile())
 }
 
-func (e extensionDescriptor) Parent() protoreflect.Descriptor {
+func (e extensionTypeDescriptor) Parent() protoreflect.Descriptor {
 	d := e.ExtensionTypeDescriptor.Parent()
 	switch d := d.(type) {
 	case protoreflect.MessageDescriptor:
-		return messageDescriptor{d}
+		return WrapMessage(d)
 	case protoreflect.FileDescriptor:
 		return getFile(d)
 	case nil:
@@ -377,63 +413,63 @@ func (e extensionDescriptor) Parent() protoreflect.Descriptor {
 	}
 }
 
-func (e extensionDescriptor) MapKey() protoreflect.FieldDescriptor {
+func (e extensionTypeDescriptor) MapKey() protoreflect.FieldDescriptor {
 	fd := e.ExtensionTypeDescriptor.MapKey()
 	if fd == nil {
 		return nil
 	}
-	return fieldDescriptor{fd}
+	return wrapField(fd)
 }
 
-func (e extensionDescriptor) MapValue() protoreflect.FieldDescriptor {
+func (e extensionTypeDescriptor) MapValue() protoreflect.FieldDescriptor {
 	fd := e.ExtensionTypeDescriptor.MapValue()
 	if fd == nil {
 		return nil
 	}
-	return fieldDescriptor{fd}
+	return wrapField(fd)
 }
 
-func (e extensionDescriptor) DefaultEnumValue() protoreflect.EnumValueDescriptor {
-	ed := e.ExtensionTypeDescriptor.DefaultEnumValue()
-	if ed == nil {
+func (e extensionTypeDescriptor) DefaultEnumValue() protoreflect.EnumValueDescriptor {
+	evd := e.ExtensionTypeDescriptor.DefaultEnumValue()
+	if evd == nil {
 		return nil
 	}
-	return enumValueDescriptor{ed}
+	return wrapEnumValue(evd)
 }
 
-func (e extensionDescriptor) ContainingOneof() protoreflect.OneofDescriptor {
-	od := e.ExtensionTypeDescriptor.ContainingOneof()
-	if od == nil {
+func (e extensionTypeDescriptor) ContainingOneof() protoreflect.OneofDescriptor {
+	ood := e.ExtensionTypeDescriptor.ContainingOneof()
+	if ood == nil {
 		return nil
 	}
-	return oneOfDescriptor{od}
+	return wrapOneof(ood)
 }
 
-func (e extensionDescriptor) ContainingMessage() protoreflect.MessageDescriptor {
-	return messageDescriptor{e.ExtensionTypeDescriptor.ContainingMessage()}
+func (e extensionTypeDescriptor) ContainingMessage() protoreflect.MessageDescriptor {
+	return WrapMessage(e.ExtensionTypeDescriptor.ContainingMessage())
 }
 
-func (e extensionDescriptor) Enum() protoreflect.EnumDescriptor {
+func (e extensionTypeDescriptor) Enum() protoreflect.EnumDescriptor {
 	ed := e.ExtensionTypeDescriptor.Enum()
 	if ed == nil {
 		return nil
 	}
-	return enumDescriptor{ed}
+	return WrapEnum(ed)
 }
 
-func (e extensionDescriptor) Message() protoreflect.MessageDescriptor {
+func (e extensionTypeDescriptor) Message() protoreflect.MessageDescriptor {
 	md := e.ExtensionTypeDescriptor.Message()
 	if md == nil {
 		return nil
 	}
-	return messageDescriptor{md}
+	return WrapMessage(md)
 }
 
-func (e extensionDescriptor) Descriptor() protoreflect.ExtensionDescriptor {
-	return e
+func (e extensionTypeDescriptor) Descriptor() protoreflect.ExtensionDescriptor {
+	return WrapExtension(e.ExtensionTypeDescriptor.Descriptor())
 }
 
-var _ protoreflect.ExtensionTypeDescriptor = extensionDescriptor{}
+var _ protoreflect.ExtensionTypeDescriptor = extensionTypeDescriptor{}
 
 type serviceDescriptor struct {
 	protoreflect.ServiceDescriptor
@@ -464,11 +500,15 @@ type methods struct {
 }
 
 func (m methods) Get(i int) protoreflect.MethodDescriptor {
-	return methodDescriptor{m.MethodDescriptors.Get(i)}
+	return wrapMethod(m.MethodDescriptors.Get(i))
 }
 
 func (m methods) ByName(n protoreflect.Name) protoreflect.MethodDescriptor {
-	return methodDescriptor{m.MethodDescriptors.ByName(n)}
+	mtd := m.MethodDescriptors.ByName(n)
+	if mtd == nil {
+		return nil
+	}
+	return wrapMethod(mtd)
 }
 
 type methodDescriptor struct {
@@ -483,7 +523,7 @@ func (m methodDescriptor) Parent() protoreflect.Descriptor {
 	d := m.MethodDescriptor.Parent()
 	switch d := d.(type) {
 	case protoreflect.ServiceDescriptor:
-		return serviceDescriptor{d}
+		return WrapService(d)
 	case nil:
 		return nil
 	default:
@@ -492,11 +532,11 @@ func (m methodDescriptor) Parent() protoreflect.Descriptor {
 }
 
 func (m methodDescriptor) Input() protoreflect.MessageDescriptor {
-	return messageDescriptor{m.MethodDescriptor.Input()}
+	return WrapMessage(m.MethodDescriptor.Input())
 }
 
 func (m methodDescriptor) Output() protoreflect.MessageDescriptor {
-	return messageDescriptor{m.MethodDescriptor.Output()}
+	return WrapMessage(m.MethodDescriptor.Output())
 }
 
 type extensionType struct {
@@ -504,7 +544,7 @@ type extensionType struct {
 }
 
 func (e extensionType) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {
-	return extensionDescriptor{e.ExtensionType.TypeDescriptor()}
+	return wrapExtensionTypeDescriptor(e.ExtensionType.TypeDescriptor())
 }
 
 type messageType struct {
@@ -512,7 +552,7 @@ type messageType struct {
 }
 
 func (m messageType) Descriptor() protoreflect.MessageDescriptor {
-	return messageDescriptor{m.MessageType.Descriptor()}
+	return WrapMessage(m.MessageType.Descriptor())
 }
 
 type enumType struct {
@@ -520,7 +560,7 @@ type enumType struct {
 }
 
 func (e enumType) Descriptor() protoreflect.EnumDescriptor {
-	return enumDescriptor{e.EnumType.Descriptor()}
+	return WrapEnum(e.EnumType.Descriptor())
 }
 
 // WrapFile wraps the given file descriptor so that it will include source
@@ -558,6 +598,36 @@ func WrapMessage(md protoreflect.MessageDescriptor) protoreflect.MessageDescript
 	return messageDescriptor{md}
 }
 
+func wrapField(fld protoreflect.FieldDescriptor) protoreflect.FieldDescriptor {
+	if wrapper, ok := fld.(fieldDescriptor); ok {
+		// already wrapped
+		return wrapper
+	}
+	if fld.ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return fld
+	}
+	if !canWrap(fld) {
+		return fld
+	}
+	return fieldDescriptor{fld}
+}
+
+func wrapOneof(ood protoreflect.OneofDescriptor) protoreflect.OneofDescriptor {
+	if wrapper, ok := ood.(oneofDescriptor); ok {
+		// already wrapped
+		return wrapper
+	}
+	if ood.ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return ood
+	}
+	if !canWrap(ood) {
+		return ood
+	}
+	return oneofDescriptor{ood}
+}
+
 // WrapEnum wraps the given enum descriptor so that it will include source
 // code info that was registered with this package if the file it is defined in
 // was processed with protoc-gen-gosrcinfo. Returns ed without wrapping if ed's
@@ -577,6 +647,62 @@ func WrapEnum(ed protoreflect.EnumDescriptor) protoreflect.EnumDescriptor {
 	return enumDescriptor{ed}
 }
 
+func wrapEnumValue(evd protoreflect.EnumValueDescriptor) protoreflect.EnumValueDescriptor {
+	if wrapper, ok := evd.(enumValueDescriptor); ok {
+		// already wrapped
+		return wrapper
+	}
+	if evd.ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return evd
+	}
+	if !canWrap(evd) {
+		return evd
+	}
+	return enumValueDescriptor{evd}
+}
+
+// WrapExtension wraps the given extension descriptor so that it will include
+// source code info that was registered with this package if the file it is
+// defined in was processed with protoc-gen-gosrcinfo. Returns ed without
+// wrapping if extd's parent file already contains source code info.
+func WrapExtension(extd protoreflect.ExtensionDescriptor) protoreflect.ExtensionDescriptor {
+	if wrapper, ok := extd.(extensionTypeDescriptor); ok {
+		// already wrapped
+		return wrapper
+	}
+	if wrapper, ok := extd.(fieldDescriptor); ok {
+		// already wrapped
+		return wrapper
+	}
+	if extd.ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return extd
+	}
+	if !canWrap(extd) {
+		return extd
+	}
+	if extType, ok := extd.(protoreflect.ExtensionTypeDescriptor); ok {
+		return wrapExtensionTypeDescriptor(extType)
+	}
+	return fieldDescriptor{extd}
+}
+
+func wrapExtensionTypeDescriptor(extd protoreflect.ExtensionTypeDescriptor) protoreflect.ExtensionTypeDescriptor {
+	if wrapper, ok := extd.(extensionTypeDescriptor); ok {
+		// already wrapped
+		return wrapper
+	}
+	if extd.ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return extd
+	}
+	if !canWrap(extd) {
+		return extd
+	}
+	return extensionTypeDescriptor{extd}
+}
+
 // WrapService wraps the given service descriptor so that it will include source
 // code info that was registered with this package if the file it is defined in
 // was processed with protoc-gen-gosrcinfo. Returns sd without wrapping if sd's
@@ -594,6 +720,21 @@ func WrapService(sd protoreflect.ServiceDescriptor) protoreflect.ServiceDescript
 		return sd
 	}
 	return serviceDescriptor{sd}
+}
+
+func wrapMethod(mtd protoreflect.MethodDescriptor) protoreflect.MethodDescriptor {
+	if wrapper, ok := mtd.(methodDescriptor); ok {
+		// already wrapped
+		return wrapper
+	}
+	if mtd.ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return mtd
+	}
+	if !canWrap(mtd) {
+		return mtd
+	}
+	return methodDescriptor{mtd}
 }
 
 // WrapExtensionType wraps the given extension type so that its associated
@@ -634,4 +775,24 @@ func WrapMessageType(mt protoreflect.MessageType) protoreflect.MessageType {
 		return mt
 	}
 	return messageType{mt}
+}
+
+// WrapEnumType wraps the given enum type so that its associated descriptor
+// will include source code info that was registered with this package
+// if the file it is defined in was processed with protoc-gen-gosrcinfo. Returns
+// et without wrapping if the parent file of et's descriptor already contains
+// source code info.
+func WrapEnumType(et protoreflect.EnumType) protoreflect.EnumType {
+	if wrapper, ok := et.(enumType); ok {
+		// already wrapped
+		return wrapper
+	}
+	if et.Descriptor().ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return et
+	}
+	if !canWrap(et.Descriptor()) {
+		return et
+	}
+	return enumType{et}
 }

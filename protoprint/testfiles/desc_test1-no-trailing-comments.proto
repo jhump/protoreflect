@@ -144,3 +144,21 @@ extend AnotherTestMessage {
   // Comment for xui
   optional uint64 xui = 103;
 }
+
+// Comment for SomeEnum
+enum SomeEnum {
+  // Comment for SOME_VAL
+  SOME_VAL = 0;
+
+  // Comment for ANOTHER_VAL
+  ANOTHER_VAL = 1;
+
+  // Comment for YET_ANOTHER_VAL
+  YET_ANOTHER_VAL = 2;
+}
+
+// Comment for SomeService
+service SomeService {
+  // Comment for SomeMethod
+  rpc SomeMethod ( TestMessage ) returns ( TestMessage );
+}
