@@ -253,7 +253,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*descriptorpb.Fil
 	protos := make([]*descriptorpb.FileDescriptorProto, len(results))
 	for i, res := range results {
 		protos[i] = res.FileDescriptorProto()
-		var optsIndex options.Index
+		var optsIndex sourceinfo.OptionIndex
 		if p.InterpretOptionsInUnlinkedFiles {
 			var err error
 			optsIndex, err = options.InterpretUnlinkedOptions(res)
@@ -263,7 +263,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*descriptorpb.Fil
 			removeDynamicExtensionsFromProto(protos[i])
 		}
 		if p.IncludeSourceCodeInfo {
-			protos[i].SourceCodeInfo = sourceinfo.GenerateSourceInfo(res.AST(), optsIndex)
+			protos[i].SourceCodeInfo = sourceinfo.GenerateSourceInfo(res.AST(), optsIndex, sourceinfo.WithExtraComments())
 		}
 	}
 
