@@ -26,7 +26,6 @@ import (
 	_ "google.golang.org/protobuf/types/pluginpb"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/grpcreflect/internal/grpc_reflection_v1"
 	"github.com/jhump/protoreflect/internal"
 	testprotosgrpc "github.com/jhump/protoreflect/internal/testprotos/grpc"
 	"github.com/jhump/protoreflect/internal/testutil"
@@ -206,7 +205,11 @@ func TestListServices(t *testing.T) {
 	testutil.Ok(t, err)
 
 	sort.Strings(s)
-	testutil.Eq(t, []string{"grpc.reflection.v1alpha.ServerReflection", "testprotos.DummyService"}, s)
+	testutil.Eq(t, []string{
+		"grpc.reflection.v1.ServerReflection",
+		"grpc.reflection.v1alpha.ServerReflection",
+		"testprotos.DummyService",
+	}, s)
 }
 
 func TestReset(t *testing.T) {
@@ -375,11 +378,11 @@ func TestAutoVersion(t *testing.T) {
 	t.Run("v1", func(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
-				grpc_reflection_v1.Register(s)
-				// HACK: The above won't show up in list of service names, so we need at least one other.
+				reflection.RegisterV1(s)
 				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
 			[]string{
+				"grpc.reflection.v1.ServerReflection",
 				"testprotos.DummyService",
 			},
 			[]string{
@@ -393,7 +396,8 @@ func TestAutoVersion(t *testing.T) {
 	t.Run("v1alpha", func(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
-				reflection.Register(s)
+				impl := reflection.NewServer(reflection.ServerOptions{Services: s})
+				rpb.RegisterServerReflectionServer(s, impl)
 				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
 			[]string{
@@ -416,11 +420,11 @@ func TestAutoVersion(t *testing.T) {
 	t.Run("both", func(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
-				grpc_reflection_v1.Register(s)
 				reflection.Register(s)
 				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
 			[]string{
+				"grpc.reflection.v1.ServerReflection",
 				"grpc.reflection.v1alpha.ServerReflection",
 				"testprotos.DummyService",
 			},

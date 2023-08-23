@@ -285,7 +285,7 @@ func TestLinkerValidation(t *testing.T) {
 			map[string]string{
 				"foo.proto": "package fu.baz; message foobar{ optional string a = 1 [default = { a: \"abc\" }]; }",
 			},
-			"foo.proto:1:66: field fu.baz.foobar.a: default value cannot be a message",
+			"foo.proto:1:66: field fu.baz.foobar.a: option default: default value cannot be a message",
 		},
 		{
 			map[string]string{

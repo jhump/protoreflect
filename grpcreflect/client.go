@@ -13,12 +13,12 @@ import (
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	refv1 "google.golang.org/grpc/reflection/grpc_reflection_v1"
 	refv1alpha "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
-	refv1 "github.com/jhump/protoreflect/grpcreflect/internal/grpc_reflection_v1"
 	"github.com/jhump/protoreflect/internal"
 )
 
@@ -758,7 +758,7 @@ type adaptStreamFromV1 struct {
 }
 
 func (a adaptStreamFromV1) Send(request *refv1alpha.ServerReflectionRequest) error {
-	v1req := refv1.ToV1Request(request)
+	v1req := toV1Request(request)
 	return a.ServerReflection_ServerReflectionInfoClient.Send(v1req)
 }
 
@@ -767,5 +767,5 @@ func (a adaptStreamFromV1) Recv() (*refv1alpha.ServerReflectionResponse, error) 
 	if err != nil {
 		return nil, err
 	}
-	return refv1.ToV1AlphaResponse(v1resp), nil
+	return toV1AlphaResponse(v1resp), nil
 }
