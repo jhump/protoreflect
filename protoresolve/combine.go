@@ -5,7 +5,6 @@ import (
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 // Combine returns a resolver that iterates through the given resolvers to find elements.
@@ -213,45 +212,5 @@ func (c combined) FindMessageByURL(url string) (protoreflect.MessageDescriptor, 
 }
 
 func (c combined) AsTypeResolver() TypeResolver {
-	return dynTypeResolver{res: c}
-}
-
-type dynTypeResolver struct {
-	res Resolver
-}
-
-func (d dynTypeResolver) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionType, error) {
-	ext, err := d.res.FindExtensionByName(name)
-	if err != nil {
-		return nil, err
-	}
-	return ExtensionType(ext), nil
-}
-
-func (d dynTypeResolver) FindExtensionByNumber(message protoreflect.FullName, number protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
-	ext, err := d.res.FindExtensionByNumber(message, number)
-	if err != nil {
-		return nil, err
-	}
-	return ExtensionType(ext), nil
-}
-
-func (d dynTypeResolver) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageType, error) {
-	msg, err := d.res.FindMessageByName(name)
-	if err != nil {
-		return nil, err
-	}
-	return dynamicpb.NewMessageType(msg), nil
-}
-
-func (d dynTypeResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
-	return d.FindMessageByName(TypeNameFromURL(url))
-}
-
-func (d dynTypeResolver) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumType, error) {
-	en, err := d.res.FindEnumByName(name)
-	if err != nil {
-		return nil, err
-	}
-	return dynamicpb.NewEnumType(en), nil
+	return TypesFromResolver(c)
 }

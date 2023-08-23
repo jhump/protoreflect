@@ -9,6 +9,10 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
+// GlobalDescriptors provides a view of protoregistry.GlobalFiles and protoregistry.GlobalTypes
+// as a Resolver.
+var GlobalDescriptors = ResolverFromPools(protoregistry.GlobalFiles, protoregistry.GlobalTypes)
+
 // FileResolver can resolve file descriptors by path.
 type FileResolver interface {
 	FindFileByPath(string) (protoreflect.FileDescriptor, error)
@@ -164,16 +168,14 @@ type Resolver interface {
 
 // FindExtensionByNumber searches the given descriptor pool for the requested extension.
 // This performs an inefficient search through all files and extensions in the pool.
-func FindExtensionByNumber(res DescriptorPool, message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error) {
+// It returns nil if the extension is not found in the file.
+func FindExtensionByNumber(res DescriptorPool, message protoreflect.FullName, field protoreflect.FieldNumber) protoreflect.ExtensionDescriptor {
 	var ext protoreflect.ExtensionDescriptor
 	res.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
 		ext = FindExtensionByNumberInFile(fd, message, field)
 		return ext == nil
 	})
-	if ext == nil {
-		return nil, protoregistry.NotFound
-	}
-	return ext, nil
+	return ext
 }
 
 // FindExtensionByNumberInFile searches all extension in the given file for the requested
@@ -465,7 +467,11 @@ func (r *resolverFromPool) FindMethodByName(name protoreflect.FullName) (protore
 }
 
 func (r *resolverFromPool) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error) {
-	return FindExtensionByNumber(r.DescriptorPool, message, field)
+	extd := FindExtensionByNumber(r.DescriptorPool, message, field)
+	if extd == nil {
+		return nil, protoregistry.NotFound
+	}
+	return extd, nil
 }
 
 func (r *resolverFromPool) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionDescriptor) bool) {

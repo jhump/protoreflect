@@ -6,12 +6,7 @@ import (
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
-
-// GlobalDescriptors provides a view of protoregistry.GlobalFiles and protoregistry.GlobalTypes
-// as a Resolver.
-var GlobalDescriptors = ResolverFromPools(protoregistry.GlobalFiles, protoregistry.GlobalTypes)
 
 // Registry implements the full Resolver interface defined in this package. It is
 // thread-safe and can be used for all kinds of operations where types or descriptors
@@ -53,6 +48,8 @@ func FromFiles(files *protoregistry.Files) (*Registry, error) {
 	reg := &Registry{
 		files: *files,
 	}
+	// NB: It's okay to call methods below without first acquiring
+	// lock because reg is not visible to any other goroutines yet.
 	var err error
 	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
 		err = reg.checkExtensionsLocked(fd)
@@ -381,130 +378,5 @@ func (r *Registry) AsTypeResolver() TypeResolver {
 // AsTypePool returns a view of this registry as a TypePool. This offers more methods
 // than AsTypeResolver, providing the ability to enumerate types.
 func (r *Registry) AsTypePool() TypePool {
-	return (*dynamicTypeResolver)(r)
-}
-
-type dynamicTypeResolver Registry
-
-func (d *dynamicTypeResolver) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionType, error) {
-	r := (*Registry)(d)
-	ext, err := r.FindExtensionByName(name)
-	if err != nil {
-		return nil, err
-	}
-	return ExtensionType(ext), nil
-}
-
-func (d *dynamicTypeResolver) FindExtensionByNumber(message protoreflect.FullName, number protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
-	r := (*Registry)(d)
-	ext, err := r.FindExtensionByNumber(message, number)
-	if err != nil {
-		return nil, err
-	}
-	return ExtensionType(ext), nil
-}
-
-func (d *dynamicTypeResolver) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageType, error) {
-	r := (*Registry)(d)
-	msg, err := r.FindMessageByName(name)
-	if err != nil {
-		return nil, err
-	}
-	return dynamicpb.NewMessageType(msg), nil
-}
-
-func (d *dynamicTypeResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
-	r := (*Registry)(d)
-	msg, err := r.FindMessageByURL(url)
-	if err != nil {
-		return nil, err
-	}
-	return dynamicpb.NewMessageType(msg), nil
-}
-
-func (d *dynamicTypeResolver) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumType, error) {
-	r := (*Registry)(d)
-	en, err := r.FindEnumByName(name)
-	if err != nil {
-		return nil, err
-	}
-	return dynamicpb.NewEnumType(en), nil
-}
-
-func (d *dynamicTypeResolver) RangeMessages(fn func(protoreflect.MessageType) bool) {
-	r := (*Registry)(d)
-	var rangeInContext func(container TypeContainer, fn func(protoreflect.MessageType) bool) bool
-	rangeInContext = func(container TypeContainer, fn func(protoreflect.MessageType) bool) bool {
-		msgs := container.Messages()
-		for i, length := 0, msgs.Len(); i < length; i++ {
-			msg := msgs.Get(i)
-			if !fn(dynamicpb.NewMessageType(msg)) {
-				return false
-			}
-			if !rangeInContext(msg, fn) {
-				return false
-			}
-		}
-		return true
-	}
-	r.RangeFiles(func(file protoreflect.FileDescriptor) bool {
-		return rangeInContext(file, fn)
-	})
-}
-
-func (d *dynamicTypeResolver) RangeEnums(fn func(protoreflect.EnumType) bool) {
-	r := (*Registry)(d)
-	var rangeInContext func(container TypeContainer, fn func(protoreflect.EnumType) bool) bool
-	rangeInContext = func(container TypeContainer, fn func(protoreflect.EnumType) bool) bool {
-		enums := container.Enums()
-		for i, length := 0, enums.Len(); i < length; i++ {
-			enum := enums.Get(i)
-			if !fn(dynamicpb.NewEnumType(enum)) {
-				return false
-			}
-		}
-		msgs := container.Messages()
-		for i, length := 0, msgs.Len(); i < length; i++ {
-			msg := msgs.Get(i)
-			if !rangeInContext(msg, fn) {
-				return false
-			}
-		}
-		return true
-	}
-	r.RangeFiles(func(file protoreflect.FileDescriptor) bool {
-		return rangeInContext(file, fn)
-	})
-}
-
-func (d *dynamicTypeResolver) RangeExtensions(fn func(protoreflect.ExtensionType) bool) {
-	r := (*Registry)(d)
-	var rangeInContext func(container TypeContainer, fn func(protoreflect.ExtensionType) bool) bool
-	rangeInContext = func(container TypeContainer, fn func(protoreflect.ExtensionType) bool) bool {
-		exts := container.Extensions()
-		for i, length := 0, exts.Len(); i < length; i++ {
-			ext := exts.Get(i)
-			if !fn(ExtensionType(ext)) {
-				return false
-			}
-		}
-		msgs := container.Messages()
-		for i, length := 0, msgs.Len(); i < length; i++ {
-			msg := msgs.Get(i)
-			if !rangeInContext(msg, fn) {
-				return false
-			}
-		}
-		return true
-	}
-	r.RangeFiles(func(file protoreflect.FileDescriptor) bool {
-		return rangeInContext(file, fn)
-	})
-}
-
-func (d *dynamicTypeResolver) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionType) bool) {
-	r := (*Registry)(d)
-	r.RangeExtensionsByMessage(message, func(ext protoreflect.ExtensionDescriptor) bool {
-		return fn(ExtensionType(ext))
-	})
+	return TypesFromDescriptorPool(r)
 }

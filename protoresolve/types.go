@@ -262,7 +262,7 @@ func TypesFromResolver(resolver interface {
 // pool provides an efficient implementation for the
 // [ExtensionTypeResolver.FindExtensionByNumber] method. Otherwise, it will
 // use an inefficient implementation that searches through all files for the
-// request extension.
+// requested extension.
 func TypesFromDescriptorPool(pool DescriptorPool) TypePool {
 	return &typesFromDescriptorPool{pool: pool}
 }
@@ -352,7 +352,10 @@ func (t *typesFromDescriptorPool) FindExtensionByNumber(message protoreflect.Ful
 	if extRes, ok := t.pool.(ExtensionResolver); ok {
 		ext, err = extRes.FindExtensionByNumber(message, field)
 	} else {
-		ext, err = FindExtensionByNumber(t.pool, message, field)
+		ext = FindExtensionByNumber(t.pool, message, field)
+		if ext == nil {
+			err = protoregistry.NotFound
+		}
 	}
 	if err != nil {
 		return nil, err

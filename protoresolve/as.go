@@ -49,7 +49,7 @@ func As[M PointerMessage[T], T any](msg proto.Message) (M, error) {
 	}
 	if data, err := proto.Marshal(msg); err != nil {
 		return nil, err
-	} else if err = (proto.UnmarshalOptions{Resolver: exts}).Unmarshal(data, dest); err != nil {
+	} else if err = opts.Unmarshal(data, dest); err != nil {
 		return nil, err
 	}
 	return dest, nil

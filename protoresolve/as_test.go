@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -20,6 +21,8 @@ func TestAs(t *testing.T) {
 
 	// msg needs conversion from dynamic message
 	msg = dynamicpb.NewMessage((&anypb.Any{}).ProtoReflect().Descriptor())
+	fields := msg.ProtoReflect().Descriptor().Fields()
+	msg.ProtoReflect().Set(fields.ByName("type_url"), protoreflect.ValueOfString("abc/def.xyz"))
 	asAny, err = As[*anypb.Any](msg)
 	require.NoError(t, err)
 	// not the same instance, but equivalent data
