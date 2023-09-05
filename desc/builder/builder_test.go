@@ -1579,29 +1579,33 @@ func TestPruneDependencies(t *testing.T) {
 
 func TestInterleavedEnumNumbers(t *testing.T) {
 	en := NewEnum("Options").
-		AddValue(NewEnumValue("OPTION_1").SetNumber(0)).
+		AddValue(NewEnumValue("OPTION_1").SetNumber(-1)).
 		AddValue(NewEnumValue("OPTION_2")).
-		AddValue(NewEnumValue("OPTION_3").SetNumber(1)).
-		AddValue(NewEnumValue("OPTION_4")).
-		AddValue(NewEnumValue("OPTION_5").SetNumber(100))
+		AddValue(NewEnumValue("OPTION_3").SetNumber(2)).
+		AddValue(NewEnumValue("OPTION_4").SetNumber(1)).
+		AddValue(NewEnumValue("OPTION_5")).
+		AddValue(NewEnumValue("OPTION_6").SetNumber(100))
 
 	ed, err := en.Build()
 	testutil.Ok(t, err)
 
 	testutil.Require(t, ed.FindValueByName("OPTION_1") != nil)
-	testutil.Eq(t, int32(0), ed.FindValueByName("OPTION_1").GetNumber())
+	testutil.Eq(t, int32(-1), ed.FindValueByName("OPTION_1").GetNumber())
 
 	testutil.Require(t, ed.FindValueByName("OPTION_2") != nil)
-	testutil.Eq(t, int32(2), ed.FindValueByName("OPTION_2").GetNumber())
+	testutil.Eq(t, int32(0), ed.FindValueByName("OPTION_2").GetNumber())
 
 	testutil.Require(t, ed.FindValueByName("OPTION_3") != nil)
-	testutil.Eq(t, int32(1), ed.FindValueByName("OPTION_3").GetNumber())
+	testutil.Eq(t, int32(2), ed.FindValueByName("OPTION_3").GetNumber())
 
 	testutil.Require(t, ed.FindValueByName("OPTION_4") != nil)
-	testutil.Eq(t, int32(3), ed.FindValueByName("OPTION_4").GetNumber())
+	testutil.Eq(t, int32(1), ed.FindValueByName("OPTION_4").GetNumber())
 
 	testutil.Require(t, ed.FindValueByName("OPTION_5") != nil)
-	testutil.Eq(t, int32(100), ed.FindValueByName("OPTION_5").GetNumber())
+	testutil.Eq(t, int32(3), ed.FindValueByName("OPTION_5").GetNumber())
+
+	testutil.Require(t, ed.FindValueByName("OPTION_6") != nil)
+	testutil.Eq(t, int32(100), ed.FindValueByName("OPTION_6").GetNumber())
 }
 
 func TestInvalid(t *testing.T) {
