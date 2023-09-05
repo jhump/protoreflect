@@ -259,7 +259,6 @@ func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceC
 		}
 		sort.Ints(tags)
 		t := 0
-
 		ti := sort.Search(len(tags), func(i int) bool {
 			return tags[i] >= 0
 		})
