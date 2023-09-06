@@ -250,10 +250,11 @@ func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceC
 
 	if len(needNumbersAssigned) > 0 {
 		tags := make([]int, len(values)-len(needNumbersAssigned))
-		for i, ev := range values {
-			tag := ev.GetNumber()
-			if tag != 0 {
-				tags[i] = int(tag)
+		tagsIndex := 0
+		for _, evb := range eb.values {
+			if evb.numberSet {
+				tags[tagsIndex] = int(evb.GetNumber())
+				tagsIndex++
 			}
 		}
 		sort.Ints(tags)
