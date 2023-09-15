@@ -272,7 +272,7 @@ func (eb *EnumBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceC
 		tagsIndex := 0
 		for _, evb := range eb.values {
 			if evb.numberSet {
-				tags[tagsIndex] = int(evb.GetNumber())
+				tags[tagsIndex] = int(evb.number)
 				tagsIndex++
 			}
 		}

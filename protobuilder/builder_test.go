@@ -1528,6 +1528,38 @@ func TestInterleavedFieldNumbers(t *testing.T) {
 	require.Equal(t, protoreflect.FieldNumber(5), md.Fields().ByName("five").Number())
 }
 
+func TestInterleavedEnumNumbers(t *testing.T) {
+	en := NewEnum("Options").
+		AddValue(NewEnumValue("OPTION_1").SetNumber(-1)).
+		AddValue(NewEnumValue("OPTION_2")).
+		AddValue(NewEnumValue("OPTION_3").SetNumber(2)).
+		AddValue(NewEnumValue("OPTION_4").SetNumber(1)).
+		AddValue(NewEnumValue("OPTION_5")).
+		AddValue(NewEnumValue("OPTION_6").SetNumber(100))
+
+	ed, err := en.Build()
+	require.NoError(t, err)
+
+	evd := ed.Values().ByName("OPTION_1")
+	require.NotNil(t, evd)
+	require.Equal(t, protoreflect.EnumNumber(-1), evd.Number())
+	evd = ed.Values().ByName("OPTION_2")
+	require.NotNil(t, evd)
+	require.Equal(t, protoreflect.EnumNumber(0), evd.Number())
+	evd = ed.Values().ByName("OPTION_3")
+	require.NotNil(t, evd)
+	require.Equal(t, protoreflect.EnumNumber(2), evd.Number())
+	evd = ed.Values().ByName("OPTION_4")
+	require.NotNil(t, evd)
+	require.Equal(t, protoreflect.EnumNumber(1), evd.Number())
+	evd = ed.Values().ByName("OPTION_5")
+	require.NotNil(t, evd)
+	require.Equal(t, protoreflect.EnumNumber(3), evd.Number())
+	evd = ed.Values().ByName("OPTION_6")
+	require.NotNil(t, evd)
+	require.Equal(t, protoreflect.EnumNumber(100), evd.Number())
+}
+
 func clone(t *testing.T, fb *FileBuilder) *FileBuilder {
 	fd, err := fb.Build()
 	require.NoError(t, err)
