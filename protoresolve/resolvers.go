@@ -9,9 +9,15 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
-// GlobalDescriptors provides a view of protoregistry.GlobalFiles and protoregistry.GlobalTypes
-// as a Resolver.
-var GlobalDescriptors = ResolverFromPools(protoregistry.GlobalFiles, protoregistry.GlobalTypes)
+var (
+	// GlobalDescriptors provides a view of protoregistry.GlobalFiles and protoregistry.GlobalTypes
+	// as a Resolver.
+	GlobalDescriptors = ResolverFromPools(protoregistry.GlobalFiles, protoregistry.GlobalTypes)
+
+	// ErrNotFound is a sentinel error that is returned from resolvers to indicate that the named
+	// element is not known to the registry. It is the same as protoregistry.NotFound.
+	ErrNotFound = protoregistry.NotFound
+)
 
 // FileResolver can resolve file descriptors by path.
 type FileResolver interface {
@@ -469,7 +475,7 @@ func (r *resolverFromPool) FindMethodByName(name protoreflect.FullName) (protore
 func (r *resolverFromPool) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error) {
 	extd := FindExtensionByNumber(r.DescriptorPool, message, field)
 	if extd == nil {
-		return nil, protoregistry.NotFound
+		return nil, ErrNotFound
 	}
 	return extd, nil
 }
