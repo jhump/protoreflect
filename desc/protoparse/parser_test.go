@@ -154,7 +154,7 @@ func TestSimpleParse(t *testing.T) {
 	// We'll also check our fixup logic to make sure it correctly rewrites the
 	// names of the files to match corresponding import statementes. This should
 	// strip the "../../internal/testprotos/" prefix from each file.
-	protos = fixupFilenames(protos)
+	protos, _ = fixupFilenames(protos)
 	var actual []string
 	for n := range protos {
 		actual = append(actual, n)
@@ -421,4 +421,68 @@ message Foo {
 
 	comment := fds[0].GetMessageTypes()[0].GetFields()[0].GetSourceInfo().GetLeadingComments()
 	testutil.Eq(t, " leading comments\n", comment)
+}
+
+func TestParseInferImportPaths_SimpleNoOp(t *testing.T) {
+	sources := map[string]string{
+		"test.proto": `
+		syntax = "proto3";
+		import "google/protobuf/struct.proto";
+		message Foo {
+			string name = 1;
+			repeated uint64 refs = 2;
+			google.protobuf.Struct meta = 3;
+		}`,
+	}
+	p := Parser{
+		Accessor:         FileContentsFromMap(sources),
+		InferImportPaths: true,
+	}
+	fds, err := p.ParseFiles("test.proto")
+	testutil.Ok(t, err)
+	testutil.Eq(t, 1, len(fds))
+}
+
+func TestParseInferImportPaths_FixesNestedPaths(t *testing.T) {
+	sources := FileContentsFromMap(map[string]string{
+		"../foo/bar/a.proto": `
+			syntax = "proto3";
+			import "baz/b.proto";
+			message A {
+				B b = 1;
+			}`,
+		"../foo/bar/baz/b.proto": `
+			syntax = "proto3";
+			import "baz/c.proto";
+			message B {
+				C c = 1;
+			}`,
+		"../foo/bar/baz/c.proto": `
+			syntax = "proto3";
+			message C {}`,
+		"../foo/bar/baz/d.proto": `
+			syntax = "proto3";
+			import "a.proto";
+			message D {
+				A a = 1;
+			}`,
+	})
+
+	p := Parser{
+		Accessor: func(filename string) (io.ReadCloser, error) {
+			filename = strings.TrimPrefix(filename, "./")
+			return sources(filename)
+		},
+		ImportPaths:      []string{"./", "../foo/bar"},
+		InferImportPaths: true,
+	}
+
+	fds, err := p.ParseFiles("../foo/bar/a.proto", "../foo/bar/baz/b.proto", "../foo/bar/baz/c.proto", "../foo/bar/baz/d.proto")
+	testutil.Ok(t, err)
+	testutil.Eq(t, 4, len(fds))
+	// check that they have the expected name
+	testutil.Eq(t, fds[0].GetName(), "a.proto")
+	testutil.Eq(t, fds[1].GetName(), "baz/b.proto")
+	testutil.Eq(t, fds[2].GetName(), "baz/c.proto")
+	testutil.Eq(t, fds[3].GetName(), "baz/d.proto")
 }
