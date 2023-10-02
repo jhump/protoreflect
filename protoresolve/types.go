@@ -1,7 +1,9 @@
 package protoresolve
 
 import (
+	"bytes"
 	"fmt"
+	"math/bits"
 	"strings"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -69,6 +71,40 @@ const (
 	// and extensions. These are the same types as supported in a SerializationResolver.
 	TypeKindsSerialization = TypeKindMessage | TypeKindExtension
 )
+
+func (k TypeKind) String() string {
+	switch k {
+	case TypeKindMessage:
+		return "message"
+	case TypeKindEnum:
+		return "enum"
+	case TypeKindExtension:
+		return "extension"
+	case 0:
+		return "<none>"
+	default:
+		i := uint(k)
+		if bits.OnesCount(i) == 1 {
+			return fmt.Sprintf("unknown kind (%d)", k)
+		}
+
+		var buf bytes.Buffer
+		l := bits.UintSize
+		for i != 0 {
+			if buf.Len() > 0 {
+				buf.WriteByte(',')
+			}
+			z := bits.LeadingZeros(i)
+			if z == l {
+				break
+			}
+			shr := l - z - 1
+			elem := TypeKind(1 << shr)
+			buf.WriteString(elem.String())
+		}
+		return buf.String()
+	}
+}
 
 // RegisterTypesInFile registers all the types (with kinds that match kindMask) with
 // the given registry. Only the types directly in file are registered. This will result

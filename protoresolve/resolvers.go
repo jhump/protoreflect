@@ -172,6 +172,116 @@ type Resolver interface {
 	AsTypeResolver() TypeResolver
 }
 
+type DescriptorKind int
+
+// The various supported TypeKind values.
+const (
+	DescriptorKindUnknown = DescriptorKind(iota)
+	DescriptorKindFile
+	DescriptorKindMessage
+	DescriptorKindField
+	DescriptorKindOneof
+	DescriptorKindEnum
+	DescriptorKindEnumValue
+	DescriptorKindExtension
+	DescriptorKindService
+	DescriptorKindMethod
+)
+
+func KindOf(d protoreflect.Descriptor) DescriptorKind {
+	switch d := d.(type) {
+	case protoreflect.FileDescriptor:
+		return DescriptorKindFile
+	case protoreflect.MessageDescriptor:
+		return DescriptorKindMessage
+	case protoreflect.FieldDescriptor:
+		if d.IsExtension() {
+			return DescriptorKindExtension
+		}
+		return DescriptorKindField
+	case protoreflect.OneofDescriptor:
+		return DescriptorKindOneof
+	case protoreflect.EnumDescriptor:
+		return DescriptorKindEnum
+	case protoreflect.EnumValueDescriptor:
+		return DescriptorKindEnumValue
+	case protoreflect.ServiceDescriptor:
+		return DescriptorKindService
+	case protoreflect.MethodDescriptor:
+		return DescriptorKindMethod
+	default:
+		return DescriptorKindUnknown
+	}
+}
+
+func (k DescriptorKind) String() string {
+	switch k {
+	case DescriptorKindFile:
+		return "file"
+	case DescriptorKindMessage:
+		return "message"
+	case DescriptorKindField:
+		return "field"
+	case DescriptorKindOneof:
+		return "oneof"
+	case DescriptorKindEnum:
+		return "enum"
+	case DescriptorKindEnumValue:
+		return "enum value"
+	case DescriptorKindExtension:
+		return "extension"
+	case DescriptorKindService:
+		return "service"
+	case DescriptorKindMethod:
+		return "method"
+	case DescriptorKindUnknown:
+		return "unknown"
+	default:
+		return fmt.Sprintf("unknown kind (%d)", k)
+	}
+}
+
+func (k DescriptorKind) withArticle() string {
+	switch k {
+	case DescriptorKindFile:
+		return "a file"
+	case DescriptorKindMessage:
+		return "a message"
+	case DescriptorKindField:
+		return "a field"
+	case DescriptorKindOneof:
+		return "a oneof"
+	case DescriptorKindEnum:
+		return "an enum"
+	case DescriptorKindEnumValue:
+		return "an enum value"
+	case DescriptorKindExtension:
+		return "an extension"
+	case DescriptorKindService:
+		return "a service"
+	case DescriptorKindMethod:
+		return "a method"
+	case DescriptorKindUnknown:
+		return "unknown"
+	default:
+		return fmt.Sprintf("unknown kind (%d)", k)
+	}
+}
+
+type ErrUnexpectedType struct {
+	// Only one of URL or Name will be set, depending on whether
+	// the type was looked up by URL or name.
+	URL string
+	// The kind of descriptor that was expected.
+	Expecting DescriptorKind
+	// The descriptor that was actually found.
+	Descriptor protoreflect.Descriptor
+}
+
+func (e *ErrUnexpectedType) Error() string {
+	return fmt.Sprintf("wrong kind of descriptor for URL %q: expected %s, got %s", e.URL, e.Expecting.withArticle(), descKindWithArticle(e.Descriptor))
+}
+
 // FindExtensionByNumber searches the given descriptor pool for the requested extension.
 // This performs an inefficient search through all files and extensions in the pool.
 // It returns nil if the extension is not found in the file.

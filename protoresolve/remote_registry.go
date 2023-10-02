@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"strings"
 	"sync"
 	"sync/atomic"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
@@ -494,12 +494,15 @@ func ensureScheme(url string) string {
 }
 
 func descKindWithArticle(d protoreflect.Descriptor) string {
-	switch d.(type) {
+	switch d := d.(type) {
 	case protoreflect.FileDescriptor:
 		return "a file"
 	case protoreflect.MessageDescriptor:
 		return "a message"
 	case protoreflect.FieldDescriptor:
+		if d.IsExtension() {
+			return "an extension"
+		}
 		return "a field"
 	case protoreflect.OneofDescriptor:
 		return "a oneof"
