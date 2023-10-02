@@ -1,5 +1,5 @@
 # Protocol Buffer and gRPC Reflection
-[![Build Status](https://circleci.com/gh/jhump/protoreflect/tree/master.svg?style=svg)](https://circleci.com/gh/jhump/protoreflect/tree/master)
+[![Build Status](https://circleci.com/gh/jhump/protoreflect/tree/main.svg?style=svg)](https://circleci.com/gh/jhump/protoreflect/tree/main)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jhump/protoreflect)](https://goreportcard.com/report/github.com/jhump/protoreflect)
 
 This repo provides reflection APIs for [protocol buffers](https://developers.google.com/protocol-buffers/) (also known as "protobufs" for short)
