@@ -445,22 +445,22 @@ func TestParseInferImportPaths_SimpleNoOp(t *testing.T) {
 
 func TestParseInferImportPaths_FixesNestedPaths(t *testing.T) {
 	sources := FileContentsFromMap(map[string]string{
-		"../foo/bar/a.proto": `
+		"/foo/bar/a.proto": `
 			syntax = "proto3";
 			import "baz/b.proto";
 			message A {
 				B b = 1;
 			}`,
-		"../foo/bar/baz/b.proto": `
+		"/foo/bar/baz/b.proto": `
 			syntax = "proto3";
 			import "baz/c.proto";
 			message B {
 				C c = 1;
 			}`,
-		"../foo/bar/baz/c.proto": `
+		"/foo/bar/baz/c.proto": `
 			syntax = "proto3";
 			message C {}`,
-		"../foo/bar/baz/d.proto": `
+		"/foo/bar/baz/d.proto": `
 			syntax = "proto3";
 			import "a.proto";
 			message D {
@@ -468,21 +468,60 @@ func TestParseInferImportPaths_FixesNestedPaths(t *testing.T) {
 			}`,
 	})
 
-	p := Parser{
-		Accessor: func(filename string) (io.ReadCloser, error) {
-			filename = strings.TrimPrefix(filename, "./")
-			return sources(filename)
+	testCases := []struct {
+		name      string
+		cwd       string
+		filenames []string
+		expect    []string
+	}{
+		{
+			name:      "outside hierarchy",
+			cwd:       "/buzz",
+			filenames: []string{"../foo/bar/a.proto", "../foo/bar/baz/b.proto", "../foo/bar/baz/c.proto", "../foo/bar/baz/d.proto"},
 		},
-		ImportPaths:      []string{"./", "../foo/bar"},
-		InferImportPaths: true,
+		{
+			name:      "inside hierarchy",
+			cwd:       "/foo",
+			filenames: []string{"bar/a.proto", "bar/baz/b.proto", "bar/baz/c.proto", "bar/baz/d.proto"},
+		},
+		{
+			name:      "import path root (no-op)",
+			cwd:       "/foo/bar",
+			filenames: []string{"a.proto", "baz/b.proto", "baz/c.proto", "baz/d.proto"},
+		},
+		{
+			name:      "inside leaf directory",
+			cwd:       "/foo/bar/baz",
+			filenames: []string{"../a.proto", "b.proto", "c.proto", "d.proto"},
+			// NB: Expected names differ from above cases because nothing imports d.proto.
+			//     So when inferring the root paths, the fact that d.proto is defined in
+			//     the baz sub-directory will not be discovered. That's okay since the parse
+			//     operation still succeeds.
+			expect: []string{"a.proto", "baz/b.proto", "baz/c.proto", "d.proto"},
+		},
 	}
-
-	fds, err := p.ParseFiles("../foo/bar/a.proto", "../foo/bar/baz/b.proto", "../foo/bar/baz/c.proto", "../foo/bar/baz/d.proto")
-	testutil.Ok(t, err)
-	testutil.Eq(t, 4, len(fds))
-	// check that they have the expected name
-	testutil.Eq(t, fds[0].GetName(), "a.proto")
-	testutil.Eq(t, fds[1].GetName(), "baz/b.proto")
-	testutil.Eq(t, fds[2].GetName(), "baz/c.proto")
-	testutil.Eq(t, fds[3].GetName(), "baz/d.proto")
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			p := Parser{
+				Accessor:         sources,
+				ImportPaths:      []string{testCase.cwd, "/foo/bar"},
+				InferImportPaths: true,
+			}
+			fds, err := p.ParseFiles(testCase.filenames...)
+			testutil.Ok(t, err)
+			testutil.Eq(t, 4, len(fds))
+			var expectedNames []string
+			if len(testCase.expect) == 0 {
+				expectedNames = []string{"a.proto", "baz/b.proto", "baz/c.proto", "baz/d.proto"}
+			} else {
+				testutil.Eq(t, 4, len(testCase.expect))
+				expectedNames = testCase.expect
+			}
+			// check that they have the expected name
+			testutil.Eq(t, expectedNames[0], fds[0].GetName())
+			testutil.Eq(t, expectedNames[1], fds[1].GetName())
+			testutil.Eq(t, expectedNames[2], fds[2].GetName())
+			testutil.Eq(t, expectedNames[3], fds[3].GetName())
+		})
+	}
 }
