@@ -386,6 +386,10 @@ func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *repo
 	}
 	results[filename] = parseResult
 
+	if astRoot == nil {
+		return
+	}
+
 	for _, decl := range astRoot.Decls {
 		imp, ok := decl.(*ast2.ImportNode)
 		if !ok {

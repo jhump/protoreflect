@@ -422,3 +422,27 @@ message Foo {
 	comment := fds[0].GetMessageTypes()[0].GetFields()[0].GetSourceInfo().GetLeadingComments()
 	testutil.Eq(t, " leading comments\n", comment)
 }
+
+func TestParseWithInferImportPaths(t *testing.T) {
+	accessor := FileContentsFromMap(map[string]string{
+		"test.proto": `
+syntax = "proto3";
+import "google/protobuf/struct.proto";
+message Foo {
+  // leading comments
+  .Foo foo = 1;
+}
+`,
+	})
+
+	p := Parser{
+		Accessor:              accessor,
+		IncludeSourceCodeInfo: true,
+		InferImportPaths:      true,
+	}
+	fds, err := p.ParseFiles("test.proto")
+	testutil.Ok(t, err)
+
+	comment := fds[0].GetMessageTypes()[0].GetFields()[0].GetSourceInfo().GetLeadingComments()
+	testutil.Eq(t, " leading comments\n", comment)
+}
