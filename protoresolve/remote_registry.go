@@ -36,7 +36,7 @@ type pkgBaseURL struct {
 	applyToSubPackages bool
 }
 
-var _ MessageURLResolver = (*RemoteRegistry)(nil)
+var _ MessageResolver = (*RemoteRegistry)(nil)
 
 func (r *RemoteRegistry) URLForType(desc protoreflect.Descriptor) string {
 	return r.urlForType(desc.FullName(), desc.ParentFile().Package())
@@ -491,31 +491,4 @@ func ensureScheme(url string) string {
 		return "https://" + url
 	}
 	return url
-}
-
-func descKindWithArticle(d protoreflect.Descriptor) string {
-	switch d := d.(type) {
-	case protoreflect.FileDescriptor:
-		return "a file"
-	case protoreflect.MessageDescriptor:
-		return "a message"
-	case protoreflect.FieldDescriptor:
-		if d.IsExtension() {
-			return "an extension"
-		}
-		return "a field"
-	case protoreflect.OneofDescriptor:
-		return "a oneof"
-	case protoreflect.EnumDescriptor:
-		return "an enum"
-	case protoreflect.EnumValueDescriptor:
-		return "an enum value"
-	case protoreflect.ServiceDescriptor:
-		return "a service"
-	case protoreflect.MethodDescriptor:
-		return "a method"
-	default:
-		// shouldn't get here...
-		return fmt.Sprintf("%T", d)
-	}
 }

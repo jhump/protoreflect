@@ -50,8 +50,7 @@ var _ DescriptorPool = (*protoregistry.Files)(nil)
 // DescriptorRegistry is a file and descriptor resolver that allows the caller to add files
 // (and their contained descriptors) to the set of files and descriptors it can resolve.
 type DescriptorRegistry interface {
-	FileResolver
-	DescriptorResolver
+	DescriptorPool
 	RegisterFile(protoreflect.FileDescriptor) error
 }
 
@@ -59,8 +58,12 @@ var _ DescriptorRegistry = (*Registry)(nil)
 var _ DescriptorRegistry = (*protoregistry.Files)(nil)
 
 // TypedDescriptorResolver can resolve descriptors by full name and provides strongly-typed methods
-// for each kind of descriptor. Note that FindFieldByName may return normal fields and may return
-// extension fields.
+// for each kind of descriptor.
+//
+// Note that FindFieldByName may return normal fields and may also return extension fields. But
+// FindExtensionByName should only ever return extensions. If the fully-qualified name of a normal
+// field is provided to FindExtensionByName, it should return an error indicating that the named
+// element was the wrong kind.
 type TypedDescriptorResolver interface {
 	FindMessageByName(protoreflect.FullName) (protoreflect.MessageDescriptor, error)
 	FindFieldByName(protoreflect.FullName) (protoreflect.FieldDescriptor, error)
@@ -74,6 +77,7 @@ type TypedDescriptorResolver interface {
 
 // ExtensionResolver can resolve extensions based on the containing message name and field number.
 type ExtensionResolver interface {
+	FindExtensionByName(protoreflect.FullName) (protoreflect.ExtensionDescriptor, error)
 	FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error)
 }
 
@@ -83,9 +87,10 @@ type ExtensionPool interface {
 	RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionDescriptor) bool)
 }
 
-// MessageURLResolver can resolve messages based on their type URL. This URL must include the
+// MessageResolver can resolve messages based on their name or a type URL. URLs must include the
 // fully-qualified type name as the last URI path component.
-type MessageURLResolver interface {
+type MessageResolver interface {
+	FindMessageByName(protoreflect.FullName) (protoreflect.MessageDescriptor, error)
 	FindMessageByURL(url string) (protoreflect.MessageDescriptor, error)
 }
 
@@ -168,7 +173,7 @@ type Resolver interface {
 	DescriptorPool
 	TypedDescriptorResolver
 	ExtensionPool
-	MessageURLResolver
+	MessageResolver
 	AsTypeResolver() TypeResolver
 }
 
@@ -494,7 +499,7 @@ func (r *resolverFromPool) FindMessageByName(name protoreflect.FullName) (protor
 	}
 	msg, ok := d.(protoreflect.MessageDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a message", name, descType(d))
+		return nil, fmt.Errorf("%s is %s, not a message", name, descKindWithArticle(d))
 	}
 	return msg, nil
 }
@@ -506,7 +511,7 @@ func (r *resolverFromPool) FindFieldByName(name protoreflect.FullName) (protoref
 	}
 	field, ok := d.(protoreflect.FieldDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a field", name, descType(d))
+		return nil, fmt.Errorf("%s is %s, not a field", name, descKindWithArticle(d))
 	}
 	return field, nil
 }
@@ -529,7 +534,7 @@ func (r *resolverFromPool) FindOneofByName(name protoreflect.FullName) (protoref
 	}
 	oneof, ok := d.(protoreflect.OneofDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a oneof", name, descType(d))
+		return nil, fmt.Errorf("%s is %s, not a oneof", name, descKindWithArticle(d))
 	}
 	return oneof, nil
 }
@@ -541,7 +546,7 @@ func (r *resolverFromPool) FindEnumByName(name protoreflect.FullName) (protorefl
 	}
 	enum, ok := d.(protoreflect.EnumDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an enum", name, descType(d))
+		return nil, fmt.Errorf("%s is %s, not an enum", name, descKindWithArticle(d))
 	}
 	return enum, nil
 }
@@ -553,7 +558,7 @@ func (r *resolverFromPool) FindEnumValueByName(name protoreflect.FullName) (prot
 	}
 	enumVal, ok := d.(protoreflect.EnumValueDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an enum value", name, descType(d))
+		return nil, fmt.Errorf("%s is %s, not an enum value", name, descKindWithArticle(d))
 	}
 	return enumVal, nil
 }
@@ -565,7 +570,7 @@ func (r *resolverFromPool) FindServiceByName(name protoreflect.FullName) (protor
 	}
 	svc, ok := d.(protoreflect.ServiceDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a service", name, descType(d))
+		return nil, fmt.Errorf("%s is %s, not a service", name, descKindWithArticle(d))
 	}
 	return svc, nil
 }
@@ -577,7 +582,7 @@ func (r *resolverFromPool) FindMethodByName(name protoreflect.FullName) (protore
 	}
 	mtd, ok := d.(protoreflect.MethodDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a method", name, descType(d))
+		return nil, fmt.Errorf("%s is %s, not a method", name, descKindWithArticle(d))
 	}
 	return mtd, nil
 }

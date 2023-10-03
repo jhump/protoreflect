@@ -11,17 +11,6 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
-// TypeRegistry is a type resolver that allows the caller to add elements to
-// the set of types it can resolve.
-type TypeRegistry interface {
-	TypeResolver
-	RegisterMessage(protoreflect.MessageType) error
-	RegisterEnum(protoreflect.EnumType) error
-	RegisterExtension(protoreflect.ExtensionType) error
-}
-
-var _ TypeRegistry = (*protoregistry.Types)(nil)
-
 // TypePool is a type resolver that allows for iteration over all known types.
 type TypePool interface {
 	TypeResolver
@@ -32,6 +21,17 @@ type TypePool interface {
 }
 
 var _ TypePool = (*protoregistry.Types)(nil)
+
+// TypeRegistry is a type resolver that allows the caller to add elements to
+// the set of types it can resolve.
+type TypeRegistry interface {
+	TypePool
+	RegisterMessage(protoreflect.MessageType) error
+	RegisterEnum(protoreflect.EnumType) error
+	RegisterExtension(protoreflect.ExtensionType) error
+}
+
+var _ TypeRegistry = (*protoregistry.Types)(nil)
 
 // ExtensionType returns a [protoreflect.ExtensionType] for the given descriptor.
 // If the given descriptor implements [protoreflect.ExtensionTypeDescriptor], then
@@ -319,7 +319,7 @@ func (t *typesFromResolver) FindExtensionByName(field protoreflect.FullName) (pr
 	}
 	ext, ok := d.(protoreflect.ExtensionDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an extension", field, descType(d))
+		return nil, fmt.Errorf("%s is %s, not an extension", field, descKindWithArticle(d))
 	}
 	if !ext.IsExtension() {
 		return nil, fmt.Errorf("%s is a normal field, not an extension", field)
@@ -342,7 +342,7 @@ func (t *typesFromResolver) FindMessageByName(message protoreflect.FullName) (pr
 	}
 	msg, ok := d.(protoreflect.MessageDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a message", message, descType(d))
+		return nil, fmt.Errorf("%s is %s, not a message", message, descKindWithArticle(d))
 	}
 	return dynamicpb.NewMessageType(msg), nil
 }
@@ -358,7 +358,7 @@ func (t *typesFromResolver) FindEnumByName(enum protoreflect.FullName) (protoref
 	}
 	en, ok := d.(protoreflect.EnumDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an enum", enum, descType(d))
+		return nil, fmt.Errorf("%s is %s, not an enum", enum, descKindWithArticle(d))
 	}
 	return dynamicpb.NewEnumType(en), nil
 }
@@ -374,7 +374,7 @@ func (t *typesFromDescriptorPool) FindExtensionByName(field protoreflect.FullNam
 	}
 	ext, ok := d.(protoreflect.ExtensionDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an extension", field, descType(d))
+		return nil, fmt.Errorf("%s is %s, not an extension", field, descKindWithArticle(d))
 	}
 	if !ext.IsExtension() {
 		return nil, fmt.Errorf("%s is a normal field, not an extension", field)
@@ -406,7 +406,7 @@ func (t *typesFromDescriptorPool) FindMessageByName(message protoreflect.FullNam
 	}
 	msg, ok := d.(protoreflect.MessageDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a message", message, descType(d))
+		return nil, fmt.Errorf("%s is %s, not a message", message, descKindWithArticle(d))
 	}
 	return dynamicpb.NewMessageType(msg), nil
 }
@@ -422,7 +422,7 @@ func (t *typesFromDescriptorPool) FindEnumByName(enum protoreflect.FullName) (pr
 	}
 	en, ok := d.(protoreflect.EnumDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an enum", enum, descType(d))
+		return nil, fmt.Errorf("%s is %s, not an enum", enum, descKindWithArticle(d))
 	}
 	return dynamicpb.NewEnumType(en), nil
 }
