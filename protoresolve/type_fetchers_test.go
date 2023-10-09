@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -13,89 +13,85 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/sourcecontextpb"
 	"google.golang.org/protobuf/types/known/typepb"
-
-	"github.com/jhump/protoreflect/internal/testutil"
 )
 
 func TestCachingTypeFetcher(t *testing.T) {
 	counts := map[string]int{}
-	uncached := func(url string, enum bool) (proto.Message, error) {
+	uncached := TypeFetcherFunc(func(ctx context.Context, url string, enum bool) (proto.Message, error) {
 		counts[url] = counts[url] + 1
-		return testFetcher(url, enum)
-	}
+		return testFetcher(ctx, url, enum)
+	})
 
 	// observe the underlying type fetcher get invoked 10x
 	for i := 0; i < 10; i++ {
-		pm, err := uncached("blah.blah.blah/fee.fi.fo.Fum", false)
-		testutil.Ok(t, err)
-		typ := pm.(*typepb.Type)
-		testutil.Eq(t, "fee.fi.fo.Fum", typ.Name)
+		typ, err := uncached.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Fum")
+		require.NoError(t, err)
+		require.Equal(t, "fee.fi.fo.Fum", typ.Name)
 	}
 	for i := 0; i < 10; i++ {
-		pm, err := uncached("blah.blah.blah/fee.fi.fo.Foo", true)
-		testutil.Ok(t, err)
-		en := pm.(*typepb.Enum)
-		testutil.Eq(t, "fee.fi.fo.Foo", en.Name)
+		en, err := uncached.FetchEnumType(context.Background(), "blah.blah.blah/fee.fi.fo.Foo")
+		require.NoError(t, err)
+		require.Equal(t, "fee.fi.fo.Foo", en.Name)
 	}
 
-	testutil.Eq(t, 10, counts["blah.blah.blah/fee.fi.fo.Fum"])
-	testutil.Eq(t, 10, counts["blah.blah.blah/fee.fi.fo.Foo"])
+	require.Equal(t, 10, counts["blah.blah.blah/fee.fi.fo.Fum"])
+	require.Equal(t, 10, counts["blah.blah.blah/fee.fi.fo.Foo"])
 
 	// now we'll see the underlying fetcher invoked just one more time,
 	// after which the result is cached
 	cached := CachingTypeFetcher(uncached)
 
 	for i := 0; i < 10; i++ {
-		pm, err := cached("blah.blah.blah/fee.fi.fo.Fum", false)
-		testutil.Ok(t, err)
-		typ := pm.(*typepb.Type)
-		testutil.Eq(t, "fee.fi.fo.Fum", typ.Name)
+		typ, err := cached.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Fum")
+		require.NoError(t, err)
+		require.Equal(t, "fee.fi.fo.Fum", typ.Name)
 	}
 
 	for i := 0; i < 10; i++ {
-		pm, err := cached("blah.blah.blah/fee.fi.fo.Foo", true)
-		testutil.Ok(t, err)
-		en := pm.(*typepb.Enum)
-		testutil.Eq(t, "fee.fi.fo.Foo", en.Name)
+		en, err := cached.FetchEnumType(context.Background(), "blah.blah.blah/fee.fi.fo.Foo")
+		require.NoError(t, err)
+		require.Equal(t, "fee.fi.fo.Foo", en.Name)
 	}
 
-	testutil.Eq(t, 11, counts["blah.blah.blah/fee.fi.fo.Fum"])
-	testutil.Eq(t, 11, counts["blah.blah.blah/fee.fi.fo.Foo"])
+	require.Equal(t, 11, counts["blah.blah.blah/fee.fi.fo.Fum"])
+	require.Equal(t, 11, counts["blah.blah.blah/fee.fi.fo.Foo"])
 }
 
 func TestCachingTypeFetcher_MismatchType(t *testing.T) {
-	fetcher := CachingTypeFetcher(testFetcher)
+	fetcher := CachingTypeFetcher(TypeFetcherFunc(testFetcher))
 	// get a message type
-	pm, err := fetcher("blah.blah.blah/fee.fi.fo.Fum", false)
-	testutil.Ok(t, err)
-	typ := pm.(*typepb.Type)
-	testutil.Eq(t, "fee.fi.fo.Fum", typ.Name)
+	typ, err := fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Fum")
+	require.NoError(t, err)
+	require.Equal(t, "fee.fi.fo.Fum", typ.Name)
 	// and an enum type
-	pm, err = fetcher("blah.blah.blah/fee.fi.fo.Foo", true)
-	testutil.Ok(t, err)
-	en := pm.(*typepb.Enum)
-	testutil.Eq(t, "fee.fi.fo.Foo", en.Name)
+	en, err := fetcher.FetchEnumType(context.Background(), "blah.blah.blah/fee.fi.fo.Foo")
+	require.NoError(t, err)
+	require.Equal(t, "fee.fi.fo.Foo", en.Name)
 
 	// now ask for same URL, but swapped types
-	_, err = fetcher("blah.blah.blah/fee.fi.fo.Fum", true)
-	testutil.Require(t, err != nil && strings.Contains(err.Error(), "wanted enum, got message"))
-	_, err = fetcher("blah.blah.blah/fee.fi.fo.Foo", false)
-	testutil.Require(t, err != nil && strings.Contains(err.Error(), "wanted message, got enum"))
+	_, err = fetcher.FetchEnumType(context.Background(), "blah.blah.blah/fee.fi.fo.Fum")
+	var unexpectedTypeErr *ErrUnexpectedType
+	require.ErrorAs(t, err, &unexpectedTypeErr)
+	require.ErrorContains(t, err, "wanted enum, got message")
+	_, err = fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Foo")
+	require.ErrorAs(t, err, &unexpectedTypeErr)
+	require.ErrorContains(t, err, "wanted message, got enum")
 }
 
 func TestCachingTypeFetcher_Concurrency(t *testing.T) {
 	// make sure we are thread safe
 	var mu sync.Mutex
 	counts := map[string]int{}
-	tf := CachingTypeFetcher(func(url string, enum bool) (proto.Message, error) {
+	tf := CachingTypeFetcher(TypeFetcherFunc(func(ctx context.Context, url string, enum bool) (proto.Message, error) {
 		mu.Lock()
 		counts[url] = counts[url] + 1
 		mu.Unlock()
-		return testFetcher(url, enum)
-	})
+		return testFetcher(ctx, url, enum)
+	}))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	names := []string{"Fee", "Fi", "Fo", "Fum", "I", "Smell", "Blood", "Of", "Englishman"}
@@ -108,16 +104,14 @@ func TestCachingTypeFetcher_Concurrency(t *testing.T) {
 			for i := 0; ctx.Err() == nil; i = (i + 1) % len(names) {
 				n := "fee.fi.fo." + names[i]
 				// message
-				pm, err := tf("blah.blah.blah/"+n, false)
-				testutil.Ok(t, err)
-				typ := pm.(*typepb.Type)
-				testutil.Eq(t, n, typ.Name)
+				typ, err := tf.FetchMessageType(context.Background(), "blah.blah.blah/"+n)
+				require.NoError(t, err)
+				require.Equal(t, n, typ.Name)
 				atomic.AddInt32(&queryCount, 1)
 				// enum
-				pm, err = tf("blah.blah.blah.en/"+n, true)
-				testutil.Ok(t, err)
-				en := pm.(*typepb.Enum)
-				testutil.Eq(t, n, en.Name)
+				en, err := tf.FetchEnumType(context.Background(), "blah.blah.blah.en/"+n)
+				require.NoError(t, err)
+				require.Equal(t, n, en.Name)
 				atomic.AddInt32(&queryCount, 1)
 			}
 		}()
@@ -129,10 +123,10 @@ func TestCachingTypeFetcher_Concurrency(t *testing.T) {
 
 	// underlying fetcher invoked just once per URL
 	for _, v := range counts {
-		testutil.Eq(t, 1, v)
+		require.Equal(t, 1, v)
 	}
 
-	testutil.Require(t, atomic.LoadInt32(&queryCount) > int32(len(counts)))
+	require.Greater(t, atomic.LoadInt32(&queryCount), int32(len(counts)))
 }
 
 func TestHttpTypeFetcher(t *testing.T) {
@@ -140,23 +134,21 @@ func TestHttpTypeFetcher(t *testing.T) {
 	fetcher := HttpTypeFetcher(trt, 65536, 10)
 
 	for i := 0; i < 10; i++ {
-		pm, err := fetcher("blah.blah.blah/fee.fi.fo.Message", false)
-		testutil.Ok(t, err)
-		typ := pm.(*typepb.Type)
-		testutil.Eq(t, "fee.fi.fo.Message", typ.Name)
+		typ, err := fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Message")
+		require.NoError(t, err)
+		require.Equal(t, "fee.fi.fo.Message", typ.Name)
 	}
 
 	for i := 0; i < 10; i++ {
 		// name must have Enum for test fetcher to return an enum type
-		pm, err := fetcher("blah.blah.blah/fee.fi.fo.Enum", true)
-		testutil.Ok(t, err)
-		en := pm.(*typepb.Enum)
-		testutil.Eq(t, "fee.fi.fo.Enum", en.Name)
+		en, err := fetcher.FetchEnumType(context.Background(), "blah.blah.blah/fee.fi.fo.Enum")
+		require.NoError(t, err)
+		require.Equal(t, "fee.fi.fo.Enum", en.Name)
 	}
 
 	// HttpTypeFetcher caches results
-	testutil.Eq(t, 1, trt.counts["https://blah.blah.blah/fee.fi.fo.Message"])
-	testutil.Eq(t, 1, trt.counts["https://blah.blah.blah/fee.fi.fo.Enum"])
+	require.Equal(t, 1, trt.counts["https://blah.blah.blah/fee.fi.fo.Message"])
+	require.Equal(t, 1, trt.counts["https://blah.blah.blah/fee.fi.fo.Enum"])
 }
 
 func TestHttpTypeFetcher_ParallelDownloads(t *testing.T) {
@@ -172,19 +164,18 @@ func TestHttpTypeFetcher_ParallelDownloads(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			name := fmt.Sprintf("fee.fi.fo.Fum%d", index)
-			pm, err := fetcher("blah.blah.blah/"+name, false)
-			testutil.Ok(t, err)
-			typ := pm.(*typepb.Type)
-			testutil.Eq(t, name, typ.Name)
+			typ, err := fetcher.FetchMessageType(context.Background(), "blah.blah.blah/"+name)
+			require.NoError(t, err)
+			require.Equal(t, name, typ.Name)
 		}()
 	}
 	wg.Wait()
 	elapsed := time.Since(start)
 
 	// we should have observed exactly the maximum number of parallel downloads
-	testutil.Eq(t, 10, trt.max)
+	require.Equal(t, 10, trt.max)
 	// should have taken about a second
-	testutil.Require(t, elapsed >= time.Second)
+	require.GreaterOrEqual(t, elapsed, time.Second)
 }
 
 func TestHttpTypeFetcher_SizeLimits(t *testing.T) {
@@ -193,12 +184,12 @@ func TestHttpTypeFetcher_SizeLimits(t *testing.T) {
 	fetcher := HttpTypeFetcher(trt, 32, 10)
 
 	// name with "Size" causes content-length to be reported in header
-	_, err := fetcher("blah.blah.blah/fee.fi.fo.FumSize", false)
-	testutil.Require(t, err != nil && strings.Contains(err.Error(), "is larger than limit of 32"))
+	_, err := fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.FumSize")
+	require.ErrorContains(t, err, "is larger than limit of 32")
 
 	// without size in the name, no content-length (e.g. streaming response)
-	_, err = fetcher("blah.blah.blah/fee.fi.fo.Fum", false)
-	testutil.Require(t, err != nil && strings.Contains(err.Error(), "is larger than limit of 32"))
+	_, err = fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Fum")
+	require.ErrorContains(t, err, "is larger than limit of 32")
 }
 
 type testRoundTripper struct {
@@ -234,7 +225,7 @@ func (t *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	name := url[strings.LastIndex(req.URL.Path, "/")+1:]
 	includeContentLength := strings.Contains(name, "Size")
-	pm, err := testFetcher(url, strings.Contains(name, "Enum"))
+	pm, err := testFetcher(req.Context(), url, strings.Contains(name, "Enum"))
 	if err != nil {
 		return nil, err
 	}
@@ -250,11 +241,11 @@ func (t *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 		StatusCode:    200,
 		Status:        "200 OK",
 		ContentLength: contentLength,
-		Body:          ioutil.NopCloser(bytes.NewReader(b)),
+		Body:          io.NopCloser(bytes.NewReader(b)),
 	}, nil
 }
 
-func testFetcher(url string, enum bool) (proto.Message, error) {
+func testFetcher(_ context.Context, url string, enum bool) (proto.Message, error) {
 	name := url[strings.LastIndex(url, "/")+1:]
 	if strings.Contains(name, "Error") {
 		return nil, errors.New(name)

@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jhump/protoreflect/v2/internal/wrappers"
 	"math"
 	"reflect"
 	"sort"
@@ -25,6 +24,8 @@ import (
 	"google.golang.org/protobuf/types/known/sourcecontextpb"
 	"google.golang.org/protobuf/types/known/typepb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+
+	"github.com/jhump/protoreflect/v2/internal/wrappers"
 )
 
 // DescriptorConverter is a type that can be used to convert between descriptors and the
@@ -38,6 +39,9 @@ import (
 // See RemoteRegistry.AsDescriptorConverter.
 type DescriptorConverter RemoteRegistry
 
+// ToServiceDescriptor converts the given Api message into a service descriptor. Since
+// the service's referenced types may not yet be known, they may be fetched, which could
+// warrant interruption by providing a cancellable context.
 func (dc *DescriptorConverter) ToServiceDescriptor(ctx context.Context, api *apipb.Api) (protoreflect.ServiceDescriptor, error) {
 	msgs := map[protoreflect.FullName]protoreflect.MessageDescriptor{}
 	unresolved := map[string]struct{}{}
@@ -118,6 +122,9 @@ func (dc *DescriptorConverter) ToServiceDescriptor(ctx context.Context, api *api
 	return sd, nil
 }
 
+// ToMessageDescriptor converts the given Type message into a message descriptor. Since
+// the message's fields may reference other types that are not yet known, other types
+// may be fetched, which could warrant interruption by providing a cancellable context.
 func (dc *DescriptorConverter) ToMessageDescriptor(ctx context.Context, msg *typepb.Type) (protoreflect.MessageDescriptor, error) {
 	reg := (*RemoteRegistry)(dc)
 	cc := newConvertContext(reg, dc.TypeFetcher)
@@ -138,10 +145,11 @@ func (dc *DescriptorConverter) ToMessageDescriptor(ctx context.Context, msg *typ
 	return md, nil
 }
 
+// ToEnumDescriptor converts the given Enum message into an enum descriptor.
 func (dc *DescriptorConverter) ToEnumDescriptor(ctx context.Context, enum *typepb.Enum) (protoreflect.EnumDescriptor, error) {
-	// NB: We keep ctx in context for consistency... and just in case we need it in the future. Ideally,
-	//     we'd use the context to fetch extension descriptions for enum options. But there's no spec
-	//     for discovering/downloading extensions, only types.
+	// NB: We keep ctx in signature for consistency... and just in case we need it in the future.
+	//     Ideally, we'd use the context to fetch extension descriptions for enum custom options.
+	//     But there's no spec for discovering/downloading extensions, only types.
 	_ = ctx
 
 	reg := (*RemoteRegistry)(dc)
@@ -161,6 +169,7 @@ func (dc *DescriptorConverter) ToEnumDescriptor(ctx context.Context, enum *typep
 	return ed, nil
 }
 
+// DescriptorAsApi produces an Api message that represents the given service descriptor.
 func (dc *DescriptorConverter) DescriptorAsApi(sd protoreflect.ServiceDescriptor) *apipb.Api {
 	ms := sd.Methods()
 	reg := (*RemoteRegistry)(dc)
@@ -186,6 +195,7 @@ func (dc *DescriptorConverter) DescriptorAsApi(sd protoreflect.ServiceDescriptor
 	}
 }
 
+// DescriptorAsType produces a Type message that represents the given message descriptor.
 func (dc *DescriptorConverter) DescriptorAsType(md protoreflect.MessageDescriptor) *typepb.Type {
 	fs := md.Fields()
 	fields := make([]*typepb.Field, fs.Len())
@@ -295,6 +305,7 @@ func (dc *DescriptorConverter) descriptorAsField(fld protoreflect.FieldDescripto
 	}
 }
 
+// DescriptorAsEnum produces an Enum message that represents the given enum descriptor.
 func (dc *DescriptorConverter) DescriptorAsEnum(ed protoreflect.EnumDescriptor) *typepb.Enum {
 	vs := ed.Values()
 	vals := make([]*typepb.EnumValue, vs.Len())
@@ -631,7 +642,7 @@ func (cc *convertContext) recordTypeAndDependencies(ctx context.Context, url str
 	}
 
 	// Resolve dependencies in parallel.
-	grp, ctx := errgroup.WithContext(ctx)
+	grp, grpCtx := errgroup.WithContext(ctx)
 	for _, f := range mt.Fields {
 		if f.Kind == typepb.Field_TYPE_GROUP || f.Kind == typepb.Field_TYPE_MESSAGE || f.Kind == typepb.Field_TYPE_ENUM {
 			typeURL := ensureScheme(f.TypeUrl)
@@ -649,7 +660,7 @@ func (cc *convertContext) recordTypeAndDependencies(ctx context.Context, url str
 				}
 
 				// not in registry, so we have to recursively fetch
-				if err := cc.addType(ctx, typeURL, kind == typepb.Field_TYPE_ENUM); err != nil {
+				if err := cc.addType(grpCtx, typeURL, kind == typepb.Field_TYPE_ENUM); err != nil {
 					return err
 				}
 				return nil
@@ -659,7 +670,7 @@ func (cc *convertContext) recordTypeAndDependencies(ctx context.Context, url str
 	if err := grp.Wait(); err != nil {
 		return err
 	}
-	// double-check if context has been cancelled
+	// double-check if parent context has been cancelled
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -1241,9 +1252,9 @@ func processOptions(options []*typepb.Option, optsMsg protoreflect.Message, res 
 			fv = protoreflect.ValueOfMessage(msgValue)
 		}
 		if field.IsList() {
-			optsMsg.Mutable(field).List().Append(protoreflect.ValueOf(fv))
+			optsMsg.Mutable(field).List().Append(fv)
 		} else {
-			optsMsg.Set(field, protoreflect.ValueOf(fv))
+			optsMsg.Set(field, fv)
 		}
 	}
 }

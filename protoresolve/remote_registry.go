@@ -15,11 +15,48 @@ import (
 
 const defaultBaseURL = "type.googleapis.com"
 
+// RemoteRegistry is a registry of types that are registered by remote URL.
+// A RemoteRegistry can be configured with a TypeFetcher, which can be used
+// to dynamically retrieve message definitions.
+//
+// It differs from a Registry in that it only exposes a subset of the Resolver
+// interface, focused on messages and enums, which are types which may be
+// resolved by downloading schemas from a remote source.
+//
+// This registry is intended to help resolve message type URLs in
+// google.protobuf.Any messages.
 type RemoteRegistry struct {
-	DefaultBaseURL       string
+	// The default base URL to apply when registering types without a URL and
+	// when looking up types by name. The message name is prefixed with the
+	// base URL to form a full type URL.
+	//
+	// If not specified or empty, a default of "type.googleapis.com" will be
+	// used.
+	//
+	// If present, the PackageBaseURLMapper will be consulted first before
+	// applying this default.
+	DefaultBaseURL string
+	// A function that provides the base URL for a given package. When types
+	// are registered without a URL or looked up by name, this base URL is
+	// used to construct a full type URL.
+	//
+	// If not specified or nil, or if it returns the empty string, the
+	// DefaultBaseURL will be applied.
 	PackageBaseURLMapper func(packageName protoreflect.FullName) string
-	TypeFetcher          TypeFetcher
-	Fallback             DescriptorResolver
+	// A value that can retrieve type definitions at runtime. If non-nil,
+	// this will be used to resolve types for URLs that have not been
+	// explicitly registered.
+	TypeFetcher TypeFetcher
+	// The final fallback for resolving types. If a type URL has not been
+	// explicitly registered and cannot be resolved by TypeFetcher (or
+	// TypeFetcher is unset/nil), then Fallback will be used to resolve
+	// the type by name.
+	//
+	// If not specified or nil, protoregistry.GlobalFiles will be used as
+	// the fallback. To prevent any fallback from being used, set this to
+	// an empty resolver, such as a new, empty Registry or
+	// protoregistry.Files.
+	Fallback DescriptorResolver
 
 	mu          sync.RWMutex
 	typeCache   map[string]protoreflect.Descriptor
@@ -78,9 +115,12 @@ func (r *RemoteRegistry) baseURLFromRegistrationsLocked(pkgName protoreflect.Ful
 
 func (r *RemoteRegistry) baseURLWithoutRegistrations(pkgName protoreflect.FullName) string {
 	if r.PackageBaseURLMapper != nil {
-		for pkgName != "" {
+		for {
 			if url := r.PackageBaseURLMapper(pkgName); url != "" {
 				return url
+			}
+			if pkgName == "" {
+				break
 			}
 			pkgName = pkgName.Parent()
 		}
@@ -98,6 +138,9 @@ func (r *RemoteRegistry) RegisterPackageBaseURL(pkgName protoreflect.FullName, b
 	previousEntry, previouslyRegistered := r.pkgBaseURLs[pkgName]
 	if !previouslyRegistered {
 		previousEntry.baseURL = r.baseURL(pkgName)
+	}
+	if r.pkgBaseURLs == nil {
+		r.pkgBaseURLs = map[protoreflect.FullName]pkgBaseURL{}
 	}
 	r.pkgBaseURLs[pkgName] = pkgBaseURL{
 		baseURL:            baseURL,
@@ -134,6 +177,12 @@ func (r *RemoteRegistry) RegisterMessageWithURL(md protoreflect.MessageDescripto
 	if err := r.checkTypeLocked(md, "message", url); err != nil {
 		return err
 	}
+	if r.typeURLs == nil {
+		r.typeURLs = map[protoreflect.FullName]string{}
+	}
+	if r.typeCache == nil {
+		r.typeCache = map[string]protoreflect.Descriptor{}
+	}
 	r.typeURLs[md.FullName()] = url
 	r.typeCache[url] = md
 	return nil
@@ -145,6 +194,12 @@ func (r *RemoteRegistry) RegisterEnumWithURL(ed protoreflect.EnumDescriptor, url
 	defer r.mu.Unlock()
 	if err := r.checkTypeLocked(ed, "enum", url); err != nil {
 		return err
+	}
+	if r.typeURLs == nil {
+		r.typeURLs = map[protoreflect.FullName]string{}
+	}
+	if r.typeCache == nil {
+		r.typeCache = map[string]protoreflect.Descriptor{}
 	}
 	r.typeURLs[ed.FullName()] = url
 	r.typeCache[url] = ed
@@ -200,6 +255,12 @@ func (r *RemoteRegistry) checkTypesInContainerLocked(container TypeContainer, ba
 }
 
 func (r *RemoteRegistry) registerTypesInContainerLocked(container TypeContainer, baseURL string) {
+	if r.typeURLs == nil {
+		r.typeURLs = map[protoreflect.FullName]string{}
+	}
+	if r.typeCache == nil {
+		r.typeCache = map[string]protoreflect.Descriptor{}
+	}
 	msgs := container.Messages()
 	for i, length := 0, msgs.Len(); i < length; i++ {
 		md := msgs.Get(i)
@@ -342,19 +403,23 @@ func (r *RemoteRegistry) findMessageTypesByURL(ctx context.Context, urls []strin
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if len(cc.typeLocations) > 0 {
+		if r.typeURLs == nil {
+			r.typeURLs = map[protoreflect.FullName]string{}
+		}
 		if r.typeCache == nil {
 			r.typeCache = map[string]protoreflect.Descriptor{}
 		}
-	}
-	for typeUrl := range cc.typeLocations {
-		d, err := files.FindDescriptorByName(TypeNameFromURL(typeUrl))
-		if err != nil {
-			// should not be possible
-			return nil, err
-		}
-		r.typeCache[typeUrl] = d
-		if _, ok := ret[typeUrl]; ok {
-			ret[typeUrl] = d.(protoreflect.MessageDescriptor)
+		for typeUrl := range cc.typeLocations {
+			d, err := files.FindDescriptorByName(TypeNameFromURL(typeUrl))
+			if err != nil {
+				// should not be possible
+				return nil, err
+			}
+			r.typeURLs[d.FullName()] = typeUrl
+			r.typeCache[typeUrl] = d
+			if _, ok := ret[typeUrl]; ok {
+				ret[typeUrl] = d.(protoreflect.MessageDescriptor)
+			}
 		}
 	}
 	return ret, nil
@@ -369,6 +434,9 @@ func (r *RemoteRegistry) resolveURLFromConvertContext(cc *convertContext, url st
 	defer r.mu.Unlock()
 	var ret protoreflect.Descriptor
 	if len(cc.typeLocations) > 0 {
+		if r.typeURLs == nil {
+			r.typeURLs = map[protoreflect.FullName]string{}
+		}
 		if r.typeCache == nil {
 			r.typeCache = map[string]protoreflect.Descriptor{}
 		}
@@ -378,6 +446,7 @@ func (r *RemoteRegistry) resolveURLFromConvertContext(cc *convertContext, url st
 				// should not be possible
 				return nil, err
 			}
+			r.typeURLs[d.FullName()] = typeUrl
 			r.typeCache[typeUrl] = d
 			if url == typeUrl {
 				ret = d

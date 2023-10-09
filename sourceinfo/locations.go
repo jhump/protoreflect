@@ -1,13 +1,13 @@
 package sourceinfo
 
 import (
-	"github.com/jhump/protoreflect/v2/sourcelocation"
 	"sync"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/sourcelocation"
 )
 
 // NB: forked from google.golang.org/protobuf/internal/filedesc/desc_list.go.

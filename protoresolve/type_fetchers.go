@@ -3,11 +3,9 @@ package protoresolve
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"sync"
 
 	"golang.org/x/sync/semaphore"
@@ -155,13 +153,11 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 		}
 		defer sem.Release(1)
 
-		// build URL
-		u, err := url.Parse(ensureScheme(typeUrl))
+		req, err := http.NewRequestWithContext(ctx, "GET", ensureScheme(typeUrl), http.NoBody)
 		if err != nil {
 			return nil, err
 		}
-
-		resp, err := transport.RoundTrip(&http.Request{URL: u})
+		resp, err := transport.RoundTrip(req)
 		if err != nil {
 			return nil, err
 		}
@@ -181,19 +177,13 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 		buf := bufferPool.Get().(*bytes.Buffer)
 		defer bufferPool.Put(buf)
 		buf.Reset()
-		for {
-			body := io.LimitReader(resp.Body, int64(szLimit+1))
-			n, err := buf.ReadFrom(body)
-			isEOF := errors.Is(err, io.EOF)
-			if err != nil && !isEOF {
-				return nil, err
-			}
-			if n > int64(szLimit) {
-				return nil, fmt.Errorf("type definition size is larger than limit of %d", szLimit)
-			}
-			if isEOF {
-				break
-			}
+		body := io.LimitReader(resp.Body, int64(szLimit+1))
+		n, err := buf.ReadFrom(body)
+		if err != nil {
+			return nil, err
+		}
+		if n > int64(szLimit) {
+			return nil, fmt.Errorf("type definition size is larger than limit of %d", szLimit)
 		}
 
 		// now we can de-serialize the type definition

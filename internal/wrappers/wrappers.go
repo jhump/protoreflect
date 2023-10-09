@@ -14,12 +14,12 @@ package wrappers
 
 import (
 	"fmt"
-	"google.golang.org/protobuf/types/dynamicpb"
 	"sync"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 // ProtoWrapper is a protoreflect.Descriptor that wraps an underlying
