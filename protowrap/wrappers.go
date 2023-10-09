@@ -1,6 +1,7 @@
 package protowrap
 
 import (
+	"github.com/jhump/protoreflect/v2/internal/wrappers"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -50,6 +51,18 @@ type ProtoWrapper interface {
 	AsProto() proto.Message
 }
 
+var _ ProtoWrapper = wrappers.ProtoWrapper(nil)
+var _ wrappers.ProtoWrapper = ProtoWrapper(nil)
+var _ ProtoWrapper = (*wrappers.File)(nil)
+var _ ProtoWrapper = (*wrappers.Message)(nil)
+var _ ProtoWrapper = (*wrappers.Field)(nil)
+var _ ProtoWrapper = (*wrappers.Oneof)(nil)
+var _ ProtoWrapper = (*wrappers.Extension)(nil)
+var _ ProtoWrapper = (*wrappers.Enum)(nil)
+var _ ProtoWrapper = (*wrappers.EnumValue)(nil)
+var _ ProtoWrapper = (*wrappers.Service)(nil)
+var _ ProtoWrapper = (*wrappers.Method)(nil)
+
 // FileWrapper is a ProtoWrapper for files: it implements
 // [protoreflect.FileDescriptor] and wraps a [*descriptorpb.FileDescriptorProto].
 //
@@ -62,6 +75,8 @@ type FileWrapper interface {
 	FileDescriptorProto() *descriptorpb.FileDescriptorProto
 }
 
+var _ FileWrapper = (*wrappers.File)(nil)
+
 // MessageWrapper is a ProtoWrapper for messages: it implements
 // [protoreflect.MessageDescriptor] and wraps a [*descriptorpb.DescriptorProto].
 //
@@ -73,6 +88,8 @@ type MessageWrapper interface {
 	protoreflect.MessageDescriptor
 	MessageDescriptorProto() *descriptorpb.DescriptorProto
 }
+
+var _ MessageWrapper = (*wrappers.Message)(nil)
 
 // FieldWrapper is a ProtoWrapper for fields: it implements
 // [protoreflect.FieldDescriptor] and wraps a [*descriptorpb.FieldDescriptorProto].
@@ -88,6 +105,9 @@ type FieldWrapper interface {
 	FieldDescriptorProto() *descriptorpb.FieldDescriptorProto
 }
 
+var _ FieldWrapper = (*wrappers.Field)(nil)
+var _ FieldWrapper = (*wrappers.Extension)(nil)
+
 // OneofWrapper is a ProtoWrapper for oneofs: it implements
 // [protoreflect.OneofDescriptor] and wraps a [*descriptorpb.OneofDescriptorProto].
 //
@@ -99,6 +119,8 @@ type OneofWrapper interface {
 	protoreflect.OneofDescriptor
 	OneofDescriptorProto() *descriptorpb.OneofDescriptorProto
 }
+
+var _ OneofWrapper = (*wrappers.Oneof)(nil)
 
 // EnumWrapper is a ProtoWrapper for enums: it implements
 // [protoreflect.EnumDescriptor] and wraps a [*descriptorpb.EnumDescriptorProto].
@@ -112,12 +134,16 @@ type EnumWrapper interface {
 	EnumDescriptorProto() *descriptorpb.EnumDescriptorProto
 }
 
+var _ EnumWrapper = (*wrappers.Enum)(nil)
+
 // EnumValueWrapper is a ProtoWrapper for enum values: it implements
 // [protoreflect.EnumValueDescriptor] and wraps a [*descriptorpb.EnumValueDescriptorProto].
 type EnumValueWrapper interface {
 	protoreflect.EnumValueDescriptor
 	EnumValueDescriptorProto() *descriptorpb.EnumValueDescriptorProto
 }
+
+var _ EnumValueWrapper = (*wrappers.EnumValue)(nil)
 
 // ServiceWrapper is a ProtoWrapper for services: it implements
 // [protoreflect.ServiceDescriptor] and wraps a [*descriptorpb.ServiceDescriptorProto].
@@ -130,6 +156,8 @@ type ServiceWrapper interface {
 	protoreflect.ServiceDescriptor
 	ServiceDescriptorProto() *descriptorpb.ServiceDescriptorProto
 }
+
+var _ ServiceWrapper = (*wrappers.Service)(nil)
 
 // MethodWrapper is a ProtoWrapper for methods: it implements
 // [protoreflect.MethodDescriptor] and wraps a [*descriptorpb.MethodDescriptorProto].
@@ -144,3 +172,5 @@ type MethodWrapper interface {
 	protoreflect.MethodDescriptor
 	MethodDescriptorProto() *descriptorpb.MethodDescriptorProto
 }
+
+var _ MethodWrapper = (*wrappers.Method)(nil)

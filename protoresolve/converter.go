@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jhump/protoreflect/v2/internal/wrappers"
 	"math"
 	"reflect"
 	"sort"
@@ -775,12 +776,9 @@ func addToRegistry(fdp *descriptorpb.FileDescriptorProto, reg *protoregistry.Fil
 			return err
 		}
 	}
-	// NB: Ideally, we'd use protowrap.AddToRegistry. But that would cause an import cycle
-	//     that is quite a pain to unravel. It would involve having to move *all* of the
-	//     descriptor wrapper types and factory functions into an internal package :(
 	fd, err := protodesc.NewFile(fdp, reg)
 	if err == nil {
-		err = reg.RegisterFile(fd)
+		err = reg.RegisterFile(wrappers.WrapFile(fd, fdp))
 	}
 	return err
 }

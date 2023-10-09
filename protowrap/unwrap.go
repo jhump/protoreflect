@@ -1,6 +1,7 @@
 package protowrap
 
 import (
+	"github.com/jhump/protoreflect/v2/internal/wrappers"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -175,39 +176,22 @@ type WrappedDescriptor interface {
 	Unwrap() protoreflect.Descriptor
 }
 
+var _ WrappedDescriptor = wrappers.WrappedDescriptor(nil)
+var _ wrappers.WrappedDescriptor = WrappedDescriptor(nil)
+var _ WrappedDescriptor = (*wrappers.File)(nil)
+var _ WrappedDescriptor = (*wrappers.Message)(nil)
+var _ WrappedDescriptor = (*wrappers.Field)(nil)
+var _ WrappedDescriptor = (*wrappers.Oneof)(nil)
+var _ WrappedDescriptor = (*wrappers.Extension)(nil)
+var _ WrappedDescriptor = (*wrappers.Enum)(nil)
+var _ WrappedDescriptor = (*wrappers.EnumValue)(nil)
+var _ WrappedDescriptor = (*wrappers.Service)(nil)
+var _ WrappedDescriptor = (*wrappers.Method)(nil)
+
 // Unwrap unwraps the given descriptor. If it implements WrappedDescriptor,
 // the underlying descriptor is returned. Otherwise, d is returned as is.
 func Unwrap(d protoreflect.Descriptor) protoreflect.Descriptor {
-	w, ok := d.(WrappedDescriptor)
-	if !ok {
-		// not wrapped
-		return d
-	}
-	wrapped := w.Unwrap()
-	if wrapped == nil {
-		return d
-	}
-	// try to make sure that the wrapped descriptor matches the incoming type
-	switch d.(type) {
-	case protoreflect.FileDescriptor:
-		return wrapped.(protoreflect.FileDescriptor)
-	case protoreflect.MessageDescriptor:
-		return wrapped.(protoreflect.MessageDescriptor)
-	case protoreflect.FieldDescriptor:
-		return wrapped.(protoreflect.FieldDescriptor)
-	case protoreflect.OneofDescriptor:
-		return wrapped.(protoreflect.OneofDescriptor)
-	case protoreflect.EnumDescriptor:
-		return wrapped.(protoreflect.EnumDescriptor)
-	case protoreflect.EnumValueDescriptor:
-		return wrapped.(protoreflect.EnumValueDescriptor)
-	case protoreflect.ServiceDescriptor:
-		return wrapped.(protoreflect.ServiceDescriptor)
-	case protoreflect.MethodDescriptor:
-		return wrapped.(protoreflect.MethodDescriptor)
-	default:
-		return wrapped
-	}
+	return wrappers.Unwrap(d)
 }
 
 // UnwrapFile unwraps the given file descriptor. If it implements
