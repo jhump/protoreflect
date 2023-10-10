@@ -3,6 +3,7 @@ package protoresolve_test
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"testing"
 
@@ -336,9 +337,9 @@ func TestRemoteRegistry_FindEnum_TypeFetcher(t *testing.T) {
 	tf := createFetcher(t)
 	// we want "defaults" for the message factory so that we can properly process
 	// known extensions (which the type fetcher puts into the descriptor options)
-	mr := &RemoteRegistry{TypeFetcher: tf}
+	rr := &RemoteRegistry{TypeFetcher: tf}
 
-	ed, err := mr.FindEnumByURL("foo.bar/some.Enum")
+	ed, err := rr.FindEnumByURL("foo.bar/some.Enum")
 	require.NoError(t, err)
 
 	require.Equal(t, "Enum", string(ed.Name()))
@@ -643,9 +644,7 @@ func TestDescriptorConverter_ToServiceDescriptor(t *testing.T) {
 		Deprecated: proto.Bool(true),
 	}
 	proto.SetExtension(so, testdata.E_Sfubar, &testdata.ReallySimpleMessage{Id: proto.Uint64(100), Name: proto.String("deuce")})
-	require.NoError(t, err)
 	proto.SetExtension(so, testdata.E_Sfubare, testdata.ReallySimpleEnum_VALUE)
-	require.NoError(t, err)
 	protosEqual(t, so, sd.Options())
 
 	methods := sd.Methods()
@@ -658,9 +657,7 @@ func TestDescriptorConverter_ToServiceDescriptor(t *testing.T) {
 		Deprecated: proto.Bool(true),
 	}
 	proto.SetExtension(mto, testdata.E_Mtfubar, []float32{3.14159, 2.71828})
-	require.NoError(t, err)
 	proto.SetExtension(mto, testdata.E_Mtfubard, 10203040.506070809)
-	require.NoError(t, err)
 	protosEqual(t, mto, methods.Get(0).Options())
 
 	require.Equal(t, "ClientStreamMethod", string(methods.Get(1).Name()))
@@ -798,11 +795,161 @@ func getApi(t *testing.T) *apipb.Api {
 }
 
 func TestDescriptorConverter_DescriptorAsApi(t *testing.T) {
-	// TODO
+	svcOpts := &descriptorpb.ServiceOptions{
+		Deprecated: proto.Bool(true),
+	}
+	proto.SetExtension(svcOpts, testdata.E_Sfubar, &testdata.ReallySimpleMessage{Id: proto.Uint64(1234), Name: proto.String("abc")})
+	proto.SetExtension(svcOpts, testdata.E_Sfubare, testdata.ReallySimpleEnum_VALUE)
+	mtdOpts := &descriptorpb.MethodOptions{
+		Deprecated: proto.Bool(true),
+	}
+	proto.SetExtension(mtdOpts, testdata.E_Mtfubar, []float32{0, 102.3040506, float32(math.Inf(-1)), 2030.40506})
+	proto.SetExtension(mtdOpts, testdata.E_Mtfubard, -98765.4321)
+	fdp := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("test.proto"),
+		Syntax:  proto.String("proto3"),
+		Package: proto.String("foo"),
+		Dependency: []string{
+			"google/protobuf/empty.proto",
+			"desc_test_options.proto",
+		},
+		Service: []*descriptorpb.ServiceDescriptorProto{
+			{
+				Name:    proto.String("FooService"),
+				Options: svcOpts,
+				Method: []*descriptorpb.MethodDescriptorProto{
+					{
+						Name:            proto.String("Do"),
+						Options:         mtdOpts,
+						InputType:       proto.String(".foo.Request"),
+						ClientStreaming: proto.Bool(true),
+						OutputType:      proto.String(".google.protobuf.Empty"),
+					},
+				},
+			},
+		},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: proto.String("Request"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{
+						Name:     proto.String("id"),
+						Number:   proto.Int32(1),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+						JsonName: proto.String("id"),
+					},
+				},
+			},
+		},
+	}
+	fd, err := protodesc.NewFile(fdp, protoregistry.GlobalFiles)
+	require.NoError(t, err)
+
+	rr := &RemoteRegistry{DefaultBaseURL: "foo.com"}
+	api := rr.AsDescriptorConverter().DescriptorAsApi(fd.Services().Get(0))
+
+	expected := &apipb.Api{
+		Name:   "foo.FooService",
+		Syntax: typepb.Syntax_SYNTAX_PROTO3,
+		SourceContext: &sourcecontextpb.SourceContext{
+			FileName: "test.proto",
+		},
+		Options: []*typepb.Option{
+			{Name: "deprecated", Value: asAny(t, &wrapperspb.BoolValue{Value: true})},
+			{Name: "testprotos.sfubar", Value: asAny(t, &testdata.ReallySimpleMessage{Id: proto.Uint64(1234), Name: proto.String("abc")})},
+			{Name: "testprotos.sfubare", Value: asAny(t, &wrapperspb.Int32Value{Value: int32(testdata.ReallySimpleEnum_VALUE)})},
+		},
+		Methods: []*apipb.Method{
+			{
+				Name:   "Do",
+				Syntax: typepb.Syntax_SYNTAX_PROTO3,
+				Options: []*typepb.Option{
+					{Name: "deprecated", Value: asAny(t, &wrapperspb.BoolValue{Value: true})},
+					{Name: "testprotos.mtfubar", Value: asAny(t, &wrapperspb.FloatValue{Value: 0})},
+					{Name: "testprotos.mtfubar", Value: asAny(t, &wrapperspb.FloatValue{Value: 102.3040506})},
+					{Name: "testprotos.mtfubar", Value: asAny(t, &wrapperspb.FloatValue{Value: float32(math.Inf(-1))})},
+					{Name: "testprotos.mtfubar", Value: asAny(t, &wrapperspb.FloatValue{Value: 2030.40506})},
+					{Name: "testprotos.mtfubard", Value: asAny(t, &wrapperspb.DoubleValue{Value: -98765.4321})},
+				},
+				RequestStreaming: true,
+				RequestTypeUrl:   "foo.com/foo.Request",
+				ResponseTypeUrl:  "foo.com/google.protobuf.Empty",
+			},
+		},
+	}
+
+	protosEqual(t, expected, api)
 }
 
 func TestDescriptorConverter_ToMessageDescriptor(t *testing.T) {
-	// TODO
+	tf := createFetcher(t)
+	msg, err := tf.FetchMessageType(context.Background(), "https://foo.bar/some.Type")
+	require.NoError(t, err)
+
+	md, err := (&RemoteRegistry{TypeFetcher: tf}).AsDescriptorConverter().ToMessageDescriptor(context.Background(), msg)
+	require.NoError(t, err)
+
+	require.Equal(t, "foo.proto", md.ParentFile().Path())
+	require.Equal(t, "some", string(md.ParentFile().Package()))
+	require.Equal(t, protoreflect.Proto3, md.ParentFile().Syntax())
+	mdProto := protowrap.ProtoFromMessageDescriptor(md)
+
+	msgOpts := &descriptorpb.MessageOptions{
+		Deprecated: proto.Bool(true),
+	}
+	proto.SetExtension(msgOpts, testdata.E_Mfubar, true)
+	fldOpts := &descriptorpb.FieldOptions{
+		Deprecated: proto.Bool(true),
+	}
+	proto.SetExtension(fldOpts, testdata.E_Ffubar, []string{"foo", "bar", "baz"})
+	proto.SetExtension(fldOpts, testdata.E_Ffubarb, []byte{1, 2, 3, 4, 5, 6, 7, 8})
+	expected := &descriptorpb.DescriptorProto{
+		Name:    proto.String("Type"),
+		Options: msgOpts,
+		OneofDecl: []*descriptorpb.OneofDescriptorProto{
+			{
+				Name: proto.String("un"),
+			},
+		},
+		Field: []*descriptorpb.FieldDescriptorProto{
+			{
+				Name:     proto.String("a"),
+				Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+				Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+				TypeName: proto.String(".some.OtherType"),
+				Number:   proto.Int32(1),
+				Options:  fldOpts,
+				JsonName: proto.String("a"),
+			},
+			{
+				Name:     proto.String("b"),
+				Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+				Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+				Number:   proto.Int32(2),
+				JsonName: proto.String("b"),
+			},
+			{
+				Name:       proto.String("c"),
+				Label:      descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+				Type:       descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum(),
+				TypeName:   proto.String(".some.Enum"),
+				Number:     proto.Int32(3),
+				OneofIndex: proto.Int32(0),
+				JsonName:   proto.String("c"),
+			},
+			{
+				Name:       proto.String("d"),
+				Label:      descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+				Type:       descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+				Number:     proto.Int32(4),
+				OneofIndex: proto.Int32(0),
+				JsonName:   proto.String("d"),
+			},
+		},
+	}
+
+	protosEqual(t, expected, mdProto)
 }
 
 func TestDescriptorConverter_DescriptorAsType(t *testing.T) {
@@ -925,7 +1072,56 @@ func TestDescriptorConverter_DescriptorAsType(t *testing.T) {
 }
 
 func TestDescriptorConverter_ToEnumDescriptor(t *testing.T) {
-	// TODO
+	tf := createFetcher(t)
+	enum, err := tf.FetchEnumType(context.Background(), "https://foo.bar/some.Enum")
+	require.NoError(t, err)
+
+	ed, err := (&RemoteRegistry{TypeFetcher: tf}).AsDescriptorConverter().ToEnumDescriptor(context.Background(), enum)
+	require.NoError(t, err)
+
+	require.Equal(t, "foo.proto", ed.ParentFile().Path())
+	require.Equal(t, "some", string(ed.ParentFile().Package()))
+	require.Equal(t, protoreflect.Proto3, ed.ParentFile().Syntax())
+	edProto := protowrap.ProtoFromEnumDescriptor(ed)
+
+	enumOpts := &descriptorpb.EnumOptions{
+		Deprecated: proto.Bool(true),
+		AllowAlias: proto.Bool(true),
+	}
+	proto.SetExtension(enumOpts, testdata.E_Efubar, int32(-42))
+	proto.SetExtension(enumOpts, testdata.E_Efubars, int32(-42))
+	proto.SetExtension(enumOpts, testdata.E_Efubarsf, int32(-42))
+	proto.SetExtension(enumOpts, testdata.E_Efubaru, uint32(42))
+	proto.SetExtension(enumOpts, testdata.E_Efubaruf, uint32(42))
+	enumValOpts := &descriptorpb.EnumValueOptions{
+		Deprecated: proto.Bool(true),
+	}
+	proto.SetExtension(enumValOpts, testdata.E_Evfubar, int64(-420420420420))
+	proto.SetExtension(enumValOpts, testdata.E_Evfubars, int64(-420420420420))
+	proto.SetExtension(enumValOpts, testdata.E_Evfubarsf, int64(-420420420420))
+	proto.SetExtension(enumValOpts, testdata.E_Evfubaru, uint64(420420420420))
+	proto.SetExtension(enumValOpts, testdata.E_Evfubaruf, uint64(420420420420))
+	expected := &descriptorpb.EnumDescriptorProto{
+		Name:    proto.String("Enum"),
+		Options: enumOpts,
+		Value: []*descriptorpb.EnumValueDescriptorProto{
+			{
+				Name:    proto.String("ABC"),
+				Number:  proto.Int32(0),
+				Options: enumValOpts,
+			},
+			{
+				Name:   proto.String("XYZ"),
+				Number: proto.Int32(1),
+			},
+			{
+				Name:   proto.String("WXY"),
+				Number: proto.Int32(1),
+			},
+		},
+	}
+
+	protosEqual(t, expected, edProto)
 }
 
 func TestDescriptorConverter_DescriptorAsEnum(t *testing.T) {
@@ -968,42 +1164,43 @@ func TestDescriptorConverter_DescriptorAsEnum(t *testing.T) {
 
 	enum := (&RemoteRegistry{}).AsDescriptorConverter().DescriptorAsEnum(fd.Enums().Get(0))
 
-	// quick check of the resulting message's properties
-	require.Equal(t, "foo.Bar", enum.Name)
-	require.Equal(t, typepb.Syntax_SYNTAX_PROTO2, enum.Syntax)
-	require.Equal(t, "test.proto", enum.SourceContext.GetFileName())
-	require.Equal(t, 5, len(enum.Enumvalue))
-	require.Equal(t, 1, len(enum.Options))
-	require.Equal(t, "allow_alias", enum.Options[0].Name)
-	// make sure the value is a wrapped bool
-	v, err := anypb.UnmarshalNew(enum.Options[0].Value, proto.UnmarshalOptions{})
-	require.NoError(t, err)
-	protosEqual(t, &wrapperspb.BoolValue{Value: true}, v)
+	expected := &typepb.Enum{
+		Name:   "foo.Bar",
+		Syntax: typepb.Syntax_SYNTAX_PROTO2,
+		SourceContext: &sourcecontextpb.SourceContext{
+			FileName: "test.proto",
+		},
+		Options: []*typepb.Option{
+			{Name: "allow_alias", Value: asAny(t, &wrapperspb.BoolValue{Value: true})},
+		},
+		Enumvalue: []*typepb.EnumValue{
+			{
+				Name:   "ZERO",
+				Number: 0,
+			},
+			{
+				Name:   "__UNSET__",
+				Number: 0,
+				Options: []*typepb.Option{
+					{Name: "deprecated", Value: asAny(t, &wrapperspb.BoolValue{Value: true})},
+				},
+			},
+			{
+				Name:   "ONE",
+				Number: 1,
+			},
+			{
+				Name:   "TWO",
+				Number: 2,
+			},
+			{
+				Name:   "THREE",
+				Number: 3,
+			},
+		},
+	}
 
-	require.Equal(t, "ZERO", enum.Enumvalue[0].Name)
-	require.Equal(t, int32(0), enum.Enumvalue[0].Number)
-	require.Equal(t, 0, len(enum.Enumvalue[0].Options))
-
-	require.Equal(t, "__UNSET__", enum.Enumvalue[1].Name)
-	require.Equal(t, int32(0), enum.Enumvalue[1].Number)
-	require.Equal(t, 1, len(enum.Enumvalue[1].Options))
-	require.Equal(t, "deprecated", enum.Enumvalue[1].Options[0].Name)
-	// make sure the value is a wrapped bool
-	v, err = anypb.UnmarshalNew(enum.Enumvalue[1].Options[0].Value, proto.UnmarshalOptions{})
-	require.NoError(t, err)
-	protosEqual(t, &wrapperspb.BoolValue{Value: true}, v)
-
-	require.Equal(t, "ONE", enum.Enumvalue[2].Name)
-	require.Equal(t, int32(1), enum.Enumvalue[2].Number)
-	require.Equal(t, 0, len(enum.Enumvalue[2].Options))
-
-	require.Equal(t, "TWO", enum.Enumvalue[3].Name)
-	require.Equal(t, int32(2), enum.Enumvalue[3].Number)
-	require.Equal(t, 0, len(enum.Enumvalue[3].Options))
-
-	require.Equal(t, "THREE", enum.Enumvalue[4].Name)
-	require.Equal(t, int32(3), enum.Enumvalue[4].Number)
-	require.Equal(t, 0, len(enum.Enumvalue[4].Options))
+	protosEqual(t, expected, enum)
 }
 
 func protosEqual(t *testing.T, expected, actual proto.Message) {

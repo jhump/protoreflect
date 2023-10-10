@@ -359,7 +359,7 @@ func (dc *DescriptorConverter) option(field protoreflect.FieldDescriptor, value 
 		listVal := value.List()
 		opts := make([]*typepb.Option, 0, listVal.Len())
 		for i, length := 0, listVal.Len(); i < length; i++ {
-			if opt := dc.singleOption(field, value); opt != nil {
+			if opt := dc.singleOption(field, listVal.Get(i)); opt != nil {
 				opts = append(opts, opt)
 			}
 		}
@@ -1054,8 +1054,9 @@ func split(s string) (string, string) {
 }
 
 func createEnumDescriptor(e *typepb.Enum, res SerializationResolver) *descriptorpb.EnumDescriptorProto {
-	opts := &descriptorpb.EnumOptions{}
+	var opts *descriptorpb.EnumOptions
 	if len(e.Options) > 0 {
+		opts = &descriptorpb.EnumOptions{}
 		processOptions(e.Options, opts.ProtoReflect(), res)
 	}
 
@@ -1073,8 +1074,9 @@ func createEnumDescriptor(e *typepb.Enum, res SerializationResolver) *descriptor
 }
 
 func createEnumValueDescriptor(v *typepb.EnumValue, res SerializationResolver) *descriptorpb.EnumValueDescriptorProto {
-	opts := &descriptorpb.EnumValueOptions{}
+	var opts *descriptorpb.EnumValueOptions
 	if len(v.Options) > 0 {
+		opts = &descriptorpb.EnumValueOptions{}
 		processOptions(v.Options, opts.ProtoReflect(), res)
 	}
 
@@ -1086,8 +1088,9 @@ func createEnumValueDescriptor(v *typepb.EnumValue, res SerializationResolver) *
 }
 
 func createMessageDescriptor(m *typepb.Type, res SerializationResolver) *descriptorpb.DescriptorProto {
-	opts := &descriptorpb.MessageOptions{}
+	var opts *descriptorpb.MessageOptions
 	if len(m.Options) > 0 {
+		opts = &descriptorpb.MessageOptions{}
 		processOptions(m.Options, opts.ProtoReflect(), res)
 	}
 
@@ -1112,8 +1115,9 @@ func createMessageDescriptor(m *typepb.Type, res SerializationResolver) *descrip
 }
 
 func createFieldDescriptor(f *typepb.Field, res SerializationResolver) *descriptorpb.FieldDescriptorProto {
-	opts := &descriptorpb.FieldOptions{}
+	var opts *descriptorpb.FieldOptions
 	if len(f.Options) > 0 {
+		opts = &descriptorpb.FieldOptions{}
 		processOptions(f.Options, opts.ProtoReflect(), res)
 	}
 	if f.Packed {
@@ -1129,10 +1133,10 @@ func createFieldDescriptor(f *typepb.Field, res SerializationResolver) *descript
 		oneOf = proto.Int32(f.OneofIndex - 1)
 	}
 
-	var typeName string
+	var typeName *string
 	if f.Kind == typepb.Field_TYPE_GROUP || f.Kind == typepb.Field_TYPE_MESSAGE || f.Kind == typepb.Field_TYPE_ENUM {
 		pos := strings.LastIndex(f.TypeUrl, "/")
-		typeName = "." + f.TypeUrl[pos+1:]
+		typeName = proto.String("." + f.TypeUrl[pos+1:])
 	}
 
 	var label descriptorpb.FieldDescriptorProto_Label
@@ -1194,7 +1198,7 @@ func createFieldDescriptor(f *typepb.Field, res SerializationResolver) *descript
 		DefaultValue: defaultVal,
 		JsonName:     proto.String(f.JsonName),
 		OneofIndex:   oneOf,
-		TypeName:     proto.String(typeName),
+		TypeName:     typeName,
 		Label:        label.Enum(),
 		Type:         typ.Enum(),
 		Options:      opts,
@@ -1202,8 +1206,9 @@ func createFieldDescriptor(f *typepb.Field, res SerializationResolver) *descript
 }
 
 func createServiceDescriptor(a *apipb.Api, res SerializationResolver) *descriptorpb.ServiceDescriptorProto {
-	opts := &descriptorpb.ServiceOptions{}
+	var opts *descriptorpb.ServiceOptions
 	if len(a.Options) > 0 {
+		opts = &descriptorpb.ServiceOptions{}
 		processOptions(a.Options, opts.ProtoReflect(), res)
 	}
 
@@ -1220,8 +1225,9 @@ func createServiceDescriptor(a *apipb.Api, res SerializationResolver) *descripto
 }
 
 func createMethodDescriptor(m *apipb.Method, res SerializationResolver) *descriptorpb.MethodDescriptorProto {
-	opts := &descriptorpb.MethodOptions{}
+	var opts *descriptorpb.MethodOptions
 	if len(m.Options) > 0 {
+		opts = &descriptorpb.MethodOptions{}
 		processOptions(m.Options, opts.ProtoReflect(), res)
 	}
 
