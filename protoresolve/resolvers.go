@@ -177,9 +177,13 @@ type Resolver interface {
 	AsTypeResolver() TypeResolver
 }
 
+// DescriptorKind represents the kind of a descriptor. Unlike other
+// descriptor-related APIs, DescriptorKind distinguishes between
+// extension fields (DescriptorKindExtension) and "regular", non-extension
+// fields (DescriptorKindField).
 type DescriptorKind int
 
-// The various supported TypeKind values.
+// The various supported DescriptorKind values.
 const (
 	DescriptorKindUnknown = DescriptorKind(iota)
 	DescriptorKindFile
@@ -193,6 +197,7 @@ const (
 	DescriptorKindMethod
 )
 
+// KindOf returns the DescriptorKind of the given descriptor d.
 func KindOf(d protoreflect.Descriptor) DescriptorKind {
 	switch d := d.(type) {
 	case protoreflect.FileDescriptor:
@@ -219,6 +224,7 @@ func KindOf(d protoreflect.Descriptor) DescriptorKind {
 	}
 }
 
+// String returns a textual representation of k.
 func (k DescriptorKind) String() string {
 	switch k {
 	case DescriptorKindFile:
@@ -273,18 +279,65 @@ func (k DescriptorKind) withArticle() string {
 	}
 }
 
+// NewNotFoundError returns an error that wraps ErrNotFound with context
+// indicating the given name as the element that could not be found.
+//
+// The parameter is generic so that it will accept both plain strings
+// and named string types like protoreflect.FullName.
+func NewNotFoundError[T ~string](name T) error {
+	return fmt.Errorf("%s: %w", name, ErrNotFound)
+}
+
+// ErrUnexpectedType is an error that indicates a descriptor was resolved for
+// a given URL or name, but it is of the wrong type. So a query may have been
+// expecting a service descriptor, for example, but instead the queried name
+// resolved to an extension descriptor.
+//
+// See NewUnexpectedTypeError.
 type ErrUnexpectedType struct {
 	// Only one of URL or Name will be set, depending on whether
-	// the type was looked up by URL or name.
-	URL string
+	// the type was looked up by URL or name. These fields indicate
+	// the query that resulted in a descriptor of the wrong type.
+	URL  string
+	Name protoreflect.FullName
 	// The kind of descriptor that was expected.
 	Expecting DescriptorKind
-	// The descriptor that was actually found.
+	// The kind of descriptor that was actually found.
+	Actual DescriptorKind
+	// Optional: the descriptor that was actually found. This may
+	// be nil. If non-nil, this is the descriptor instance that
+	// was resolved whose kind is Actual instead of Expecting.
 	Descriptor protoreflect.Descriptor
 }
 
+// NewUnexpectedTypeError constructs a new *ErrUnexpectedType based
+// on the given properties. The last parameter, url, is optional. If
+// empty, the returned error will indicate that the given descriptor's
+// full name as the query.
+func NewUnexpectedTypeError(expecting DescriptorKind, got protoreflect.Descriptor, url string) *ErrUnexpectedType {
+	var name protoreflect.FullName
+	if url == "" {
+		name = got.FullName()
+	}
+	return &ErrUnexpectedType{
+		URL:        url,
+		Name:       name,
+		Expecting:  expecting,
+		Descriptor: got,
+	}
+}
+
+// Error implements the error interface.
 func (e *ErrUnexpectedType) Error() string {
-	return fmt.Sprintf("wrong kind of descriptor for URL %q: expected %s, got %s", e.URL, e.Expecting.withArticle(), descKindWithArticle(e.Descriptor))
+	var queryKind, query string
+	if e.URL != "" {
+		queryKind = "URL"
+		query = e.URL
+	} else {
+		queryKind = "name"
+		query = string(e.Name)
+	}
+	return fmt.Sprintf("wrong kind of descriptor for %s %q: expected %s, got %s", queryKind, query, e.Expecting.withArticle(), e.Actual.withArticle())
 }
 
 // FindExtensionByNumber searches the given descriptor pool for the requested extension.
@@ -499,7 +552,7 @@ func (r *resolverFromPool) FindMessageByName(name protoreflect.FullName) (protor
 	}
 	msg, ok := d.(protoreflect.MessageDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a message", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindMessage, d, "")
 	}
 	return msg, nil
 }
@@ -511,18 +564,22 @@ func (r *resolverFromPool) FindFieldByName(name protoreflect.FullName) (protoref
 	}
 	field, ok := d.(protoreflect.FieldDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a field", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindField, d, "")
 	}
 	return field, nil
 }
 
 func (r *resolverFromPool) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
-	field, err := r.FindFieldByName(name)
+	d, err := r.DescriptorPool.FindDescriptorByName(name)
 	if err != nil {
 		return nil, err
 	}
+	field, ok := d.(protoreflect.FieldDescriptor)
+	if !ok {
+		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
+	}
 	if !field.IsExtension() {
-		return nil, fmt.Errorf("%s is a normal field, not an extension", name)
+		return nil, NewUnexpectedTypeError(DescriptorKindExtension, field, "")
 	}
 	return field, nil
 }
@@ -534,7 +591,7 @@ func (r *resolverFromPool) FindOneofByName(name protoreflect.FullName) (protoref
 	}
 	oneof, ok := d.(protoreflect.OneofDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a oneof", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindOneof, d, "")
 	}
 	return oneof, nil
 }
@@ -546,7 +603,7 @@ func (r *resolverFromPool) FindEnumByName(name protoreflect.FullName) (protorefl
 	}
 	enum, ok := d.(protoreflect.EnumDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an enum", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindEnum, d, "")
 	}
 	return enum, nil
 }
@@ -558,7 +615,7 @@ func (r *resolverFromPool) FindEnumValueByName(name protoreflect.FullName) (prot
 	}
 	enumVal, ok := d.(protoreflect.EnumValueDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an enum value", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindEnumValue, d, "")
 	}
 	return enumVal, nil
 }
@@ -570,7 +627,7 @@ func (r *resolverFromPool) FindServiceByName(name protoreflect.FullName) (protor
 	}
 	svc, ok := d.(protoreflect.ServiceDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a service", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindService, d, "")
 	}
 	return svc, nil
 }
@@ -582,7 +639,7 @@ func (r *resolverFromPool) FindMethodByName(name protoreflect.FullName) (protore
 	}
 	mtd, ok := d.(protoreflect.MethodDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a method", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindMethod, d, "")
 	}
 	return mtd, nil
 }

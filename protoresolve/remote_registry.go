@@ -52,6 +52,9 @@ type RemoteRegistry struct {
 	// TypeFetcher is unset/nil), then Fallback will be used to resolve
 	// the type by name.
 	//
+	// Fallback is also used to resolve custom options found in type
+	// definitions returned from TypeFetcher.
+	//
 	// If not specified or nil, protoregistry.GlobalFiles will be used as
 	// the fallback. To prevent any fallback from being used, set this to
 	// an empty resolver, such as a new, empty Registry or
@@ -301,18 +304,15 @@ func (r *RemoteRegistry) FindMessageByURL(url string) (protoreflect.MessageDescr
 }
 
 func (r *RemoteRegistry) FindMessageByURLContext(ctx context.Context, url string) (protoreflect.MessageDescriptor, error) {
-	return r.findMessageByURLContext(ctx, url, r.TypeFetcher)
-}
-
-func (r *RemoteRegistry) findMessageByURLContext(ctx context.Context, url string, fetcher TypeFetcher) (protoreflect.MessageDescriptor, error) {
-	desc, err := r.findTypeByURL(ctx, url, false, fetcher)
+	desc, err := r.findTypeByURL(ctx, url, false)
 	if err != nil {
 		return nil, err
 	}
-	if md, ok := desc.(protoreflect.MessageDescriptor); ok {
-		return md, nil
+	md, ok := desc.(protoreflect.MessageDescriptor)
+	if !ok {
+		return nil, NewUnexpectedTypeError(DescriptorKindMessage, desc, url)
 	}
-	return nil, fmt.Errorf("%s is not a message; it is %s", desc.FullName(), descKindWithArticle(desc))
+	return md, nil
 }
 
 func (r *RemoteRegistry) FindEnumByURL(url string) (protoreflect.EnumDescriptor, error) {
@@ -320,17 +320,18 @@ func (r *RemoteRegistry) FindEnumByURL(url string) (protoreflect.EnumDescriptor,
 }
 
 func (r *RemoteRegistry) FindEnumByURLContext(ctx context.Context, url string) (protoreflect.EnumDescriptor, error) {
-	desc, err := r.findTypeByURL(ctx, url, true, r.TypeFetcher)
+	desc, err := r.findTypeByURL(ctx, url, true)
 	if err != nil {
 		return nil, err
 	}
-	if ed, ok := desc.(protoreflect.EnumDescriptor); ok {
-		return ed, nil
+	ed, ok := desc.(protoreflect.EnumDescriptor)
+	if !ok {
+		return nil, NewUnexpectedTypeError(DescriptorKindEnum, desc, url)
 	}
-	return nil, fmt.Errorf("%s is not an enum; it is %s", desc.FullName(), descKindWithArticle(desc))
+	return ed, nil
 }
 
-func (r *RemoteRegistry) findTypeByURL(ctx context.Context, url string, isEnum bool, fetcher TypeFetcher) (protoreflect.Descriptor, error) {
+func (r *RemoteRegistry) findTypeByURL(ctx context.Context, url string, isEnum bool) (protoreflect.Descriptor, error) {
 	url = ensureScheme(url)
 	r.mu.RLock()
 	d := r.typeCache[url]
@@ -338,8 +339,8 @@ func (r *RemoteRegistry) findTypeByURL(ctx context.Context, url string, isEnum b
 	if d != nil {
 		return d, nil
 	}
-	if fetcher != nil {
-		en, err := r.fetchTypesForURL(ctx, url, isEnum, fetcher)
+	if r.TypeFetcher != nil {
+		en, err := r.fetchTypesForURL(ctx, url, isEnum)
 		if err == nil || !errors.Is(err, protoregistry.NotFound) {
 			return en, err
 		}
@@ -351,8 +352,8 @@ func (r *RemoteRegistry) findTypeByURL(ctx context.Context, url string, isEnum b
 	return fb.FindDescriptorByName(TypeNameFromURL(url))
 }
 
-func (r *RemoteRegistry) fetchTypesForURL(ctx context.Context, url string, isEnum bool, fetcher TypeFetcher) (protoreflect.Descriptor, error) {
-	cc := newConvertContext(r, fetcher)
+func (r *RemoteRegistry) fetchTypesForURL(ctx context.Context, url string, isEnum bool) (protoreflect.Descriptor, error) {
+	cc := newConvertContext(r, r.TypeFetcher)
 	if err := cc.addType(ctx, url, isEnum); err != nil {
 		return nil, err
 	}
@@ -531,10 +532,48 @@ func (r *RemoteTypeResolver) FindEnumByURL(url string) (protoreflect.EnumType, e
 type remoteSubResolver RemoteRegistry
 
 func (r *remoteSubResolver) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
-	return nil, ErrNotFound
+	fb := r.Fallback
+	if fb == nil {
+		return protoregistry.GlobalTypes.FindExtensionByName(field)
+	}
+	type typeRes interface {
+		AsTypeResolver() TypeResolver
+	}
+	if tr, ok := fb.(typeRes); ok {
+		return tr.AsTypeResolver().FindExtensionByName(field)
+	}
+	d, err := fb.FindDescriptorByName(field)
+	if err != nil {
+		return nil, err
+	}
+	fld, ok := d.(protoreflect.FieldDescriptor)
+	if !ok {
+		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
+	}
+	if !fld.IsExtension() {
+		return nil, NewUnexpectedTypeError(DescriptorKindExtension, fld, "")
+	}
+	return ExtensionType(fld), nil
+}
+
+type typeResolvable interface {
+	AsTypeResolver() TypeResolver
 }
 
 func (r *remoteSubResolver) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
+	fb := r.Fallback
+	if fb == nil {
+		return protoregistry.GlobalTypes.FindExtensionByNumber(message, field)
+	}
+	if tr, ok := fb.(typeResolvable); ok {
+		return tr.AsTypeResolver().FindExtensionByNumber(message, field)
+	}
+	if pool, ok := fb.(DescriptorPool); ok {
+		ext := FindExtensionByNumber(pool, message, field)
+		if ext != nil {
+			return ExtensionType(ext), nil
+		}
+	}
 	return nil, ErrNotFound
 }
 
@@ -544,10 +583,27 @@ func (r *remoteSubResolver) FindMessageByName(message protoreflect.FullName) (pr
 }
 
 func (r *remoteSubResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
-	reg := (*RemoteRegistry)(r)
-	md, err := reg.findMessageByURLContext(context.Background(), url, nil)
-	if err != nil {
-		return nil, err
+	url = ensureScheme(url)
+	r.mu.RLock()
+	d := r.typeCache[url]
+	r.mu.RUnlock()
+	if d == nil {
+		fb := r.Fallback
+		if fb == nil {
+			fb = protoregistry.GlobalFiles
+		}
+		if tr, ok := fb.(typeResolvable); ok {
+			return tr.AsTypeResolver().FindMessageByURL(url)
+		}
+		var err error
+		d, err = fb.FindDescriptorByName(TypeNameFromURL(url))
+		if err != nil {
+			return nil, err
+		}
+	}
+	md, ok := d.(protoreflect.MessageDescriptor)
+	if !ok {
+		return nil, NewUnexpectedTypeError(DescriptorKindMessage, d, url)
 	}
 	return dynamicpb.NewMessageType(md), nil
 }

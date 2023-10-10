@@ -205,7 +205,7 @@ func (r *Registry) FindMessageByName(name protoreflect.FullName) (protoreflect.M
 	}
 	msg, ok := d.(protoreflect.MessageDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("descriptor %q is %s, not a message", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindMessage, d, "")
 	}
 	return msg, nil
 }
@@ -218,7 +218,7 @@ func (r *Registry) FindFieldByName(name protoreflect.FullName) (protoreflect.Fie
 	}
 	fld, ok := d.(protoreflect.FieldDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("descriptor %q is %s, not a field", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindField, d, "")
 	}
 	return fld, nil
 }
@@ -231,10 +231,10 @@ func (r *Registry) FindExtensionByName(name protoreflect.FullName) (protoreflect
 	}
 	fld, ok := d.(protoreflect.FieldDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("descriptor %q is %s, not an extension", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
 	}
 	if !fld.IsExtension() {
-		return nil, fmt.Errorf("descriptor %q is a field, not an extension", name)
+		return nil, NewUnexpectedTypeError(DescriptorKindExtension, fld, "")
 	}
 	return fld, nil
 }
@@ -247,7 +247,7 @@ func (r *Registry) FindOneofByName(name protoreflect.FullName) (protoreflect.One
 	}
 	ood, ok := d.(protoreflect.OneofDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("descriptor %q is %s, not a oneof", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindOneof, d, "")
 	}
 	return ood, nil
 }
@@ -260,7 +260,7 @@ func (r *Registry) FindEnumByName(name protoreflect.FullName) (protoreflect.Enum
 	}
 	en, ok := d.(protoreflect.EnumDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("descriptor %q is %s, not an enum", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindEnum, d, "")
 	}
 	return en, nil
 }
@@ -273,7 +273,7 @@ func (r *Registry) FindEnumValueByName(name protoreflect.FullName) (protoreflect
 	}
 	enVal, ok := d.(protoreflect.EnumValueDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("descriptor %q is %s, not an enum value", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindEnumValue, d, "")
 	}
 	return enVal, nil
 }
@@ -286,7 +286,7 @@ func (r *Registry) FindServiceByName(name protoreflect.FullName) (protoreflect.S
 	}
 	svc, ok := d.(protoreflect.ServiceDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("descriptor %q is %s, not a service", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindService, d, "")
 	}
 	return svc, nil
 }
@@ -299,7 +299,7 @@ func (r *Registry) FindMethodByName(name protoreflect.FullName) (protoreflect.Me
 	}
 	mtd, ok := d.(protoreflect.MethodDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("descriptor %q is %s, not a method", name, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindMethod, d, "")
 	}
 	return mtd, nil
 }
@@ -353,31 +353,4 @@ func (r *Registry) AsTypeResolver() TypeResolver {
 // than AsTypeResolver, providing the ability to enumerate types.
 func (r *Registry) AsTypePool() TypePool {
 	return TypesFromDescriptorPool(r)
-}
-
-func descKindWithArticle(d protoreflect.Descriptor) string {
-	switch d := d.(type) {
-	case protoreflect.FileDescriptor:
-		return "a file"
-	case protoreflect.MessageDescriptor:
-		return "a message"
-	case protoreflect.FieldDescriptor:
-		if d.IsExtension() {
-			return "an extension"
-		}
-		return "a field"
-	case protoreflect.OneofDescriptor:
-		return "a oneof"
-	case protoreflect.EnumDescriptor:
-		return "an enum"
-	case protoreflect.EnumValueDescriptor:
-		return "an enum value"
-	case protoreflect.ServiceDescriptor:
-		return "a service"
-	case protoreflect.MethodDescriptor:
-		return "a method"
-	default:
-		// shouldn't get here...
-		return fmt.Sprintf("a %T", d)
-	}
 }

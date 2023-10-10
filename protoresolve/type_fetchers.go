@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"google.golang.org/protobuf/types/known/apipb"
 	"io"
 	"net/http"
 	"sync"
@@ -13,15 +14,27 @@ import (
 	"google.golang.org/protobuf/types/known/typepb"
 )
 
+// TypeFetcher is a value that knows how to fetch type definitions for a URL.
+// The type definitions are represented by google.protobuf.Type and google.protobuf.Enum
+// messages (which were originally part of the specification for google.protobuf.Any
+// and how such types could be resolved at runtime).
 type TypeFetcher interface {
+	// FetchMessageType fetches the definition of a message type that is identified
+	// by the given URL.
 	FetchMessageType(ctx context.Context, url string) (*typepb.Type, error)
+	// FetchEnumType fetches the definition of an enum type that is identified by
+	// the given URL.
 	FetchEnumType(ctx context.Context, url string) (*typepb.Enum, error)
 }
 
+// TypeFetcherFunc is a TypeFetcher implementation backed by a single function.
+// The function accepts a parameter to have it switch between fetching a message
+// type vs. finding an enum type.
 type TypeFetcherFunc func(ctx context.Context, url string, enum bool) (proto.Message, error)
 
 var _ TypeFetcher = TypeFetcherFunc(nil)
 
+// FetchMessageType implements the TypeFetcher interface.
 func (t TypeFetcherFunc) FetchMessageType(ctx context.Context, url string) (*typepb.Type, error) {
 	msg, err := t(ctx, url, false)
 	if err != nil {
@@ -30,9 +43,10 @@ func (t TypeFetcherFunc) FetchMessageType(ctx context.Context, url string) (*typ
 	if typ, ok := msg.(*typepb.Type); ok {
 		return typ, nil
 	}
-	return nil, fmt.Errorf("fetcher returned wrong type: expecting %T, got %T", (*typepb.Type)(nil), msg)
+	return nil, newUnexpectedTypeError(DescriptorKindMessage, msg, url)
 }
 
+// FetchEnumType implements the TypeFetcher interface.
 func (t TypeFetcherFunc) FetchEnumType(ctx context.Context, url string) (*typepb.Enum, error) {
 	msg, err := t(ctx, url, true)
 	if err != nil {
@@ -41,7 +55,32 @@ func (t TypeFetcherFunc) FetchEnumType(ctx context.Context, url string) (*typepb
 	if en, ok := msg.(*typepb.Enum); ok {
 		return en, nil
 	}
-	return nil, fmt.Errorf("fetcher returned wrong type: expecting %T, got %T", (*typepb.Enum)(nil), msg)
+	return nil, newUnexpectedTypeError(DescriptorKindEnum, msg, url)
+}
+
+func newUnexpectedTypeError(expecting DescriptorKind, typ proto.Message, url string) *ErrUnexpectedType {
+	var actualKind DescriptorKind
+	switch typ.(type) {
+	case *typepb.Type:
+		actualKind = DescriptorKindMessage
+	case *typepb.Field:
+		actualKind = DescriptorKindField
+	case *typepb.Enum:
+		actualKind = DescriptorKindEnum
+	case *typepb.EnumValue:
+		actualKind = DescriptorKindEnumValue
+	case *apipb.Api:
+		actualKind = DescriptorKindService
+	case *apipb.Method:
+		actualKind = DescriptorKindMethod
+	default:
+		actualKind = DescriptorKindUnknown
+	}
+	return &ErrUnexpectedType{
+		URL:       url,
+		Expecting: expecting,
+		Actual:    actualKind,
+	}
 }
 
 // CachingTypeFetcher adds a caching layer to the given type fetcher. Queries for
@@ -89,18 +128,23 @@ func (c *cachingFetcher) fetchType(ctx context.Context, url string, enum bool) (
 	if err != nil {
 		return nil, err
 	}
-	if _, isEnum := m.(*typepb.Enum); enum != isEnum {
-		var want, got string
-		if enum {
-			want = "enum"
-			got = "message"
-		} else {
-			want = "message"
-			got = "enum"
+	switch m.(type) {
+	case *typepb.Type:
+		if !enum {
+			return m, nil
 		}
-		return nil, fmt.Errorf("type for URL %v is the wrong type: wanted %s, got %s", url, want, got)
+	case *typepb.Enum:
+		if enum {
+			return m, nil
+		}
 	}
-	return m.(proto.Message), nil
+	var wanted DescriptorKind
+	if enum {
+		wanted = DescriptorKindEnum
+	} else {
+		wanted = DescriptorKindMessage
+	}
+	return nil, newUnexpectedTypeError(wanted, m, url)
 }
 
 func (c *cachingFetcher) getOrLoad(key string, loader func() (proto.Message, error)) (m proto.Message, err error) {
@@ -165,8 +209,14 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 			_ = resp.Body.Close()
 		}()
 
-		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("HTTP request returned non-200 status code: %s", resp.Status)
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNonAuthoritativeInfo {
+			if resp.StatusCode == http.StatusNoContent ||
+				resp.StatusCode == http.StatusNotImplemented ||
+				(resp.StatusCode >= 300 && resp.StatusCode <= 499) {
+				// No content, unimplemented, redirect, or request error? Treat as "not found".
+				return nil, fmt.Errorf("%w: HTTP request returned status code %s", ErrNotFound, resp.Status)
+			}
+			return nil, fmt.Errorf("HTTP request returned unsupported status code: %s", resp.Status)
 		}
 
 		if resp.ContentLength > int64(szLimit) {
@@ -193,13 +243,12 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 				return nil, err
 			}
 			return &ret, nil
-		} else {
-			var ret typepb.Type
-			if err = proto.Unmarshal(buf.Bytes(), &ret); err != nil {
-				return nil, err
-			}
-			return &ret, nil
 		}
+		var ret typepb.Type
+		if err = proto.Unmarshal(buf.Bytes(), &ret); err != nil {
+			return nil, err
+		}
+		return &ret, nil
 	}))
 }
 

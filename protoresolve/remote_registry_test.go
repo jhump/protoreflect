@@ -17,7 +17,9 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/apipb"
+	_ "google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/sourcecontextpb"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/typepb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
@@ -200,14 +202,14 @@ func TestRemoteRegistry_FindMessage_TypeFetcher(t *testing.T) {
 	require.Equal(t, "OtherType", string(md2.Name()))
 	require.Equal(t, "some.OtherType", string(md2.FullName()))
 	require.Equal(t, "some", string(md2.ParentFile().Package()))
-	require.Equal(t, protoreflect.Proto3, md2.ParentFile().Syntax())
+	require.Equal(t, protoreflect.Proto2, md2.ParentFile().Syntax())
 
 	nmd := md2.Messages().Get(0)
 	protosEqual(t, protowrap.ProtoFromMessageDescriptor(nmd), protowrap.ProtoFromMessageDescriptor(md2.Fields().ByName("a").Message()))
 	require.Equal(t, "AnotherType", string(nmd.Name()))
 	require.Equal(t, "some.OtherType.AnotherType", string(nmd.FullName()))
 	require.Equal(t, "some", string(nmd.ParentFile().Package()))
-	require.Equal(t, protoreflect.Proto3, nmd.ParentFile().Syntax())
+	require.Equal(t, protoreflect.Proto2, nmd.ParentFile().Syntax())
 
 	en := md.Fields().ByName("c").Enum()
 	require.Equal(t, "Enum", string(en.Name()))
@@ -434,19 +436,19 @@ func createFetcher(t *testing.T) TypeFetcher {
 							Value: &bol,
 						},
 						{
-							Name:  "testdata.ffubar",
+							Name:  "testprotos.ffubar",
 							Value: &str1,
 						},
 						{
-							Name:  "testdata.ffubar",
+							Name:  "testprotos.ffubar",
 							Value: &str2,
 						},
 						{
-							Name:  "testdata.ffubar",
+							Name:  "testprotos.ffubar",
 							Value: &str3,
 						},
 						{
-							Name:  "testdata.ffubarb",
+							Name:  "testprotos.ffubarb",
 							Value: &byt,
 						},
 					},
@@ -482,7 +484,7 @@ func createFetcher(t *testing.T) TypeFetcher {
 					Value: &bol,
 				},
 				{
-					Name:  "testdata.mfubar",
+					Name:  "testprotos.mfubar",
 					Value: &bol,
 				},
 			},
@@ -530,23 +532,23 @@ func createFetcher(t *testing.T) TypeFetcher {
 							Value: &bol,
 						},
 						{
-							Name:  "testdata.evfubar",
+							Name:  "testprotos.evfubar",
 							Value: &in64,
 						},
 						{
-							Name:  "testdata.evfubars",
+							Name:  "testprotos.evfubars",
 							Value: &in64,
 						},
 						{
-							Name:  "testdata.evfubarsf",
+							Name:  "testprotos.evfubarsf",
 							Value: &in64,
 						},
 						{
-							Name:  "testdata.evfubaru",
+							Name:  "testprotos.evfubaru",
 							Value: &uin64,
 						},
 						{
-							Name:  "testdata.evfubaruf",
+							Name:  "testprotos.evfubaruf",
 							Value: &uin64,
 						},
 					},
@@ -570,23 +572,23 @@ func createFetcher(t *testing.T) TypeFetcher {
 					Value: &bol,
 				},
 				{
-					Name:  "testdata.efubar",
+					Name:  "testprotos.efubar",
 					Value: &in32,
 				},
 				{
-					Name:  "testdata.efubars",
+					Name:  "testprotos.efubars",
 					Value: &in32,
 				},
 				{
-					Name:  "testdata.efubarsf",
+					Name:  "testprotos.efubarsf",
 					Value: &in32,
 				},
 				{
-					Name:  "testdata.efubaru",
+					Name:  "testprotos.efubaru",
 					Value: &uin32,
 				},
 				{
-					Name:  "testdata.efubaruf",
+					Name:  "testprotos.efubaruf",
 					Value: &uin32,
 				},
 			},
@@ -606,7 +608,7 @@ func createFetcher(t *testing.T) TypeFetcher {
 				},
 			},
 			SourceContext: &sourcecontextpb.SourceContext{FileName: "baz.proto"},
-			Syntax:        typepb.Syntax_SYNTAX_PROTO2,
+			Syntax:        typepb.Syntax_SYNTAX_PROTO3,
 		},
 	}
 	return TypeFetcherFunc(func(_ context.Context, url string, enum bool) (proto.Message, error) {
@@ -739,15 +741,15 @@ func getApi(t *testing.T) *apipb.Api {
 						Value: &bol,
 					},
 					{
-						Name:  "testdata.mtfubar",
+						Name:  "testprotos.mtfubar",
 						Value: &flt1,
 					},
 					{
-						Name:  "testdata.mtfubar",
+						Name:  "testprotos.mtfubar",
 						Value: &flt2,
 					},
 					{
-						Name:  "testdata.mtfubard",
+						Name:  "testprotos.mtfubard",
 						Value: &dbl,
 					},
 				},
@@ -782,11 +784,11 @@ func getApi(t *testing.T) *apipb.Api {
 				Value: &bol,
 			},
 			{
-				Name:  "testdata.sfubar",
+				Name:  "testprotos.sfubar",
 				Value: &msg,
 			},
 			{
-				Name:  "testdata.sfubare",
+				Name:  "testprotos.sfubare",
 				Value: &enu,
 			},
 		},
@@ -854,7 +856,7 @@ func TestDescriptorConverter_DescriptorAsType(t *testing.T) {
 						Number:     proto.Int32(5),
 						Label:      descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
 						Type:       descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
-						JsonName:   proto.String("sid"),
+						JsonName:   proto.String("_SID_"),
 						OneofIndex: proto.Int32(0),
 					},
 				},
@@ -866,59 +868,60 @@ func TestDescriptorConverter_DescriptorAsType(t *testing.T) {
 
 	msg := (&RemoteRegistry{}).AsDescriptorConverter().DescriptorAsType(fd.Messages().Get(0))
 
-	// quick check of the resulting message's properties
-	require.Equal(t, "foo.Bar", msg.Name)
-	require.Equal(t, []string{"oo"}, msg.Oneofs)
-	require.Equal(t, typepb.Syntax_SYNTAX_PROTO2, msg.Syntax)
-	require.Equal(t, "test.proto", msg.SourceContext.GetFileName())
-	require.Equal(t, 0, len(msg.Options))
-	require.Equal(t, 5, len(msg.Fields))
+	expected := &typepb.Type{
+		Name:   "foo.Bar",
+		Syntax: typepb.Syntax_SYNTAX_PROTO2,
+		SourceContext: &sourcecontextpb.SourceContext{
+			FileName: "test.proto",
+		},
+		Oneofs: []string{"oo"},
+		Fields: []*typepb.Field{
+			{
+				Name:        "abc",
+				Cardinality: typepb.Field_CARDINALITY_OPTIONAL,
+				Kind:        typepb.Field_TYPE_STRING,
+				Number:      1,
+				Options: []*typepb.Option{
+					{Name: "deprecated", Value: asAny(t, &wrapperspb.BoolValue{Value: true})},
+				},
+				JsonName: "abc",
+			},
+			{
+				Name:        "def",
+				Cardinality: typepb.Field_CARDINALITY_REPEATED,
+				Kind:        typepb.Field_TYPE_INT32,
+				Number:      2,
+				Packed:      true,
+				JsonName:    "def",
+			},
+			{
+				Name:         "ghi",
+				Cardinality:  typepb.Field_CARDINALITY_OPTIONAL,
+				Kind:         typepb.Field_TYPE_STRING,
+				Number:       3,
+				DefaultValue: "foobar",
+				JsonName:     "ghi",
+			},
+			{
+				Name:        "nid",
+				Cardinality: typepb.Field_CARDINALITY_OPTIONAL,
+				Kind:        typepb.Field_TYPE_UINT64,
+				Number:      4,
+				OneofIndex:  1,
+				JsonName:    "nid",
+			},
+			{
+				Name:        "sid",
+				Cardinality: typepb.Field_CARDINALITY_OPTIONAL,
+				Kind:        typepb.Field_TYPE_STRING,
+				Number:      5,
+				OneofIndex:  1,
+				JsonName:    "_SID_",
+			},
+		},
+	}
 
-	require.Equal(t, "abc", msg.Fields[0].Name)
-	require.Equal(t, typepb.Field_CARDINALITY_OPTIONAL, msg.Fields[0].Cardinality)
-	require.Equal(t, typepb.Field_TYPE_STRING, msg.Fields[0].Kind)
-	require.Equal(t, "", msg.Fields[0].DefaultValue)
-	require.Equal(t, int32(1), msg.Fields[0].Number)
-	require.Equal(t, int32(0), msg.Fields[0].OneofIndex)
-	require.Equal(t, 1, len(msg.Fields[0].Options))
-	require.Equal(t, "deprecated", msg.Fields[0].Options[0].Name)
-	// make sure the value is a wrapped bool
-	v, err := anypb.UnmarshalNew(msg.Fields[0].Options[0].Value, proto.UnmarshalOptions{})
-	require.NoError(t, err)
-	protosEqual(t, &wrapperspb.BoolValue{Value: true}, v)
-
-	require.Equal(t, "def", msg.Fields[1].Name)
-	require.Equal(t, typepb.Field_CARDINALITY_REPEATED, msg.Fields[1].Cardinality)
-	require.Equal(t, typepb.Field_TYPE_INT32, msg.Fields[1].Kind)
-	require.Equal(t, "", msg.Fields[1].DefaultValue)
-	require.Equal(t, int32(2), msg.Fields[1].Number)
-	require.Equal(t, int32(0), msg.Fields[1].OneofIndex)
-	require.Equal(t, true, msg.Fields[1].Packed)
-	require.Equal(t, 0, len(msg.Fields[1].Options))
-
-	require.Equal(t, "ghi", msg.Fields[2].Name)
-	require.Equal(t, typepb.Field_CARDINALITY_OPTIONAL, msg.Fields[2].Cardinality)
-	require.Equal(t, typepb.Field_TYPE_STRING, msg.Fields[2].Kind)
-	require.Equal(t, "foobar", msg.Fields[2].DefaultValue)
-	require.Equal(t, int32(3), msg.Fields[2].Number)
-	require.Equal(t, int32(0), msg.Fields[2].OneofIndex)
-	require.Equal(t, 0, len(msg.Fields[2].Options))
-
-	require.Equal(t, "nid", msg.Fields[3].Name)
-	require.Equal(t, typepb.Field_CARDINALITY_OPTIONAL, msg.Fields[3].Cardinality)
-	require.Equal(t, typepb.Field_TYPE_UINT64, msg.Fields[3].Kind)
-	require.Equal(t, "", msg.Fields[3].DefaultValue)
-	require.Equal(t, int32(4), msg.Fields[3].Number)
-	require.Equal(t, int32(0), msg.Fields[3].OneofIndex)
-	require.Equal(t, 0, len(msg.Fields[3].Options))
-
-	require.Equal(t, "sid", msg.Fields[4].Name)
-	require.Equal(t, typepb.Field_CARDINALITY_OPTIONAL, msg.Fields[4].Cardinality)
-	require.Equal(t, typepb.Field_TYPE_STRING, msg.Fields[4].Kind)
-	require.Equal(t, "", msg.Fields[4].DefaultValue)
-	require.Equal(t, int32(5), msg.Fields[4].Number)
-	require.Equal(t, int32(0), msg.Fields[4].OneofIndex)
-	require.Equal(t, 0, len(msg.Fields[4].Options))
+	protosEqual(t, expected, msg)
 }
 
 func TestDescriptorConverter_ToEnumDescriptor(t *testing.T) {
@@ -1003,8 +1006,15 @@ func TestDescriptorConverter_DescriptorAsEnum(t *testing.T) {
 	require.Equal(t, 0, len(enum.Enumvalue[4].Options))
 }
 
-func protosEqual(t *testing.T, a, b proto.Message) {
+func protosEqual(t *testing.T, expected, actual proto.Message) {
 	t.Helper()
-	diff := cmp.Diff(a, b, protocmp.Transform())
-	require.Empty(t, diff)
+	diff := cmp.Diff(expected, actual, protocmp.Transform())
+	require.Empty(t, diff, "unexpected differences: + present but not expected; - expected but not present")
+}
+
+func asAny(t *testing.T, msg proto.Message) *anypb.Any {
+	var a anypb.Any
+	err := anypb.MarshalFrom(&a, msg, proto.MarshalOptions{})
+	require.NoError(t, err)
+	return &a
 }

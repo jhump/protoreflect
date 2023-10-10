@@ -76,10 +76,10 @@ func TestCachingTypeFetcher_MismatchType(t *testing.T) {
 	_, err = fetcher.FetchEnumType(context.Background(), "blah.blah.blah/fee.fi.fo.Fum")
 	var unexpectedTypeErr *ErrUnexpectedType
 	require.ErrorAs(t, err, &unexpectedTypeErr)
-	require.ErrorContains(t, err, "wanted enum, got message")
+	require.ErrorContains(t, err, "expected an enum, got a message")
 	_, err = fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Foo")
 	require.ErrorAs(t, err, &unexpectedTypeErr)
-	require.ErrorContains(t, err, "wanted message, got enum")
+	require.ErrorContains(t, err, "expected a message, got an enum")
 }
 
 func TestCachingTypeFetcher_Concurrency(t *testing.T) {

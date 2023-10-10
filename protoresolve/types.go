@@ -319,7 +319,7 @@ func (t *typesFromResolver) FindExtensionByName(field protoreflect.FullName) (pr
 	}
 	ext, ok := d.(protoreflect.ExtensionDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an extension", field, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
 	}
 	if !ext.IsExtension() {
 		return nil, fmt.Errorf("%s is a normal field, not an extension", field)
@@ -342,7 +342,7 @@ func (t *typesFromResolver) FindMessageByName(message protoreflect.FullName) (pr
 	}
 	msg, ok := d.(protoreflect.MessageDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a message", message, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindMessage, d, "")
 	}
 	return dynamicpb.NewMessageType(msg), nil
 }
@@ -358,7 +358,7 @@ func (t *typesFromResolver) FindEnumByName(enum protoreflect.FullName) (protoref
 	}
 	en, ok := d.(protoreflect.EnumDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an enum", enum, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindEnum, d, "")
 	}
 	return dynamicpb.NewEnumType(en), nil
 }
@@ -374,7 +374,7 @@ func (t *typesFromDescriptorPool) FindExtensionByName(field protoreflect.FullNam
 	}
 	ext, ok := d.(protoreflect.ExtensionDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an extension", field, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
 	}
 	if !ext.IsExtension() {
 		return nil, fmt.Errorf("%s is a normal field, not an extension", field)
@@ -406,7 +406,7 @@ func (t *typesFromDescriptorPool) FindMessageByName(message protoreflect.FullNam
 	}
 	msg, ok := d.(protoreflect.MessageDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not a message", message, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindMessage, d, "")
 	}
 	return dynamicpb.NewMessageType(msg), nil
 }
@@ -422,7 +422,7 @@ func (t *typesFromDescriptorPool) FindEnumByName(enum protoreflect.FullName) (pr
 	}
 	en, ok := d.(protoreflect.EnumDescriptor)
 	if !ok {
-		return nil, fmt.Errorf("%s is %s, not an enum", enum, descKindWithArticle(d))
+		return nil, NewUnexpectedTypeError(DescriptorKindEnum, d, "")
 	}
 	return dynamicpb.NewEnumType(en), nil
 }
