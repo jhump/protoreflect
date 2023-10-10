@@ -350,6 +350,20 @@ func (dc *DescriptorConverter) options(options proto.Message) []*typepb.Option {
 		}
 		return true
 	})
+	// Range above results in non-deterministic ordering of extensions.
+	// So sort the options to make the results deterministic.
+	sort.SliceStable(opts, func(i, j int) bool {
+		iName := opts[i].Name
+		jName := opts[j].Name
+		iExt := strings.Contains(iName, ".")
+		jExt := strings.Contains(jName, ".")
+		// Normal options first, custom options/extensions last.
+		if iExt != jExt {
+			return !iExt
+		}
+		// Then order by name.
+		return iName < jName
+	})
 	return opts
 }
 
