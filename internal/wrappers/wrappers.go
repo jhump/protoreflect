@@ -74,6 +74,8 @@ func Unwrap(d protoreflect.Descriptor) protoreflect.Descriptor {
 	}
 }
 
+// File is a wrapper around a FileDescriptor that provides convenient
+// access to the underlying FileDescriptorProto.
 type File struct {
 	protoreflect.FileDescriptor
 	proto   *descriptorpb.FileDescriptorProto
@@ -87,54 +89,70 @@ type File struct {
 var _ ProtoWrapper = &File{}
 var _ WrappedDescriptor = &File{}
 
+// WrapFile wraps the given FileDescriptor in a *File. The given
+// *FileDescriptorProto, fd,  is assumed to be the underlying
+// descriptor proto from which file was produced.
 func WrapFile(file protoreflect.FileDescriptor, fd *descriptorpb.FileDescriptorProto) *File {
 	return &File{FileDescriptor: file, proto: fd, srcLocs: srcLocsWrapper{SourceLocations: file.SourceLocations()}}
 }
 
+// Unwrap implements the WrappedDescriptor interface.
 func (w *File) Unwrap() protoreflect.Descriptor {
 	return w.FileDescriptor
 }
 
+// ParentFile implements the FileDescriptor interface.
 func (w *File) ParentFile() protoreflect.FileDescriptor {
 	return w
 }
 
+// Parent implements the FileDescriptor interface.
 func (w *File) Parent() protoreflect.Descriptor {
 	return nil
 }
 
+// Options implements the FileDescriptor interface.
 func (w *File) Options() proto.Message {
 	return w.proto.GetOptions()
 }
 
+// AsProto implements the ProtoWrapper interface. Also
+// see FileDescriptorProto.
 func (w *File) AsProto() proto.Message {
 	return w.proto
 }
 
+// FileDescriptorProto provides access to the underlying
+// descriptor proto.
 func (w *File) FileDescriptorProto() *descriptorpb.FileDescriptorProto {
 	return w.proto
 }
 
+// Messages implements the FileDescriptor interface.
 func (w *File) Messages() protoreflect.MessageDescriptors {
 	w.msgs.initFromFile(w)
 	return &w.msgs
 }
 
+// Enums implements the FileDescriptor interface.
 func (w *File) Enums() protoreflect.EnumDescriptors {
 	w.enums.initFromFile(w)
 	return &w.enums
 }
 
+// Extensions implements the FileDescriptor interface.
 func (w *File) Extensions() protoreflect.ExtensionDescriptors {
 	w.exts.initFromFile(w)
 	return &w.exts
 }
 
+// Services implements the FileDescriptor interface.
 func (w *File) Services() protoreflect.ServiceDescriptors {
 	w.svcs.initFromFile(w)
 	return &w.svcs
 }
 
+// SourceLocations implements the FileDescriptor interface.
 func (w *File) SourceLocations() protoreflect.SourceLocations {
 	return &w.srcLocs
 }
@@ -483,6 +501,11 @@ func (w *mtdsWrapper) ByName(name protoreflect.Name) protoreflect.MethodDescript
 	return w.mtds[mtd.Index()]
 }
 
+// Message is a wrapper around a MessageDescriptor that provides convenient
+// access to the underlying DescriptorProto.
+//
+// This is the concrete type of message descriptors returned from instances
+// of *File. All messages in the hierarchy of a *File will have this type.
 type Message struct {
 	protoreflect.MessageDescriptor
 	parent ProtoWrapper // either *File or *Message
@@ -497,55 +520,74 @@ type Message struct {
 var _ ProtoWrapper = &Message{}
 var _ WrappedDescriptor = &Message{}
 
+// Unwrap implements the WrappedDescriptor interface.
 func (w *Message) Unwrap() protoreflect.Descriptor {
 	return w.MessageDescriptor
 }
 
+// Parent implements the MessageDescriptor interface.
 func (w *Message) Parent() protoreflect.Descriptor {
 	return w.parent
 }
 
+// ParentFile implements the MessageDescriptor interface.
 func (w *Message) ParentFile() protoreflect.FileDescriptor {
 	return parentFile(w)
 }
 
+// Options implements the MessageDescriptor interface.
 func (w *Message) Options() proto.Message {
 	return w.proto.GetOptions()
 }
 
+// AsProto implements the ProtoWrapper interface. Also
+// see MessageDescriptorProto.
 func (w *Message) AsProto() proto.Message {
 	return w.proto
 }
 
+// MessageDescriptorProto provides access to the underlying
+// descriptor proto.
 func (w *Message) MessageDescriptorProto() *descriptorpb.DescriptorProto {
 	return w.proto
 }
 
+// Fields implements the MessageDescriptor interface.
 func (w *Message) Fields() protoreflect.FieldDescriptors {
 	w.fields.initFromMessage(w)
 	return &w.fields
 }
 
+// Oneofs implements the MessageDescriptor interface.
 func (w *Message) Oneofs() protoreflect.OneofDescriptors {
 	w.oneofs.initFromMessage(w)
 	return &w.oneofs
 }
 
+// Messages implements the MessageDescriptor interface.
 func (w *Message) Messages() protoreflect.MessageDescriptors {
 	w.msgs.initFromMessage(w)
 	return &w.msgs
 }
 
+// Enums implements the MessageDescriptor interface.
 func (w *Message) Enums() protoreflect.EnumDescriptors {
 	w.enums.initFromMessage(w)
 	return &w.enums
 }
 
+// Extensions implements the MessageDescriptor interface.
 func (w *Message) Extensions() protoreflect.ExtensionDescriptors {
 	w.exts.initFromMessage(w)
 	return &w.exts
 }
 
+// Field is a wrapper around a FieldDescriptor that provides convenient
+// access to the underlying FieldDescriptorProto.
+//
+// This is the concrete type of field descriptors returned from instances
+// of *Message. All (non-extension) fields in the hierarchy of a *File will
+// have this type.
 type Field struct {
 	protoreflect.FieldDescriptor
 	parent ProtoWrapper // could be *File or *Message
@@ -563,60 +605,75 @@ type Field struct {
 var _ ProtoWrapper = &Field{}
 var _ WrappedDescriptor = &Field{}
 
+// Unwrap implements the WrappedDescriptor interface.
 func (w *Field) Unwrap() protoreflect.Descriptor {
 	return w.FieldDescriptor
 }
 
+// Parent implements the FieldDescriptor interface.
 func (w *Field) Parent() protoreflect.Descriptor {
 	return w.parent
 }
 
+// ParentFile implements the FieldDescriptor interface.
 func (w *Field) ParentFile() protoreflect.FileDescriptor {
 	return parentFile(w)
 }
 
+// Options implements the FieldDescriptor interface.
 func (w *Field) Options() proto.Message {
 	return w.proto.GetOptions()
 }
 
+// AsProto implements the ProtoWrapper interface. Also
+// see FieldDescriptorProto.
 func (w *Field) AsProto() proto.Message {
 	return w.proto
 }
 
+// FieldDescriptorProto provides access to the underlying
+// descriptor proto.
 func (w *Field) FieldDescriptorProto() *descriptorpb.FieldDescriptorProto {
 	return w.proto
 }
 
+// MapKey implements the FieldDescriptor interface.
 func (w *Field) MapKey() protoreflect.FieldDescriptor {
 	w.doInit()
 	return w.mapKey
 }
 
+// MapValue implements the FieldDescriptor interface.
 func (w *Field) MapValue() protoreflect.FieldDescriptor {
 	w.doInit()
 	return w.mapValue
 }
 
+// DefaultEnumValue implements the FieldDescriptor interface.
 func (w *Field) DefaultEnumValue() protoreflect.EnumValueDescriptor {
 	w.doInit()
 	return w.defaultEnumValue
 }
 
+// ContainingOneof implements the FieldDescriptor interface.
 func (w *Field) ContainingOneof() protoreflect.OneofDescriptor {
 	w.doInit()
 	return w.containingOneof
 }
 
+// ContainingMessage implements the FieldDescriptor interface.
 func (w *Field) ContainingMessage() protoreflect.MessageDescriptor {
 	w.doInit()
 	return w.containingMsg
 }
 
+// Message implements the FieldDescriptor interface.
 func (w *Field) Message() protoreflect.MessageDescriptor {
 	w.doInit()
 	return w.msgType
 }
 
+// Enum implements the FieldDescriptor interface.
 func (w *Field) Enum() protoreflect.EnumDescriptor {
 	w.doInit()
 	return w.enumType
@@ -651,6 +708,19 @@ func (w *Field) doInit() {
 	})
 }
 
+// Extension is a wrapper around a FieldDescriptor that provides convenient
+// access to the underlying FieldDescriptorProto. This type is used to
+// represent extension fields; *Field is used to represent normal
+// (non-extension) fields.
+//
+// In addition to protoreflect.FieldDescriptor, this type also implements
+// protoreflect.ExtensionTypeDescriptor. If the FieldDescriptor this wraps
+// did not implemented ExtensionTypeDescriptor, these methods are
+// implemented in terms of a dynamic extension type (e.g. dynamicpb.NewExtensionType).
+//
+// This is the concrete type of field descriptors returned from instances
+// of *File. All extension fields in the hierarchy of a *File will have this
+// type.
 type Extension struct {
 	*Field
 	extType protoreflect.ExtensionType
@@ -661,50 +731,68 @@ var _ WrappedDescriptor = &Extension{}
 var _ protoreflect.ExtensionTypeDescriptor = &Extension{}
 var _ protoreflect.ExtensionType = &Extension{}
 
+// New implements the ExtensionType interface.
 func (w *Extension) New() protoreflect.Value {
 	return w.extType.New()
 }
 
+// Zero implements the ExtensionType interface.
 func (w *Extension) Zero() protoreflect.Value {
 	return w.extType.Zero()
 }
 
+// TypeDescriptor implements the ExtensionType interface.
 func (w *Extension) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {
 	return w
 }
 
+// ValueOf implements the ExtensionType interface.
 func (w *Extension) ValueOf(i interface{}) protoreflect.Value {
 	return w.extType.ValueOf(i)
 }
 
+// InterfaceOf implements the ExtensionType interface.
 func (w *Extension) InterfaceOf(value protoreflect.Value) interface{} {
 	return w.extType.InterfaceOf(value)
 }
 
+// IsValidValue implements the ExtensionType interface.
 func (w *Extension) IsValidValue(value protoreflect.Value) bool {
 	return w.extType.IsValidValue(value)
 }
 
+// IsValidInterface implements the ExtensionType interface.
 func (w *Extension) IsValidInterface(i interface{}) bool {
 	return w.extType.IsValidInterface(i)
 }
 
+// AsProto implements the ProtoWrapper interface. Also
+// see FieldDescriptorProto.
 func (w *Extension) AsProto() proto.Message {
 	return w.proto
 }
 
+// FieldDescriptorProto provides access to the underlying
+// descriptor proto.
 func (w *Extension) FieldDescriptorProto() *descriptorpb.FieldDescriptorProto {
 	return w.proto
 }
 
+// Type implements the ExtensionTypeDescriptor interface.
 func (w *Extension) Type() protoreflect.ExtensionType {
 	return w
 }
 
+// Descriptor implements the ExtensionTypeDescriptor interface.
 func (w *Extension) Descriptor() protoreflect.ExtensionDescriptor {
 	return w
 }
 
+// Oneof is a wrapper around a OneofDescriptor that provides convenient
+// access to the underlying OneofDescriptorProto.
+//
+// This is the concrete type of oneof descriptors returned from instances
+// of *Message. All oneofs in the hierarchy of a *File will have this type.
 type Oneof struct {
 	protoreflect.OneofDescriptor
 	proto  *descriptorpb.OneofDescriptorProto
@@ -715,35 +803,49 @@ type Oneof struct {
 var _ ProtoWrapper = &Oneof{}
 var _ WrappedDescriptor = &Oneof{}
 
+// Unwrap implements the WrappedDescriptor interface.
 func (w *Oneof) Unwrap() protoreflect.Descriptor {
 	return w.OneofDescriptor
 }
 
+// Parent implements the OneofDescriptor interface.
 func (w *Oneof) Parent() protoreflect.Descriptor {
 	return w.parent
 }
 
+// ParentFile implements the OneofDescriptor interface.
 func (w *Oneof) ParentFile() protoreflect.FileDescriptor {
 	return parentFile(w)
 }
 
+// Options implements the OneofDescriptor interface.
 func (w *Oneof) Options() proto.Message {
 	return w.proto.GetOptions()
 }
 
+// AsProto implements the ProtoWrapper interface. Also
+// see OneofDescriptorProto.
 func (w *Oneof) AsProto() proto.Message {
 	return w.proto
 }
 
+// OneofDescriptorProto provides access to the underlying
+// descriptor proto.
 func (w *Oneof) OneofDescriptorProto() *descriptorpb.OneofDescriptorProto {
 	return w.proto
 }
 
+// Fields implements the OneofDescriptor interface.
 func (w *Oneof) Fields() protoreflect.FieldDescriptors {
 	w.fields.initFromOneof(w)
 	return &w.fields
 }
 
+// Enum is a wrapper around an EnumDescriptor that provides convenient
+// access to the underlying EnumDescriptorProto.
+//
+// This is the concrete type of enum descriptors returned from instances
+// of *File. All enums in the hierarchy of a *File will have this type.
 type Enum struct {
 	protoreflect.EnumDescriptor
 	proto  *descriptorpb.EnumDescriptorProto
@@ -754,35 +856,50 @@ type Enum struct {
 var _ ProtoWrapper = &Enum{}
 var _ WrappedDescriptor = &Enum{}
 
+// Unwrap implements the WrappedDescriptor interface.
 func (w *Enum) Unwrap() protoreflect.Descriptor {
 	return w.EnumDescriptor
 }
 
+// Parent implements the EnumDescriptor interface.
 func (w *Enum) Parent() protoreflect.Descriptor {
 	return w.parent
 }
 
+// ParentFile implements the EnumDescriptor interface.
 func (w *Enum) ParentFile() protoreflect.FileDescriptor {
 	return parentFile(w)
 }
 
+// Options implements the EnumDescriptor interface.
 func (w *Enum) Options() proto.Message {
 	return w.proto.GetOptions()
 }
 
+// AsProto implements the ProtoWrapper interface. Also
+// see EnumDescriptorProto.
 func (w *Enum) AsProto() proto.Message {
 	return w.proto
 }
 
+// EnumDescriptorProto provides access to the underlying
+// descriptor proto.
 func (w *Enum) EnumDescriptorProto() *descriptorpb.EnumDescriptorProto {
 	return w.proto
 }
 
+// Values implements the EnumDescriptor interface.
 func (w *Enum) Values() protoreflect.EnumValueDescriptors {
 	w.values.initFromEnum(w)
 	return &w.values
 }
 
+// EnumValue is a wrapper around an EnumValueDescriptor that provides
+// convenient access to the underlying EnumValueDescriptorProto.
+//
+// This is the concrete type of enum value descriptors returned from
+// instances of *Enum. All enum values in the hierarchy of a *File will
+// have this type.
 type EnumValue struct {
 	protoreflect.EnumValueDescriptor
 	parent *Enum
@@ -792,30 +909,43 @@ type EnumValue struct {
 var _ ProtoWrapper = &EnumValue{}
 var _ WrappedDescriptor = &EnumValue{}
 
+// Unwrap implements the WrappedDescriptor interface.
 func (w *EnumValue) Unwrap() protoreflect.Descriptor {
 	return w.EnumValueDescriptor
 }
 
+// Parent implements the EnumValueDescriptor interface.
 func (w *EnumValue) Parent() protoreflect.Descriptor {
 	return w.parent
 }
 
+// ParentFile implements the EnumValueDescriptor interface.
 func (w *EnumValue) ParentFile() protoreflect.FileDescriptor {
 	return parentFile(w)
 }
 
+// Options implements the EnumValueDescriptor interface.
 func (w *EnumValue) Options() proto.Message {
 	return w.proto.GetOptions()
 }
 
+// AsProto implements the ProtoWrapper interface. Also
+// see EnumValueDescriptorProto.
 func (w *EnumValue) AsProto() proto.Message {
 	return w.proto
 }
 
+// EnumValueDescriptorProto provides access to the underlying
+// descriptor proto.
 func (w *EnumValue) EnumValueDescriptorProto() *descriptorpb.EnumValueDescriptorProto {
 	return w.proto
 }
 
+// Service is a wrapper around a ServiceDescriptor that provides convenient
+// access to the underlying ServiceDescriptorProto.
+//
+// This is the concrete type of service descriptors returned from instances
+// of *File.
 type Service struct {
 	protoreflect.ServiceDescriptor
 	parent *File
@@ -826,35 +956,49 @@ type Service struct {
 var _ ProtoWrapper = &Service{}
 var _ WrappedDescriptor = &Service{}
 
+// Unwrap implements the WrappedDescriptor interface.
 func (w *Service) Unwrap() protoreflect.Descriptor {
 	return w.ServiceDescriptor
 }
 
+// Parent implements the ServiceDescriptor interface.
 func (w *Service) Parent() protoreflect.Descriptor {
 	return w.parent
 }
 
+// ParentFile implements the ServiceDescriptor interface.
 func (w *Service) ParentFile() protoreflect.FileDescriptor {
 	return w.parent
 }
 
+// Options implements the ServiceDescriptor interface.
 func (w *Service) Options() proto.Message {
 	return w.proto.GetOptions()
 }
 
+// AsProto implements the ProtoWrapper interface. Also
+// see ServiceDescriptorProto.
 func (w *Service) AsProto() proto.Message {
 	return w.proto
 }
 
+// ServiceDescriptorProto provides access to the underlying
+// descriptor proto.
 func (w *Service) ServiceDescriptorProto() *descriptorpb.ServiceDescriptorProto {
 	return w.proto
 }
 
+// Methods implements the ServiceDescriptor interface.
 func (w *Service) Methods() protoreflect.MethodDescriptors {
 	w.mtds.initFromSvc(w)
 	return &w.mtds
 }
 
+// Method is a wrapper around a MethodDescriptor that provides convenient
+// access to the underlying MethodDescriptorProto.
+//
+// This is the concrete type of method descriptors returned from instances
+// of *Service.
 type Method struct {
 	protoreflect.MethodDescriptor
 	parent *Service
@@ -867,35 +1011,45 @@ type Method struct {
 var _ ProtoWrapper = &Method{}
 var _ WrappedDescriptor = &Method{}
 
+// Unwrap implements the WrappedDescriptor interface.
 func (w *Method) Unwrap() protoreflect.Descriptor {
 	return w.MethodDescriptor
 }
 
+// Parent implements the MethodDescriptor interface.
 func (w *Method) Parent() protoreflect.Descriptor {
 	return w.parent
 }
 
+// ParentFile implements the MethodDescriptor interface.
 func (w *Method) ParentFile() protoreflect.FileDescriptor {
 	return parentFile(w)
 }
 
+// Options implements the MethodDescriptor interface.
 func (w *Method) Options() proto.Message {
 	return w.proto.GetOptions()
 }
 
+// AsProto implements the ProtoWrapper interface. Also
+// see MethodDescriptorProto.
 func (w *Method) AsProto() proto.Message {
 	return w.proto
 }
 
+// MethodDescriptorProto provides access to the underlying
+// descriptor proto.
 func (w *Method) MethodDescriptorProto() *descriptorpb.MethodDescriptorProto {
 	return w.proto
 }
 
+// Input implements the MethodDescriptor interface.
 func (w *Method) Input() protoreflect.MessageDescriptor {
 	w.doInit()
 	return w.input
 }
 
+// Output implements the MethodDescriptor interface.
 func (w *Method) Output() protoreflect.MessageDescriptor {
 	w.doInit()
 	return w.output
