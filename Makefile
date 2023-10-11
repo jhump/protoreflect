@@ -1,5 +1,5 @@
 .PHONY: ci
-ci: deps checkgofmt errcheck golint vet staticcheck ineffassign test
+ci: deps checkgofmt checkgenerate errcheck golint vet staticcheck ineffassign test
 
 .PHONY: deps
 deps:
@@ -15,9 +15,7 @@ install:
 
 .PHONY: checkgofmt
 checkgofmt:
-	@go install golang.org/x/tools/cmd/goimports@v0.14.0
 	@echo gofmt -s -l .
-	@echo goimports -local github.com/jhump/protoreflect/v2 .
 	@output="$$(gofmt -s -l .)" ; \
 	if [ -n "$$output"  ]; then \
 	    echo "$$output"; \
@@ -57,6 +55,12 @@ test:
 
 .PHONY: generate
 generate:
+	@go install golang.org/x/tools/cmd/goimports@v0.14.0
 	go generate ./...
 	go generate ./internal/testdata
 	goimports -w -local github.com/jhump/protoreflect/v2 .
+
+.PHONY: checkgenerate
+checkgenerate: generate
+	# Make sure generate target doesn't produce a diff
+	 test -z "$$(git status --porcelain | tee /dev/stderr)"
