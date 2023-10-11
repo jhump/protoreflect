@@ -235,10 +235,17 @@ func TestRangeExtensionsByMessage(t *testing.T) {
 	assert.Equal(t, 0, len(exts))
 }
 
-func TestResolverFromPool(t *testing.T) {
+func TestGlobalDescriptors(t *testing.T) {
+	// TODO
+	testResolver(t, protoresolve.GlobalDescriptors)
+}
 
+func TestResolverFromPool(t *testing.T) {
+	// TODO
+	testResolver(t, protoresolve.ResolverFromPool(nil))
 }
 
 func TestResolverFromPools(t *testing.T) {
-
+	// TODO
+	testResolver(t, protoresolve.ResolverFromPools(nil, nil))
 }

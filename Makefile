@@ -1,8 +1,5 @@
-# TODO: run golint, errcheck
 .PHONY: ci
-# TODO: add staticcheck back ASAP; removed temporarily because it
-# complains about a lot of APIs deprecated by protobuf 1.4
-ci: deps checkgofmt errcheck golint vet ineffassign test
+ci: deps checkgofmt errcheck golint vet staticcheck ineffassign test
 
 .PHONY: deps
 deps:
@@ -18,7 +15,9 @@ install:
 
 .PHONY: checkgofmt
 checkgofmt:
+	@go install golang.org/x/tools/cmd/goimports@v0.14.0
 	@echo gofmt -s -l .
+	@echo goimports -local github.com/jhump/protoreflect/v2 .
 	@output="$$(gofmt -s -l .)" ; \
 	if [ -n "$$output"  ]; then \
 	    echo "$$output"; \
@@ -33,7 +32,7 @@ vet:
 
 .PHONY: staticcheck
 staticcheck:
-	@go install honnef.co/go/tools/cmd/staticcheck@v0.0.1-2020.1.4
+	@go install honnef.co/go/tools/cmd/staticcheck@v0.4.6
 	staticcheck ./...
 
 .PHONY: ineffassign

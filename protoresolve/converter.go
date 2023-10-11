@@ -335,12 +335,8 @@ func (dc *DescriptorConverter) DescriptorAsEnum(ed protoreflect.EnumDescriptor) 
 }
 
 func (dc *DescriptorConverter) options(options proto.Message) []*typepb.Option {
-	rv := reflect.ValueOf(options)
-	if rv.Kind() == reflect.Ptr {
-		if rv.IsNil() {
-			return nil
-		}
-		rv = rv.Elem()
+	if rv := reflect.ValueOf(options); rv.Kind() == reflect.Ptr && rv.IsNil() {
+		return nil
 	}
 	var opts []*typepb.Option
 	options.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, val protoreflect.Value) bool {

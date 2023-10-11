@@ -135,7 +135,13 @@ func (eb *EnumBuilder) Children() []Builder {
 }
 
 func (eb *EnumBuilder) findChild(name protoreflect.Name) Builder {
-	return eb.symbols[name]
+	child := eb.symbols[name]
+	if child == nil {
+		// NB: can't just return child because then it would
+		//     be a typed nil, not a nil interface
+		return nil
+	}
+	return child
 }
 
 func (eb *EnumBuilder) removeChild(b Builder) {

@@ -19,17 +19,6 @@ func (p *Printer) printMessageLiteralCompact(msg protoreflect.Message, res *prot
 	return buf.String()
 }
 
-func (p *Printer) printMessageLiteral(
-	msg protoreflect.Message,
-	res *protoregistry.Types,
-	pkg, scope protoreflect.FullName,
-	threshold, indent int,
-) string {
-	var buf bytes.Buffer
-	p.printMessageLiteralToBuffer(&buf, msg, res, pkg, scope, threshold, indent)
-	return buf.String()
-}
-
 var (
 	anyTypeName = (&anypb.Any{}).ProtoReflect().Descriptor().FullName()
 )

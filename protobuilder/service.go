@@ -111,7 +111,13 @@ func (sb *ServiceBuilder) Children() []Builder {
 }
 
 func (sb *ServiceBuilder) findChild(name protoreflect.Name) Builder {
-	return sb.symbols[name]
+	child := sb.symbols[name]
+	if child == nil {
+		// NB: can't just return child because then it would
+		//     be a typed nil, not a nil interface
+		return nil
+	}
+	return child
 }
 
 func (sb *ServiceBuilder) removeChild(b Builder) {

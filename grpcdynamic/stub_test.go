@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
@@ -59,7 +60,7 @@ func TestMain(m *testing.M) {
 	bidiStreamingMd = sd.Methods().ByName("FullDuplexCall")
 
 	// Start up client that talks to the same port
-	cc, err := grpc.Dial(l.Addr().String(), grpc.WithInsecure())
+	cc, err := grpc.Dial(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create client to %s: %s", l.Addr().String(), err.Error()))
 	}

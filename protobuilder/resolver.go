@@ -494,7 +494,6 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts protor
 			_, n = protowire.ConsumeGroup(num, unk)
 		case protowire.EndGroupType:
 			// invalid encoding
-			break
 		case protowire.Fixed32Type:
 			_, n = protowire.ConsumeFixed32(unk)
 		}
