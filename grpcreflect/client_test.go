@@ -48,7 +48,6 @@ func TestMain(m *testing.M) {
 	svr := grpc.NewServer()
 	testprotosgrpc.RegisterDummyServiceServer(svr, testService{})
 	// support both v1 and v1alpha
-	registerV1(svr)
 	reflection.Register(svr)
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -407,7 +406,7 @@ func TestAutoVersion(t *testing.T) {
 	t.Run("v1", func(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
-				registerV1(s)
+				reflection.RegisterV1(s) // this one just uses v1
 				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
 			[]protoreflect.FullName{
@@ -425,7 +424,8 @@ func TestAutoVersion(t *testing.T) {
 	t.Run("v1alpha", func(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
-				reflection.Register(s) // this one just uses v1alpha
+				// this one just uses v1alpha
+				refv1alpha.RegisterServerReflectionServer(s, reflection.NewServer(reflection.ServerOptions{Services: s}))
 				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
 			[]protoreflect.FullName{
@@ -448,8 +448,7 @@ func TestAutoVersion(t *testing.T) {
 	t.Run("both", func(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
-				registerV1(s)
-				reflection.Register(s) // this one just uses v1alpha
+				reflection.Register(s) // this registers both
 				testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 			},
 			[]protoreflect.FullName{
@@ -543,45 +542,4 @@ func (c *captureStreamNames) intercept(srv interface{}, ss grpc.ServerStream, in
 
 func (c *captureStreamNames) handleUnknown(_ interface{}, _ grpc.ServerStream) error {
 	return status.Errorf(codes.Unimplemented, "WTF?")
-}
-
-func registerV1(svr reflection.GRPCServer) {
-	reflection.Register(registrarInterceptor{svr})
-}
-
-type registrarInterceptor struct {
-	svr reflection.GRPCServer
-}
-
-func (r registrarInterceptor) RegisterService(_ *grpc.ServiceDesc, impl interface{}) {
-	r.svr.RegisterService(&refv1.ServerReflection_ServiceDesc, reflectImpl{svr: impl.(refv1alpha.ServerReflectionServer)})
-}
-
-func (r registrarInterceptor) GetServiceInfo() map[string]grpc.ServiceInfo {
-	return r.svr.GetServiceInfo()
-}
-
-type reflectImpl struct {
-	svr refv1alpha.ServerReflectionServer
-	refv1.UnimplementedServerReflectionServer
-}
-
-func (r reflectImpl) ServerReflectionInfo(stream refv1.ServerReflection_ServerReflectionInfoServer) error {
-	return r.svr.ServerReflectionInfo(streamImpl{stream})
-}
-
-type streamImpl struct {
-	refv1.ServerReflection_ServerReflectionInfoServer
-}
-
-func (s streamImpl) Send(response *refv1alpha.ServerReflectionResponse) error {
-	return s.ServerReflection_ServerReflectionInfoServer.Send(toV1Response(response))
-}
-
-func (s streamImpl) Recv() (*refv1alpha.ServerReflectionRequest, error) {
-	resp, err := s.ServerReflection_ServerReflectionInfoServer.Recv()
-	if err != nil {
-		return nil, err
-	}
-	return toV1AlphaRequest(resp), nil
 }
