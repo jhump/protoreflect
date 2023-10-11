@@ -1,11 +1,11 @@
 package grpcreflect
 
 import (
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	testprotosgrpc "github.com/jhump/protoreflect/v2/internal/testdata/grpc"
 )

@@ -59,3 +59,4 @@ test:
 generate:
 	go generate ./...
 	go generate ./internal/testdata
+	goimports -w -local github.com/jhump/protoreflect/v2 .

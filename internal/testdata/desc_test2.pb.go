@@ -7,12 +7,14 @@
 package testdata
 
 import (
-	nopkg "github.com/jhump/protoreflect/v2/internal/testdata/nopkg"
-	pkg "github.com/jhump/protoreflect/v2/internal/testdata/pkg"
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+
+	nopkg "github.com/jhump/protoreflect/v2/internal/testdata/nopkg"
+	pkg "github.com/jhump/protoreflect/v2/internal/testdata/pkg"
 )
 
 const (

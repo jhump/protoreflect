@@ -1,11 +1,12 @@
 package protowrap
 
 import (
-	"github.com/jhump/protoreflect/v2/internal/wrappers"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
+
+	"github.com/jhump/protoreflect/v2/internal/wrappers"
 )
 
 // ProtoFromDescriptor extracts a descriptor proto from the given "rich"

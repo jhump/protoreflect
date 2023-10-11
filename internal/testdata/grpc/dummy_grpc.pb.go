@@ -8,11 +8,13 @@ package grpc
 
 import (
 	context "context"
-	testdata "github.com/jhump/protoreflect/v2/internal/testdata"
-	pkg "github.com/jhump/protoreflect/v2/internal/testdata/pkg"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+
+	testdata "github.com/jhump/protoreflect/v2/internal/testdata"
+	pkg "github.com/jhump/protoreflect/v2/internal/testdata/pkg"
 )
 
 // This is a compile-time assertion to ensure that this generated file

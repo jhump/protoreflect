@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"google.golang.org/protobuf/types/known/apipb"
 	"io"
 	"net/http"
 	"sync"
 
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/apipb"
 	"google.golang.org/protobuf/types/known/typepb"
 )
 

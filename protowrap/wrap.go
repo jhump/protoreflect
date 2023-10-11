@@ -2,10 +2,11 @@ package protowrap
 
 import (
 	"fmt"
-	"github.com/jhump/protoreflect/v2/internal/wrappers"
+
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/types/descriptorpb"
 
+	"github.com/jhump/protoreflect/v2/internal/wrappers"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 

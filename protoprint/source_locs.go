@@ -1,9 +1,9 @@
 package protoprint
 
 import (
-	"github.com/jhump/protoreflect/v2/internal"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
+	"github.com/jhump/protoreflect/v2/internal"
 	"github.com/jhump/protoreflect/v2/sourcelocation"
 )
 
