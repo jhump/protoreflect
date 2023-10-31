@@ -1542,7 +1542,7 @@ desc_test_complex.proto:31:30
 
  > message_type[1] > extension_range:
 desc_test_complex.proto:33:9
-desc_test_complex.proto:33:81
+desc_test_complex.proto:33:91
 
 
  > message_type[1] > extension_range[1]:
@@ -1607,42 +1607,42 @@ desc_test_complex.proto:33:61
 
  > message_type[1] > extension_range[1] > options:
 desc_test_complex.proto:33:62
-desc_test_complex.proto:33:80
+desc_test_complex.proto:33:90
 
 
  > message_type[1] > extension_range[1] > options > (foo.bar.label):
 desc_test_complex.proto:33:63
-desc_test_complex.proto:33:79
+desc_test_complex.proto:33:89
 
 
  > message_type[1] > extension_range[2] > options:
 desc_test_complex.proto:33:62
-desc_test_complex.proto:33:80
+desc_test_complex.proto:33:90
 
 
  > message_type[1] > extension_range[2] > options > (foo.bar.label):
 desc_test_complex.proto:33:63
-desc_test_complex.proto:33:79
+desc_test_complex.proto:33:89
 
 
  > message_type[1] > extension_range[3] > options:
 desc_test_complex.proto:33:62
-desc_test_complex.proto:33:80
+desc_test_complex.proto:33:90
 
 
  > message_type[1] > extension_range[3] > options > (foo.bar.label):
 desc_test_complex.proto:33:63
-desc_test_complex.proto:33:79
+desc_test_complex.proto:33:89
 
 
  > message_type[1] > extension_range[4] > options:
 desc_test_complex.proto:33:62
-desc_test_complex.proto:33:80
+desc_test_complex.proto:33:90
 
 
  > message_type[1] > extension_range[4] > options > (foo.bar.label):
 desc_test_complex.proto:33:63
-desc_test_complex.proto:33:79
+desc_test_complex.proto:33:89
 
 
  > message_type[1] > nested_type[1]:
@@ -5426,17 +5426,17 @@ desc_test_complex.proto:275:99
 
  > message_type[9] > field[0] > options > (foo.bar.string):
 desc_test_complex.proto:276:17
-desc_test_complex.proto:276:36
+desc_test_complex.proto:276:78
 
 
  > message_type[9] > field[0] > options > (foo.bar.bytes):
-desc_test_complex.proto:276:38
-desc_test_complex.proto:276:55
+desc_test_complex.proto:276:80
+desc_test_complex.proto:276:139
 
 
  > message_type[9] > field[0] > options > (foo.bar.bool):
-desc_test_complex.proto:276:57
-desc_test_complex.proto:276:70
+desc_test_complex.proto:276:141
+desc_test_complex.proto:276:154
 
 
  > message_type[9] > field[0] > options > (foo.bar.float):
