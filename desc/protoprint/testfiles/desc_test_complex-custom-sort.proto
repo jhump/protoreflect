@@ -145,7 +145,7 @@ message Validator {
 }
 
 message Test {
-  extensions 20000 to max, 500 to 550, 300 to 350, 249 [(label) = "jazz \hands\"];
+  extensions 20000 to max, 500 to 550, 300 to 350, 249 [(label) = "jazz \"hands\""];
 
   extensions 100 to 200;
 
@@ -385,7 +385,7 @@ message KeywordCollisionOptions {
     (true) = 111,
     (to) = true,
     (syntax) = true,
-    (string) = "string蝥\U00107F6D\007\010\014\n\r\t\013\\\'?B",
+    (string) = "string蝥\U00107F6D\007\010\014\n\r\t\013\\\"'?B",
     (sint64) = -64,
     (sint32) = -32,
     (sfixed64) = -6464,
@@ -412,7 +412,7 @@ message KeywordCollisionOptions {
     (enum) = true,
     (double) = 3.141590,
     (default) = 222,
-    (bytes) = "bytes\350\235\245\364\207\275\255\007\010\014\n\r\t\013\\\'?B",
+    (bytes) = "bytes\350\235\245\364\207\275\255\007\010\014\n\r\t\013\\\"'?B",
     (bool) = true
   ];
 }

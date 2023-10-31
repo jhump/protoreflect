@@ -19,7 +19,7 @@ message Test {
   map<string, int32> m = 5;
   optional bytes b = 6 [default = "\000\001\002\003\004\005\006\007fubar!"];
   extensions 100 to 200;
-  extensions 249, 300 to 350, 500 to 550, 20000 to max [(label) = "jazz \hands\"];
+  extensions 249, 300 to 350, 500 to 550, 20000 to max [(label) = "jazz \"hands\""];
   message Nested {
     extend google.protobuf.MessageOptions {
       optional int32 fooblez = 20003;
@@ -248,8 +248,8 @@ message KeywordCollisionOptions {
     (public) = true,
     (weak) = true,
     (package) = true,
-    (string) = "string蝥\U00107F6D\007\010\014\n\r\t\013\\\'?B",
-    (bytes) = "bytes\350\235\245\364\207\275\255\007\010\014\n\r\t\013\\\'?B",
+    (string) = "string蝥\U00107F6D\007\010\014\n\r\t\013\\\"'?B",
+    (bytes) = "bytes\350\235\245\364\207\275\255\007\010\014\n\r\t\013\\\"'?B",
     (bool) = true,
     (float) = 3.140000,
     (double) = 3.141590,
