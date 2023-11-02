@@ -2137,10 +2137,19 @@ func (a elementAddrs) Less(i, j int) bool {
 		return vi.GetNumber() < vj.GetNumber()
 
 	case *desc.EnumValueDescriptor:
-		// enum values ordered by number then name
+		// enum values ordered by number then name,
+		// but first velue must be 0 in proto3
 		vj := dj.(*desc.EnumValueDescriptor)
 		if vi.GetNumber() == vj.GetNumber() {
 			return vi.GetName() < vj.GetName()
+		}
+		if vi.GetFile().IsProto3() {
+			if vi.GetNumber() == 0 {
+				return true
+			}
+			if vj.GetNumber() == 0 {
+				return false
+			}
 		}
 		return vi.GetNumber() < vj.GetNumber()
 
