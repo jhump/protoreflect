@@ -2138,7 +2138,7 @@ func (a elementAddrs) Less(i, j int) bool {
 
 	case *desc.EnumValueDescriptor:
 		// enum values ordered by number then name,
-		// but first velue must be 0 in proto3
+		// but first value number must be 0 in proto3
 		vj := dj.(*desc.EnumValueDescriptor)
 		if vi.GetNumber() == vj.GetNumber() {
 			return vi.GetName() < vj.GetName()
