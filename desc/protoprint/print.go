@@ -2144,11 +2144,11 @@ func (a elementAddrs) Less(i, j int) bool {
 			return vi.GetName() < vj.GetName()
 		}
 		if vi.GetFile().IsProto3() {
-			if vi.GetNumber() == 0 {
-				return true
-			}
 			if vj.GetNumber() == 0 {
 				return false
+			}
+			if vi.GetNumber() == 0 {
+				return true
 			}
 		}
 		return vi.GetNumber() < vj.GetNumber()
