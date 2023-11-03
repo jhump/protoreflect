@@ -11,9 +11,9 @@ message Options {
 }
 
 message SomeMessage {
-  option (.pkg.my_some_option) = some_option_value : true;
+  option (.pkg.my_some_option) = { some_option_value : true };
 }
 
 extend google.protobuf.MessageOptions {
-  optional double my_some_option = 11964;
+  optional Options my_some_option = 11964;
 }
