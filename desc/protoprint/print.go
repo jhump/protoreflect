@@ -777,6 +777,13 @@ func (p *Printer) typeString(fld *desc.FieldDescriptor, scope string) string {
 	if fld.IsMap() {
 		return fmt.Sprintf("map<%s, %s>", p.typeString(fld.GetMapKeyType(), scope), p.typeString(fld.GetMapValueType(), scope))
 	}
+	fldProto := fld.AsFieldDescriptorProto()
+	if fldProto.Type == nil && fldProto.TypeName != nil {
+		// In an unlinked proto, the type may be absent because it is not known
+		// whether the symbol is a message or an enum. In that case, just return
+		// the type name.
+		return fldProto.GetTypeName()
+	}
 	switch fld.GetType() {
 	case descriptorpb.FieldDescriptorProto_TYPE_INT32:
 		return "int32"
@@ -1976,7 +1983,7 @@ func uninterpretedToOptions(uninterp []*descriptorpb.UninterpretedOption) []opti
 		case unint.NegativeIntValue != nil:
 			v = unint.GetNegativeIntValue()
 		case unint.AggregateValue != nil:
-			v = ident(unint.GetAggregateValue())
+			v = ident("{ " + unint.GetAggregateValue() + " }")
 		}
 
 		opts[i] = option{name: buf.String(), val: v}
