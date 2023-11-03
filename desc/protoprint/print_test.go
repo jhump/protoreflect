@@ -185,7 +185,46 @@ service TestService {
 	fds, err := pa.ParseFiles("test.proto")
 	testutil.Ok(t, err)
 
+	// Sanity check that this resulted in unrecognized options
+	unk := fds[0].FindSymbol("TestService.Get").(*desc.MethodDescriptor).GetMethodOptions().ProtoReflect().GetUnknown()
+	testutil.Require(t, len(unk) > 0)
+
 	checkFile(t, &Printer{}, fds[0], "test-unrecognized-options.proto")
+}
+
+func TestPrintUninterpretedOptions(t *testing.T) {
+	files := map[string]string{"test.proto": `
+syntax = "proto2";
+package pkg;
+option go_package = "some.pkg";
+import "google/protobuf/descriptor.proto";
+message Options {
+    optional bool some_option_value = 1;
+}
+extend google.protobuf.MessageOptions {
+    optional Options my_some_option = 11964;
+}
+message SomeMessage {
+    option (.pkg.my_some_option) = {some_option_value : true};
+}
+`}
+
+	pa := &protoparse.Parser{
+		Accessor: protoparse.FileContentsFromMap(files),
+	}
+	fds, err := pa.ParseFilesButDoNotLink("test.proto")
+	testutil.Ok(t, err)
+
+	// Sanity check that this resulted in uninterpreted options
+	unint := fds[0].MessageType[1].Options.UninterpretedOption
+	testutil.Require(t, len(unint) > 0)
+
+	descFd, err := desc.WrapFile((*descriptorpb.FileDescriptorProto)(nil).ProtoReflect().Descriptor().ParentFile())
+	testutil.Ok(t, err)
+	fd, err := desc.CreateFileDescriptor(fds[0], descFd)
+	testutil.Ok(t, err)
+
+	checkFile(t, &Printer{}, fd, "test-uninterpreted-options.proto")
 }
 
 func TestPrintNonFileDescriptors(t *testing.T) {
