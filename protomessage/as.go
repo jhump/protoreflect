@@ -1,4 +1,4 @@
-package protoresolve
+package protomessage
 
 import (
 	"fmt"
@@ -6,6 +6,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
+
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 // PointerMessage is a pointer type that implements [proto.Message].
@@ -34,7 +36,7 @@ func As[M PointerMessage[T], T any](msg proto.Message) (M, error) {
 			if exts == nil {
 				exts = &protoregistry.Types{}
 			}
-			err = exts.RegisterExtension(ExtensionType(fd))
+			err = exts.RegisterExtension(protoresolve.ExtensionType(fd))
 			return err == nil
 		}
 		return true

@@ -1,4 +1,4 @@
-package protoresolve
+package protomessage
 
 import (
 	"testing"
