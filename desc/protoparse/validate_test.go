@@ -107,11 +107,11 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `message Foo { option map_entry = true; }`,
-			errMsg:   `test.proto:1:34: message Foo: map_entry option should not be set explicitly; use map type instead`,
+			errMsg:   `test.proto:1:22: message Foo: map_entry option should not be set explicitly; use map type instead`,
 		},
 		{
 			contents: `message Foo { option map_entry = false; }`,
-			succeeds: true, // okay if explicit setting is false
+			errMsg:   `test.proto:1:22: message Foo: map_entry option should not be set explicitly; use map type instead`,
 		},
 		{
 			contents: `syntax = "proto2"; message Foo { string s = 1; }`,
@@ -131,15 +131,15 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { required string s = 1; }`,
-			errMsg:   `test.proto:1:34: field Foo.s: label 'required' is not allowed in proto3`,
+			errMsg:   `test.proto:1:34: field Foo.s: label 'required' is not allowed in proto3 or editions`,
 		},
 		{
 			contents: `message Foo { extensions 1 to max; } extend Foo { required string sss = 100; }`,
-			errMsg:   `test.proto:1:51: field sss: extension fields cannot be 'required'`,
+			errMsg:   `test.proto:1:51: extension sss: extension fields cannot be 'required'`,
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { optional group Grp = 1 { } }`,
-			errMsg:   `test.proto:1:43: field Foo.grp: groups are not allowed in proto3`,
+			errMsg:   `test.proto:1:43: field Foo.grp: groups are not allowed in proto3 or editions`,
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { extensions 1 to max; }`,
@@ -247,11 +247,11 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `message Foo { reserved "foo", "foo"; }`,
-			errMsg:   `test.proto:1:31: name "foo" is reserved multiple times`,
+			errMsg:   `test.proto:1:31: name "foo" is already reserved at test.proto:1:24`,
 		},
 		{
 			contents: `message Foo { reserved "foo"; reserved "foo"; }`,
-			errMsg:   `test.proto:1:40: name "foo" is reserved multiple times`,
+			errMsg:   `test.proto:1:40: name "foo" is already reserved at test.proto:1:24`,
 		},
 		{
 			contents: `message Foo { reserved "foo"; optional string foo = 1; }`,
@@ -279,7 +279,7 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `enum Foo { reserved = 1; }`,
-			errMsg:   `test.proto:1:21: syntax error: unexpected '=', expecting string literal or int literal or '-'`,
+			errMsg:   `test.proto:1:21: syntax error: unexpected '='`,
 		},
 		{
 			contents: `syntax = "proto3"; enum message { unset = 0; } message Foo { message bar = 1; }`,
@@ -291,7 +291,7 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `syntax = "proto3"; enum reserved { unset = 0; } message Foo { reserved bar = 1; }`,
-			errMsg:   `test.proto:1:72: syntax error: unexpected identifier, expecting string literal or int literal`,
+			errMsg:   `test.proto:1:76: expected ';'`,
 		},
 		{
 			contents: `syntax = "proto3"; enum extend { unset = 0; } message Foo { extend bar = 1; }`,
