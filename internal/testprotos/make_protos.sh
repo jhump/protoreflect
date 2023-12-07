@@ -4,7 +4,8 @@ set -e
 
 cd $(dirname $0)
 
-PROTOC_VERSION="22.0"
+PROTOC_VERSION="25.0-rc1"
+PROTOC_ARTIFACT_VERSION="25.0-rc-1"
 PROTOC_OS="$(uname -s)"
 PROTOC_ARCH="$(uname -m)"
 case "${PROTOC_OS}" in
@@ -23,10 +24,10 @@ fi
 
 PROTOC="${PWD}/protoc/bin/protoc"
 
-if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc 3.${PROTOC_VERSION}" ]]; then
+if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc ${PROTOC_VERSION}" ]]; then
   rm -rf ./protoc
   mkdir -p protoc
-  curl -L "https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${PROTOC_OS}-${PROTOC_ARCH}.zip" > protoc/protoc.zip
+  curl -L "https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_ARTIFACT_VERSION}-${PROTOC_OS}-${PROTOC_ARCH}.zip" > protoc/protoc.zip
   cd ./protoc && unzip protoc.zip && cd ..
 fi
 

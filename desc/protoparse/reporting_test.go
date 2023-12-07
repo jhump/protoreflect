@@ -57,7 +57,7 @@ func TestErrorReporting(t *testing.T) {
 					`,
 			},
 			expectedErrs: []string{
-				"test.proto:5:41: syntax error: unexpected \"enum\", expecting ';' or '.'",
+				"test.proto:5:41: expected ';'",
 				"test.proto:5:69: syntax error: unexpected ';', expecting '='",
 				"test.proto:7:53: syntax error: unexpected '='",
 			},
@@ -132,14 +132,14 @@ func TestErrorReporting(t *testing.T) {
 					`,
 			},
 			expectedErrs: []string{
-				"test2.proto:7:49: syntax error: unexpected identifier, expecting \"option\" or \"rpc\" or ';' or '}'",
+				"test2.proto:7:49: syntax error: unexpected identifier, expecting \"option\" or \"rpc\" or '}'",
 				"test1.proto:5:62: syntax error: unexpected '-', expecting int literal",
 				"test1.proto:8:62: syntax error: unexpected ';', expecting \"returns\"",
 			},
 			expectedErrsAlt: []string{
 				"test1.proto:5:62: syntax error: unexpected '-', expecting int literal",
 				"test1.proto:8:62: syntax error: unexpected ';', expecting \"returns\"",
-				"test2.proto:7:49: syntax error: unexpected identifier, expecting \"option\" or \"rpc\" or ';' or '}'",
+				"test2.proto:7:49: syntax error: unexpected identifier, expecting \"option\" or \"rpc\" or '}'",
 			},
 		},
 		{
