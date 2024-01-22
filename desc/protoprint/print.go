@@ -319,7 +319,7 @@ func (p *Printer) printProto(dsc desc.Descriptor, out io.Writer) error {
 	extendOptionLocations(sourceInfo, fdp.GetSourceCodeInfo().GetLocation())
 
 	var reg protoregistry.Types
-	internal.RegisterTypesForFile(&reg, dsc.GetFile().UnwrapFile())
+	internal.RegisterTypesVisibleToFile(&reg, dsc.GetFile().UnwrapFile())
 	reparseUnknown(&reg, fdp.ProtoReflect())
 
 	path := findElement(dsc)

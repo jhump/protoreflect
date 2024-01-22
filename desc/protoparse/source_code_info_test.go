@@ -37,9 +37,9 @@ func TestSourceCodeInfo(t *testing.T) {
 	// (human readable so diffs in source control are comprehensible)
 	var buf bytes.Buffer
 	for _, fd := range fds {
-		printSourceCodeInfo(t, fd, &buf)
+		printSourceCodeInfo(fd, &buf)
 	}
-	printSourceCodeInfo(t, importedFd, &buf)
+	printSourceCodeInfo(importedFd, &buf)
 	actual := buf.String()
 
 	if regenerateMode {
@@ -58,11 +58,11 @@ func TestSourceCodeInfo(t *testing.T) {
 // NB: this function can be used to manually inspect the source code info for a
 // descriptor, in a manner that is much easier to read and check than raw
 // descriptor form.
-func printSourceCodeInfo(t *testing.T, fd *desc.FileDescriptor, out io.Writer) {
+func printSourceCodeInfo(fd *desc.FileDescriptor, out io.Writer) {
 	_, _ = fmt.Fprintf(out, "---- %s ----\n", fd.GetName())
 	msg := fd.AsFileDescriptorProto().ProtoReflect()
 	var reg protoregistry.Types
-	internal.RegisterExtensionsForFile(&reg, fd.UnwrapFile())
+	internal.RegisterExtensionsVisibleToFile(&reg, fd.UnwrapFile())
 
 	for _, loc := range fd.AsFileDescriptorProto().GetSourceCodeInfo().GetLocation() {
 		var buf bytes.Buffer
