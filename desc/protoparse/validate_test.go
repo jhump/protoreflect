@@ -291,7 +291,7 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `syntax = "proto3"; enum reserved { unset = 0; } message Foo { reserved bar = 1; }`,
-			errMsg:   `test.proto:1:76: expected ';'`,
+			errMsg:   `test.proto:1:76: syntax error: expecting ';'`,
 		},
 		{
 			contents: `syntax = "proto3"; enum extend { unset = 0; } message Foo { extend bar = 1; }`,
