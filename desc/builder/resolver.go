@@ -33,7 +33,7 @@ func (d *dependencies) add(fd *desc.FileDescriptor) {
 		return
 	}
 	d.descs[fd] = struct{}{}
-	internal.RegisterExtensionsForFile(&d.res, fd.UnwrapFile())
+	internal.RegisterExtensionsFromImportedFile(&d.res, fd.UnwrapFile())
 }
 
 // dependencyResolver is the work-horse for converting a tree of builders into a
@@ -150,7 +150,6 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 	fileNames := map[string]struct{}{}
 	for _, d := range depSlice {
 		addFileNames(d, fileNames)
-		fileNames[d.GetName()] = struct{}{}
 	}
 	unique := makeUnique(fp.GetName(), fileNames)
 	if unique != fp.GetName() {
@@ -481,7 +480,7 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts *dynam
 			continue
 		}
 		// see if configured extension registry knows about it
-		if extd := r.opts.Extensions.FindExtension(string(msgName), int32(tag)); extd != nil {
+		if extd := r.opts.Extensions.FindExtension(msgName, tag); extd != nil {
 			// extension registry recognized it!
 			deps.add(extd.GetFile())
 			continue
