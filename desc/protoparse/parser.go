@@ -241,6 +241,7 @@ func (r noCloneParseResult) Clone() parser.Result {
 // ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*descriptorpb.FileDescriptorProto, error) {
 	rep := newReporter(p.ErrorReporter, p.WarningReporter)
+	p.ImportPaths = nil // not used for this "do not link" operation.
 	res, _ := p.getResolver(filenames)
 	results, err := parseToProtos(res, filenames, reporter.NewHandler(rep), p.ValidateUnlinkedFiles)
 	if err != nil {

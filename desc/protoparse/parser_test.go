@@ -525,3 +525,22 @@ func TestParseInferImportPaths_FixesNestedPaths(t *testing.T) {
 		})
 	}
 }
+
+func TestParseFilesButDoNotLink_DoesNotUseImportPaths(t *testing.T) {
+	tempdir, err := os.MkdirTemp("", "protoparse")
+	testutil.Ok(t, err)
+	defer func() {
+		_ = os.RemoveAll(tempdir)
+	}()
+	err = os.WriteFile(filepath.Join(tempdir, "extra.proto"), []byte("package extra;"), 0644)
+	testutil.Ok(t, err)
+	mainPath := filepath.Join(tempdir, "main.proto")
+	err = os.WriteFile(mainPath, []byte("package main; import \"extra.proto\";"), 0644)
+	testutil.Ok(t, err)
+	p := Parser{
+		ImportPaths: []string{tempdir},
+	}
+	fds, err := p.ParseFilesButDoNotLink(mainPath)
+	testutil.Ok(t, err)
+	testutil.Eq(t, 1, len(fds))
+}
