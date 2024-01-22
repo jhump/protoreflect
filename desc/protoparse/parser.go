@@ -556,16 +556,9 @@ func (p Parser) getResolver(filenames []string) (protocompile.Resolver, *ast2.So
 		}))
 	}
 	backupResolver := protocompile.WithStandardImports(importResolver)
-	mustBeSource := make(map[string]struct{}, len(filenames))
-	for _, name := range filenames {
-		mustBeSource[name] = struct{}{}
-	}
 	return protocompile.CompositeResolver{
 		sourceResolver,
 		protocompile.ResolverFunc(func(path string) (protocompile.SearchResult, error) {
-			if _, ok := mustBeSource[path]; ok {
-				return protocompile.SearchResult{}, os.ErrNotExist
-			}
 			return backupResolver.FindFileByPath(path)
 		}),
 	}, &srcSpan
