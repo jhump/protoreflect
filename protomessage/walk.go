@@ -1,6 +1,10 @@
 package protomessage
 
-import "google.golang.org/protobuf/reflect/protoreflect"
+import (
+	"google.golang.org/protobuf/reflect/protoreflect"
+
+	"github.com/jhump/protoreflect/v2/internal"
+)
 
 // Walk traverses the given root messages, iterating through its fields and
 // through all values in maps and lists, calling the given action for all
@@ -22,15 +26,7 @@ func walk(root protoreflect.Message, path []any, action func(path []any, val pro
 	root.Range(func(field protoreflect.FieldDescriptor, val protoreflect.Value) bool {
 		path = append(path, field.Number())
 		switch {
-		case field.IsMap() && isMessageKind(field.MapValue().Kind()):
-			mapVal := val.Map()
-			mapVal.Range(func(key protoreflect.MapKey, val protoreflect.Value) bool {
-				path = append(path, key, protoreflect.FieldNumber(2) /* field 2 is the value in an entry */)
-				ok = walk(val.Message(), path, action)
-				path = path[:len(path)-2]
-				return ok
-			})
-		case field.IsList() && isMessageKind(field.Kind()):
+		case field.IsList() && internal.IsMessageKind(field.Kind()):
 			listVal := val.List()
 			for i, length := 0, listVal.Len(); i < length; i++ {
 				path = append(path, i)
@@ -40,15 +36,19 @@ func walk(root protoreflect.Message, path []any, action func(path []any, val pro
 					break
 				}
 			}
-		case isMessageKind(field.Kind()):
+		case field.IsMap() && internal.IsMessageKind(field.MapValue().Kind()):
+			mapVal := val.Map()
+			mapVal.Range(func(key protoreflect.MapKey, val protoreflect.Value) bool {
+				path = append(path, key, protoreflect.FieldNumber(2) /* field 2 is the value in an entry */)
+				ok = walk(val.Message(), path, action)
+				path = path[:len(path)-2]
+				return ok
+			})
+		case !field.IsMap() && internal.IsMessageKind(field.Kind()):
 			ok = walk(val.Message(), path, action)
 		}
 		path = path[:len(path)-1] // pop field number
 		return ok
 	})
 	return ok
-}
-
-func isMessageKind(k protoreflect.Kind) bool {
-	return k == protoreflect.MessageKind || k == protoreflect.GroupKind
 }

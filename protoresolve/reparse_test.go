@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 
+	"github.com/jhump/protoreflect/v2/internal"
 	"github.com/jhump/protoreflect/v2/internal/testdata"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
@@ -51,7 +52,7 @@ func hasUnrecognized(msg protoreflect.Message) bool {
 	var foundUnrecognized bool
 	msg.Range(func(fd protoreflect.FieldDescriptor, val protoreflect.Value) bool {
 		switch {
-		case fd.IsList() && isMessageKind(fd.Kind()):
+		case fd.IsList() && internal.IsMessageKind(fd.Kind()):
 			l := val.List()
 			for i, length := 0, l.Len(); i < length; i++ {
 				if hasUnrecognized(l.Get(i).Message()) {
@@ -59,7 +60,7 @@ func hasUnrecognized(msg protoreflect.Message) bool {
 					return false
 				}
 			}
-		case fd.IsMap() && isMessageKind(fd.MapValue().Kind()):
+		case fd.IsMap() && internal.IsMessageKind(fd.MapValue().Kind()):
 			val.Map().Range(func(_ protoreflect.MapKey, val protoreflect.Value) bool {
 				if hasUnrecognized(val.Message()) {
 					foundUnrecognized = true
@@ -70,7 +71,7 @@ func hasUnrecognized(msg protoreflect.Message) bool {
 			if foundUnrecognized {
 				return false
 			}
-		case !fd.IsMap() && isMessageKind(fd.Kind()):
+		case !fd.IsMap() && internal.IsMessageKind(fd.Kind()):
 			if hasUnrecognized(val.Message()) {
 				foundUnrecognized = true
 				return false
@@ -79,8 +80,4 @@ func hasUnrecognized(msg protoreflect.Message) bool {
 		return true
 	})
 	return foundUnrecognized
-}
-
-func isMessageKind(k protoreflect.Kind) bool {
-	return k == protoreflect.MessageKind || k == protoreflect.GroupKind
 }

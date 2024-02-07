@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/types/known/typepb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
+	"github.com/jhump/protoreflect/v2/internal"
 	"github.com/jhump/protoreflect/v2/internal/wrappers"
 )
 
@@ -1349,14 +1350,13 @@ func base(name string) string {
 }
 
 func newMessageValueForField(msg protoreflect.Message, field protoreflect.FieldDescriptor) protoreflect.Message {
-	isMessageKind := field.Kind() == protoreflect.MessageKind || field.Kind() == protoreflect.GroupKind
 	switch {
-	case field.IsList() && isMessageKind:
+	case field.IsList() && internal.IsMessageKind(field.Kind()):
 		return msg.NewField(field).List().NewElement().Message()
 	case field.IsMap():
 		// For maps, create a dynamic message representing the map entry
 		return dynamicpb.NewMessage(field.Message())
-	case isMessageKind:
+	case internal.IsMessageKind(field.Kind()):
 		return msg.NewField(field).Message()
 	default:
 		switch field.Kind() {

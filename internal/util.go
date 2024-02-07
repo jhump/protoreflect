@@ -271,3 +271,9 @@ func PathKey(path protoreflect.SourcePath) string {
 	}
 	return string(b)
 }
+
+// IsMessageKind returns true if the given kind indicates a message type. Both
+// messages and groups are message types.
+func IsMessageKind(k protoreflect.Kind) bool {
+	return k == protoreflect.MessageKind || k == protoreflect.GroupKind
+}

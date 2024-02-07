@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
-	"github.com/jhump/protoreflect/v2/protoresolve"
+	"github.com/jhump/protoreflect/v2/protomessage"
 )
 
 // EnumRange is a range of enum numbers. The first element is the start
@@ -69,7 +69,7 @@ func FromEnum(ed protoreflect.EnumDescriptor) (*EnumBuilder, error) {
 func fromEnum(ed protoreflect.EnumDescriptor, localEnums map[protoreflect.EnumDescriptor]*EnumBuilder) (*EnumBuilder, error) {
 	eb := NewEnum(ed.Name())
 	var err error
-	eb.Options, err = protoresolve.As[*descriptorpb.EnumOptions](ed.Options())
+	eb.Options, err = protomessage.As[*descriptorpb.EnumOptions](ed.Options())
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +389,7 @@ func FromEnumValue(evd protoreflect.EnumValueDescriptor) (*EnumValueBuilder, err
 func fromEnumValue(evd protoreflect.EnumValueDescriptor) (*EnumValueBuilder, error) {
 	evb := NewEnumValue(evd.Name())
 	var err error
-	evb.Options, err = protoresolve.As[*descriptorpb.EnumValueOptions](evd.Options())
+	evb.Options, err = protomessage.As[*descriptorpb.EnumValueOptions](evd.Options())
 	if err != nil {
 		return nil, err
 	}

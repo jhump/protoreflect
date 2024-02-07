@@ -3,6 +3,8 @@ package protoresolve
 import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+
+	"github.com/jhump/protoreflect/v2/internal"
 )
 
 // ReparseUnrecognized is a helper function for re-parsing unknown fields of a message,
@@ -20,7 +22,7 @@ func ReparseUnrecognized(msg proto.Message, resolver SerializationResolver) {
 
 func reparseUnrecognized(msg protoreflect.Message, resolver SerializationResolver) {
 	msg.Range(func(fld protoreflect.FieldDescriptor, val protoreflect.Value) bool {
-		if fld.Kind() != protoreflect.MessageKind && fld.Kind() != protoreflect.GroupKind {
+		if !internal.IsMessageKind(fld.Kind()) {
 			return true
 		}
 		if fld.IsList() {
@@ -30,7 +32,7 @@ func reparseUnrecognized(msg protoreflect.Message, resolver SerializationResolve
 			}
 		} else if fld.IsMap() {
 			mapVal := fld.MapValue()
-			if mapVal.Kind() != protoreflect.MessageKind && mapVal.Kind() != protoreflect.GroupKind {
+			if !internal.IsMessageKind(mapVal.Kind()) {
 				return true
 			}
 			m := val.Map()

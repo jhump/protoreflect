@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/protomessage"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 	"github.com/jhump/protoreflect/v2/sourcelocation"
 )
@@ -893,7 +894,7 @@ func (p *Printer) printMessageBody(
 }
 
 func isMessageSet(msg protoreflect.MessageDescriptor) bool {
-	opts, _ := protoresolve.As[*descriptorpb.MessageOptions](msg.Options())
+	opts, _ := protomessage.As[*descriptorpb.MessageOptions](msg.Options())
 	return opts.GetMessageSetWireFormat()
 }
 
