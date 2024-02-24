@@ -30,7 +30,7 @@ message Test {
 
 	extensions 100 to 200;
 
-	extensions 249, 300 to 350, 500 to 550, 20000 to max [(label) = "jazz"];
+	extensions 249, 300 to 350, 500 to 550, 20000 to max [(label) = "jazz \"hands\""];
 
 	message Nested {
 		extend google.protobuf.MessageOptions {
@@ -273,7 +273,7 @@ extend google.protobuf.FieldOptions {
 message KeywordCollisionOptions {
 	optional uint64 id = 1 [
 		(syntax) = true, (import) = true, (public) = true, (weak) = true, (package) = true,
-		(string) = "string", (bytes) = "bytes", (bool) = true,
+		(string) = "string\u8765\U00107f6d\a\b\f\n\r\t\v\\\"\'\?\x42", (bytes) = "bytes\u8765\U00107f6d\a\b\f\n\r\t\v\\\"\'\?\x42", (bool) = true,
 		(float) = 3.14, (double) = 3.14159,
 		(int32) = 32, (int64) = 64, (uint32) = 3200, (uint64) = 6400, (sint32) = -32, (sint64) = -64,
 		(fixed32) = 3232, (fixed64) = 6464, (sfixed32) = -3232, (sfixed64) = -6464,

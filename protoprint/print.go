@@ -3,6 +3,7 @@ package protoprint
 import (
 	"bytes"
 	"fmt"
+	"github.com/jhump/protoreflect/v2/protowrap"
 	"io"
 	"math"
 	"os"
@@ -692,6 +693,13 @@ func (p *Printer) qualifyElementName(pkg, scope, fqn protoreflect.FullName, requ
 func (p *Printer) typeString(fld protoreflect.FieldDescriptor, scope protoreflect.FullName) string {
 	if fld.IsMap() {
 		return fmt.Sprintf("map<%s, %s>", p.typeString(fld.MapKey(), scope), p.typeString(fld.MapValue(), scope))
+	}
+	fldProto := protowrap.ProtoFromFieldDescriptor(fld)
+	if fldProto.Type == nil && fldProto.TypeName != nil {
+		// In an unlinked proto, the type may be absent because it is not known
+		// whether the symbol is a message or an enum. In that case, just return
+		// the type name.
+		return fldProto.GetTypeName()
 	}
 	switch fld.Kind() {
 	case protoreflect.EnumKind:
@@ -2033,7 +2041,7 @@ func uninterpretedToOptions(uninterp []*descriptorpb.UninterpretedOption) []opti
 		case unint.NegativeIntValue != nil:
 			v = unint.GetNegativeIntValue()
 		case unint.AggregateValue != nil:
-			v = ident(unint.GetAggregateValue())
+			v = ident("{ " + unint.GetAggregateValue() + " }")
 		}
 
 		opts[i] = option{name: buf.String(), val: v}
@@ -2072,7 +2080,7 @@ func quotedBytes(s string) string {
 		case '\t':
 			b.WriteString("\\t")
 		case '"':
-			b.WriteString("\\")
+			b.WriteString("\\\"")
 		case '\\':
 			b.WriteString("\\\\")
 		default:
@@ -2118,7 +2126,7 @@ func quotedString(s string) string {
 		case '\t':
 			b.WriteString("\\t")
 		case '"':
-			b.WriteString("\\")
+			b.WriteString("\\\"")
 		case '\\':
 			b.WriteString("\\\\")
 		default:
@@ -2162,20 +2170,22 @@ func (a elementAddrs) Len() int {
 
 func (a elementAddrs) Less(i, j int) bool {
 	// explicit order is considered first
-	if a.addrs[i].order < a.addrs[j].order {
+	addri := a.addrs[i]
+	addrj := a.addrs[j]
+	if addri.order < addrj.order {
 		return true
-	} else if a.addrs[i].order > a.addrs[j].order {
+	} else if addri.order > addrj.order {
 		return false
 	}
 	// if order is equal, sort by element type
-	if a.addrs[i].elementType < a.addrs[j].elementType {
+	if addri.elementType < addrj.elementType {
 		return true
-	} else if a.addrs[i].elementType > a.addrs[j].elementType {
+	} else if addri.elementType > addrj.elementType {
 		return false
 	}
 
-	di := a.at(a.addrs[i])
-	dj := a.at(a.addrs[j])
+	di := a.at(addri)
+	dj := a.at(addrj)
 
 	switch vi := di.(type) {
 	case protoreflect.FieldDescriptor:
@@ -2194,10 +2204,19 @@ func (a elementAddrs) Less(i, j int) bool {
 		return vi.Number() < vj.Number()
 
 	case protoreflect.EnumValueDescriptor:
-		// enum values ordered by number then name
+		// enum values ordered by number then name,
+		// but first value number must be 0 in proto3
 		vj := dj.(protoreflect.EnumValueDescriptor)
 		if vi.Number() == vj.Number() {
 			return vi.Name() < vj.Name()
+		}
+		if vi.ParentFile().Syntax() == protoreflect.Proto3 {
+			if vi.Number() == 0 {
+				return true
+			}
+			if vj.Number() == 0 {
+				return false
+			}
 		}
 		return vi.Number() < vj.Number()
 
@@ -2458,8 +2477,30 @@ type customSortOrder struct {
 }
 
 func (cso customSortOrder) Less(i, j int) bool {
-	ei := asElement(cso.at(cso.addrs[i]))
-	ej := asElement(cso.at(cso.addrs[j]))
+	// Regardless of the custom sort order, for proto3 files,
+	// the enum value zero MUST be first. So we override the
+	// custom sort order to make sure the file will be valid
+	// and can compile.
+	addri := cso.addrs[i]
+	addrj := cso.addrs[j]
+	di := cso.at(addri)
+	dj := cso.at(addrj)
+	if addri.elementType == addrj.elementType {
+		if vi, ok := di.(protoreflect.EnumValueDescriptor); ok {
+			vj := dj.(protoreflect.EnumValueDescriptor)
+			if vi.ParentFile().Syntax() == protoreflect.Proto3 {
+				if vi.Number() == 0 {
+					return true
+				}
+				if vj.Number() == 0 {
+					return false
+				}
+			}
+		}
+	}
+
+	ei := asElement(di)
+	ej := asElement(dj)
 	return cso.less(ei, ej)
 }
 

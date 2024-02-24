@@ -47,6 +47,7 @@ ${PROTOC} --descriptor_set_out=./desc_test1.protoset --include_source_info --inc
 ${PROTOC} --descriptor_set_out=./desc_test_comments.protoset --include_source_info --include_imports -I. desc_test_comments.proto
 ${PROTOC} --descriptor_set_out=./desc_test_complex.protoset -I. desc_test_complex.proto
 ${PROTOC} --descriptor_set_out=./desc_test_complex_source_info.protoset --include_source_info --include_imports -I. desc_test_complex.proto
+${PROTOC} --descriptor_set_out=./desc_test_proto3.protoset --include_source_info --include_imports -I. desc_test_proto3.proto
 ${PROTOC} --descriptor_set_out=./descriptor.protoset --include_source_info --include_imports -I./protoc/include/ google/protobuf/descriptor.proto
 ${PROTOC} --descriptor_set_out=./duration.protoset -I./protoc/include/ google/protobuf/duration.proto
 ${PROTOC} --descriptor_set_out=./proto3_optional/desc_test_proto3_optional.protoset --include_source_info --include_imports -I. proto3_optional/desc_test_proto3_optional.proto

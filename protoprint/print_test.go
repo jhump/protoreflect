@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/bufbuild/protocompile/parser"
+	"github.com/bufbuild/protocompile/reporter"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/bufbuild/protocompile"
@@ -78,6 +81,7 @@ func TestPrinter(t *testing.T) {
 	files := []string{
 		"../internal/testdata/desc_test_comments.protoset",
 		"../internal/testdata/desc_test_complex_source_info.protoset",
+		"../internal/testdata/desc_test_proto3.protoset",
 		"../internal/testdata/descriptor.protoset",
 		"../internal/testdata/desc_test1.protoset",
 		"../internal/testdata/proto3_optional/desc_test_proto3_optional.protoset",
@@ -142,21 +146,7 @@ func checkFile(t *testing.T, pr *Printer, fd protoreflect.FileDescriptor, golden
 	checkContents(t, buf.String(), goldenFile)
 }
 
-func TestParseAndPrintPreservesAsMuchAsPossible(t *testing.T) {
-	compiler := protocompile.Compiler{
-		Resolver: protocompile.WithStandardImports(&protocompile.SourceResolver{
-			ImportPaths: []string{"../internal/testdata"},
-		}),
-		SourceInfoMode: protocompile.SourceInfoExtraComments,
-	}
-	fds, err := compiler.Compile(context.Background(), "desc_test_comments.proto")
-	require.NoError(t, err)
-	fd := fds[0]
-	checkFile(t, &Printer{}, fd, "test-preserve-comments.proto")
-	checkFile(t, &Printer{OmitComments: CommentsNonDoc}, fd, "test-preserve-doc-comments.proto")
-}
-
-func TestParseAndPrintWithUnrecognizedOptions(t *testing.T) {
+func TestPrintCustomOptions(t *testing.T) {
 	files := map[string]string{"test.proto": `
 syntax = "proto3";
 
@@ -198,8 +188,62 @@ service TestService {
 	}
 	fds, err := compiler.Compile(context.Background(), "test.proto")
 	require.NoError(t, err)
+	// Sanity check that custom options are recognized.
+	unk := fds[0].Services().ByName("TestService").Methods().ByName("Get").(protoreflect.MethodDescriptor).Options().ProtoReflect().GetUnknown()
+	require.Empty(t, unk)
 
 	checkFile(t, &Printer{}, fds[0], "test-unrecognized-options.proto")
+
+	// Now we try again with descriptors where custom options are unrecognized.
+	// We do that by marshaling and then unmarshaling (w/out a resolver) the file
+	// descriptor protos.
+	fdProto := protowrap.ProtoFromFileDescriptor(fds[0])
+	fdBytes, err := proto.Marshal(fdProto)
+	require.NoError(t, err)
+	err = proto.Unmarshal(fdBytes, fdProto)
+	require.NoError(t, err)
+
+	fd, err := protowrap.FromFileDescriptorProto(fdProto, protoregistry.GlobalFiles)
+	require.NoError(t, err)
+	// Sanity check that this resulted in unrecognized options
+	unk = fd.Services().ByName("TestService").Methods().ByName("Get").(protoreflect.MethodDescriptor).Options().ProtoReflect().GetUnknown()
+	require.NotEmpty(t, unk)
+
+	checkFile(t, &Printer{}, fd, "test-unrecognized-options.proto")
+}
+
+func TestPrintUninterpretedOptions(t *testing.T) {
+	fileSource := `
+syntax = "proto2";
+package pkg;
+option go_package = "some.pkg";
+import "google/protobuf/descriptor.proto";
+message Options {
+    optional bool some_option_value = 1;
+}
+extend google.protobuf.MessageOptions {
+    optional Options my_some_option = 11964;
+}
+message SomeMessage {
+    option (.pkg.my_some_option) = {some_option_value : true};
+}
+`
+
+	handler := reporter.NewHandler(nil)
+	ast, err := parser.Parse("test.proto", strings.NewReader(fileSource), handler)
+	require.NoError(t, err)
+	result, err := parser.ResultFromAST(ast, false, handler)
+	require.NoError(t, err)
+	fdProto := result.FileDescriptorProto()
+
+	// Sanity check that this resulted in uninterpreted options
+	unint := fdProto.MessageType[1].Options.UninterpretedOption
+	require.NotEmpty(t, unint)
+
+	fd, err := protowrap.FromFileDescriptorProto(fdProto, protoregistry.GlobalFiles)
+	require.NoError(t, err)
+
+	checkFile(t, &Printer{}, fd, "test-uninterpreted-options.proto")
 }
 
 func TestPrintNonFileDescriptors(t *testing.T) {

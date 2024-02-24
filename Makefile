@@ -52,6 +52,7 @@ errcheck:
 .PHONY: test
 test:
 	go test -cover -race ./...
+	pushd protoprint/testfiles && ./check-protos.sh && popd
 
 .PHONY: generate
 generate:

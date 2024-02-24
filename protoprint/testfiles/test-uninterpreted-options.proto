@@ -1,0 +1,19 @@
+syntax = "proto2";
+
+package pkg;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "some.pkg";
+
+message Options {
+  optional bool some_option_value = 1;
+}
+
+message SomeMessage {
+  option (.pkg.my_some_option) = { some_option_value : true };
+}
+
+extend google.protobuf.MessageOptions {
+  optional Options my_some_option = 11964;
+}
