@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/internal/register"
 	"github.com/jhump/protoreflect/v2/protomessage"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 	"github.com/jhump/protoreflect/v2/protowrap"
@@ -317,9 +318,7 @@ func (p *Printer) printProto(dsc protoreflect.Descriptor, out io.Writer) error {
 	sourceInfo := extendOptionLocations(fd)
 
 	var reg protoregistry.Types
-	if err := protoresolve.RegisterTypesInFile(fd, &reg, protoresolve.TypeKindExtension|protoresolve.TypeKindMessage); err != nil {
-		return err
-	}
+	register.RegisterTypesVisibleToFile(fd, &reg, true)
 
 	path := findElement(dsc)
 	switch d := dsc.(type) {

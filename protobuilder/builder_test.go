@@ -1172,17 +1172,35 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 	fileDesc, err := file.Build()
 	require.NoError(t, err)
 
+	// Another file that imports the options. Since it's not a public import, presence
+	// of this file should not prevent builder from correctly adding options.proto dependency
+	// in the "auto" case below.
+	otherFileDesc, err := NewFile("other.proto").AddImportedDependency(fileDesc).Build()
+	require.NoError(t, err)
+
+	regWithOpts := &protoregistry.Types{}
+	err = protoresolve.RegisterTypesInFileRecursive(fileDesc, regWithOpts, protoresolve.TypeKindExtension)
+	require.NoError(t, err)
+
 	// Now we can test referring to these and making sure they show up correctly
 	// in built descriptors
-	for name, useBuilder := range map[string]bool{"descriptor": false, "builder": true} {
+	for name, useBuilder := range map[string]*bool{"descriptor": proto.Bool(false), "builder": proto.Bool(true), "auto": nil} {
 		newFile := func() *FileBuilder {
-			fb := NewFile("foo.proto")
-			if useBuilder {
-				fb.AddDependency(file)
-			} else {
-				fb.AddImportedDependency(fileDesc)
+			fb := NewFile("foo.proto").AddImportedDependency(otherFileDesc)
+			if useBuilder != nil {
+				if *useBuilder {
+					fb.AddDependency(file)
+				} else {
+					fb.AddImportedDependency(fileDesc)
+				}
 			}
 			return fb
+		}
+		var reg protoresolve.ExtensionTypeResolver
+		if useBuilder == nil {
+			// if providing neither builder nor descriptor, we need to provide
+			// a registry for resolving custom options
+			reg = regWithOpts
 		}
 		t.Run(name, func(t *testing.T) {
 			t.Run("file options", func(t *testing.T) {
@@ -1191,7 +1209,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 				ext, err := fileOpt.Build()
 				require.NoError(t, err)
 				fb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
-				checkBuildWithImportedExtensions(t, fb)
+				checkBuildWithImportedExtensions(t, fb, reg)
 			})
 
 			t.Run("message options", func(t *testing.T) {
@@ -1203,7 +1221,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 				fb := newFile()
 				fb.AddMessage(mb)
-				checkBuildWithImportedExtensions(t, mb)
+				checkBuildWithImportedExtensions(t, mb, reg)
 			})
 
 			t.Run("field options", func(t *testing.T) {
@@ -1217,7 +1235,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 				fb := newFile()
 				fb.AddMessage(mb)
-				checkBuildWithImportedExtensions(t, flb)
+				checkBuildWithImportedExtensions(t, flb, reg)
 			})
 
 			t.Run("oneof options", func(t *testing.T) {
@@ -1232,7 +1250,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 				fb := newFile()
 				fb.AddMessage(mb)
-				checkBuildWithImportedExtensions(t, oob)
+				checkBuildWithImportedExtensions(t, oob, reg)
 			})
 
 			t.Run("extension range options", func(t *testing.T) {
@@ -1244,7 +1262,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 				fb := newFile()
 				fb.AddMessage(mb)
-				checkBuildWithImportedExtensions(t, mb)
+				checkBuildWithImportedExtensions(t, mb, reg)
 			})
 
 			t.Run("enum options", func(t *testing.T) {
@@ -1257,7 +1275,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 				fb := newFile()
 				fb.AddEnum(eb)
-				checkBuildWithImportedExtensions(t, eb)
+				checkBuildWithImportedExtensions(t, eb, reg)
 			})
 
 			t.Run("enum val options", func(t *testing.T) {
@@ -1271,7 +1289,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 				fb := newFile()
 				fb.AddEnum(eb)
-				checkBuildWithImportedExtensions(t, evb)
+				checkBuildWithImportedExtensions(t, evb, reg)
 			})
 
 			t.Run("service options", func(t *testing.T) {
@@ -1283,7 +1301,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 				fb := newFile()
 				fb.AddService(sb)
-				checkBuildWithImportedExtensions(t, sb)
+				checkBuildWithImportedExtensions(t, sb, reg)
 			})
 
 			t.Run("method options", func(t *testing.T) {
@@ -1301,21 +1319,24 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 				fb := newFile()
 				fb.AddService(sb).AddMessage(req).AddMessage(resp)
-				checkBuildWithImportedExtensions(t, mtb)
+				checkBuildWithImportedExtensions(t, mtb, reg)
 			})
 		})
 	}
 }
 
-func checkBuildWithImportedExtensions(t *testing.T, builder Builder) {
+func checkBuildWithImportedExtensions(t *testing.T, builder Builder, reg protoresolve.ExtensionTypeResolver) {
 	// requiring options and succeeding (since they are defined in explicit import)
-	var opts BuilderOptions
-	opts.RequireInterpretedOptions = true
+	opts := BuilderOptions{
+		RequireInterpretedOptions: true,
+		Resolver:                  reg,
+	}
 	d, err := opts.Build(builder)
 	require.NoError(t, err)
-	// the only import is for the custom options
-	require.Equal(t, 1, d.ParentFile().Imports().Len())
+	// the only import is the explicitly added one and one added for the custom options
+	require.Equal(t, 2, d.ParentFile().Imports().Len())
 	require.Equal(t, "options.proto", d.ParentFile().Imports().Get(0).Path())
+	require.Equal(t, "other.proto", d.ParentFile().Imports().Get(1).Path())
 }
 
 func TestUseOfExtensionRegistry(t *testing.T) {

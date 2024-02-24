@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 
+	"github.com/jhump/protoreflect/v2/internal/register"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 	"github.com/jhump/protoreflect/v2/protowrap"
 )
@@ -26,13 +27,13 @@ func newDependencies() *dependencies {
 	}
 }
 
-func (d *dependencies) add(fd protoreflect.FileDescriptor) error {
+func (d *dependencies) add(fd protoreflect.FileDescriptor) {
 	if _, ok := d.descs[fd]; ok {
 		// already added
-		return nil
+		return
 	}
 	d.descs[fd] = struct{}{}
-	return protoresolve.RegisterTypesInFile(fd, &d.res, protoresolve.TypeKindExtension)
+	register.RegisterTypesInImportedFile(fd, &d.res, false)
 }
 
 // dependencyResolver is the work-horse for converting a tree of builders into a
@@ -93,9 +94,7 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 	deps := newDependencies()
 	// add explicit imports first
 	for fd := range fb.explicitImports {
-		if err := deps.add(fd); err != nil {
-			return nil, err
-		}
+		deps.add(fd)
 	}
 	for dep := range fb.explicitDeps {
 		if dep == fb {
@@ -106,9 +105,7 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 		if err != nil {
 			return nil, err
 		}
-		if err := deps.add(fd); err != nil {
-			return nil, err
-		}
+		deps.add(fd)
 	}
 	// now accumulate implicit dependencies based on other types referenced
 	for _, mb := range fb.messages {
@@ -155,7 +152,6 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 	fileNames := map[string]struct{}{}
 	for _, d := range depSlice {
 		addFileNames(d, fileNames)
-		fileNames[d.Path()] = struct{}{}
 	}
 	unique := makeUnique(fp.GetName(), fileNames)
 	if unique != fp.GetName() {
@@ -302,9 +298,7 @@ func (r *dependencyResolver) resolveTypesInExtension(root Builder, seen []Builde
 		return err
 	}
 	if exb.foreignExtendee != nil {
-		if err := deps.add(exb.foreignExtendee.ParentFile()); err != nil {
-			return err
-		}
+		deps.add(exb.foreignExtendee.ParentFile())
 	} else if err := r.resolveType(root, seen, exb.localExtendee, deps); err != nil {
 		return err
 	}
@@ -325,9 +319,7 @@ func (r *dependencyResolver) resolveTypesInService(root Builder, seen []Builder,
 
 func (r *dependencyResolver) resolveRpcType(root Builder, seen []Builder, t *RpcType, deps *dependencies) error {
 	if t.foreignType != nil {
-		if err := deps.add(t.foreignType.ParentFile()); err != nil {
-			return err
-		}
+		deps.add(t.foreignType.ParentFile())
 	} else {
 		return r.resolveType(root, seen, t.localType, deps)
 	}
@@ -337,13 +329,9 @@ func (r *dependencyResolver) resolveRpcType(root Builder, seen []Builder, t *Rpc
 func (r *dependencyResolver) resolveTypesInField(root Builder, seen []Builder, deps *dependencies, flb *FieldBuilder) error {
 	switch {
 	case flb.fieldType.foreignMsgType != nil:
-		if err := deps.add(flb.fieldType.foreignMsgType.ParentFile()); err != nil {
-			return err
-		}
+		deps.add(flb.fieldType.foreignMsgType.ParentFile())
 	case flb.fieldType.foreignEnumType != nil:
-		if err := deps.add(flb.fieldType.foreignEnumType.ParentFile()); err != nil {
-			return err
-		}
+		deps.add(flb.fieldType.foreignEnumType.ParentFile())
 	case flb.fieldType.localMsgType != nil:
 		if flb.fieldType.localMsgType == flb.msgType {
 			return r.resolveTypesInMessage(root, seen, deps, flb.msgType)
@@ -365,7 +353,8 @@ func (r *dependencyResolver) resolveType(root Builder, seen []Builder, typeBuild
 	if err != nil {
 		return err
 	}
-	return deps.add(fd)
+	deps.add(fd)
+	return nil
 }
 
 func (r *dependencyResolver) resolveTypesInFileOptions(root Builder, deps *dependencies, fb *FileBuilder) error {
@@ -515,13 +504,11 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts protor
 			// yep!
 			continue
 		}
-		// see if configured extension registry knows about it
+		// see if configured resolver knows about it
 		if r.opts.Resolver != nil {
 			if extd, err := r.opts.Resolver.FindExtensionByNumber(msgName, tag); err == nil {
 				// extension registry recognized it!
-				if err := deps.add(extd.TypeDescriptor().ParentFile()); err != nil {
-					return err
-				}
+				deps.add(extd.TypeDescriptor().ParentFile())
 				continue
 			}
 		}
@@ -529,9 +516,7 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts protor
 		if fileExts != nil {
 			if extd, err := fileExts.FindExtensionByNumber(msgName, tag); err == nil {
 				// file extensions recognized it!
-				if err := deps.add(extd.TypeDescriptor().ParentFile()); err != nil {
-					return err
-				}
+				deps.add(extd.TypeDescriptor().ParentFile())
 				continue
 			}
 		}
@@ -539,9 +524,7 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts protor
 		if xt != nil {
 			// known extension? add its file to builder's deps
 			fd := xt.TypeDescriptor().ParentFile()
-			if err := deps.add(fd); err != nil {
-				return err
-			}
+			deps.add(fd)
 			continue
 		}
 
