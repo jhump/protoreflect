@@ -1,5 +1,7 @@
 package grpcreflect
 
+//lint:file-ignore SA1019 The refv1alpha package is deprecated, but we need it in order to adapt it to new version
+
 import (
 	"bytes"
 	"context"

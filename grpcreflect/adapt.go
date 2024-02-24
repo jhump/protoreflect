@@ -1,5 +1,7 @@
 package grpcreflect
 
+//lint:file-ignore SA1019 The refv1alpha package is deprecated, but we need it in order to adapt it to new version
+
 import (
 	refv1 "google.golang.org/grpc/reflection/grpc_reflection_v1"
 	refv1alpha "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
@@ -98,59 +100,6 @@ func toV1AlphaRequest(v1 *refv1.ServerReflectionRequest) *refv1alpha.ServerRefle
 		// no value set
 	}
 	return &v1alpha
-}
-
-func toV1Response(v1alpha *refv1alpha.ServerReflectionResponse) *refv1.ServerReflectionResponse {
-	var v1 refv1.ServerReflectionResponse
-	v1.ValidHost = v1alpha.ValidHost
-	if v1alpha.OriginalRequest != nil {
-		v1.OriginalRequest = toV1Request(v1alpha.OriginalRequest)
-	}
-	switch mr := v1alpha.MessageResponse.(type) {
-	case *refv1alpha.ServerReflectionResponse_FileDescriptorResponse:
-		if mr != nil {
-			v1.MessageResponse = &refv1.ServerReflectionResponse_FileDescriptorResponse{
-				FileDescriptorResponse: &refv1.FileDescriptorResponse{
-					FileDescriptorProto: mr.FileDescriptorResponse.GetFileDescriptorProto(),
-				},
-			}
-		}
-	case *refv1alpha.ServerReflectionResponse_AllExtensionNumbersResponse:
-		if mr != nil {
-			v1.MessageResponse = &refv1.ServerReflectionResponse_AllExtensionNumbersResponse{
-				AllExtensionNumbersResponse: &refv1.ExtensionNumberResponse{
-					BaseTypeName:    mr.AllExtensionNumbersResponse.GetBaseTypeName(),
-					ExtensionNumber: mr.AllExtensionNumbersResponse.GetExtensionNumber(),
-				},
-			}
-		}
-	case *refv1alpha.ServerReflectionResponse_ListServicesResponse:
-		if mr != nil {
-			svcs := make([]*refv1.ServiceResponse, len(mr.ListServicesResponse.GetService()))
-			for i, svc := range mr.ListServicesResponse.GetService() {
-				svcs[i] = &refv1.ServiceResponse{
-					Name: svc.GetName(),
-				}
-			}
-			v1.MessageResponse = &refv1.ServerReflectionResponse_ListServicesResponse{
-				ListServicesResponse: &refv1.ListServiceResponse{
-					Service: svcs,
-				},
-			}
-		}
-	case *refv1alpha.ServerReflectionResponse_ErrorResponse:
-		if mr != nil {
-			v1.MessageResponse = &refv1.ServerReflectionResponse_ErrorResponse{
-				ErrorResponse: &refv1.ErrorResponse{
-					ErrorCode:    mr.ErrorResponse.GetErrorCode(),
-					ErrorMessage: mr.ErrorResponse.GetErrorMessage(),
-				},
-			}
-		}
-	default:
-		// no value set
-	}
-	return &v1
 }
 
 func toV1AlphaResponse(v1 *refv1.ServerReflectionResponse) *refv1alpha.ServerReflectionResponse {

@@ -189,7 +189,7 @@ service TestService {
 	fds, err := compiler.Compile(context.Background(), "test.proto")
 	require.NoError(t, err)
 	// Sanity check that custom options are recognized.
-	unk := fds[0].Services().ByName("TestService").Methods().ByName("Get").(protoreflect.MethodDescriptor).Options().ProtoReflect().GetUnknown()
+	unk := fds[0].Services().ByName("TestService").Methods().ByName("Get").Options().ProtoReflect().GetUnknown()
 	require.Empty(t, unk)
 
 	checkFile(t, &Printer{}, fds[0], "test-unrecognized-options.proto")
@@ -206,7 +206,7 @@ service TestService {
 	fd, err := protowrap.FromFileDescriptorProto(fdProto, protoregistry.GlobalFiles)
 	require.NoError(t, err)
 	// Sanity check that this resulted in unrecognized options
-	unk = fd.Services().ByName("TestService").Methods().ByName("Get").(protoreflect.MethodDescriptor).Options().ProtoReflect().GetUnknown()
+	unk = fd.Services().ByName("TestService").Methods().ByName("Get").Options().ProtoReflect().GetUnknown()
 	require.NotEmpty(t, unk)
 
 	checkFile(t, &Printer{}, fd, "test-unrecognized-options.proto")
