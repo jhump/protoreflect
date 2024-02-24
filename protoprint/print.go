@@ -3,7 +3,6 @@ package protoprint
 import (
 	"bytes"
 	"fmt"
-	"github.com/jhump/protoreflect/v2/protowrap"
 	"io"
 	"math"
 	"os"
@@ -23,6 +22,7 @@ import (
 	"github.com/jhump/protoreflect/v2/internal"
 	"github.com/jhump/protoreflect/v2/protomessage"
 	"github.com/jhump/protoreflect/v2/protoresolve"
+	"github.com/jhump/protoreflect/v2/protowrap"
 	"github.com/jhump/protoreflect/v2/sourcelocation"
 )
 

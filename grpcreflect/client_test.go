@@ -3,6 +3,7 @@ package grpcreflect
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -265,7 +266,8 @@ func TestRecover(t *testing.T) {
 
 		// kill the stream
 		stream := client.stream
-		_ = client.stream.CloseSend()
+		err = client.stream.CloseSend()
+		require.NoError(t, err)
 
 		// it should auto-recover and re-create stream
 		_, err = client.ListServices()
@@ -464,6 +466,8 @@ func TestAutoVersion(t *testing.T) {
 				"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
 			})
 	})
+
+	t.Run("fallback-on-unavailable", testClientAutoOnUnavailable)
 }
 
 func testClientAuto(t *testing.T, register func(*grpc.Server), expectedServices []protoreflect.FullName, expectedLog []string) {
@@ -475,7 +479,8 @@ func testClientAuto(t *testing.T, register func(*grpc.Server), expectedServices 
 		panic(fmt.Sprintf("Failed to open server socket: %s", err.Error()))
 	}
 	go func() {
-		_ = svr.Serve(l)
+		err := svr.Serve(l)
+		require.NoError(t, err)
 	}()
 	defer svr.Stop()
 
@@ -484,7 +489,8 @@ func testClientAuto(t *testing.T, register func(*grpc.Server), expectedServices 
 		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))
 	}
 	defer func() {
-		_ = cconn.Close()
+		err := cconn.Close()
+		require.NoError(t, err)
 	}()
 	client := NewClientAuto(context.Background(), cconn)
 	now := time.Now()
@@ -542,4 +548,139 @@ func (c *captureStreamNames) intercept(srv interface{}, ss grpc.ServerStream, in
 
 func (c *captureStreamNames) handleUnknown(_ interface{}, _ grpc.ServerStream) error {
 	return status.Errorf(codes.Unimplemented, "WTF?")
+}
+
+func testClientAutoOnUnavailable(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(fmt.Sprintf("Failed to open server socket: %s", err.Error()))
+	}
+	captureConn := &captureListener{Listener: l}
+
+	var capture captureStreamNames
+	svr := grpc.NewServer(
+		grpc.StreamInterceptor(capture.intercept),
+		grpc.UnknownServiceHandler(func(_ interface{}, _ grpc.ServerStream) error {
+			// On unknown method, forcibly close the net.Conn, without sending
+			// back any reply, which should result in an "unavailable" error.
+			return captureConn.latest().Close()
+		}),
+	)
+	impl := reflection.NewServer(reflection.ServerOptions{Services: svr})
+	refv1alpha.RegisterServerReflectionServer(svr, impl)
+	testprotosgrpc.RegisterDummyServiceServer(svr, testService{})
+
+	go func() {
+		err := svr.Serve(captureConn)
+		require.NoError(t, err)
+	}()
+	defer svr.Stop()
+
+	var captureErrs captureErrors
+	cconn, err := grpc.Dial(
+		l.Addr().String(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStreamInterceptor(captureErrs.intercept),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))
+	}
+	defer func() {
+		err := cconn.Close()
+		require.NoError(t, err)
+	}()
+	client := NewClientAuto(context.Background(), cconn)
+	now := time.Now()
+	client.now = func() time.Time {
+		return now
+	}
+
+	svcs, err := client.ListServices()
+	require.NoError(t, err)
+	sort.Slice(svcs, func(i, j int) bool {
+		return svcs[i] < svcs[j]
+	})
+	require.Equal(t, []protoreflect.FullName{
+		"grpc.reflection.v1alpha.ServerReflection",
+		"testprotos.DummyService",
+	}, svcs)
+
+	// It should have tried v1 first and failed then tried v1alpha.
+	actualLog := capture.names()
+	require.Equal(t, []string{
+		"/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+		"/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo",
+	}, actualLog)
+
+	// Make sure the error code observed by the client was unavailable and not unimplemented.
+	actualCodes := captureErrs.codes()
+	require.Equal(t, []codes.Code{codes.Unavailable}, actualCodes)
+}
+
+type captureListener struct {
+	net.Listener
+	mu   sync.Mutex
+	conn net.Conn
+}
+
+func (c *captureListener) Accept() (net.Conn, error) {
+	conn, err := c.Listener.Accept()
+	if err == nil {
+		c.mu.Lock()
+		c.conn = conn
+		c.mu.Unlock()
+	}
+	return conn, err
+}
+
+func (c *captureListener) latest() net.Conn {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.conn
+}
+
+type captureErrors struct {
+	mu       sync.Mutex
+	observed []codes.Code
+}
+
+func (c *captureErrors) intercept(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	stream, err := streamer(ctx, desc, cc, method, opts...)
+	if err != nil {
+		c.observe(err)
+		return nil, err
+	}
+	return &captureErrorStream{ClientStream: stream, c: c}, nil
+}
+
+func (c *captureErrors) observe(err error) {
+	c.mu.Lock()
+	c.observed = append(c.observed, status.Code(err))
+	c.mu.Unlock()
+}
+
+func (c *captureErrors) codes() []codes.Code {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ret := make([]codes.Code, len(c.observed))
+	copy(ret, c.observed)
+	return ret
+}
+
+type captureErrorStream struct {
+	grpc.ClientStream
+	c    *captureErrors
+	done int32
+}
+
+func (c *captureErrorStream) RecvMsg(m interface{}) error {
+	err := c.ClientStream.RecvMsg(m)
+	if err == nil || errors.Is(err, io.EOF) {
+		return nil
+	}
+	// Only record one error per RPC.
+	if atomic.CompareAndSwapInt32(&c.done, 0, 1) {
+		c.c.observe(err)
+	}
+	return err
 }

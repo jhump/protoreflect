@@ -4,7 +4,7 @@ set -e
 
 cd $(dirname $0)
 
-PROTOC_VERSION="23.0"
+PROTOC_VERSION="25.3"
 PROTOC_OS="$(uname -s)"
 PROTOC_ARCH="$(uname -m)"
 case "${PROTOC_OS}" in
@@ -31,7 +31,7 @@ if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc ${PROTOC_VERSION}" ]]; 
 fi
 
 go install google.golang.org/protobuf/cmd/protoc-gen-go
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 go install github.com/jhump/protoreflect/v2/sourceinfo/cmd/protoc-gen-gosrcinfo
 
 # Output directory will effectively be GOPATH/src.
