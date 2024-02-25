@@ -24,7 +24,7 @@ import (
 	"github.com/jhump/protoreflect/v2/protomessage"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 	"github.com/jhump/protoreflect/v2/protowrap"
-	"github.com/jhump/protoreflect/v2/sourcelocation"
+	"github.com/jhump/protoreflect/v2/sourceloc"
 )
 
 // Printer knows how to format file descriptors as proto source code. Its fields
@@ -543,7 +543,7 @@ func (p *Printer) printFile(
 }
 
 func findExtSi(locs protoreflect.SourceLocations, fieldSi, extSi protoreflect.SourceLocation) protoreflect.SourceLocation {
-	if sourcelocation.IsZero(fieldSi) {
+	if sourceloc.IsZero(fieldSi) {
 		return protoreflect.SourceLocation{}
 	}
 	for {
@@ -2381,13 +2381,13 @@ func (a elementSrcOrder) Less(i, j int) bool {
 		sj = a.sourceInfo.ByPath(append(a.prefix, tj, int32(ej)))
 	}
 
-	if sourcelocation.IsZero(si) != sourcelocation.IsZero(sj) {
+	if sourceloc.IsZero(si) != sourceloc.IsZero(sj) {
 		// generally, we put unknown elements after known ones;
 		// except package, imports, and option elements go first
 
 		// i will be unknown and j will be known
 		swapped := false
-		if !sourcelocation.IsZero(si) {
+		if !sourceloc.IsZero(si) {
 			ti, tj = tj, ti
 			swapped = true
 		}
@@ -2444,7 +2444,7 @@ func (a elementSrcOrder) Less(i, j int) bool {
 		}
 		return swapped
 
-	} else if sourcelocation.IsZero(si) || sourcelocation.IsZero(sj) {
+	} else if sourceloc.IsZero(si) || sourceloc.IsZero(sj) {
 		// let stable sort keep unknown elements in same relative order
 		return false
 	}
@@ -2546,7 +2546,7 @@ func (p *Printer) printBlockElement(
 		p.printLeadingComments(si, w, indent)
 	}
 	el(w, func(indent int, wantTrailingNewline bool) {
-		if includeComments && !sourcelocation.IsZero(si) {
+		if includeComments && !sourceloc.IsZero(si) {
 			if p.printTrailingComments(si, w, indent) && wantTrailingNewline && !p.Compact {
 				// separator line between trailing comment and next element
 				_, _ = fmt.Fprintln(w)
@@ -2562,11 +2562,11 @@ func (p *Printer) printBlockElement(
 func (p *Printer) printElement(isDecriptor bool, si protoreflect.SourceLocation, w *writer, indent int, el func(*writer)) {
 	includeComments := isDecriptor || p.includeCommentType(CommentsTokens)
 
-	if includeComments && !sourcelocation.IsZero(si) {
+	if includeComments && !sourceloc.IsZero(si) {
 		p.printLeadingComments(si, w, indent)
 	}
 	el(w)
-	if includeComments && !sourcelocation.IsZero(si) {
+	if includeComments && !sourceloc.IsZero(si) {
 		p.printTrailingComments(si, w, indent)
 	}
 	if indent >= 0 && !w.newline {

@@ -4,7 +4,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/jhump/protoreflect/v2/internal"
-	"github.com/jhump/protoreflect/v2/sourcelocation"
+	"github.com/jhump/protoreflect/v2/sourceloc"
 )
 
 type sourceLocations struct {
@@ -38,7 +38,7 @@ func (s *sourceLocations) ByPath(path protoreflect.SourcePath) protoreflect.Sour
 }
 
 func (s *sourceLocations) putIfAbsent(path protoreflect.SourcePath, loc protoreflect.SourceLocation) {
-	if existing := s.ByPath(path); sourcelocation.IsZero(existing) {
+	if existing := s.ByPath(path); sourceloc.IsZero(existing) {
 		k := internal.PathKey(path)
 		s.extras = append(s.extras, loc)
 		if s.extrasByPath == nil {

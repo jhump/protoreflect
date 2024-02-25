@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
-	"github.com/jhump/protoreflect/v2/sourcelocation"
+	"github.com/jhump/protoreflect/v2/sourceloc"
 )
 
 // NB: forked from google.golang.org/protobuf/internal/filedesc/desc_list.go.
@@ -35,23 +35,27 @@ type sourceLocations struct {
 }
 
 func (p *sourceLocations) Len() int { return len(p.orig) }
+
 func (p *sourceLocations) Get(i int) protoreflect.SourceLocation {
 	return p.lazyInit().locs[i]
 }
+
 func (p *sourceLocations) byKey(k string) protoreflect.SourceLocation {
 	if i, ok := p.lazyInit().byPath[k]; ok {
 		return p.locs[i]
 	}
 	return protoreflect.SourceLocation{}
 }
+
 func (p *sourceLocations) ByPath(path protoreflect.SourcePath) protoreflect.SourceLocation {
 	return p.byKey(internal.PathKey(path))
 }
+
 func (p *sourceLocations) ByDescriptor(desc protoreflect.Descriptor) protoreflect.SourceLocation {
 	if p.fd != nil && desc != nil && p.fd != desc.ParentFile() {
 		return protoreflect.SourceLocation{} // mismatching parent imports
 	}
-	path := sourcelocation.PathFor(desc)
+	path := sourceloc.PathFor(desc)
 	if path == nil {
 		return protoreflect.SourceLocation{}
 	}

@@ -17,9 +17,9 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
-	"google.golang.org/protobuf/types/descriptorpb"
 
 	_ "github.com/jhump/protoreflect/v2/internal/testdata"
+	prototesting "github.com/jhump/protoreflect/v2/internal/testing"
 	"github.com/jhump/protoreflect/v2/protowrap"
 )
 
@@ -88,7 +88,7 @@ func TestPrinter(t *testing.T) {
 	}
 	fds := make([]protoreflect.FileDescriptor, len(files)+1)
 	for i, file := range files {
-		fd, err := loadProtoset(file)
+		fd, err := prototesting.LoadProtoset(file)
 		require.NoError(t, err)
 		fds[i] = fd
 	}
@@ -112,30 +112,6 @@ func TestPrinter(t *testing.T) {
 			checkFile(t, pr, fd, goldenFile)
 		}
 	}
-}
-
-func loadProtoset(path string) (protoreflect.FileDescriptor, error) {
-	var fds descriptorpb.FileDescriptorSet
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-	bb, err := io.ReadAll(f)
-	if err != nil {
-		return nil, err
-	}
-	if err = proto.Unmarshal(bb, &fds); err != nil {
-		return nil, err
-	}
-	res, err := protowrap.FromFileDescriptorSet(&fds)
-	if err != nil {
-		return nil, err
-	}
-	// return the last file in the set
-	return res.FindFileByPath(fds.File[len(fds.File)-1].GetName())
 }
 
 func checkFile(t *testing.T, pr *Printer, fd protoreflect.FileDescriptor, goldenFile string) {

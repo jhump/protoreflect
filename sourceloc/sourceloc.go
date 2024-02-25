@@ -1,6 +1,6 @@
 // Package sourcelocation contains some helpers for interacting with
 // protoreflect.SourceLocation and protoreflect.SourcePath values.
-package sourcelocation
+package sourceloc
 
 import (
 	"google.golang.org/protobuf/reflect/protoreflect"
