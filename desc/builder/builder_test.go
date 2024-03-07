@@ -1661,9 +1661,7 @@ func TestInvalid(t *testing.T) {
 						NewMessage("Foo").AddField(NewGroupField(NewMessage("Bar"))),
 					)
 			},
-			// NB: This is the actual error message returned by the protobuf runtime. It is
-			//     misleading since it says proto2 instead of proto3.
-			expectedError: "invalid group: invalid under proto2 semantics",
+			expectedError: "invalid group: invalid under proto3 semantics",
 		},
 		{
 			name: "default value in proto3",
@@ -1673,7 +1671,7 @@ func TestInvalid(t *testing.T) {
 						NewMessage("Foo").AddField(NewField("foo", FieldTypeString()).SetDefaultValue("abc")),
 					)
 			},
-			expectedError: "invalid default: cannot be specified under proto3 semantics",
+			expectedError: "invalid default: cannot be specified with implicit field presence",
 		},
 		{
 			name: "extension tag outside range",
