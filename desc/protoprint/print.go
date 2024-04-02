@@ -531,6 +531,10 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, reg *protoregistry.Types, w
 	path[0] = internal.File_syntaxTag
 	si := sourceInfo.Get(path)
 	p.printElement(false, si, w, 0, func(w *writer) {
+		if syn == "editions" {
+			_, _ = fmt.Fprintf(w, "edition = %q;", strings.TrimPrefix(fdp.GetEdition().String(), "EDITION_"))
+			return
+		}
 		syn := fdp.GetSyntax()
 		if syn == "" {
 			syn = "proto2"
@@ -984,7 +988,7 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, reg *protoregistr
 				addrs = append(addrs, elnext)
 				skip[rn] = true
 			}
-			p.printReservedNames(names, addrs, w, sourceInfo, path, indent)
+			p.printReservedNames(names, addrs, w, sourceInfo, path, indent, useQuotedReserved(md.GetFile()))
 		}
 	}
 }
@@ -1063,7 +1067,7 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, reg *protoregistry.Types
 		// we use negative values for "extras" keys so they can't collide
 		// with legit option tags
 
-		if !fld.GetFile().IsProto3() && fld.AsFieldDescriptorProto().DefaultValue != nil {
+		if fld.UnwrapField().HasPresence() && fld.AsFieldDescriptorProto().DefaultValue != nil {
 			defVal := fld.GetDefaultValue()
 			if fld.GetEnumType() != nil {
 				defVal = ident(fld.GetEnumType().FindValueByNumber(defVal.(int32)).GetName())
@@ -1097,7 +1101,8 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, reg *protoregistry.Types
 func shouldEmitLabel(fld *desc.FieldDescriptor) bool {
 	return fld.IsProto3Optional() ||
 		(!fld.IsMap() && fld.GetOneOf() == nil &&
-			(fld.GetLabel() != descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL || !fld.GetFile().IsProto3()))
+			(fld.GetLabel() != descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL ||
+				fld.GetFile().UnwrapFile().Syntax() == protoreflect.Proto2))
 }
 
 func labelString(lbl descriptorpb.FieldDescriptorProto_Label) string {
@@ -1276,7 +1281,11 @@ func (p *Printer) printReservedRanges(ranges []reservedRange, maxVal int32, addr
 	_, _ = fmt.Fprintln(w, ";")
 }
 
-func (p *Printer) printReservedNames(names []string, addrs []elementAddr, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
+func useQuotedReserved(fd *desc.FileDescriptor) bool {
+	return fd.AsFileDescriptorProto().GetEdition().Number() < descriptorpb.Edition_EDITION_2023.Number()
+}
+
+func (p *Printer) printReservedNames(names []string, addrs []elementAddr, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int, useQuotes bool) {
 	p.indent(w, indent)
 	_, _ = fmt.Fprint(w, "reserved ")
 
@@ -1289,7 +1298,11 @@ func (p *Printer) printReservedNames(names []string, addrs []elementAddr, w *wri
 		}
 		el := addrs[i]
 		si := sourceInfo.Get(append(parentPath, el.elementType, int32(el.elementIndex)))
-		p.printElementString(si, w, indent, quotedString(name))
+		if useQuotes {
+			p.printElementString(si, w, indent, quotedString(name))
+		} else {
+			p.printElementString(si, w, indent, name)
+		}
 	}
 
 	_, _ = fmt.Fprintln(w, ";")
@@ -1381,7 +1394,7 @@ func (p *Printer) printEnum(ed *desc.EnumDescriptor, reg *protoregistry.Types, w
 					addrs = append(addrs, elnext)
 					skip[rn] = true
 				}
-				p.printReservedNames(names, addrs, w, sourceInfo, path, indent)
+				p.printReservedNames(names, addrs, w, sourceInfo, path, indent, useQuotedReserved(ed.GetFile()))
 			}
 		}
 
@@ -2145,12 +2158,12 @@ func (a elementAddrs) Less(i, j int) bool {
 
 	case *desc.EnumValueDescriptor:
 		// enum values ordered by number then name,
-		// but first value number must be 0 in proto3
+		// but first value number must be 0 for open enums
 		vj := dj.(*desc.EnumValueDescriptor)
 		if vi.GetNumber() == vj.GetNumber() {
 			return vi.GetName() < vj.GetName()
 		}
-		if vi.GetFile().IsProto3() {
+		if !vi.GetEnum().UnwrapEnum().IsClosed() {
 			if vj.GetNumber() == 0 {
 				return false
 			}

@@ -227,6 +227,41 @@ message SomeMessage {
 	checkFile(t, &Printer{}, fd, "test-uninterpreted-options.proto")
 }
 
+func TestPrintEditions(t *testing.T) {
+	files := map[string]string{"test.proto": `
+edition = "2023";
+package pkg;
+option go_package = "some.pkg";
+option features.enum_type = CLOSED;
+message Foo {
+	int32 a = 1;
+	int32 required_field = 2 [features.field_presence = LEGACY_REQUIRED];
+	int32 default_field = 3 [default = 99];
+	Foo delimited_field = 4 [features.message_encoding = DELIMITED];
+  reserved reserved_field;
+}
+enum Closed {
+	CLOSED_C = 1;
+	CLOSED_A = 2;
+	reserved CLOSED_E, CLOSED_F;
+}
+enum Open {
+	option features.enum_type = OPEN;
+	OPEN_B = 0;
+	OPEN_C = -1;
+	OPEN_A = 2;
+}
+`}
+
+	pa := &protoparse.Parser{
+		Accessor: protoparse.FileContentsFromMap(files),
+	}
+	fds, err := pa.ParseFiles("test.proto")
+	testutil.Ok(t, err)
+
+	checkFile(t, &Printer{}, fds[0], "test-editions.proto")
+}
+
 func TestPrintNonFileDescriptors(t *testing.T) {
 	pa := protoparse.Parser{ImportPaths: []string{"../../internal/testprotos"}, IncludeSourceCodeInfo: true}
 	fds, err := pa.ParseFiles("desc_test_comments.proto")
