@@ -1,10 +1,10 @@
 edition = "2023";
 
-package pkg;
+package testprotos;
 
 option features = { enum_type: CLOSED };
 
-option go_package = "some.pkg";
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
 
 message Foo {
   reserved reserved_field;
@@ -15,7 +15,11 @@ message Foo {
 
   int32 default_field = 3 [default = 99];
 
-  Foo delimited_field = 4 [features = { message_encoding: DELIMITED }];
+  DelimitedField delimitedfield = 4 [features = { message_encoding: DELIMITED }];
+
+  message DelimitedField {
+    int32 b = 1;
+  }
 }
 
 enum Closed {
