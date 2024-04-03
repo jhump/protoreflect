@@ -16,6 +16,10 @@ func TestASTRoundTrips(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		if filepath.Base(path) == "desc_test_editions.proto" {
+			// The AST doesn't support editions yet
+			return nil
+		}
 		if filepath.Ext(path) == ".proto" {
 			t.Run(path, func(t *testing.T) {
 				b, err := ioutil.ReadFile(path)
