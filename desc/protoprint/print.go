@@ -531,11 +531,11 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, reg *protoregistry.Types, w
 	path[0] = internal.File_syntaxTag
 	si := sourceInfo.Get(path)
 	p.printElement(false, si, w, 0, func(w *writer) {
+		syn := fdp.GetSyntax()
 		if syn == "editions" {
 			_, _ = fmt.Fprintf(w, "edition = %q;", strings.TrimPrefix(fdp.GetEdition().String(), "EDITION_"))
 			return
 		}
-		syn := fdp.GetSyntax()
 		if syn == "" {
 			syn = "proto2"
 		}
@@ -1282,7 +1282,7 @@ func (p *Printer) printReservedRanges(ranges []reservedRange, maxVal int32, addr
 }
 
 func useQuotedReserved(fd *desc.FileDescriptor) bool {
-	return fd.AsFileDescriptorProto().GetEdition().Number() < descriptorpb.Edition_EDITION_2023.Number()
+	return fd.AsFileDescriptorProto().GetEdition() < descriptorpb.Edition_EDITION_2023
 }
 
 func (p *Printer) printReservedNames(names []string, addrs []elementAddr, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int, useQuotes bool) {
