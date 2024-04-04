@@ -66,6 +66,7 @@ errcheck:
 .PHONY: test
 test:
 	go test -cover -race ./...
+	./desc/protoprint/testfiles/check-protos.sh > /dev/null
 
 .PHONY: test-nounsafe
 test-nounsafe:
