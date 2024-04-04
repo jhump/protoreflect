@@ -64,8 +64,9 @@ errcheck:
 	errcheck ./...
 
 .PHONY: test
-test:
+test: generate
 	go test -cover -race ./...
+	./desc/protoprint/testfiles/check-protos.sh > /dev/null
 
 .PHONY: test-nounsafe
 test-nounsafe:

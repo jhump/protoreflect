@@ -231,7 +231,7 @@ func TestPrintEditions(t *testing.T) {
 	fd, err := loadProtoset("../../internal/testprotos/desc_test_editions.protoset")
 	testutil.Ok(t, err)
 
-	checkFile(t, &Printer{}, fd, "desc_test_editions.proto")
+	checkFile(t, &Printer{}, fd, "desc_test_editions-default.proto")
 }
 
 func TestPrintNonFileDescriptors(t *testing.T) {

@@ -6,7 +6,7 @@ cd $(dirname $0)
 
 for f in *.proto; do
   echo -n "Checking $f..."
-  protoc $f -o tmp.protoset -I ../../../internal/testprotos -I .
+  ../../../internal/testprotos/protoc/bin/protoc $f --experimental_editions -o tmp.protoset -I ../../../internal/testprotos -I .
   echo "  good"
 done
 
