@@ -2,7 +2,7 @@
 .PHONY: ci
 # TODO: add staticcheck back ASAP; removed temporarily because it
 # complains about a lot of APIs deprecated by protobuf 1.4
-ci: deps generate checkgofmt vet ineffassign test test-nounsafe
+ci: deps checkgofmt vet ineffassign test test-nounsafe
 
 .PHONY: deps
 deps:
@@ -64,7 +64,7 @@ errcheck:
 	errcheck ./...
 
 .PHONY: test
-test:
+test: generate
 	go test -cover -race ./...
 	./desc/protoprint/testfiles/check-protos.sh > /dev/null
 
