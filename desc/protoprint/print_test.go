@@ -227,6 +227,13 @@ message SomeMessage {
 	checkFile(t, &Printer{}, fd, "test-uninterpreted-options.proto")
 }
 
+func TestPrintEditions(t *testing.T) {
+	fd, err := loadProtoset("../../internal/testprotos/desc_test_editions.protoset")
+	testutil.Ok(t, err)
+
+	checkFile(t, &Printer{}, fd, "desc_test_editions.proto")
+}
+
 func TestPrintNonFileDescriptors(t *testing.T) {
 	pa := protoparse.Parser{ImportPaths: []string{"../../internal/testprotos"}, IncludeSourceCodeInfo: true}
 	fds, err := pa.ParseFiles("desc_test_comments.proto")
