@@ -2,7 +2,7 @@
 .PHONY: ci
 # TODO: add staticcheck back ASAP; removed temporarily because it
 # complains about a lot of APIs deprecated by protobuf 1.4
-ci: deps checkgofmt vet ineffassign test test-nounsafe
+ci: deps generate checkgofmt vet ineffassign test test-nounsafe
 
 .PHONY: deps
 deps:
