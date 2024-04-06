@@ -77,6 +77,7 @@ func TestPrinter(t *testing.T) {
 	files := []string{
 		"../../internal/testprotos/desc_test_comments.protoset",
 		"../../internal/testprotos/desc_test_complex_source_info.protoset",
+		"../../internal/testprotos/desc_test_editions.protoset",
 		"../../internal/testprotos/descriptor.protoset",
 		"../../internal/testprotos/desc_test1.protoset",
 		"../../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset",
@@ -225,13 +226,6 @@ message SomeMessage {
 	testutil.Ok(t, err)
 
 	checkFile(t, &Printer{}, fd, "test-uninterpreted-options.proto")
-}
-
-func TestPrintEditions(t *testing.T) {
-	fd, err := loadProtoset("../../internal/testprotos/desc_test_editions.protoset")
-	testutil.Ok(t, err)
-
-	checkFile(t, &Printer{}, fd, "desc_test_editions-default.proto")
 }
 
 func TestPrintNonFileDescriptors(t *testing.T) {
