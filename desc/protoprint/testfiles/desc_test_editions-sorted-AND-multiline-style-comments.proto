@@ -1,0 +1,41 @@
+edition = "2023";
+
+package testprotos;
+
+option features = { enum_type: CLOSED };
+
+option go_package = "github.com/jhump/protoreflect/internal/testprotos";
+
+message Foo {
+  int32 a = 1;
+
+  int32 required_field = 2 [features = { field_presence: LEGACY_REQUIRED }];
+
+  int32 default_field = 3 [default = 99];
+
+  DelimitedField delimitedfield = 4 [features = { message_encoding: DELIMITED }];
+
+  message DelimitedField {
+    int32 b = 1;
+  }
+
+  reserved reserved_field;
+}
+
+enum Closed {
+  CLOSED_C = 1;
+
+  CLOSED_A = 2;
+
+  reserved CLOSED_E, CLOSED_F;
+}
+
+enum Open {
+  option features = { enum_type: OPEN };
+
+  OPEN_B = 0;
+
+  OPEN_C = -1;
+
+  OPEN_A = 2;
+}

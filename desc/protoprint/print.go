@@ -2419,8 +2419,30 @@ type customSortOrder struct {
 }
 
 func (cso customSortOrder) Less(i, j int) bool {
-	ei := asElement(cso.at(cso.addrs[i]))
-	ej := asElement(cso.at(cso.addrs[j]))
+	// Regardless of the custom sort order, for proto3 files,
+	// the enum value zero MUST be first. So we override the
+	// custom sort order to make sure the file will be valid
+	// and can compile.
+	addri := cso.addrs[i]
+	addrj := cso.addrs[j]
+	di := cso.at(addri)
+	dj := cso.at(addrj)
+	if addri.elementType == addrj.elementType {
+		if vi, ok := di.(*desc.EnumValueDescriptor); ok {
+			vj := dj.(*desc.EnumValueDescriptor)
+			if !vi.GetEnum().UnwrapEnum().IsClosed() {
+				if vi.GetNumber() == 0 {
+					return true
+				}
+				if vj.GetNumber() == 0 {
+					return false
+				}
+			}
+		}
+	}
+
+	ei := asElement(di)
+	ej := asElement(dj)
 	return cso.less(ei, ej)
 }
 
