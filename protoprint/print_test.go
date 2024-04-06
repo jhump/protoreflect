@@ -81,6 +81,7 @@ func TestPrinter(t *testing.T) {
 	files := []string{
 		"../internal/testdata/desc_test_comments.protoset",
 		"../internal/testdata/desc_test_complex_source_info.protoset",
+		"../internal/testdata/desc_test_editions.protoset",
 		"../internal/testdata/desc_test_proto3.protoset",
 		"../internal/testdata/descriptor.protoset",
 		"../internal/testdata/desc_test1.protoset",

@@ -76,6 +76,8 @@ type FileWrapper interface {
 	FileDescriptorProto() *descriptorpb.FileDescriptorProto
 }
 
+var _ FileWrapper = wrappers.FileWrapper(nil)
+var _ wrappers.FileWrapper = FileWrapper(nil)
 var _ FileWrapper = (*wrappers.File)(nil)
 
 // MessageWrapper is a ProtoWrapper for messages: it implements

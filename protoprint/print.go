@@ -446,7 +446,11 @@ func (p *Printer) printFile(
 	si := sourceInfo.ByPath(path)
 	p.printElement(false, si, w, 0, func(w *writer) {
 		syn := fd.Syntax()
-		_, _ = fmt.Fprintf(w, "syntax = %q;", syn.String())
+		if syn != protoreflect.Editions {
+			_, _ = fmt.Fprintf(w, "syntax = %q;", syn.String())
+			return
+		}
+		_, _ = fmt.Fprintf(w, "edition = %q;", strings.TrimPrefix(protoresolve.GetEdition(fd).String(), "EDITION_"))
 	})
 	p.newLine(w)
 
@@ -477,7 +481,7 @@ func (p *Printer) printFile(
 	exts := fd.Extensions()
 	for i, length := 0, exts.Len(); i < length; i++ {
 		extd := exts.Get(i)
-		if extd.Kind() == protoreflect.GroupKind {
+		if isGroup(extd) {
 			// we don't emit nested messages for groups since
 			// they get special treatment
 			skip[extd.Message()] = true
@@ -703,10 +707,13 @@ func (p *Printer) typeString(fld protoreflect.FieldDescriptor, scope protoreflec
 	switch fld.Kind() {
 	case protoreflect.EnumKind:
 		return p.qualifyName(fld.ParentFile().Package(), scope, fld.Enum().FullName())
+	case protoreflect.GroupKind:
+		if isGroup(fld) {
+			return string(fld.Message().Name())
+		}
+		fallthrough
 	case protoreflect.MessageKind:
 		return p.qualifyName(fld.ParentFile().Package(), scope, fld.Message().FullName())
-	case protoreflect.GroupKind:
-		return string(fld.Message().Name())
 	default:
 		return fld.Kind().String()
 	}
@@ -772,7 +779,7 @@ func (p *Printer) printMessageBody(
 	fields := md.Fields()
 	for i, length := 0, fields.Len(); i < length; i++ {
 		fld := fields.Get(i)
-		if fld.IsMap() || fld.Kind() == protoreflect.GroupKind {
+		if fld.IsMap() || isGroup(fld) {
 			// we don't emit nested messages for map types or groups since
 			// they get special treatment
 			skip[fld.Message()] = true
@@ -791,7 +798,7 @@ func (p *Printer) printMessageBody(
 	exts := md.Extensions()
 	for i, length := 0, exts.Len(); i < length; i++ {
 		extd := exts.Get(i)
-		if extd.Kind() == protoreflect.GroupKind {
+		if isGroup(extd) {
 			// we don't emit nested messages for groups since
 			// they get special treatment
 			skip[extd.Message()] = true
@@ -895,7 +902,7 @@ func (p *Printer) printMessageBody(
 				addrs = append(addrs, elnext)
 				skip[rn] = true
 			}
-			p.printReservedNames(names, addrs, w, sourceInfo, path, indent)
+			p.printReservedNames(names, addrs, w, sourceInfo, path, indent, reservedShouldUseQuotes(md))
 		}
 	}
 }
@@ -917,7 +924,7 @@ func (p *Printer) printField(
 	var groupPath []int32
 	var si protoreflect.SourceLocation
 
-	group := fld.Kind() == protoreflect.GroupKind
+	group := isGroup(fld)
 
 	if group {
 		// compute path to group message type
@@ -995,7 +1002,7 @@ func (p *Printer) printField(
 		// we use negative values for "extras" keys so they can't collide
 		// with legit option tags
 
-		if fld.ParentFile().Syntax() != protoreflect.Proto3 && fld.HasDefault() {
+		if fld.HasPresence() && fld.HasDefault() {
 			var defVal any
 			if fld.Enum() != nil {
 				defVal = ident(fld.DefaultEnumValue().Name())
@@ -1028,10 +1035,21 @@ func (p *Printer) printField(
 	})
 }
 
+func isGroup(fld protoreflect.FieldDescriptor) bool {
+	// Groups are a proto2 thing. If we see GroupLKind, but in editions, it
+	// really just means a field with delimited message encoding.
+	return fld.Kind() == protoreflect.GroupKind && fld.Syntax() != protoreflect.Editions
+}
+
 func shouldEmitLabel(fld protoreflect.FieldDescriptor) bool {
+	card := fld.Cardinality()
+	if card == protoreflect.Required && fld.Syntax() == protoreflect.Editions {
+		// no required label in editions (it will come from a feature)
+		return false
+	}
 	return (fld.ContainingOneof() != nil && fld.ContainingOneof().IsSynthetic()) ||
 		(!fld.IsMap() && fld.ContainingOneof() == nil &&
-			(fld.Cardinality() != protoreflect.Optional || fld.ParentFile().Syntax() == protoreflect.Proto2))
+			(card != protoreflect.Optional || fld.ParentFile().Syntax() == protoreflect.Proto2))
 }
 
 func (p *Printer) printOneOf(
@@ -1234,6 +1252,10 @@ func (p *Printer) printReservedRanges(
 	_, _ = fmt.Fprintln(w, ";")
 }
 
+func reservedShouldUseQuotes(d protoreflect.Descriptor) bool {
+	return d.Syntax() != protoreflect.Editions
+}
+
 func (p *Printer) printReservedNames(
 	names []protoreflect.Name,
 	addrs []elementAddr,
@@ -1241,6 +1263,7 @@ func (p *Printer) printReservedNames(
 	sourceInfo protoreflect.SourceLocations,
 	parentPath protoreflect.SourcePath,
 	indent int,
+	useQuotes bool,
 ) {
 	p.indent(w, indent)
 	_, _ = fmt.Fprint(w, "reserved ")
@@ -1254,7 +1277,11 @@ func (p *Printer) printReservedNames(
 		}
 		el := addrs[i]
 		si := sourceInfo.ByPath(append(parentPath, el.elementType, int32(el.elementIndex)))
-		p.printElementString(si, w, indent, quotedString(string(name)))
+		reservedName := string(name)
+		if useQuotes {
+			reservedName = quotedString(reservedName)
+		}
+		p.printElementString(si, w, indent, reservedName)
 	}
 
 	_, _ = fmt.Fprintln(w, ";")
@@ -1356,7 +1383,7 @@ func (p *Printer) printEnum(
 					addrs = append(addrs, elnext)
 					skip[rn] = true
 				}
-				p.printReservedNames(names, addrs, w, sourceInfo, path, indent)
+				p.printReservedNames(names, addrs, w, sourceInfo, path, indent, reservedShouldUseQuotes(ed))
 			}
 		}
 
@@ -2204,12 +2231,12 @@ func (a elementAddrs) Less(i, j int) bool {
 
 	case protoreflect.EnumValueDescriptor:
 		// enum values ordered by number then name,
-		// but first value number must be 0 in proto3
+		// but first value number must be 0 for open enums
 		vj := dj.(protoreflect.EnumValueDescriptor)
 		if vi.Number() == vj.Number() {
 			return vi.Name() < vj.Name()
 		}
-		if vi.ParentFile().Syntax() == protoreflect.Proto3 {
+		if ed, ok := vi.Parent().(protoreflect.EnumDescriptor); ok && !ed.IsClosed() {
 			if vi.Number() == 0 {
 				return true
 			}
@@ -2487,7 +2514,7 @@ func (cso customSortOrder) Less(i, j int) bool {
 	if addri.elementType == addrj.elementType {
 		if vi, ok := di.(protoreflect.EnumValueDescriptor); ok {
 			vj := dj.(protoreflect.EnumValueDescriptor)
-			if vi.ParentFile().Syntax() == protoreflect.Proto3 {
+			if ed, ok := vi.Parent().(protoreflect.EnumDescriptor); ok && !ed.IsClosed() {
 				if vi.Number() == 0 {
 					return true
 				}

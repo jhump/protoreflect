@@ -18,7 +18,8 @@ func main() {
 }
 
 func genSourceInfo(plugin *protogen.Plugin) error {
-	plugin.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL)
+	plugin.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL |
+		pluginpb.CodeGeneratorResponse_FEATURE_SUPPORTS_EDITIONS)
 	for _, f := range plugin.Files {
 		if f.Generate {
 			if err := generateSourceInfo(f, plugin); err != nil {

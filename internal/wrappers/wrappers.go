@@ -16,6 +16,8 @@ import (
 	"fmt"
 	"sync"
 
+	"google.golang.org/protobuf/reflect/protodesc"
+
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -31,6 +33,35 @@ import (
 type ProtoWrapper interface {
 	protoreflect.Descriptor
 	AsProto() proto.Message
+}
+
+// FileWrapper is a protoreflect.FileDescriptor that wraps an underlying
+// FileDescriptorProto. It is like ProtoWrapper, but specific to files
+// and has a strongly-typed accessor method.
+//
+// See protowrap.FileWrapper for more.
+type FileWrapper interface {
+	protoreflect.FileDescriptor
+	FileDescriptorProto() *descriptorpb.FileDescriptorProto
+}
+
+// ProtoFromFileDescriptor extracts a descriptor proto from the given "rich"
+// descriptor.
+//
+// See protowrap.ProtoFromFileDescriptor for more.
+func ProtoFromFileDescriptor(d protoreflect.FileDescriptor) *descriptorpb.FileDescriptorProto {
+	if imp, ok := d.(protoreflect.FileImport); ok {
+		d = imp.FileDescriptor
+	}
+	if res, ok := d.(FileWrapper); ok {
+		return res.FileDescriptorProto()
+	}
+	if res, ok := d.(ProtoWrapper); ok {
+		if fd, ok := res.AsProto().(*descriptorpb.FileDescriptorProto); ok {
+			return fd
+		}
+	}
+	return protodesc.ToFileDescriptorProto(d)
 }
 
 // WrappedDescriptor represents a descriptor that has been wrapped or decorated.
