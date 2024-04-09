@@ -32,11 +32,23 @@ type FieldBuilder struct {
 	msgType   *MessageBuilder
 	fieldType *FieldType
 
-	Options        *descriptorpb.FieldOptions
-	Label          descriptorpb.FieldDescriptorProto_Label
+	Options *descriptorpb.FieldOptions
+	Label   descriptorpb.FieldDescriptorProto_Label
+
+	// Proto3Optional indicates if the field is a proto3 optional field. This
+	// only applies to fields in files with "proto3" syntax whose Cardinality
+	// is set to protoreflect.Optional.
+	//
+	// If the file's syntax is not "proto3", this may not be set to true.
+	//
+	// This allows setting a field in a proto3 file to have explicit field
+	// presence. To manage field presence for fields in files that use
+	// "editions", set the field_presence field of the features option in
+	// Options.
 	Proto3Optional bool
-	Default        string
-	JsonName       string
+
+	Default  string
+	JsonName string
 
 	foreignExtendee *desc.MessageDescriptor
 	localExtendee   *MessageBuilder
@@ -496,6 +508,7 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 	addCommentsTo(sourceInfo, path, &flb.comments)
 
 	isProto3 := flb.GetFile().IsProto3
+	isEditions := flb.GetFile().Edition > 0
 	if flb.Proto3Optional {
 		if !isProto3 {
 			return nil, fmt.Errorf("field %s is not in a proto3 syntax file but is marked as a proto3 optional field", GetFullyQualifiedName(flb))
@@ -510,8 +523,8 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 
 	var lbl *descriptorpb.FieldDescriptorProto_Label
 	if int32(flb.Label) != 0 {
-		if isProto3 && flb.Label == descriptorpb.FieldDescriptorProto_LABEL_REQUIRED {
-			return nil, fmt.Errorf("field %s: proto3 does not allow required fields", GetFullyQualifiedName(flb))
+		if (isProto3 || isEditions) && flb.Label == descriptorpb.FieldDescriptorProto_LABEL_REQUIRED {
+			return nil, fmt.Errorf("field %s: only proto2 allows required fields", GetFullyQualifiedName(flb))
 		}
 		lbl = flb.Label.Enum()
 	}
