@@ -14,12 +14,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 	reflectv1alpha "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 	_ "google.golang.org/protobuf/types/known/apipb"
 	_ "google.golang.org/protobuf/types/known/emptypb"
 	_ "google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -226,14 +232,14 @@ func TestReset(t *testing.T) {
 	stream := client.stream
 	// intercept cancellation
 	cancel := client.cancel
-	var cancelled int32
+	var cancelled atomic.Bool
 	client.cancel = func() {
-		atomic.StoreInt32(&cancelled, 1)
+		cancelled.Store(true)
 		cancel()
 	}
 
 	client.Reset()
-	testutil.Eq(t, int32(1), atomic.LoadInt32(&cancelled))
+	testutil.Eq(t, true, cancelled.Load())
 	testutil.Eq(t, nil, client.stream)
 
 	_, err = client.ListServices()
@@ -295,6 +301,98 @@ func TestMultipleFiles(t *testing.T) {
 		_, ok := sd.(*desc.ServiceDescriptor)
 		testutil.Require(t, ok, "symbol for %s is not a service descriptor, instead is %T", svc, sd)
 	}
+}
+
+func TestAllowMissingFileDescriptors(t *testing.T) {
+	svr := grpc.NewServer()
+	files := createFilesWithMissingDeps(t)
+	reflectionSvc := reflection.NewServer(reflection.ServerOptions{
+		DescriptorResolver: files,
+		ExtensionResolver:  files,
+	})
+	reflectv1alpha.RegisterServerReflectionServer(svr, reflectionSvc)
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	testutil.Ok(t, err, "failed to listen")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		defer cancel()
+		if err := svr.Serve(l); err != nil {
+			t.Logf("serve returned error: %v", err)
+		}
+	}()
+	time.Sleep(100 * time.Millisecond) // give server a chance to start
+	testutil.Ok(t, ctx.Err(), "failed to start server")
+	defer func() {
+		svr.Stop()
+	}()
+
+	dialCtx, dialCancel := context.WithTimeout(ctx, 3*time.Second)
+	defer dialCancel()
+	cc, err := grpc.DialContext(dialCtx, l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	testutil.Ok(t, err, "failed ot dial %v", l.Addr().String())
+	cl := reflectv1alpha.NewServerReflectionClient(cc)
+
+	client := NewClientV1Alpha(ctx, cl)
+	defer client.Reset()
+
+	// First we try some things that should fail due to missing descriptors.
+	_, err = client.FileByFilename("foo/bar/this.proto")
+	testutil.Nok(t, err)
+	_, err = client.FileContainingSymbol("foo.bar.Bar")
+	testutil.Nok(t, err)
+	_, err = client.FileContainingExtension("google.protobuf.MessageOptions", 10101)
+	testutil.Nok(t, err)
+
+	client.AllowMissingFileDescriptors()
+	// Now the above queries should succeed.
+	file, err := client.FileByFilename("foo/bar/this.proto")
+	testutil.Ok(t, err)
+	testutil.Require(t, file != nil)
+	testutil.Eq(t, "foo/bar/this.proto", file.GetName())
+	_, err = client.FileContainingSymbol("foo.bar.Bar")
+	testutil.Ok(t, err)
+	testutil.Require(t, file != nil)
+	testutil.Eq(t, "foo/bar/this.proto", file.GetName())
+	_, err = client.FileContainingExtension("google.protobuf.MessageOptions", 10101)
+	testutil.Ok(t, err)
+	testutil.Require(t, file != nil)
+	testutil.Eq(t, "foo/bar/this.proto", file.GetName())
+}
+
+func TestFileWithoutDeps(t *testing.T) {
+	fd := &descriptorpb.FileDescriptorProto{
+		Dependency: []string{
+			"foo/bar.proto",
+			"foo/public/bar.proto", // missing
+			"foo/weak/bar.proto",
+			"foo/baz.proto", // missing
+			"foo/public/baz.proto",
+			"foo/weak/baz.proto", // missing
+			"foo/fizz.proto",
+			"foo/public/fizz.proto", // missing
+			"foo/weak/fizz.proto",
+			"foo/buzz.proto", // missing
+			"foo/public/buzz.proto",
+			"foo/weak/buzz.proto", // missing
+		},
+		PublicDependency: []int32{1, 4, 7, 10},
+		WeakDependency:   []int32{2, 5, 8, 11},
+	}
+	fd = fileWithoutDeps(fd, []int{1, 3, 5, 7, 9, 11})
+	testutil.Eq(t,
+		[]string{
+			"foo/bar.proto",
+			"foo/weak/bar.proto",
+			"foo/public/baz.proto",
+			"foo/fizz.proto",
+			"foo/weak/fizz.proto",
+			"foo/public/buzz.proto",
+		},
+		fd.Dependency)
+	testutil.Eq(t, []int32{2, 5}, fd.PublicDependency)
+	testutil.Eq(t, []int32{1, 4}, fd.WeakDependency)
 }
 
 type testReflectionServer struct{}
@@ -656,4 +754,230 @@ func (c *captureErrorStream) RecvMsg(m interface{}) error {
 		c.c.observe(err)
 	}
 	return err
+}
+
+func createFilesWithMissingDeps(t *testing.T) *files {
+	t.Helper()
+	var result files
+	empty, err := protodesc.NewFile(&descriptorpb.FileDescriptorProto{
+		Name:   proto.String("empty.proto"),
+		Syntax: proto.String("proto2"),
+	}, &result)
+	testutil.Ok(t, err)
+
+	// These will be missing, so we create them as placeholders, so
+	// the protobuf-go runtime can resolve imports for them and
+	// still build a protoreflect.FileDescriptor.
+	err = result.RegisterFile(&placeholder{path: "test/custom/options.proto", FileDescriptor: empty})
+	testutil.Ok(t, err)
+	err = result.RegisterFile(&placeholder{path: "test/unused.proto", FileDescriptor: empty})
+	testutil.Ok(t, err)
+
+	// register google/protobuf/descriptor.proto from the embedded descriptor in descriptorpb
+	err = result.RegisterFile((*descriptorpb.FileDescriptorProto)(nil).ProtoReflect().Descriptor().ParentFile())
+	testutil.Ok(t, err)
+
+	importedFile := &descriptorpb.FileDescriptorProto{
+		Name:             proto.String("test/imported.proto"),
+		Syntax:           proto.String("proto3"),
+		Package:          proto.String("test"),
+		Dependency:       []string{"google/protobuf/descriptor.proto", "test/unused.proto"},
+		PublicDependency: []int32{1}, // unused is public
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: proto.String("Message"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{
+						Name:     proto.String("name"),
+						Number:   proto.Int32(1),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+						JsonName: proto.String("name"),
+					},
+					{
+						Name:     proto.String("tags"),
+						Number:   proto.Int32(2),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_UINT64.Enum(),
+						JsonName: proto.String("tags"),
+					},
+				},
+				Extension: []*descriptorpb.FieldDescriptorProto{
+					{
+						Extendee: proto.String(".google.protobuf.MessageOptions"),
+						Name:     proto.String("message_option"),
+						Number:   proto.Int32(10101),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+					},
+				},
+			},
+		},
+		EnumType: []*descriptorpb.EnumDescriptorProto{
+			{
+				Name: proto.String("Enum"),
+				Value: []*descriptorpb.EnumValueDescriptorProto{
+					{
+						Name:   proto.String("VAL0"),
+						Number: proto.Int32(0),
+					},
+					{
+						Name:   proto.String("VAL1"),
+						Number: proto.Int32(1),
+					},
+				},
+			},
+		},
+		Extension: []*descriptorpb.FieldDescriptorProto{
+			{
+				Extendee: proto.String(".google.protobuf.FileOptions"),
+				Name:     proto.String("file_option"),
+				Number:   proto.Int32(10101),
+				Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+				Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+			},
+		},
+	}
+	importedFileDesc, err := protodesc.NewFile(importedFile, &result)
+	testutil.Ok(t, err)
+	err = result.Files.RegisterFile(importedFileDesc)
+	testutil.Ok(t, err)
+
+	topFile := &descriptorpb.FileDescriptorProto{
+		Name:       proto.String("foo/bar/this.proto"),
+		Syntax:     proto.String("proto3"),
+		Package:    proto.String("foo.bar"),
+		Dependency: []string{"test/imported.proto", "test/unused.proto", "test/custom/options.proto"},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: proto.String("Foo"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{
+						Name:     proto.String("msg"),
+						Number:   proto.Int32(1),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+						TypeName: proto.String(".test.Message"),
+						JsonName: proto.String("msg"),
+					},
+					{
+						Name:     proto.String("en"),
+						Number:   proto.Int32(2),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum(),
+						TypeName: proto.String(".test.Enum"),
+						JsonName: proto.String("en"),
+					},
+				},
+			},
+			{
+				Name: proto.String("Bar"),
+				Field: []*descriptorpb.FieldDescriptorProto{
+					{
+						Name:     proto.String("foos"),
+						Number:   proto.Int32(1),
+						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+						Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+						TypeName: proto.String(".foo.bar.Foo"),
+						JsonName: proto.String("foos"),
+					},
+				},
+			},
+		},
+	}
+	topFileDesc, err := protodesc.NewFile(topFile, &result)
+	testutil.Ok(t, err)
+	err = result.Files.RegisterFile(topFileDesc)
+	testutil.Ok(t, err)
+
+	return &result
+}
+
+type files struct {
+	protoregistry.Files
+}
+
+func (f *files) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
+	d, err := f.FindDescriptorByName(field)
+	if err != nil {
+		return nil, err
+	}
+	fd, ok := d.(protoreflect.FieldDescriptor)
+	if !ok {
+		return nil, fmt.Errorf("%s is not a field descriptor but a %T", field, fd)
+	}
+	if !fd.IsExtension() {
+		return nil, fmt.Errorf("%s is a normal field, not an extension", field)
+	}
+	return asExtensionType(fd), nil
+}
+
+func (f *files) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
+	var found protoreflect.ExtensionType
+	f.RangeExtensionsByMessage(message, func(xt protoreflect.ExtensionType) bool {
+		if xt.TypeDescriptor().Number() == field {
+			found = xt
+			return false
+		}
+		return true
+	})
+	if found == nil {
+		return nil, protoregistry.NotFound
+	}
+	return found, nil
+}
+
+func (f *files) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionType) bool) {
+	f.RangeFiles(func(file protoreflect.FileDescriptor) bool {
+		return rangeExtensionsByMessage(file, message, fn)
+	})
+}
+
+func rangeExtensionsByMessage(
+	container interface {
+		Messages() protoreflect.MessageDescriptors
+		Extensions() protoreflect.ExtensionDescriptors
+	},
+	message protoreflect.FullName,
+	fn func(protoreflect.ExtensionType) bool,
+) bool {
+	for i := 0; i < container.Extensions().Len(); i++ {
+		ext := container.Extensions().Get(i)
+		if ext.ContainingMessage().FullName() == message {
+			if !fn(asExtensionType(ext)) {
+				return false
+			}
+		}
+	}
+	for i := 0; i < container.Messages().Len(); i++ {
+		if !rangeExtensionsByMessage(container.Messages().Get(i), message, fn) {
+			return false
+		}
+	}
+	return true
+}
+
+func asExtensionType(fd protoreflect.ExtensionDescriptor) protoreflect.ExtensionType {
+	xtd, ok := fd.(protoreflect.ExtensionTypeDescriptor)
+	if ok {
+		return xtd.Type()
+	}
+	return dynamicpb.NewExtensionType(fd)
+}
+
+type placeholder struct {
+	path string
+	protoreflect.FileDescriptor
+}
+
+func (p *placeholder) IsPlaceholder() bool {
+	return true
+}
+
+func (p *placeholder) Path() string {
+	return p.path
+}
+
+func (p *placeholder) Syntax() protoreflect.Syntax {
+	return 0
 }
