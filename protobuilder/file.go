@@ -49,7 +49,11 @@ func makeUnique(name string, existingNames map[string]struct{}) string {
 type FileBuilder struct {
 	path string
 
-	Syntax  protoreflect.Syntax
+	Syntax protoreflect.Syntax
+	// Edition indicates which edition this file uses. It may only be
+	// set when Syntax is unset or set to protoreflect.Editions.
+	Edition descriptorpb.Edition
+
 	Package protoreflect.FullName
 	Options *descriptorpb.FileOptions
 
@@ -87,6 +91,9 @@ func NewFile(path string) *FileBuilder {
 func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
 	fb := NewFile(fd.Path())
 	fb.Syntax = fd.Syntax()
+	if fb.Syntax == protoreflect.Editions {
+		fb.Edition = protoresolve.GetEdition(fd)
+	}
 	fb.Package = fd.Package()
 	var err error
 	fb.Options, err = protomessage.As[*descriptorpb.FileOptions](fd.Options())
@@ -697,9 +704,18 @@ func (fb *FileBuilder) SetPackageName(pkg protoreflect.FullName) *FileBuilder {
 }
 
 // SetSyntax sets whether this file is declared to use "proto3" syntax or not
-// and returns the file, for method chaining.
+// and returns the file, for method chaining. To set the syntax of the file
+// to protoreflect.Editions, use SetEdition instead.
 func (fb *FileBuilder) SetSyntax(syntax protoreflect.Syntax) *FileBuilder {
 	fb.Syntax = syntax
+	return fb
+}
+
+// SetEdition sets the edition for this file. Setting it to unknown, legacy,
+// max, or a test-only value will result in an error when this file is built.
+func (fb *FileBuilder) SetEdition(edition descriptorpb.Edition) *FileBuilder {
+	fb.Syntax = protoreflect.Editions
+	fb.Edition = edition
 	return fb
 }
 
@@ -709,11 +725,37 @@ func (fb *FileBuilder) buildProto(deps []protoreflect.FileDescriptor) (*descript
 		filePath = uniqueFilePath()
 	}
 	var syntax *string
+	var edition *descriptorpb.Edition
 	switch fb.Syntax {
 	case protoreflect.Proto3:
 		syntax = proto.String("proto3")
-	case protoreflect.Proto2, 0: // default (zero) is proto2
+	case protoreflect.Proto2:
 		syntax = proto.String("proto2")
+	case 0: // default (unset) is proto2 unless and edition was specified
+		if fb.Edition == 0 {
+			syntax = proto.String("proto2")
+			break
+		}
+		fallthrough
+	case protoreflect.Editions:
+		switch {
+		case fb.Edition < descriptorpb.Edition_EDITION_PROTO2 ||
+			fb.Edition >= descriptorpb.Edition_EDITION_MAX ||
+			descriptorpb.Edition_name[int32(fb.Edition)] == "" ||
+			strings.HasSuffix(fb.Edition.String(), "_TEST_ONLY"):
+			return nil, fmt.Errorf("builder contains unknown or invalid edition: %v", fb.Edition)
+		case fb.Edition == descriptorpb.Edition_EDITION_PROTO2 && fb.Syntax == 0:
+			// Edition set to proto2 instead of syntax? We'll allow it.
+			syntax = proto.String("proto2")
+		case fb.Edition == descriptorpb.Edition_EDITION_PROTO3 && fb.Syntax == 0:
+			// Edition set to proto3 instead of syntax? We'll allow it.
+			syntax = proto.String("proto3")
+		case fb.Edition == descriptorpb.Edition_EDITION_PROTO2 || fb.Edition == descriptorpb.Edition_EDITION_PROTO3:
+			return nil, fmt.Errorf("builder indicates syntax editions but edition %v; set syntax instead", fb.Edition)
+		default:
+			syntax = proto.String("editions")
+			edition = fb.Edition.Enum()
+		}
 	default:
 		return nil, fmt.Errorf("builder contains unknown syntax: %v", fb.Syntax)
 	}
@@ -780,6 +822,7 @@ func (fb *FileBuilder) buildProto(deps []protoreflect.FileDescriptor) (*descript
 		Dependency:     imports,
 		Options:        fb.Options,
 		Syntax:         syntax,
+		Edition:        edition,
 		MessageType:    messages,
 		EnumType:       enums,
 		Extension:      extensions,

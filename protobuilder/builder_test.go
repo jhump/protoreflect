@@ -350,7 +350,11 @@ func TestProto3Optional(t *testing.T) {
 }
 
 func TestBuildersFromDescriptors(t *testing.T) {
-	for _, s := range []string{"desc_test1.proto", "desc_test2.proto", "desc_test_defaults.proto", "desc_test_options.proto", "desc_test_proto3.proto", "desc_test_wellknowntypes.proto", "nopkg/desc_test_nopkg.proto", "nopkg/desc_test_nopkg_new.proto", "pkg/desc_test_pkg.proto"} {
+	for _, s := range []string{
+		"desc_test1.proto", "desc_test2.proto",
+		"desc_test_defaults.proto", "desc_test_editions.proto", "desc_test_options.proto",
+		"desc_test_proto3.proto", "desc_test_wellknowntypes.proto",
+		"nopkg/desc_test_nopkg.proto", "nopkg/desc_test_nopkg_new.proto", "pkg/desc_test_pkg.proto"} {
 		fd, err := protoregistry.GlobalFiles.FindFileByPath(s)
 		require.NoError(t, err)
 		roundTripFile(t, fd)
@@ -1649,7 +1653,7 @@ func TestInvalid(t *testing.T) {
 						NewMessage("Foo").AddField(NewField("foo", FieldTypeBool()).SetRequired()),
 					)
 			},
-			expectedError: "proto3 does not allow required fields",
+			expectedError: "only proto2 allows required fields",
 		},
 		{
 			name: "extension range in proto3",

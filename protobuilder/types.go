@@ -185,7 +185,12 @@ func FieldTypeImportedEnum(ed protoreflect.EnumDescriptor) *FieldType {
 func fieldTypeFromDescriptor(fld protoreflect.FieldDescriptor) *FieldType {
 	switch fld.Kind() {
 	case protoreflect.GroupKind:
-		return &FieldType{fieldType: descriptorpb.FieldDescriptorProto_TYPE_GROUP, foreignMsgType: fld.Message()}
+		if fld.ParentFile().Syntax() == protoreflect.Proto2 {
+			return &FieldType{fieldType: descriptorpb.FieldDescriptorProto_TYPE_GROUP, foreignMsgType: fld.Message()}
+		}
+		// Outside of proto2, this kind is just a marker for delimited encoding.
+		// The actual type is a normal message field.
+		fallthrough
 	case protoreflect.MessageKind:
 		return FieldTypeImportedMessage(fld.Message())
 	case protoreflect.EnumKind:

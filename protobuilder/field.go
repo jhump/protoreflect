@@ -34,11 +34,23 @@ type FieldBuilder struct {
 	msgType   *MessageBuilder
 	fieldType *FieldType
 
-	Options        *descriptorpb.FieldOptions
-	Cardinality    protoreflect.Cardinality
+	Options     *descriptorpb.FieldOptions
+	Cardinality protoreflect.Cardinality
+
+	// Proto3Optional indicates if the field is a proto3 optional field. This
+	// only applies to fields in files with "proto3" syntax whose Cardinality
+	// is set to protoreflect.Optional.
+	//
+	// If the file's syntax is not "proto3", this may not be set to true.
+	//
+	// This allows setting a field in a proto3 file to have explicit field
+	// presence. To manage field presence for fields in files that use
+	// "editions", set the field_presence field of the features option in
+	// Options.
 	Proto3Optional bool
-	Default        string
-	JsonName       string
+
+	Default  string
+	JsonName string
 
 	foreignExtendee protoreflect.MessageDescriptor
 	localExtendee   *MessageBuilder
@@ -194,6 +206,11 @@ func fromField(fld protoreflect.FieldDescriptor) (*FieldBuilder, error) {
 		return nil, err
 	}
 	flb.Cardinality = fld.Cardinality()
+	if flb.Cardinality == protoreflect.Required && fld.ParentFile().Syntax() == protoreflect.Editions {
+		// We actually leave "legacy required" fields as optional. The "required" aspect
+		// comes from the features set in the field options.
+		flb.Cardinality = protoreflect.Optional
+	}
 	flb.Proto3Optional = fld.ContainingOneof() != nil && fld.ContainingOneof().IsSynthetic()
 	fldProto := protowrap.ProtoFromFieldDescriptor(fld)
 	flb.Default = fldProto.GetDefaultValue()
@@ -400,6 +417,10 @@ func (flb *FieldBuilder) SetOptions(options *descriptorpb.FieldOptions) *FieldBu
 
 // SetCardinality sets the label for this field, which can be optional, repeated, or
 // required. It returns the field builder, for method chaining.
+//
+// If the field will be in a file with "proto3" or editions syntax, required is not
+// an allowed option. For editions, to set a field to be required, set the field_presence
+// feature in the field options to descriptorpb.FeatureSet_LEGACY_REQUIRED.
 func (flb *FieldBuilder) SetCardinality(card protoreflect.Cardinality) *FieldBuilder {
 	flb.Cardinality = card
 	return flb
@@ -407,6 +428,8 @@ func (flb *FieldBuilder) SetCardinality(card protoreflect.Cardinality) *FieldBui
 
 // SetProto3Optional sets whether this is a proto3 optional field. It returns
 // the field builder, for method chaining.
+//
+// This can only be set for fields in files with "proto3" syntax.
 func (flb *FieldBuilder) SetProto3Optional(p3o bool) *FieldBuilder {
 	flb.Proto3Optional = p3o
 	return flb
@@ -420,6 +443,10 @@ func (flb *FieldBuilder) SetRepeated() *FieldBuilder {
 
 // SetRequired sets the label for this field to required. It returns the field
 // builder, for method chaining.
+//
+// This is only allowed for files with "proto2" syntax. For editions, to set a
+// field to be required, set the field_presence feature in the field options to
+// descriptorpb.FeatureSet_LEGACY_REQUIRED.
 func (flb *FieldBuilder) SetRequired() *FieldBuilder {
 	return flb.SetCardinality(protoreflect.Required)
 }
@@ -505,9 +532,8 @@ func (flb *FieldBuilder) ExtendeeTypeName() protoreflect.FullName {
 func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.SourceCodeInfo, isMessageSet bool) (*descriptorpb.FieldDescriptorProto, error) {
 	addCommentsTo(sourceInfo, path, &flb.comments)
 
-	isProto3 := flb.ParentFile().Syntax == protoreflect.Proto3
 	if flb.Proto3Optional {
-		if !isProto3 {
+		if flb.ParentFile().Syntax != protoreflect.Proto3 {
 			return nil, fmt.Errorf("field %s is not in a proto3 syntax file but is marked as a proto3 optional field", FullName(flb))
 		}
 		if flb.IsExtension() {
@@ -520,8 +546,8 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 
 	var lbl *descriptorpb.FieldDescriptorProto_Label
 	if int32(flb.Cardinality) != 0 {
-		if isProto3 && flb.Cardinality == protoreflect.Required {
-			return nil, fmt.Errorf("field %s: proto3 does not allow required fields", FullName(flb))
+		if flb.ParentFile().Syntax != protoreflect.Proto2 && flb.Cardinality == protoreflect.Required {
+			return nil, fmt.Errorf("field %s: only proto2 allows required fields", FullName(flb))
 		}
 		lbl = (descriptorpb.FieldDescriptorProto_Label)(flb.Cardinality).Enum()
 	}
