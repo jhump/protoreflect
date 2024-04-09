@@ -46,9 +46,17 @@ func makeUnique(name string, existingNames map[string]struct{}) string {
 type FileBuilder struct {
 	name string
 
+	// IsProto3 indicates that the file's syntax is "proto3". If this is
+	// false the file either uses syntax "proto2" (when Edition is zero)
+	// or uses editions (when Edition is non-zero).
 	IsProto3 bool
-	Package  string
-	Options  *descriptorpb.FileOptions
+
+	// Edition indicates which edition this file uses. It may only be
+	// set when IsProto3 is false.
+	Edition descriptorpb.Edition
+
+	Package string
+	Options *descriptorpb.FileOptions
 
 	comments        Comments
 	SyntaxComments  Comments
@@ -82,6 +90,7 @@ func NewFile(name string) *FileBuilder {
 func FromFile(fd *desc.FileDescriptor) (*FileBuilder, error) {
 	fb := NewFile(fd.GetName())
 	fb.IsProto3 = fd.IsProto3()
+	fb.Edition = fd.Edition()
 	fb.Package = fd.GetPackage()
 	fb.Options = fd.GetFileOptions()
 	setComments(&fb.comments, fd.GetSourceInfo())
@@ -89,7 +98,7 @@ func FromFile(fd *desc.FileDescriptor) (*FileBuilder, error) {
 	// find syntax and package comments, too
 	for _, loc := range fd.AsFileDescriptorProto().GetSourceCodeInfo().GetLocation() {
 		if len(loc.Path) == 1 {
-			if loc.Path[0] == internal.File_syntaxTag {
+			if loc.Path[0] == internal.File_syntaxTag || loc.Path[0] == internal.File_editionTag {
 				setComments(&fb.SyntaxComments, loc)
 			} else if loc.Path[0] == internal.File_packageTag {
 				setComments(&fb.PackageComments, loc)
@@ -649,9 +658,31 @@ func (fb *FileBuilder) SetPackageName(pkg string) *FileBuilder {
 }
 
 // SetProto3 sets whether this file is declared to use "proto3" syntax or not
-// and returns the file, for method chaining.
+// and returns the file, for method chaining. If this is called with a value
+// of false, then "proto2" syntax is assumed. To instead set the file to use
+// editions, call SetEdition.
 func (fb *FileBuilder) SetProto3(isProto3 bool) *FileBuilder {
 	fb.IsProto3 = isProto3
+	fb.Edition = 0
+	return fb
+}
+
+// SetEdition sets the edition that this file uses and returns the file, for
+// method chaining. This supports the use of the EDITION_PROTO2 and EDITION_PROTO3
+// values to actually set the value as "proto2" or "proto3" syntax respectively.
+// If a value less than EDITION_PROTO2 is provided, the invalid value is ignored
+// and the file is instead set to use "proto2" syntax.
+func (fb *FileBuilder) SetEdition(edition descriptorpb.Edition) *FileBuilder {
+	if edition <= descriptorpb.Edition_EDITION_PROTO2 {
+		fb.IsProto3 = false
+		fb.Edition = 0
+	} else if edition == descriptorpb.Edition_EDITION_PROTO3 {
+		fb.IsProto3 = true
+		fb.Edition = 0
+	} else {
+		fb.IsProto3 = false
+		fb.Edition = edition
+	}
 	return fb
 }
 
@@ -661,8 +692,19 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*descriptorpb.Fi
 		name = uniqueFileName()
 	}
 	var syntax *string
+	var edition *descriptorpb.Edition
 	if fb.IsProto3 {
 		syntax = proto.String("proto3")
+	} else if fb.Edition > 0 {
+		if fb.Edition < descriptorpb.Edition_EDITION_2023 ||
+			fb.Edition >= descriptorpb.Edition_EDITION_MAX ||
+			descriptorpb.Edition_name[int32(fb.Edition)] == "" ||
+			strings.HasSuffix(fb.Edition.String(), "_TEST_ONLY") {
+			// Not a valid edition!
+			return nil, fmt.Errorf("builder contains unknown or invalid edition: %v", fb.Edition)
+		}
+		syntax = proto.String("editions")
+		edition = fb.Edition.Enum()
 	}
 	var pkg *string
 	if fb.Package != "" {
@@ -727,6 +769,7 @@ func (fb *FileBuilder) buildProto(deps []*desc.FileDescriptor) (*descriptorpb.Fi
 		Dependency:     imports,
 		Options:        fb.Options,
 		Syntax:         syntax,
+		Edition:        edition,
 		MessageType:    messages,
 		EnumType:       enums,
 		Extension:      extensions,
