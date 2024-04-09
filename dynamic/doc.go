@@ -156,4 +156,12 @@
 //
 // The ExtensionRegistry allows for recognizing and parsing extensions fields
 // (for proto2 messages).
+//
+// Deprecated: This module was created for use with the older "v1" Protobuf API
+// in github.com/golang/protobuf. However, much of this module is no longer
+// necessary as the newer "v2" API in google.golang.org/protobuf provides similar
+// capabilities. Instead of using this github.com/jhump/protoreflect/dynamic package,
+// see [google.golang.org/protobuf/types/dynamicpb].
+//
+// [google.golang.org/protobuf/types/dynamicpb]: https://pkg.go.dev/google.golang.org/protobuf/types/dynamicpb
 package dynamic
