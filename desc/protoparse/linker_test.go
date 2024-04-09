@@ -1258,7 +1258,7 @@ func TestProto3Enums(t *testing.T) {
 			_, err := Parser{Accessor: acc}.ParseFiles("f1.proto", "f2.proto")
 
 			if o1 != o2 && o2 == "proto3" {
-				expected := "f2.proto:1:54: field foo.bar: cannot use proto2 enum bar in a proto3 message"
+				expected := "f2.proto:1:54: cannot use closed enum bar in a field with implicit presence"
 				if err == nil {
 					t.Errorf("expecting validation error; instead got no error")
 				} else if err.Error() != expected {

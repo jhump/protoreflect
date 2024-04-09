@@ -191,7 +191,7 @@ func TestBasicValidation(t *testing.T) {
 		},
 		{
 			contents: `syntax = "proto3"; enum Foo { FIRST = 1; }`,
-			errMsg:   `test.proto:1:39: enum Foo: proto3 requires that first value in enum have numeric value of 0`,
+			errMsg:   `test.proto:1:39: enum Foo: proto3 requires that first value of enum have numeric value zero`,
 		},
 		{
 			contents: `syntax = "proto3"; message Foo { string s = 1; int32 i = 1; }`,
