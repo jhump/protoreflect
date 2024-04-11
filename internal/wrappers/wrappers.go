@@ -72,36 +72,43 @@ type WrappedDescriptor interface {
 
 // Unwrap unwraps the given descriptor. If it implements WrappedDescriptor,
 // the underlying descriptor is returned. Otherwise, d is returned as is.
-func Unwrap(d protoreflect.Descriptor) protoreflect.Descriptor {
+func Unwrap(d protoreflect.Descriptor) (protoreflect.Descriptor, bool) {
+	if imp, ok := d.(protoreflect.FileImport); ok {
+		// FileImports need to be unwrapped first.
+		d = imp.FileDescriptor
+	} else if xtd, ok := d.(protoreflect.ExtensionTypeDescriptor); ok {
+		// ExtensionTypeDescriptors also need to be unwrapped.
+		d = xtd.Descriptor()
+	}
 	w, ok := d.(WrappedDescriptor)
 	if !ok {
 		// not wrapped
-		return d
+		return d, false
 	}
 	unwrapped := w.Unwrap()
 	if unwrapped == nil {
-		return d
+		return d, false
 	}
 	// Make sure that the unwrapped descriptor matches the incoming type
 	switch d.(type) {
 	case protoreflect.FileDescriptor:
-		return unwrapped.(protoreflect.FileDescriptor)
+		return unwrapped.(protoreflect.FileDescriptor), true
 	case protoreflect.MessageDescriptor:
-		return unwrapped.(protoreflect.MessageDescriptor)
+		return unwrapped.(protoreflect.MessageDescriptor), true
 	case protoreflect.FieldDescriptor:
-		return unwrapped.(protoreflect.FieldDescriptor)
+		return unwrapped.(protoreflect.FieldDescriptor), true
 	case protoreflect.OneofDescriptor:
-		return unwrapped.(protoreflect.OneofDescriptor)
+		return unwrapped.(protoreflect.OneofDescriptor), true
 	case protoreflect.EnumDescriptor:
-		return unwrapped.(protoreflect.EnumDescriptor)
+		return unwrapped.(protoreflect.EnumDescriptor), true
 	case protoreflect.EnumValueDescriptor:
-		return unwrapped.(protoreflect.EnumValueDescriptor)
+		return unwrapped.(protoreflect.EnumValueDescriptor), true
 	case protoreflect.ServiceDescriptor:
-		return unwrapped.(protoreflect.ServiceDescriptor)
+		return unwrapped.(protoreflect.ServiceDescriptor), true
 	case protoreflect.MethodDescriptor:
-		return unwrapped.(protoreflect.MethodDescriptor)
+		return unwrapped.(protoreflect.MethodDescriptor), true
 	default:
-		return unwrapped
+		return unwrapped, true
 	}
 }
 
@@ -196,7 +203,8 @@ func (w *srcLocsWrapper) ByDescriptor(d protoreflect.Descriptor) protoreflect.So
 	// The underlying SourceLocations makes a check that the given descriptor belongs to
 	// the same file. But if the descriptor is wrapped, its file will be different (its
 	// file will be the wrapper, but compared against unwrapped original).
-	return w.SourceLocations.ByDescriptor(Unwrap(d))
+	d, _ = Unwrap(d)
+	return w.SourceLocations.ByDescriptor(d)
 }
 
 type msgsWrapper struct {

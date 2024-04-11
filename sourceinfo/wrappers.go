@@ -48,6 +48,10 @@ func (f fileDescriptor) SourceLocations() protoreflect.SourceLocations {
 	return f.locs
 }
 
+func (f fileDescriptor) Unwrap() protoreflect.Descriptor {
+	return f.FileDescriptor
+}
+
 type imports struct {
 	protoreflect.FileImports
 }
@@ -167,6 +171,10 @@ func (m messageDescriptor) Extensions() protoreflect.ExtensionDescriptors {
 	return extensions{m.MessageDescriptor.Extensions()}
 }
 
+func (m messageDescriptor) Unwrap() protoreflect.Descriptor {
+	return m.MessageDescriptor
+}
+
 type fields struct {
 	protoreflect.FieldDescriptors
 }
@@ -281,6 +289,10 @@ func (f fieldDescriptor) Message() protoreflect.MessageDescriptor {
 	return WrapMessage(md)
 }
 
+func (f fieldDescriptor) Unwrap() protoreflect.Descriptor {
+	return f.FieldDescriptor
+}
+
 type oneofs struct {
 	protoreflect.OneofDescriptors
 }
@@ -321,6 +333,10 @@ func (o oneofDescriptor) Fields() protoreflect.FieldDescriptors {
 	return fields{o.OneofDescriptor.Fields()}
 }
 
+func (o oneofDescriptor) Unwrap() protoreflect.Descriptor {
+	return o.OneofDescriptor
+}
+
 type enumDescriptor struct {
 	protoreflect.EnumDescriptor
 }
@@ -345,6 +361,10 @@ func (e enumDescriptor) Parent() protoreflect.Descriptor {
 
 func (e enumDescriptor) Values() protoreflect.EnumValueDescriptors {
 	return enumValues{e.EnumDescriptor.Values()}
+}
+
+func (e enumDescriptor) Unwrap() protoreflect.Descriptor {
+	return e.EnumDescriptor
 }
 
 type enumValues struct {
@@ -389,6 +409,10 @@ func (e enumValueDescriptor) Parent() protoreflect.Descriptor {
 	default:
 		panic(fmt.Sprintf("unexpected descriptor type %T", d))
 	}
+}
+
+func (e enumValueDescriptor) Unwrap() protoreflect.Descriptor {
+	return e.EnumValueDescriptor
 }
 
 type extensionTypeDescriptor struct {
@@ -469,6 +493,10 @@ func (e extensionTypeDescriptor) Descriptor() protoreflect.ExtensionDescriptor {
 	return WrapExtension(e.ExtensionTypeDescriptor.Descriptor())
 }
 
+func (e extensionTypeDescriptor) Unwrap() protoreflect.Descriptor {
+	return e.ExtensionTypeDescriptor
+}
+
 var _ protoreflect.ExtensionTypeDescriptor = extensionTypeDescriptor{}
 
 type serviceDescriptor struct {
@@ -493,6 +521,10 @@ func (s serviceDescriptor) Parent() protoreflect.Descriptor {
 
 func (s serviceDescriptor) Methods() protoreflect.MethodDescriptors {
 	return methods{s.ServiceDescriptor.Methods()}
+}
+
+func (s serviceDescriptor) Unwrap() protoreflect.Descriptor {
+	return s.ServiceDescriptor
 }
 
 type methods struct {
@@ -537,6 +569,10 @@ func (m methodDescriptor) Input() protoreflect.MessageDescriptor {
 
 func (m methodDescriptor) Output() protoreflect.MessageDescriptor {
 	return WrapMessage(m.MethodDescriptor.Output())
+}
+
+func (m methodDescriptor) Unwrap() protoreflect.Descriptor {
+	return m.MethodDescriptor
 }
 
 type extensionType struct {
