@@ -179,7 +179,14 @@ var _ WrappedDescriptor = (*wrappers.Service)(nil)
 var _ WrappedDescriptor = (*wrappers.Method)(nil)
 
 // Unwrap unwraps the given descriptor. If it implements WrappedDescriptor,
-// the underlying descriptor is returned. Otherwise, d is returned as is.
+// the underlying descriptor is returned. This also supports more strongly
+// typed unwrap methods. For example, if the given value is a FileDescriptor
+// and has a method with the following signature, it will be invoked:
+//
+//	Unwrap() protoreflect.FileDescriptor.
+//
+// Otherwise, if d cannot be unwrapped, it is returned as is. If it does have
+// an Unwrap method, but that method returns nil, d is returned as is.
 func Unwrap(d protoreflect.Descriptor) protoreflect.Descriptor {
 	d, _ = wrappers.Unwrap(d)
 	return d

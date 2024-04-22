@@ -73,6 +73,9 @@ type WrappedDescriptor interface {
 // Unwrap unwraps the given descriptor. If it implements WrappedDescriptor,
 // the underlying descriptor is returned. Otherwise, d is returned as is.
 func Unwrap(d protoreflect.Descriptor) (protoreflect.Descriptor, bool) {
+	if d == nil {
+		return d, false
+	}
 	if imp, ok := d.(protoreflect.FileImport); ok {
 		// FileImports need to be unwrapped first.
 		d = imp.FileDescriptor
@@ -82,7 +85,10 @@ func Unwrap(d protoreflect.Descriptor) (protoreflect.Descriptor, bool) {
 	}
 	w, ok := d.(WrappedDescriptor)
 	if !ok {
-		// not wrapped
+		// Maybe it implements a more strongly-typed Unwrap method.
+		if unwrapped := typedUnwrap(d); unwrapped != nil {
+			return unwrapped, true
+		}
 		return d, false
 	}
 	unwrapped := w.Unwrap()
@@ -110,6 +116,55 @@ func Unwrap(d protoreflect.Descriptor) (protoreflect.Descriptor, bool) {
 	default:
 		return unwrapped, true
 	}
+}
+
+func typedUnwrap(d protoreflect.Descriptor) protoreflect.Descriptor {
+	type typedWrapper[D protoreflect.Descriptor] interface {
+		Unwrap() D
+	}
+	switch d.(type) {
+	case protoreflect.FileDescriptor:
+		w, ok := d.(typedWrapper[protoreflect.FileDescriptor])
+		if ok {
+			return w.Unwrap()
+		}
+	case protoreflect.MessageDescriptor:
+		w, ok := d.(typedWrapper[protoreflect.MessageDescriptor])
+		if ok {
+			return w.Unwrap()
+		}
+	case protoreflect.FieldDescriptor:
+		w, ok := d.(typedWrapper[protoreflect.FieldDescriptor])
+		if ok {
+			return w.Unwrap()
+		}
+	case protoreflect.OneofDescriptor:
+		w, ok := d.(typedWrapper[protoreflect.OneofDescriptor])
+		if ok {
+			return w.Unwrap()
+		}
+	case protoreflect.EnumDescriptor:
+		w, ok := d.(typedWrapper[protoreflect.EnumDescriptor])
+		if ok {
+			return w.Unwrap()
+		}
+	case protoreflect.EnumValueDescriptor:
+		w, ok := d.(typedWrapper[protoreflect.EnumValueDescriptor])
+		if ok {
+			return w.Unwrap()
+		}
+	case protoreflect.ServiceDescriptor:
+		w, ok := d.(typedWrapper[protoreflect.ServiceDescriptor])
+		if ok {
+			return w.Unwrap()
+		}
+	case protoreflect.MethodDescriptor:
+		w, ok := d.(typedWrapper[protoreflect.MethodDescriptor])
+		if ok {
+			return w.Unwrap()
+		}
+	}
+	return nil
 }
 
 // File is a wrapper around a FileDescriptor that provides convenient
