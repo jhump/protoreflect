@@ -185,11 +185,11 @@ func (r registry) FindFileByPath(path string) (protoreflect.FileDescriptor, erro
 
 func (r registry) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
 	d, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
-	if !canWrap(d) {
-		return d, nil
-	}
 	if err != nil {
 		return nil, err
+	}
+	if !canWrap(d) {
+		return d, nil
 	}
 	switch d := d.(type) {
 	case protoreflect.FileDescriptor:
