@@ -361,6 +361,64 @@ func TestAllowMissingFileDescriptors(t *testing.T) {
 	testutil.Eq(t, "foo/bar/this.proto", file.GetName())
 }
 
+func TestAllowFallbackResolver(t *testing.T) {
+	svr := grpc.NewServer()
+	files := createFilesWithMissingDeps(t)
+	reflectionSvc := reflection.NewServer(reflection.ServerOptions{
+		DescriptorResolver: files,
+		ExtensionResolver:  files,
+	})
+	reflectv1alpha.RegisterServerReflectionServer(svr, reflectionSvc)
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	testutil.Ok(t, err, "failed to listen")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		defer cancel()
+		if err := svr.Serve(l); err != nil {
+			t.Logf("serve returned error: %v", err)
+		}
+	}()
+	time.Sleep(100 * time.Millisecond) // give server a chance to start
+	testutil.Ok(t, ctx.Err(), "failed to start server")
+	defer func() {
+		svr.Stop()
+	}()
+
+	dialCtx, dialCancel := context.WithTimeout(ctx, 3*time.Second)
+	defer dialCancel()
+	cc, err := grpc.DialContext(dialCtx, l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	testutil.Ok(t, err, "failed ot dial %v", l.Addr().String())
+	cl := reflectv1alpha.NewServerReflectionClient(cc)
+
+	client := NewClientV1Alpha(ctx, cl)
+	defer client.Reset()
+
+	// First we try some things that should fail due to missing descriptors.
+	_, err = client.FileByFilename("foo/bar/this.proto")
+	testutil.Nok(t, err)
+	_, err = client.FileContainingSymbol("foo.bar.Bar")
+	testutil.Nok(t, err)
+	_, err = client.FileContainingExtension("google.protobuf.MessageOptions", 10101)
+	testutil.Nok(t, err)
+
+	client.AllowMissingFileDescriptors()
+	// Now the above queries should succeed.
+	file, err := client.FileByFilename("foo/bar/this.proto")
+	testutil.Ok(t, err)
+	testutil.Require(t, file != nil)
+	testutil.Eq(t, "foo/bar/this.proto", file.GetName())
+	_, err = client.FileContainingSymbol("foo.bar.Bar")
+	testutil.Ok(t, err)
+	testutil.Require(t, file != nil)
+	testutil.Eq(t, "foo/bar/this.proto", file.GetName())
+	_, err = client.FileContainingExtension("google.protobuf.MessageOptions", 10101)
+	testutil.Ok(t, err)
+	testutil.Require(t, file != nil)
+	testutil.Eq(t, "foo/bar/this.proto", file.GetName())
+}
+
 func TestFileWithoutDeps(t *testing.T) {
 	fd := &descriptorpb.FileDescriptorProto{
 		Dependency: []string{
