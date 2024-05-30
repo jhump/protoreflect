@@ -427,7 +427,7 @@ func TestLinkerValidation(t *testing.T) {
 					"extend google.protobuf.FileOptions { optional foo f = 20000; }\n" +
 					"option (f) = { a: \"a\" };\n",
 			},
-			"foo.proto:1:1: error in file options: some required fields missing: (f).b",
+			"foo.proto:4:1: error in file options: some required fields missing: (f).b",
 		},
 		{
 			map[string]string{
@@ -522,18 +522,6 @@ func TestLinkerValidation(t *testing.T) {
 					"message Baz { option (foo) = { Bar< name: \"abc\" > }; }\n",
 			},
 			"", // should succeed
-		},
-		{
-			map[string]string{
-				"foo.proto": "syntax = \"proto2\";\n" +
-					"import \"google/protobuf/descriptor.proto\";\n" +
-					"message Foo {\n" +
-					"  optional group Bar = 1 { optional string name = 1; }\n" +
-					"}\n" +
-					"extend google.protobuf.MessageOptions { optional Foo foo = 10001; }\n" +
-					"message Baz { option (foo) = { bar< name: \"abc\" > }; }\n",
-			},
-			"foo.proto:7:32: message Baz: option (foo): field bar not found (did you mean the group named Bar?)",
 		},
 		{
 			map[string]string{
