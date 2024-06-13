@@ -11,24 +11,28 @@ RPC services.
 
 [![GoDoc](https://godoc.org/github.com/jhump/protoreflect?status.svg)](https://godoc.org/github.com/jhump/protoreflect)
 
-----
+> [!IMPORTANT]
+> This repo was originally built to work with the "V1" API of the Protobuf runtime for Go: `github.com/golang/protobuf`.
+>
+> Since the creation of this repo, a new runtime for Go has been released, a "V2" of the API in `google.golang.org/protobuf`. This newer API now includes support for functionality that this repo implements:
+>   * _Descriptors_: This repo provides `github.com/jhump/protoreflect/desc`. The new API now provides alternative types in [`google.golang.org/protobuf/reflect/protoreflect`](https://pkg.go.dev/google.golang.org/protobuf/reflect/protoreflect). It also provides ways to access descriptors for statically linked types in [`google.golang.org/protobuf/reflect/protoregistry`](https://pkg.go.dev/google.golang.org/protobuf/reflect/protoregistry) and the ability to convert between these descriptor types and their "poorer cousins", [descriptor protos](https://pkg.go.dev/google.golang.org/protobuf/types/descriptorpb), in [`google.golang.org/protobuf/reflect/protodesc`](https://pkg.go.dev/google.golang.org/protobuf/reflect/protodesc)
+>   * _Dynamic Messages_: This repo provides `github.com/jhump/protoreflect/dynamic`. The new API now provides an alternative in [`google.golang.org/protobuf/types/dynamicpb`](https://pkg.go.dev/google.golang.org/protobuf/types/dynamicpb).
+>   * _Binary Wire Format_: This repo provides `github.com/jhump/protoreflect/codec`. The new API now provides an alternative in [`google.golang.org/protobuf/encoding/protowire`](https://pkg.go.dev/google.golang.org/protobuf/encoding/protowire).
+>
+> Most protobuf users have certainly upgraded to that newer runtime by now and thus encounter some friction using this repo. It is now recommended to use the above packages in the V2 Protobuf API _instead of_ using the corresponding packages in this repo. But that still leaves a lot of functionality in this repo, such as the `desc/builder`, `desc/protoparse`, `desc/protoprint`, `dynamic/grpcdynamic`, `dynamic/msgregistry`, and `grpcreflect` packages herein. And all of these packages build on the core `desc.Descriptor` types in this repo. As of v1.15.0, you can convert between this repo's `desc.Descriptor` types and the V2 API's `protoreflect.Descriptor` types using `Wrap` functions in the `desc` package and `Unwrap` methods on the `desc.Descriptor` types. That allows easier interop between these remaining useful packages and new V2 API descriptor implementations.
+>
+> If you have code that uses the `dynamic` package in this repo and are trying to interop with V2 APIs, in some cases you can use the [`proto.MessageV2`](https://pkg.go.dev/github.com/golang/protobuf/proto#MessageV2) converter function (defined in the V1 `proto` package in `github.com/golang/protobuf/proto`). However, this wrapper does not provide 100% complete interop, so in some cases you may have to port your code over to the V2 API's `dynamicpb` package. (Sorry!)
 
-### ⚠️ Note
+> [!NOTE]
+> We've had a v2 of this whole repo in the works for some time. A lot of what's in this repo is no longer necessary, but some features still are. The v2 will _drop_ functionality now provided by the V2 Protobuf API. The remaining packages will be updated to make direct use of the V2 Protobuf API and have no more references to the old V1 API. One exception is that a v2 of this repo will _not_ include a new version of the `desc/protoparse` package in this repo -- that is already available in a brand new module named [`protocompile`](https://pkg.go.dev/github.com/bufbuild/protocompile).
+>
+> If you want to try out the v2, you can do so by getting a pre-release version:
+> ```
+> go get github.com/jhump/protoreflect/v2@c9ae7caed596cda2e3c4a90f5973a46081a371a
+> ```
+>
+> Note that the APIs are likely to change a little bit between now and a formal v2 release. Also note that some packages in the v2 still need more tests, so you may find some bugs, but that is mostly for new functionality. If you're just trying to update your code from v1 of this repo, those packages should be rock-solid and least likely to see any further API changes.
 
-This repo was originally built to work with the "V1" API of the Protobuf runtime for Go: `github.com/golang/protobuf`.
-
-Since the creation of this repo, a new runtime for Go has been release, a "V2" of the API in `google.golang.org/protobuf`. This new API now includes support for functionality that this repo implements:
-  * _Descriptors_: This repo provides `github.com/jhump/protoreflect/desc`. The new API now provides alternative types in [`google.golang.org/protobuf/reflect/protoreflect`](https://pkg.go.dev/google.golang.org/protobuf/reflect/protoreflect). It also provides ways to access descriptors for statically linked types in [`google.golang.org/protobuf/reflect/protoregistry`](https://pkg.go.dev/google.golang.org/protobuf/reflect/protoregistry) and the ability to convert between these descriptor types and their "poorer cousins", [descriptor protos](https://pkg.go.dev/google.golang.org/protobuf/types/descriptorpb), in [`google.golang.org/protobuf/reflect/protodesc`](https://pkg.go.dev/google.golang.org/protobuf/reflect/protodesc)
-  * _Dynamic Messages_: This repo provides `github.com/jhump/protoreflect/dynamic`. The new API now provides an alternative in [`google.golang.org/protobuf/types/dynamicpb`](https://pkg.go.dev/google.golang.org/protobuf/types/dynamicpb).
-  * _Binary Wire Format_: This repo provides `github.com/jhump/protoreflect/codec`. The new API now provides an alternative in [`google.golang.org/protobuf/encoding/protowire`](https://pkg.go.dev/google.golang.org/protobuf/encoding/protowire).
-
-Most protobuf users have likely upgraded to that newer runtime and thus encounter some friction using this repo. It is now recommended to use the above packages in the V2 Protobuf API _instead of_ using the corresponding packages in this repo. But that still leaves a lot of functionality in this repo, such as the `desc/builder`, `desc/protoparse`, `desc/protoprint`, `dynamic/grpcdynamic`, `dynamic/msgregistry`, and `grpcreflect` packages herein. And all of these packages build on the core `desc.Descriptor` types in this repo. As of v1.15.0, you can convert between this repo's `desc.Descriptor` types and the V2 API's `protoreflect.Descriptor` types using `Wrap` functions in the `desc` package and `Unwrap` methods on the `desc.Descriptor` types. That allows easier interop between these remaining useful packages and new V2 API descriptor implementations.
-
-If you have code that uses the `dynamic` package in this repo and are trying to interop with V2 APIs, in some cases you can use the [`proto.MessageV2`](https://pkg.go.dev/github.com/golang/protobuf/proto#MessageV2) converter function (defined in the V1 `proto` package in `github.com/golang/protobuf/proto`). This wrapper does not provide 100% complete interop, so in some cases you may have to port your code over to the V2 API's `dynamicpb` package. (Sorry!)
-
-Later this year, we expect to cut a v2 of this whole repo. A lot of what's in this repo is no longer necessary, but some features still are. The v2 will _drop_ functionality now provided by the V2 Protobuf API. The remaining packages will be updated to make direct use of the V2 Protobuf API and have no more references to the old V1 API. One exception is that a v2 of this repo will _not_ include a new version of the `desc/protoparse` package in this repo -- that is already available in a brand new module named [`protocompile`](https://pkg.go.dev/github.com/bufbuild/protocompile).
-
-----
 ## Descriptors: The Language Model of Protocol Buffers
 
 ```go
