@@ -143,6 +143,24 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 	}
 }
 
+func TestInvalidOptionsInUnlinkedFiles(t *testing.T) {
+	// https://github.com/jhump/protoreflect/issues/620
+	// This would previously panic. This also ensures that the reported error
+	// is not due to the inability to resolve "malformed_non_existant".
+	_, err := Parser{
+		Accessor: FileContentsFromMap(map[string]string{
+			"test.proto": `syntax = "proto2";
+				package foo;
+				option malformed_non_existant = true;
+				option features.utf8_validation = NONE;`,
+		}),
+		InterpretOptionsInUnlinkedFiles: true,
+		IncludeSourceCodeInfo:           true,
+	}.ParseFilesButDoNotLink("test.proto")
+	testutil.Nok(t, err)
+	testutil.Eq(t, `test.proto:4:33: field "google.protobuf.FeatureSet.utf8_validation" was not introduced until edition 2023`, err.Error())
+}
+
 func accessorFor(name, contents string) FileAccessor {
 	return func(n string) (io.ReadCloser, error) {
 		if n == name {
