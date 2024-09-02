@@ -5,7 +5,10 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/jhump/protoreflect/desc/sourceinfo"
 	_ "github.com/jhump/protoreflect/internal/testprotos"
 	"github.com/jhump/protoreflect/internal/testutil"
@@ -15,6 +18,38 @@ func TestRegistry(t *testing.T) {
 	fd, err := sourceinfo.GlobalFiles.FindFileByPath("desc_test1.proto")
 	testutil.Ok(t, err)
 	checkFileComments(t, fd)
+}
+
+func TestCanUpgrade(t *testing.T) {
+	fd, err := protoregistry.GlobalFiles.FindFileByPath("desc_test1.proto")
+	testutil.Ok(t, err)
+	testutil.Require(t, sourceinfo.CanUpgrade(fd))
+
+	fd, err = sourceinfo.GlobalFiles.FindFileByPath("desc_test1.proto")
+	testutil.Ok(t, err)
+	testutil.Require(t, !sourceinfo.CanUpgrade(fd)) // already has source info
+
+	p := protoparse.Parser{
+		Accessor: protoparse.FileContentsFromMap(map[string]string{
+			"test.proto": `
+				syntax = "proto3";
+				package test;
+				message Foo {
+					string name = 1;
+				}
+				`,
+		}),
+	}
+	fdProtos, err := p.ParseFilesButDoNotLink("test.proto")
+	testutil.Ok(t, err)
+	file, err := desc.CreateFileDescriptor(fdProtos[0])
+	testutil.Ok(t, err)
+	testutil.Require(t, !sourceinfo.CanUpgrade(file.UnwrapFile())) // already has source info
+
+	fdProtos[0].SourceCodeInfo = nil // strip source info and try again
+	file, err = desc.CreateFileDescriptor(fdProtos[0])
+	testutil.Ok(t, err)
+	testutil.Require(t, !sourceinfo.CanUpgrade(file.UnwrapFile())) // still false; not from gen code
 }
 
 func checkFileComments(t *testing.T, fd protoreflect.FileDescriptor) {
