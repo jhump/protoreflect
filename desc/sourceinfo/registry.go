@@ -30,11 +30,12 @@ package sourceinfo
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
-	"github.com/golang/protobuf/proto"
 	"io"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -56,9 +57,10 @@ var (
 	// can include source code info in the returned descriptors.
 	GlobalTypes TypeResolver = registry{}
 
-	mu               sync.RWMutex
-	sourceInfoByFile = map[string]*descriptorpb.SourceCodeInfo{}
-	fileDescriptors  = map[protoreflect.FileDescriptor]protoreflect.FileDescriptor{}
+	mu                 sync.RWMutex
+	sourceInfoByFile   = map[string]*descriptorpb.SourceCodeInfo{}
+	fileDescriptors    = map[protoreflect.FileDescriptor]protoreflect.FileDescriptor{}
+	updatedDescriptors filesWithFallback
 )
 
 // Resolver can resolve file names into file descriptors and also provides methods for
@@ -196,26 +198,23 @@ func getFileLocked(fd protoreflect.FileDescriptor) (protoreflect.FileDescriptor,
 	}
 
 	srcInfo := sourceInfoByFile[fd.Path()]
-	if len(srcInfo.GetLocation()) == 0 && deps == nil {
+	if len(srcInfo.GetLocation()) == 0 && len(deps) == 0 {
 		// nothing to do; don't bother changing
 		return fd, nil
-	}
-
-	var reg protoregistry.Files
-	for _, dep := range deps {
-		if err := reg.RegisterFile(dep); err != nil {
-			return nil, fmt.Errorf("registering import %q: %w", dep.Path(), err)
-		}
 	}
 
 	// Add source code info and rebuild.
 	fdProto := protodesc.ToFileDescriptorProto(fd)
 	fdProto.SourceCodeInfo = srcInfo
 
-	result, err := protodesc.NewFile(fdProto, &reg)
+	result, err := protodesc.NewFile(fdProto, &updatedDescriptors)
 	if err != nil {
 		return nil, err
 	}
+	if err := updatedDescriptors.RegisterFile(result); err != nil {
+		return nil, fmt.Errorf("registering import %q: %w", result.Path(), err)
+	}
+
 	fileDescriptors[fd] = result
 	return result, nil
 }
@@ -318,4 +317,24 @@ func (r registry) RangeExtensionsByMessage(message protoreflect.FullName, fn fun
 		}
 		return fn(extensionType{ExtensionType: xt, extDesc: ext})
 	})
+}
+
+type filesWithFallback struct {
+	protoregistry.Files
+}
+
+func (f *filesWithFallback) FindFileByPath(path string) (protoreflect.FileDescriptor, error) {
+	fd, err := f.Files.FindFileByPath(path)
+	if errors.Is(err, protoregistry.NotFound) {
+		fd, err = protoregistry.GlobalFiles.FindFileByPath(path)
+	}
+	return fd, err
+}
+
+func (f *filesWithFallback) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
+	fd, err := f.Files.FindDescriptorByName(name)
+	if errors.Is(err, protoregistry.NotFound) {
+		fd, err = protoregistry.GlobalFiles.FindDescriptorByName(name)
+	}
+	return fd, err
 }
