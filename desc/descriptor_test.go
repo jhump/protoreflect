@@ -472,8 +472,22 @@ func TestFileDescriptorObjectGraph(t *testing.T) {
 					},
 				},
 			}},
-			"enums":    {(*FileDescriptor).GetEnumTypes, nil},
-			"services": {(*FileDescriptor).GetServices, nil},
+			"enums": {(*FileDescriptor).GetEnumTypes, nil},
+			"services": {(*FileDescriptor).GetServices, []descCase{
+				{
+					name: "testprotos.SomeService",
+					references: map[string]childCases{
+						"methods": {(*ServiceDescriptor).GetMethods, []descCase{
+							{
+								name: "testprotos.SomeService.SomeRPC",
+							},
+							{
+								name: "testprotos.SomeService.SomeOtherRPC",
+							},
+						}},
+					},
+				},
+			}},
 			"extensions": {(*FileDescriptor).GetExtensions, []descCase{
 				{
 					name:   "testprotos.xtm",

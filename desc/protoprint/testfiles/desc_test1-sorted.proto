@@ -127,6 +127,15 @@ message TestMessage {
    }
 }
 
+// Comment for SomeService
+service SomeService {
+   // Comment for SomeOtherRPC
+   rpc SomeOtherRPC ( AnotherTestMessage ) returns ( AnotherTestMessage );
+
+   // Comment for SomeRPC
+   rpc SomeRPC ( TestMessage ) returns ( TestMessage );
+}
+
 // Comment for AnotherTestMessage extensions (2)
 extend AnotherTestMessage {
    // Comment for xtm

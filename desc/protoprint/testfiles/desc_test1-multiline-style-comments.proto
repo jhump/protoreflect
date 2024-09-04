@@ -144,3 +144,12 @@ extend AnotherTestMessage {
 	/* Comment for xui */
 	optional uint64 xui = 103;
 }
+
+/* Comment for SomeService */
+service SomeService {
+	/* Comment for SomeRPC */
+	rpc SomeRPC ( TestMessage ) returns ( TestMessage );
+
+	/* Comment for SomeOtherRPC */
+	rpc SomeOtherRPC ( AnotherTestMessage ) returns ( AnotherTestMessage );
+}
