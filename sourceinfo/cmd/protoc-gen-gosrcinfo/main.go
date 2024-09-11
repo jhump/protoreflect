@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
@@ -20,6 +21,8 @@ func main() {
 func genSourceInfo(plugin *protogen.Plugin) error {
 	plugin.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL |
 		pluginpb.CodeGeneratorResponse_FEATURE_SUPPORTS_EDITIONS)
+	plugin.SupportedEditionsMinimum = descriptorpb.Edition_EDITION_2023
+	plugin.SupportedEditionsMaximum = descriptorpb.Edition_EDITION_2023
 	for _, f := range plugin.Files {
 		if f.Generate {
 			if err := generateSourceInfo(f, plugin); err != nil {

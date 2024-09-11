@@ -11,34 +11,33 @@ shared_configs:
 version: 2.1
 
 orbs:
-  win: circleci/windows@4.1.1
+  win: circleci/windows@5.0
 
 jobs:
-  # TODO: re-enable Windows when the image is updated to 1.19 or newer
-#  build-windows:  # as of Feb 2022, Go 1.17
-#    executor:
-#      name: win/default
-#    steps:
-#      - run: git config --global core.autocrlf false
-#      - checkout
-#      - run: go test ./...
-
-  build-1-19:
-    working_directory: ~/repo
-    docker:
-      - image: cimg/go:1.19
-    steps: *simple_job_steps
-
-  build-1-20:
-    working_directory: ~/repo
-    docker:
-      - image: cimg/go:1.20
-    steps: *simple_job_steps
+  build-windows:
+    executor:
+      name: win/default
+    steps:
+      - run: git config --global core.autocrlf false
+      - checkout
+      - run: go test ./...
 
   build-1-21:
     working_directory: ~/repo
     docker:
       - image: cimg/go:1.21
+    steps: *simple_job_steps
+
+  build-1-22:
+    working_directory: ~/repo
+    docker:
+      - image: cimg/go:1.22
+    steps: *simple_job_steps
+
+  build-1-23:
+    working_directory: ~/repo
+    docker:
+      - image: cimg/go:1.23
     steps:
       - checkout
       - restore_cache:
@@ -60,10 +59,10 @@ jobs:
     #- store_test_results:
     #    path: /tmp/test-reports
 
-  build-1-21-u:
+  build-1-23-u:
     working_directory: ~/repo
     docker:
-      - image: cimg/go:1.21
+      - image: cimg/go:1.23
     steps:
       - checkout
       - run:
@@ -79,9 +78,7 @@ workflows:
   pr-build-test:
     jobs:
       # - build-windows
-      - build-1-18
-      - build-1-19
-      - build-1-19
-      - build-1-20
       - build-1-21
-      - build-1-21-u
+      - build-1-22
+      - build-1-23
+      - build-1-23-u

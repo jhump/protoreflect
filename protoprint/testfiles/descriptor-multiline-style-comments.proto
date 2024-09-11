@@ -76,6 +76,12 @@ enum Edition {
 	EDITION_UNKNOWN = 0;
 
 	/*
+	 * A placeholder edition for specifying default behaviors *before* a feature
+	 * was first introduced.  This is effectively an "infinite past".
+	 */
+	EDITION_LEGACY = 900;
+
+	/*
 	 * Legacy syntax "editions".  These pre-date editions, but behave much like
 	 * distinct editions.  These can't be used to specify the edition of proto
 	 * files, but feature definitions must supply proto2/proto3 defaults for
@@ -577,12 +583,16 @@ message FileOptions {
 	optional bool java_generate_equals_and_hash = 20 [deprecated = true];
 
 	/*
-	 * If set true, then the Java2 code generator will generate code that
-	 * throws an exception whenever an attempt is made to assign a non-UTF-8
-	 * byte sequence to a string field.
-	 * Message reflection will do the same.
-	 * However, an extension field still accepts non-UTF-8 byte sequences.
-	 * This option has no effect on when used with the lite runtime.
+	 * A proto2 file can set this to true to opt in to UTF-8 checking for Java,
+	 * which will throw an exception if invalid UTF-8 is parsed from the wire or
+	 * assigned to a string field.
+	 *
+	 * TODO: clarify exactly what kinds of field types this option
+	 * applies to, and update these docs accordingly.
+	 *
+	 * Proto3 files already perform these checks. Setting the option explicitly to
+	 * false has no effect: it cannot be used to opt proto3 files out of UTF-8
+	 * checks.
 	 */
 	optional bool java_string_check_utf8 = 27 [default = false];
 
@@ -626,6 +636,8 @@ message FileOptions {
 	optional bool py_generic_services = 18 [default = false];
 
 	reserved 42;
+
+	reserved "php_generic_services";
 
 	/*
 	 * Is this file deprecated?
@@ -791,12 +803,13 @@ message MessageOptions {
 
 message FieldOptions {
 	/*
+	 * NOTE: ctype is deprecated. Use `features.(pb.cpp).string_type` instead.
 	 * The ctype option instructs the C++ code generator to use a different
 	 * representation of the field than it normally would.  See the specific
 	 * options below.  This option is only implemented to support use of
 	 * [ctype=CORD] and [ctype=STRING] (the default) on non-repeated fields of
-	 * type "bytes" in the open source release -- sorry, we'll try to include
-	 * other types in a future version!
+	 * type "bytes" in the open source release.
+	 * TODO: make ctype actually deprecated.
 	 */
 	optional CType ctype = 1 [default = STRING];
 
@@ -960,6 +973,37 @@ message FieldOptions {
 	/* Any features defined in the specific edition. */
 	optional FeatureSet features = 21;
 
+	/* Information about the support window of a feature. */
+	message FeatureSupport {
+		/*
+		 * The edition that this feature was first available in.  In editions
+		 * earlier than this one, the default assigned to EDITION_LEGACY will be
+		 * used, and proto files will not be able to override it.
+		 */
+		optional Edition edition_introduced = 1;
+
+		/*
+		 * The edition this feature becomes deprecated in.  Using this after this
+		 * edition may trigger warnings.
+		 */
+		optional Edition edition_deprecated = 2;
+
+		/*
+		 * The deprecation warning text if this feature is used after the edition it
+		 * was marked deprecated in.
+		 */
+		optional string deprecation_warning = 3;
+
+		/*
+		 * The edition this feature is no longer available in.  In editions after
+		 * this one, the last default assigned will be used, and proto files will
+		 * not be able to override it.
+		 */
+		optional Edition edition_removed = 4;
+	}
+
+	optional FeatureSupport feature_support = 22;
+
 	/* The parser stores options it doesn't recognize here. See above. */
 	repeated UninterpretedOption uninterpreted_option = 999;
 
@@ -1032,6 +1076,9 @@ message EnumValueOptions {
 	 * credentials.
 	 */
 	optional bool debug_redact = 3 [default = false];
+
+	/* Information about the support window of a feature value. */
+	optional FieldOptions.FeatureSupport feature_support = 4;
 
 	/* The parser stores options it doesn't recognize here. See above. */
 	repeated UninterpretedOption uninterpreted_option = 999;
@@ -1173,7 +1220,8 @@ message FeatureSet {
 		retention = RETENTION_RUNTIME,
 		targets = TARGET_TYPE_FIELD,
 		targets = TARGET_TYPE_FILE,
-		edition_defaults = { value: "EXPLICIT", edition: EDITION_PROTO2 },
+		feature_support = { edition_introduced: EDITION_2023 },
+		edition_defaults = { value: "EXPLICIT", edition: EDITION_LEGACY },
 		edition_defaults = { value: "IMPLICIT", edition: EDITION_PROTO3 },
 		edition_defaults = { value: "EXPLICIT", edition: EDITION_2023 }
 	];
@@ -1190,7 +1238,8 @@ message FeatureSet {
 		retention = RETENTION_RUNTIME,
 		targets = TARGET_TYPE_ENUM,
 		targets = TARGET_TYPE_FILE,
-		edition_defaults = { value: "CLOSED", edition: EDITION_PROTO2 },
+		feature_support = { edition_introduced: EDITION_2023 },
+		edition_defaults = { value: "CLOSED", edition: EDITION_LEGACY },
 		edition_defaults = { value: "OPEN", edition: EDITION_PROTO3 }
 	];
 
@@ -1206,7 +1255,8 @@ message FeatureSet {
 		retention = RETENTION_RUNTIME,
 		targets = TARGET_TYPE_FIELD,
 		targets = TARGET_TYPE_FILE,
-		edition_defaults = { value: "EXPANDED", edition: EDITION_PROTO2 },
+		feature_support = { edition_introduced: EDITION_2023 },
+		edition_defaults = { value: "EXPANDED", edition: EDITION_LEGACY },
 		edition_defaults = { value: "PACKED", edition: EDITION_PROTO3 }
 	];
 
@@ -1216,13 +1266,16 @@ message FeatureSet {
 		VERIFY = 2;
 
 		NONE = 3;
+
+		reserved 1;
 	}
 
 	optional Utf8Validation utf8_validation = 4 [
 		retention = RETENTION_RUNTIME,
 		targets = TARGET_TYPE_FIELD,
 		targets = TARGET_TYPE_FILE,
-		edition_defaults = { value: "NONE", edition: EDITION_PROTO2 },
+		feature_support = { edition_introduced: EDITION_2023 },
+		edition_defaults = { value: "NONE", edition: EDITION_LEGACY },
 		edition_defaults = { value: "VERIFY", edition: EDITION_PROTO3 }
 	];
 
@@ -1238,7 +1291,8 @@ message FeatureSet {
 		retention = RETENTION_RUNTIME,
 		targets = TARGET_TYPE_FIELD,
 		targets = TARGET_TYPE_FILE,
-		edition_defaults = { value: "LENGTH_PREFIXED", edition: EDITION_PROTO2 }
+		feature_support = { edition_introduced: EDITION_2023 },
+		edition_defaults = { value: "LENGTH_PREFIXED", edition: EDITION_LEGACY }
 	];
 
 	enum JsonFormat {
@@ -1254,13 +1308,14 @@ message FeatureSet {
 		targets = TARGET_TYPE_MESSAGE,
 		targets = TARGET_TYPE_ENUM,
 		targets = TARGET_TYPE_FILE,
-		edition_defaults = { value: "LEGACY_BEST_EFFORT", edition: EDITION_PROTO2 },
+		feature_support = { edition_introduced: EDITION_2023 },
+		edition_defaults = { value: "LEGACY_BEST_EFFORT", edition: EDITION_LEGACY },
 		edition_defaults = { value: "ALLOW", edition: EDITION_PROTO3 }
 	];
 
 	reserved 999;
 
-	extensions 1000, 1001, 1002, 9995 to 9999, 10000;
+	extensions 1000 to 9994, 9995 to 9999, 10000;
 }
 
 /*
@@ -1279,7 +1334,15 @@ message FeatureSetDefaults {
 	message FeatureSetEditionDefault {
 		optional Edition edition = 3;
 
-		optional FeatureSet features = 2;
+		/* Defaults of features that can be overridden in this edition. */
+		optional FeatureSet overridable_features = 4;
+
+		/* Defaults of features that can't be overridden in this edition. */
+		optional FeatureSet fixed_features = 5;
+
+		reserved 1, 2;
+
+		reserved "features";
 	}
 
 	repeated FeatureSetEditionDefault defaults = 1;
