@@ -5,6 +5,7 @@ package grpcreflect
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -56,14 +57,26 @@ const (
 )
 
 func symbolNotFound(symbol protoreflect.FullName, cause *elementNotFoundError) error {
+	if cause != nil && cause.kind == elementKindSymbol && cause.name == symbol {
+		// no need to wrap
+		return cause
+	}
 	return &elementNotFoundError{name: symbol, kind: elementKindSymbol, cause: cause}
 }
 
 func extensionNotFound(extendee protoreflect.FullName, tag protoreflect.FieldNumber, cause *elementNotFoundError) error {
+	if cause != nil && cause.kind == elementKindExtension && cause.name == extendee && cause.tag == tag {
+		// no need to wrap
+		return cause
+	}
 	return &elementNotFoundError{name: extendee, tag: tag, kind: elementKindExtension, cause: cause}
 }
 
 func fileNotFound(file string, cause *elementNotFoundError) error {
+	if cause != nil && cause.kind == elementKindFile && cause.path == file {
+		// no need to wrap
+		return cause
+	}
 	return &elementNotFoundError{path: file, kind: elementKindFile, cause: cause}
 }
 
@@ -80,9 +93,9 @@ func (e *elementNotFoundError) Error() string {
 		case elementKindSymbol:
 			_, _ = fmt.Fprintf(&b, "symbol not found: %s", e.name)
 		case elementKindExtension:
-			_, _ = fmt.Fprintf(&b, "Extension not found: tag %d for %s", e.tag, e.name)
+			_, _ = fmt.Fprintf(&b, "extension not found: tag %d for %s", e.tag, e.name)
 		default:
-			_, _ = fmt.Fprintf(&b, "File not found: %s", e.path)
+			_, _ = fmt.Fprintf(&b, "file not found: %s", e.path)
 		}
 	}
 	return b.String()
@@ -91,8 +104,8 @@ func (e *elementNotFoundError) Error() string {
 // IsElementNotFoundError determines if the given error indicates that a file
 // name, symbol name, or extension field was could not be found by the server.
 func IsElementNotFoundError(err error) bool {
-	_, ok := err.(*elementNotFoundError)
-	return ok
+	var enfe *elementNotFoundError
+	return errors.As(err, &enfe)
 }
 
 // ProtocolError is an error returned when the server sends a response of the
@@ -108,10 +121,11 @@ func (p ProtocolError) Error() string {
 // Client is a client connection to a server for performing reflection calls
 // and resolving remote symbols.
 type Client struct {
-	ctx         context.Context
-	now         func() time.Time
-	stubV1      refv1.ServerReflectionClient
-	stubV1Alpha refv1alpha.ServerReflectionClient
+	ctx          context.Context
+	now          func() time.Time
+	stubV1       refv1.ServerReflectionClient
+	stubV1Alpha  refv1alpha.ServerReflectionClient
+	allowMissing bool
 
 	connMu      sync.Mutex
 	cancel      context.CancelFunc
@@ -124,27 +138,35 @@ type Client struct {
 	descriptors  protoresolve.Registry
 }
 
+// ClientOption is an option that can be used to configure the behavior of
+// a reflection client created with one of the various NewClient* functions
+// in this package.
+type ClientOption func(*Client)
+
 // NewClientV1 creates a new Client using the v1 version of reflection
 // with the given root context and using the given RPC stub for talking to the
 // server.
-func NewClientV1(ctx context.Context, stub refv1.ServerReflectionClient) *Client {
-	return newClient(ctx, stub, nil)
+func NewClientV1(ctx context.Context, stub refv1.ServerReflectionClient, opts ...ClientOption) *Client {
+	return newClient(ctx, stub, nil, opts)
 }
 
 // NewClientV1Alpha creates a new Client using the v1alpha version of reflection
 // with the given root context and using the given RPC stub for talking to the
 // server.
-func NewClientV1Alpha(ctx context.Context, stub refv1alpha.ServerReflectionClient) *Client {
-	return newClient(ctx, nil, stub)
+func NewClientV1Alpha(ctx context.Context, stub refv1alpha.ServerReflectionClient, opts ...ClientOption) *Client {
+	return newClient(ctx, nil, stub, opts)
 }
 
-func newClient(ctx context.Context, stubv1 refv1.ServerReflectionClient, stubv1alpha refv1alpha.ServerReflectionClient) *Client {
+func newClient(ctx context.Context, stubv1 refv1.ServerReflectionClient, stubv1alpha refv1alpha.ServerReflectionClient, opts []ClientOption) *Client {
 	cr := &Client{
 		ctx:          ctx,
 		now:          time.Now,
 		stubV1:       stubv1,
 		stubV1Alpha:  stubv1alpha,
 		protosByName: map[string]*descriptorpb.FileDescriptorProto{},
+	}
+	for _, opt := range opts {
+		opt(cr)
 	}
 	// don't leak a grpc stream
 	runtime.SetFinalizer(cr, (*Client).Reset)
@@ -161,10 +183,21 @@ func newClient(ctx context.Context, stubv1 refv1.ServerReflectionClient, stubv1a
 // that need to re-invoke the streaming RPC. But, if it's a very long-lived
 // client, it will periodically retry the v1 version (in case the server is
 // updated to support it also). The period for these retries is every hour.
-func NewClientAuto(ctx context.Context, cc grpc.ClientConnInterface) *Client {
+func NewClientAuto(ctx context.Context, cc grpc.ClientConnInterface, opts ...ClientOption) *Client {
 	stubv1 := refv1.NewServerReflectionClient(cc)
 	stubv1alpha := refv1alpha.NewServerReflectionClient(cc)
-	return newClient(ctx, stubv1, stubv1alpha)
+	return newClient(ctx, stubv1, stubv1alpha, opts)
+}
+
+// WithAllowMissingFileDescriptors returns an option that configures a client
+// to allow missing files when building descriptors when possible. Missing files
+// are often fatal errors, but with this option they can sometimes be worked
+// around. Building a schema can only succeed with some files missing if the
+// files in question only provide custom options and/or other unused types.
+func WithAllowMissingFileDescriptors() ClientOption {
+	return func(c *Client) {
+		c.allowMissing = true
+	}
 }
 
 // FileByFilename asks the server for a file descriptor for the proto file with
@@ -313,10 +346,23 @@ func (cr *Client) getAndCacheFileDescriptors(req *refv1alpha.ServerReflectionReq
 }
 
 func (cr *Client) descriptorFromProto(fd *descriptorpb.FileDescriptorProto) (protoreflect.FileDescriptor, error) {
-	for _, depName := range fd.GetDependency() {
+	var deferredErr error
+	var missingDeps []int
+	for i, depName := range fd.GetDependency() {
 		if _, err := cr.FileByFilename(depName); err != nil {
-			return nil, err
+			if _, ok := err.(*elementNotFoundError); !ok || !cr.allowMissing {
+				return nil, err
+			}
+			// We'll ignore for now to see if the file is really necessary.
+			// (If it only supplies custom options, we can get by without it.)
+			if deferredErr == nil {
+				deferredErr = err
+			}
+			missingDeps = append(missingDeps, i)
 		}
+	}
+	if len(missingDeps) > 0 {
+		fd = fileWithoutDeps(fd, missingDeps)
 	}
 	cr.cacheMu.Lock()
 	defer cr.cacheMu.Unlock()
@@ -325,9 +371,53 @@ func (cr *Client) descriptorFromProto(fd *descriptorpb.FileDescriptorProto) (pro
 	}
 	d, err := protowrap.AddToRegistry(fd, &cr.descriptors)
 	if err != nil {
+		if deferredErr != nil {
+			// assume the issue is the missing dep
+			return nil, deferredErr
+		}
 		return nil, err
 	}
 	return d, nil
+}
+
+func fileWithoutDeps(fd *descriptorpb.FileDescriptorProto, missingDeps []int) *descriptorpb.FileDescriptorProto {
+	// We need to rebuild the file without the missing deps.
+	fd = proto.Clone(fd).(*descriptorpb.FileDescriptorProto)
+	newNumDeps := len(fd.GetDependency()) - len(missingDeps)
+	newDeps := make([]string, 0, newNumDeps)
+	remapped := make(map[int]int, newNumDeps)
+	missingIdx := 0
+	for i, dep := range fd.GetDependency() {
+		if missingIdx < len(missingDeps) {
+			if i == missingDeps[missingIdx] {
+				// This dep was missing. Skip it.
+				missingIdx++
+				continue
+			}
+		}
+		remapped[i] = len(newDeps)
+		newDeps = append(newDeps, dep)
+	}
+	// Also rebuild public and weak import slices.
+	newPublic := make([]int32, 0, len(fd.GetPublicDependency()))
+	for _, idx := range fd.GetPublicDependency() {
+		newIdx, ok := remapped[int(idx)]
+		if ok {
+			newPublic = append(newPublic, int32(newIdx))
+		}
+	}
+	newWeak := make([]int32, 0, len(fd.GetWeakDependency()))
+	for _, idx := range fd.GetWeakDependency() {
+		newIdx, ok := remapped[int(idx)]
+		if ok {
+			newWeak = append(newWeak, int32(newIdx))
+		}
+	}
+
+	fd.Dependency = newDeps
+	fd.PublicDependency = newPublic
+	fd.WeakDependency = newWeak
+	return fd
 }
 
 // AllExtensionNumbersForType asks the server for all known extension numbers
