@@ -68,7 +68,7 @@ func TestMain(m *testing.M) {
 
 	// create grpc client
 	addr := l.Addr().String()
-	cconn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	cconn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))
 	}
@@ -303,14 +303,7 @@ func TestMultipleFiles(t *testing.T) {
 		svr.Stop()
 	}()
 
-	dialCtx, dialCancel := context.WithTimeout(ctx, 3*time.Second)
-	defer dialCancel()
-	cc, err := grpc.DialContext(
-		dialCtx,
-		l.Addr().String(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
-	)
+	cc, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err, "failed to dial %v", l.Addr().String())
 	cl := refv1alpha.NewServerReflectionClient(cc)
 
@@ -352,9 +345,7 @@ func TestAllowMissingFileDescriptors(t *testing.T) {
 		svr.Stop()
 	}()
 
-	dialCtx, dialCancel := context.WithTimeout(ctx, 3*time.Second)
-	defer dialCancel()
-	cc, err := grpc.DialContext(dialCtx, l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	cc, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err, "failed to dial %v", l.Addr().String())
 	cl := refv1alpha.NewServerReflectionClient(cc)
 
@@ -405,9 +396,7 @@ func TestAllowFallbackResolver(t *testing.T) {
 		svr.Stop()
 	}()
 
-	dialCtx, dialCancel := context.WithTimeout(ctx, 3*time.Second)
-	defer dialCancel()
-	cc, err := grpc.DialContext(dialCtx, l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	cc, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, err, "failed to dial %v", l.Addr().String())
 	cl := refv1.NewServerReflectionClient(cc)
 
@@ -423,7 +412,7 @@ func TestAllowFallbackResolver(t *testing.T) {
 	require.Error(t, err)
 	_, err = client.FileContainingSymbol("foo.bar.Bar")
 	require.Error(t, err)
-	file, err = client.FileContainingExtension("google.protobuf.MessageOptions", 23456)
+	_, err = client.FileContainingExtension("google.protobuf.MessageOptions", 23456)
 	require.Error(t, err)
 	nums, err := client.AllExtensionNumbersForType("google.protobuf.MessageOptions")
 	require.NoError(t, err)
@@ -675,7 +664,7 @@ func testClientAuto(t *testing.T, register func(*grpc.Server), expectedServices 
 	}()
 	defer svr.Stop()
 
-	cconn, err := grpc.Dial(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	cconn, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))
 	}
@@ -768,7 +757,7 @@ func testClientAutoOnUnavailable(t *testing.T) {
 	defer svr.Stop()
 
 	var captureErrs captureErrors
-	cconn, err := grpc.Dial(
+	cconn, err := grpc.NewClient(
 		l.Addr().String(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithStreamInterceptor(captureErrs.intercept),

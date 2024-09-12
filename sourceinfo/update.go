@@ -152,11 +152,7 @@ func updateField(fd protoreflect.FieldDescriptor) (protoreflect.FieldDescriptor,
 		}
 		return extensionTypeDescriptor{ExtensionDescriptor: ext, extType: xtd.Type()}, nil
 	}
-	d, err := updateDescriptor(fd)
-	if err != nil {
-		return nil, err
-	}
-	return d.(protoreflect.FieldDescriptor), nil
+	return updateDescriptor(fd)
 }
 
 func updateDescriptor[D protoreflect.Descriptor](d D) (D, error) {
@@ -196,10 +192,9 @@ func findDescriptor(fd protoreflect.FileDescriptor, d protoreflect.Descriptor) p
 		if d.IsExtension() {
 			parent := findDescriptor(fd, d.Parent()).(extensionContainer)
 			return parent.Extensions().Get(d.Index())
-		} else {
-			parent := findDescriptor(fd, d.Parent()).(fieldContainer)
-			return parent.Fields().Get(d.Index())
 		}
+		parent := findDescriptor(fd, d.Parent()).(fieldContainer)
+		return parent.Fields().Get(d.Index())
 	case protoreflect.OneofDescriptor:
 		parent := findDescriptor(fd, d.Parent()).(oneofContainer)
 		return parent.Oneofs().Get(d.Index())

@@ -143,6 +143,9 @@ enum SomeEnum {
 service SomeService {
    // Comment for SomeMethod
    rpc SomeMethod ( TestMessage ) returns ( TestMessage );
+
+   // Comment for SomeOtherMethod
+   rpc SomeOtherMethod ( AnotherTestMessage ) returns ( AnotherTestMessage );
 }
 
 // Comment for AnotherTestMessage extensions (2)

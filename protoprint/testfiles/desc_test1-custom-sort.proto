@@ -20,6 +20,9 @@ extend AnotherTestMessage {
 
 // Comment for SomeService
 service SomeService {
+  // Comment for SomeOtherMethod
+  rpc SomeOtherMethod ( AnotherTestMessage ) returns ( AnotherTestMessage );
+
   // Comment for SomeMethod
   rpc SomeMethod ( TestMessage ) returns ( TestMessage );
 }

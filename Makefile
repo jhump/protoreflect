@@ -30,7 +30,7 @@ vet:
 
 .PHONY: staticcheck
 staticcheck:
-	@go install honnef.co/go/tools/cmd/staticcheck@v0.4.6
+	@go install honnef.co/go/tools/cmd/staticcheck@v0.5.1
 	staticcheck ./...
 
 .PHONY: ineffassign

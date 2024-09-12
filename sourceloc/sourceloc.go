@@ -1,4 +1,4 @@
-// Package sourcelocation contains some helpers for interacting with
+// Package sourceloc contains some helpers for interacting with
 // protoreflect.SourceLocation and protoreflect.SourcePath values.
 package sourceloc
 

@@ -60,7 +60,7 @@ func TestMain(m *testing.M) {
 	bidiStreamingMd = sd.Methods().ByName("FullDuplexCall")
 
 	// Start up client that talks to the same port
-	cc, err := grpc.Dial(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	cc, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create client to %s: %s", l.Addr().String(), err.Error()))
 	}
