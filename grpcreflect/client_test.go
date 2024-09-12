@@ -355,7 +355,7 @@ func TestAllowMissingFileDescriptors(t *testing.T) {
 	dialCtx, dialCancel := context.WithTimeout(ctx, 3*time.Second)
 	defer dialCancel()
 	cc, err := grpc.DialContext(dialCtx, l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
-	require.NoError(t, err, "failed ot dial %v", l.Addr().String())
+	require.NoError(t, err, "failed to dial %v", l.Addr().String())
 	cl := refv1alpha.NewServerReflectionClient(cc)
 
 	client := NewClientV1Alpha(ctx, cl)
@@ -375,14 +375,106 @@ func TestAllowMissingFileDescriptors(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, file)
 	require.Equal(t, "foo/bar/this.proto", file.Path())
+	file, err = client.FileContainingSymbol("foo.bar.Bar")
+	require.NoError(t, err)
+	require.NotNil(t, file)
+	require.Equal(t, "foo/bar/this.proto", file.Path())
+	file, err = client.FileContainingExtension("google.protobuf.MessageOptions", 10101)
+	require.NoError(t, err)
+	require.NotNil(t, file)
+	require.Equal(t, "test/imported.proto", file.Path())
+}
+
+func TestAllowFallbackResolver(t *testing.T) {
+	svr := grpc.NewServer()
+	reflection.RegisterV1(svr)
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err, "failed to listen")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		defer cancel()
+		if err := svr.Serve(l); err != nil {
+			t.Logf("serve returned error: %v", err)
+		}
+	}()
+	time.Sleep(100 * time.Millisecond) // give server a chance to start
+	require.NoError(t, ctx.Err(), "failed to start server")
+	defer func() {
+		svr.Stop()
+	}()
+
+	dialCtx, dialCancel := context.WithTimeout(ctx, 3*time.Second)
+	defer dialCancel()
+	cc, err := grpc.DialContext(dialCtx, l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	require.NoError(t, err, "failed to dial %v", l.Addr().String())
+	cl := refv1.NewServerReflectionClient(cc)
+
+	client := NewClientV1(ctx, cl)
+	defer client.Reset()
+
+	// First sanity-check that the well-known types are there.
+	file, err := client.FileByFilename("google/protobuf/descriptor.proto")
+	require.NoError(t, err)
+	require.Equal(t, "google/protobuf/descriptor.proto", file.Path())
+	// Now we try some things that should fail due to missing descriptors.
+	_, err = client.FileByFilename("foo/bar/this.proto")
+	require.Error(t, err)
 	_, err = client.FileContainingSymbol("foo.bar.Bar")
+	require.Error(t, err)
+	file, err = client.FileContainingExtension("google.protobuf.MessageOptions", 23456)
+	require.Error(t, err)
+	nums, err := client.AllExtensionNumbersForType("google.protobuf.MessageOptions")
+	require.NoError(t, err)
+	withoutFallbackExts := len(nums)
+
+	// Now we configure a fallback.
+	fdp := &descriptorpb.FileDescriptorProto{
+		Name:       proto.String("foo/bar/this.proto"),
+		Package:    proto.String("foo.bar"),
+		Dependency: []string{"google/protobuf/descriptor.proto"},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: proto.String("Bar"),
+			},
+		},
+		Extension: []*descriptorpb.FieldDescriptorProto{
+			{
+				Name:     proto.String("opt"),
+				Extendee: proto.String(".google.protobuf.MessageOptions"),
+				Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+				Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+				TypeName: proto.String(".foo.bar.Bar"),
+				Number:   proto.Int32(23456),
+			},
+		},
+	}
+	fd, err := protodesc.NewFile(fdp, protoregistry.GlobalFiles)
+	require.NoError(t, err)
+	var files files
+	err = files.RegisterFile(fd)
+	require.NoError(t, err)
+
+	client = NewClientV1(ctx, cl, WithFallbackResolvers(&files, &files))
+
+	// The above queries should now succeed.
+	file, err = client.FileByFilename("foo/bar/this.proto")
 	require.NoError(t, err)
 	require.NotNil(t, file)
 	require.Equal(t, "foo/bar/this.proto", file.Path())
-	_, err = client.FileContainingExtension("google.protobuf.MessageOptions", 10101)
+	file, err = client.FileContainingSymbol("foo.bar.Bar")
 	require.NoError(t, err)
 	require.NotNil(t, file)
 	require.Equal(t, "foo/bar/this.proto", file.Path())
+	file, err = client.FileContainingExtension("google.protobuf.MessageOptions", 23456)
+	require.NoError(t, err)
+	require.NotNil(t, file)
+	require.Equal(t, "foo/bar/this.proto", file.Path())
+	nums, err = client.AllExtensionNumbersForType("google.protobuf.MessageOptions")
+	require.NoError(t, err)
+	// The same extensions as before, plus an extra one provided by the fallback.
+	require.Len(t, nums, withoutFallbackExts+1)
 }
 
 func TestFileWithoutDeps(t *testing.T) {
