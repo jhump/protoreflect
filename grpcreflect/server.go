@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
@@ -24,9 +25,9 @@ func LoadServiceDescriptors(s GRPCServer) (map[string]protoreflect.ServiceDescri
 		sd, ok := info.Metadata.(protoreflect.ServiceDescriptor)
 		if !ok {
 			var err error
-			sd, err = protoresolve.GlobalDescriptors.FindServiceByName(protoreflect.FullName(name))
+			sd, err = findServiceDescriptor(name)
 			if err != nil {
-				return nil, fmt.Errorf("could not resolve descriptor for service %q: %w", name, err)
+				return nil, err
 			}
 		}
 		descs[name] = sd
@@ -45,9 +46,21 @@ func LoadServiceDescriptor(svc *grpc.ServiceDesc) (protoreflect.ServiceDescripto
 	if sd, ok := svc.Metadata.(protoreflect.ServiceDescriptor); ok {
 		return sd, nil
 	}
-	sd, err := protoresolve.GlobalDescriptors.FindServiceByName(protoreflect.FullName(svc.ServiceName))
+	sd, err := findServiceDescriptor(svc.ServiceName)
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve descriptor for service %q: %w", svc.ServiceName, err)
+	}
+	return sd, nil
+}
+
+func findServiceDescriptor(name string) (protoreflect.ServiceDescriptor, error) {
+	d, err := protoregistry.GlobalFiles.FindDescriptorByName(protoreflect.FullName(name))
+	if err != nil {
+		return nil, fmt.Errorf("could not resolve descriptor for service %q: %w", name, err)
+	}
+	sd, ok := d.(protoreflect.ServiceDescriptor)
+	if !ok {
+		return nil, protoresolve.NewUnexpectedTypeError(protoresolve.DescriptorKindService, d, "")
 	}
 	return sd, nil
 }

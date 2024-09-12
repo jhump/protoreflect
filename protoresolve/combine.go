@@ -95,17 +95,6 @@ func (c combined) FindMessageByName(name protoreflect.FullName) (protoreflect.Me
 	return nil, protoregistry.NotFound
 }
 
-func (c combined) FindFieldByName(name protoreflect.FullName) (protoreflect.FieldDescriptor, error) {
-	for _, res := range c {
-		fld, err := res.FindFieldByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return fld, err
-	}
-	return nil, protoregistry.NotFound
-}
-
 func (c combined) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
 	for _, res := range c {
 		ext, err := res.FindExtensionByName(name)
@@ -113,61 +102,6 @@ func (c combined) FindExtensionByName(name protoreflect.FullName) (protoreflect.
 			continue
 		}
 		return ext, err
-	}
-	return nil, protoregistry.NotFound
-}
-
-func (c combined) FindOneofByName(name protoreflect.FullName) (protoreflect.OneofDescriptor, error) {
-	for _, res := range c {
-		ood, err := res.FindOneofByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return ood, err
-	}
-	return nil, protoregistry.NotFound
-}
-
-func (c combined) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumDescriptor, error) {
-	for _, res := range c {
-		en, err := res.FindEnumByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return en, err
-	}
-	return nil, protoregistry.NotFound
-}
-
-func (c combined) FindEnumValueByName(name protoreflect.FullName) (protoreflect.EnumValueDescriptor, error) {
-	for _, res := range c {
-		enVal, err := res.FindEnumValueByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return enVal, err
-	}
-	return nil, protoregistry.NotFound
-}
-
-func (c combined) FindServiceByName(name protoreflect.FullName) (protoreflect.ServiceDescriptor, error) {
-	for _, res := range c {
-		svc, err := res.FindServiceByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return svc, err
-	}
-	return nil, protoregistry.NotFound
-}
-
-func (c combined) FindMethodByName(name protoreflect.FullName) (protoreflect.MethodDescriptor, error) {
-	for _, res := range c {
-		mtd, err := res.FindMethodByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return mtd, err
 	}
 	return nil, protoregistry.NotFound
 }

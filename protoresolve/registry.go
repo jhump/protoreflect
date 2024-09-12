@@ -210,19 +210,6 @@ func (r *Registry) FindMessageByName(name protoreflect.FullName) (protoreflect.M
 	return msg, nil
 }
 
-// FindFieldByName implements part of the Resolver interface.
-func (r *Registry) FindFieldByName(name protoreflect.FullName) (protoreflect.FieldDescriptor, error) {
-	d, err := r.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	fld, ok := d.(protoreflect.FieldDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindField, d, "")
-	}
-	return fld, nil
-}
-
 // FindExtensionByName implements part of the Resolver interface.
 func (r *Registry) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
 	d, err := r.FindDescriptorByName(name)
@@ -237,71 +224,6 @@ func (r *Registry) FindExtensionByName(name protoreflect.FullName) (protoreflect
 		return nil, NewUnexpectedTypeError(DescriptorKindExtension, fld, "")
 	}
 	return fld, nil
-}
-
-// FindOneofByName implements part of the Resolver interface.
-func (r *Registry) FindOneofByName(name protoreflect.FullName) (protoreflect.OneofDescriptor, error) {
-	d, err := r.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	ood, ok := d.(protoreflect.OneofDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindOneof, d, "")
-	}
-	return ood, nil
-}
-
-// FindEnumByName implements part of the Resolver interface.
-func (r *Registry) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumDescriptor, error) {
-	d, err := r.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	en, ok := d.(protoreflect.EnumDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindEnum, d, "")
-	}
-	return en, nil
-}
-
-// FindEnumValueByName implements part of the Resolver interface.
-func (r *Registry) FindEnumValueByName(name protoreflect.FullName) (protoreflect.EnumValueDescriptor, error) {
-	d, err := r.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	enVal, ok := d.(protoreflect.EnumValueDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindEnumValue, d, "")
-	}
-	return enVal, nil
-}
-
-// FindServiceByName implements part of the Resolver interface.
-func (r *Registry) FindServiceByName(name protoreflect.FullName) (protoreflect.ServiceDescriptor, error) {
-	d, err := r.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	svc, ok := d.(protoreflect.ServiceDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindService, d, "")
-	}
-	return svc, nil
-}
-
-// FindMethodByName implements part of the Resolver interface.
-func (r *Registry) FindMethodByName(name protoreflect.FullName) (protoreflect.MethodDescriptor, error) {
-	d, err := r.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	mtd, ok := d.(protoreflect.MethodDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindMethod, d, "")
-	}
-	return mtd, nil
 }
 
 // FindExtensionByNumber implements part of the Resolver interface.

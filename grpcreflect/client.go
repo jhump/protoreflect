@@ -782,18 +782,6 @@ func (c *clientResolver) FindMessageByName(name protoreflect.FullName) (protoref
 	return d, err
 }
 
-func (c *clientResolver) FindFieldByName(name protoreflect.FullName) (protoreflect.FieldDescriptor, error) {
-	cr := (*Client)(c)
-	_, err := cr.FileContainingSymbol(name)
-	if err != nil {
-		return nil, err
-	}
-	cr.cacheMu.RLock()
-	d, err := cr.descriptors.FindFieldByName(name)
-	cr.cacheMu.RUnlock()
-	return d, err
-}
-
 func (c *clientResolver) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
 	cr := (*Client)(c)
 	_, err := cr.FileContainingSymbol(name)
@@ -802,66 +790,6 @@ func (c *clientResolver) FindExtensionByName(name protoreflect.FullName) (protor
 	}
 	cr.cacheMu.RLock()
 	d, err := cr.descriptors.FindExtensionByName(name)
-	cr.cacheMu.RUnlock()
-	return d, err
-}
-
-func (c *clientResolver) FindOneofByName(name protoreflect.FullName) (protoreflect.OneofDescriptor, error) {
-	cr := (*Client)(c)
-	_, err := cr.FileContainingSymbol(name)
-	if err != nil {
-		return nil, err
-	}
-	cr.cacheMu.RLock()
-	d, err := cr.descriptors.FindOneofByName(name)
-	cr.cacheMu.RUnlock()
-	return d, err
-}
-
-func (c *clientResolver) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumDescriptor, error) {
-	cr := (*Client)(c)
-	_, err := cr.FileContainingSymbol(name)
-	if err != nil {
-		return nil, err
-	}
-	cr.cacheMu.RLock()
-	d, err := cr.descriptors.FindEnumByName(name)
-	cr.cacheMu.RUnlock()
-	return d, err
-}
-
-func (c *clientResolver) FindEnumValueByName(name protoreflect.FullName) (protoreflect.EnumValueDescriptor, error) {
-	cr := (*Client)(c)
-	_, err := cr.FileContainingSymbol(name)
-	if err != nil {
-		return nil, err
-	}
-	cr.cacheMu.RLock()
-	d, err := cr.descriptors.FindEnumValueByName(name)
-	cr.cacheMu.RUnlock()
-	return d, err
-}
-
-func (c *clientResolver) FindServiceByName(name protoreflect.FullName) (protoreflect.ServiceDescriptor, error) {
-	cr := (*Client)(c)
-	_, err := cr.FileContainingSymbol(name)
-	if err != nil {
-		return nil, err
-	}
-	cr.cacheMu.RLock()
-	d, err := cr.descriptors.FindServiceByName(name)
-	cr.cacheMu.RUnlock()
-	return d, err
-}
-
-func (c *clientResolver) FindMethodByName(name protoreflect.FullName) (protoreflect.MethodDescriptor, error) {
-	cr := (*Client)(c)
-	_, err := cr.FileContainingSymbol(name)
-	if err != nil {
-		return nil, err
-	}
-	cr.cacheMu.RLock()
-	d, err := cr.descriptors.FindMethodByName(name)
 	cr.cacheMu.RUnlock()
 	return d, err
 }

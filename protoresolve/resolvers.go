@@ -57,24 +57,6 @@ type DescriptorRegistry interface {
 var _ DescriptorRegistry = (*Registry)(nil)
 var _ DescriptorRegistry = (*protoregistry.Files)(nil)
 
-// TypedDescriptorResolver can resolve descriptors by full name and provides strongly-typed methods
-// for each kind of descriptor.
-//
-// Note that FindFieldByName may return normal fields and may also return extension fields. But
-// FindExtensionByName should only ever return extensions. If the fully-qualified name of a normal
-// field is provided to FindExtensionByName, it should return an error indicating that the named
-// element was the wrong kind.
-type TypedDescriptorResolver interface {
-	FindMessageByName(protoreflect.FullName) (protoreflect.MessageDescriptor, error)
-	FindFieldByName(protoreflect.FullName) (protoreflect.FieldDescriptor, error)
-	FindExtensionByName(protoreflect.FullName) (protoreflect.ExtensionDescriptor, error)
-	FindOneofByName(protoreflect.FullName) (protoreflect.OneofDescriptor, error)
-	FindEnumByName(protoreflect.FullName) (protoreflect.EnumDescriptor, error)
-	FindEnumValueByName(protoreflect.FullName) (protoreflect.EnumValueDescriptor, error)
-	FindServiceByName(protoreflect.FullName) (protoreflect.ServiceDescriptor, error)
-	FindMethodByName(protoreflect.FullName) (protoreflect.MethodDescriptor, error)
-}
-
 // ExtensionResolver can resolve extensions based on the containing message name and field number.
 type ExtensionResolver interface {
 	FindExtensionByName(protoreflect.FullName) (protoreflect.ExtensionDescriptor, error)
@@ -163,6 +145,12 @@ type DependencyResolver interface {
 var _ protodesc.Resolver = DependencyResolver(nil)
 var _ DependencyResolver = protodesc.Resolver(nil)
 
+// TODO: Other sometimes-used interfaces that might warrant a named type:
+// 			interface { DependencyResolver; ExtensionResolver }
+//			interface { DescriptorResolver; ExtensionResolver }
+//			interface { RangeExtensionsByMessage(protoreflect.FullName, func(protoreflect.ExtensionType) bool) }
+//		Admittedly, we've got a LOT of named types already, so maybe best to leave these out...
+
 // Resolver is a comprehensive resolver interface with methods for resolving all kinds
 // of descriptors.
 //
@@ -171,7 +159,6 @@ var _ DependencyResolver = protodesc.Resolver(nil)
 // descriptors and the [google.golang.org/protobuf/types/dynamicpb] package.
 type Resolver interface {
 	DescriptorPool
-	TypedDescriptorResolver
 	ExtensionPool
 	MessageResolver
 	AsTypeResolver() TypeResolver
@@ -557,18 +544,6 @@ func (r *resolverFromPool) FindMessageByName(name protoreflect.FullName) (protor
 	return msg, nil
 }
 
-func (r *resolverFromPool) FindFieldByName(name protoreflect.FullName) (protoreflect.FieldDescriptor, error) {
-	d, err := r.DescriptorPool.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	field, ok := d.(protoreflect.FieldDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindField, d, "")
-	}
-	return field, nil
-}
-
 func (r *resolverFromPool) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
 	d, err := r.DescriptorPool.FindDescriptorByName(name)
 	if err != nil {
@@ -582,66 +557,6 @@ func (r *resolverFromPool) FindExtensionByName(name protoreflect.FullName) (prot
 		return nil, NewUnexpectedTypeError(DescriptorKindExtension, field, "")
 	}
 	return field, nil
-}
-
-func (r *resolverFromPool) FindOneofByName(name protoreflect.FullName) (protoreflect.OneofDescriptor, error) {
-	d, err := r.DescriptorPool.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	oneof, ok := d.(protoreflect.OneofDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindOneof, d, "")
-	}
-	return oneof, nil
-}
-
-func (r *resolverFromPool) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumDescriptor, error) {
-	d, err := r.DescriptorPool.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	enum, ok := d.(protoreflect.EnumDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindEnum, d, "")
-	}
-	return enum, nil
-}
-
-func (r *resolverFromPool) FindEnumValueByName(name protoreflect.FullName) (protoreflect.EnumValueDescriptor, error) {
-	d, err := r.DescriptorPool.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	enumVal, ok := d.(protoreflect.EnumValueDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindEnumValue, d, "")
-	}
-	return enumVal, nil
-}
-
-func (r *resolverFromPool) FindServiceByName(name protoreflect.FullName) (protoreflect.ServiceDescriptor, error) {
-	d, err := r.DescriptorPool.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	svc, ok := d.(protoreflect.ServiceDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindService, d, "")
-	}
-	return svc, nil
-}
-
-func (r *resolverFromPool) FindMethodByName(name protoreflect.FullName) (protoreflect.MethodDescriptor, error) {
-	d, err := r.DescriptorPool.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	mtd, ok := d.(protoreflect.MethodDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindMethod, d, "")
-	}
-	return mtd, nil
 }
 
 func (r *resolverFromPool) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error) {

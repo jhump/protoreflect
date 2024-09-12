@@ -283,11 +283,26 @@ func findType(res TypeResolver, name protoreflect.FullName) protoreflect.Descrip
 // extension implements [protoreflect.ExtensionTypeDescriptor], it will return
 // its associated [protoreflect.ExtensionType]. (Otherwise it returns a dynamic
 // extension.)
+//
+// If the given value implements DescriptorPool, then the returned value will
+// implement TypePool.
+//
+// If the given value implements ExtensionPool, then the returned value will
+// implement an additional method:
+//
+//	RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionType) bool)
 func TypesFromResolver(resolver interface {
 	DescriptorResolver
 	ExtensionResolver
 }) TypeResolver {
-	return &typesFromResolver{resolver: resolver}
+	switch pool := resolver.(type) {
+	case DescriptorPool:
+		return TypesFromDescriptorPool(pool)
+	case ExtensionPool:
+		return &typesAndExtensionPool{&typesFromResolver{resolver}, pool}
+	default:
+		return &typesFromResolver{resolver}
+	}
 }
 
 // TypesFromDescriptorPool adapts a descriptor pool into a pool that returns
@@ -361,6 +376,17 @@ func (t *typesFromResolver) FindEnumByName(enum protoreflect.FullName) (protoref
 		return nil, NewUnexpectedTypeError(DescriptorKindEnum, d, "")
 	}
 	return dynamicpb.NewEnumType(en), nil
+}
+
+type typesAndExtensionPool struct {
+	TypeResolver
+	pool ExtensionPool
+}
+
+func (t *typesAndExtensionPool) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionType) bool) {
+	t.pool.RangeExtensionsByMessage(message, func(ext protoreflect.ExtensionDescriptor) bool {
+		return fn(ExtensionType(ext))
+	})
 }
 
 type typesFromDescriptorPool struct {
