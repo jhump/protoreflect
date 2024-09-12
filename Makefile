@@ -50,7 +50,7 @@ errcheck:
 	errcheck ./...
 
 .PHONY: test
-test:
+test: generate
 	go test -cover -race ./...
 	./protoprint/testfiles/check-protos.sh > /dev/null
 
