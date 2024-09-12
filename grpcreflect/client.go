@@ -431,7 +431,10 @@ func (cr *Client) descriptorFromProto(fd *descriptorpb.FileDescriptorProto) (pro
 	if fd, err := cr.descriptors.FindFileByPath(fd.GetName()); err == nil {
 		return fd, nil
 	}
-	d, err := protowrap.AddToRegistry(fd, &cr.descriptors)
+	d, err := protowrap.FromFileDescriptorProto(fd, (*depResolver)(cr))
+	if err == nil {
+		err = cr.descriptors.RegisterFile(d)
+	}
 	if err != nil {
 		if deferredErr != nil {
 			// assume the issue is the missing dep

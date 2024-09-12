@@ -466,6 +466,115 @@ func TestAllowFallbackResolver(t *testing.T) {
 	require.Len(t, nums, withoutFallbackExts+1)
 }
 
+func TestAllowFallbackResolver_ForDependency(t *testing.T) {
+	// Create resolver with some extra files.
+	fdp := &descriptorpb.FileDescriptorProto{
+		Name:       proto.String("foo/bar/this.proto"),
+		Package:    proto.String("foo.bar"),
+		Dependency: []string{"google/protobuf/descriptor.proto"},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name: proto.String("Bar"),
+			},
+		},
+		Extension: []*descriptorpb.FieldDescriptorProto{
+			{
+				Name:     proto.String("opt"),
+				Extendee: proto.String(".google.protobuf.MessageOptions"),
+				Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+				Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+				TypeName: proto.String(".foo.bar.Bar"),
+				Number:   proto.Int32(23456),
+			},
+		},
+	}
+	fd, err := protodesc.NewFile(fdp, protoregistry.GlobalFiles)
+	require.NoError(t, err)
+	var files protoresolve.Registry
+	err = files.RegisterFile(fd)
+	require.NoError(t, err)
+	resolver := protoresolve.CombinePools(protoresolve.GlobalDescriptors, &files)
+
+	svr := grpc.NewServer()
+	refv1.RegisterServerReflectionServer(
+		svr,
+		serverMissingFiles{
+			server: reflection.NewServerV1(reflection.ServerOptions{
+				DescriptorResolver: resolver,
+				// We leave ExtensionResolver set to GlobalTypes, so it won't
+				// include the one in foo/bar/this.proto above.
+			}),
+			missing: []string{"google/protobuf/descriptor.proto", "google/protobuf/empty.proto", "google/protobuf/source_context.proto"},
+		},
+	)
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err, "failed to listen")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		defer cancel()
+		if err := svr.Serve(l); err != nil {
+			t.Logf("serve returned error: %v", err)
+		}
+	}()
+	time.Sleep(100 * time.Millisecond) // give server a chance to start
+	require.NoError(t, ctx.Err(), "failed to start server")
+	defer func() {
+		svr.Stop()
+	}()
+
+	cc, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err, "failed to dial %v", l.Addr().String())
+	cl := refv1.NewServerReflectionClient(cc)
+
+	client := NewClientV1(ctx, cl)
+	defer client.Reset()
+
+	// First sanity-check that some well-known types are there.
+	file, err := client.FileByFilename("google/protobuf/field_mask.proto")
+	require.NoError(t, err)
+	require.Equal(t, "google/protobuf/field_mask.proto", file.Path())
+	// Now we try some things that should fail due to missing dependencies.
+	_, err = client.FileByFilename("google/protobuf/type.proto")
+	require.Error(t, err)
+	_, err = client.FileByFilename("foo/bar/this.proto")
+	require.Error(t, err)
+	_, err = client.FileContainingSymbol("foo.bar.Bar")
+	require.Error(t, err)
+	_, err = client.FileContainingExtension("google.protobuf.MessageOptions", 23456)
+	require.Error(t, err)
+	nums, err := client.AllExtensionNumbersForType("google.protobuf.MessageOptions")
+	require.NoError(t, err)
+	withoutFallbackExts := len(nums)
+
+	// Now we configure a fallback
+
+	client = NewClientV1(ctx, cl, WithFallbackResolver(resolver))
+
+	// The above queries should now succeed.
+	file, err = client.FileByFilename("google/protobuf/type.proto")
+	require.NoError(t, err)
+	require.NotNil(t, file)
+	require.Equal(t, "google/protobuf/type.proto", file.Path())
+	file, err = client.FileByFilename("foo/bar/this.proto")
+	require.NoError(t, err)
+	require.NotNil(t, file)
+	require.Equal(t, "foo/bar/this.proto", file.Path())
+	file, err = client.FileContainingSymbol("foo.bar.Bar")
+	require.NoError(t, err)
+	require.NotNil(t, file)
+	require.Equal(t, "foo/bar/this.proto", file.Path())
+	file, err = client.FileContainingExtension("google.protobuf.MessageOptions", 23456)
+	require.NoError(t, err)
+	require.NotNil(t, file)
+	require.Equal(t, "foo/bar/this.proto", file.Path())
+	nums, err = client.AllExtensionNumbersForType("google.protobuf.MessageOptions")
+	require.NoError(t, err)
+	// The same extensions as before, plus an extra one provided by the fallback.
+	require.Len(t, nums, withoutFallbackExts+1)
+}
+
 func TestFileWithoutDeps(t *testing.T) {
 	fd := &descriptorpb.FileDescriptorProto{
 		Dependency: []string{
@@ -1089,4 +1198,55 @@ func (p *placeholder) Path() string {
 
 func (p *placeholder) Syntax() protoreflect.Syntax {
 	return 0
+}
+
+type serverMissingFiles struct {
+	server  refv1.ServerReflectionServer
+	missing []string
+}
+
+func (s serverMissingFiles) ServerReflectionInfo(stream grpc.BidiStreamingServer[refv1.ServerReflectionRequest, refv1.ServerReflectionResponse]) error {
+	return s.server.ServerReflectionInfo(streamMissingFiles{stream, s.missing})
+}
+
+type streamMissingFiles struct {
+	grpc.BidiStreamingServer[refv1.ServerReflectionRequest, refv1.ServerReflectionResponse]
+	missing []string
+}
+
+func (s streamMissingFiles) Send(msg *refv1.ServerReflectionResponse) error {
+	if descs, ok := msg.MessageResponse.(*refv1.ServerReflectionResponse_FileDescriptorResponse); ok {
+		origFileData := descs.FileDescriptorResponse.FileDescriptorProto
+		newFileData := make([][]byte, 0, len(origFileData))
+		for _, fileData := range origFileData {
+			var file descriptorpb.FileDescriptorProto
+			if err := proto.Unmarshal(fileData, &file); err != nil {
+				// should never happen... just ignore the entry if it does
+				continue
+			}
+			var omit bool
+			for _, missing := range s.missing {
+				if file.GetName() == missing {
+					// exclude this file
+					omit = true
+					break
+				}
+			}
+			if !omit {
+				newFileData = append(newFileData, fileData)
+			}
+		}
+		if len(newFileData) > 0 {
+			descs.FileDescriptorResponse.FileDescriptorProto = newFileData
+		} else {
+			// if we stripped all files, replace with not found error
+			msg.MessageResponse = &refv1.ServerReflectionResponse_ErrorResponse{
+				ErrorResponse: &refv1.ErrorResponse{
+					ErrorCode:    int32(codes.NotFound),
+					ErrorMessage: "not found",
+				},
+			}
+		}
+	}
+	return s.BidiStreamingServer.Send(msg)
 }
