@@ -149,6 +149,7 @@ var _ DependencyResolver = protodesc.Resolver(nil)
 // 			interface { DependencyResolver; ExtensionResolver }
 //			interface { DescriptorResolver; ExtensionResolver }
 //			interface { RangeExtensionsByMessage(protoreflect.FullName, func(protoreflect.ExtensionType) bool) }
+//			interface { Resolver; AsTypePool() TypePool }
 //		Admittedly, we've got a LOT of named types already, so maybe best to leave these out...
 
 // Resolver is a comprehensive resolver interface with methods for resolving all kinds
@@ -524,7 +525,10 @@ func ResolverFromPool(pool DescriptorPool) Resolver {
 // also accepts a TypePool that is used to implement the AsTypeResolver method.
 // So instead of always returning dynamic types based on the given DescriptorPool,
 // it uses the given TypePool.
-func ResolverFromPools(descPool DescriptorPool, typePool TypePool) Resolver {
+func ResolverFromPools(descPool DescriptorPool, typePool TypePool) interface {
+	Resolver
+	AsTypePool() TypePool
+} {
 	return &resolverWithTypes{Resolver: ResolverFromPool(descPool), types: typePool}
 }
 
