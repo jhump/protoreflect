@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/google/go-cmp v0.6.0
-	github.com/jhump/protoreflect v1.15.2
+	github.com/jhump/protoreflect v1.17.1-0.20240913204751-8f5fd1dcb3c5
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/sync v0.8.0
 	google.golang.org/grpc v1.66.2
