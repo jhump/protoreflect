@@ -16,23 +16,11 @@ orbs:
 jobs:
   build-windows:
     executor:
-      name: win/server-2022
+      name: win/default
     steps:
       - run: git config --global core.autocrlf false
       - checkout
       - run: go test ./...
-
-  build-1-19:
-    working_directory: ~/repo
-    docker:
-      - image: cimg/go:1.19
-    steps: *simple_job_steps
-
-  build-1-20:
-    working_directory: ~/repo
-    docker:
-      - image: cimg/go:1.20
-    steps: *simple_job_steps
 
   build-1-21:
     working_directory: ~/repo
@@ -44,6 +32,12 @@ jobs:
     working_directory: ~/repo
     docker:
       - image: cimg/go:1.22
+    steps: *simple_job_steps
+
+  build-1-23:
+    working_directory: ~/repo
+    docker:
+      - image: cimg/go:1.23
     steps:
       - checkout
       - restore_cache:
@@ -59,12 +53,16 @@ jobs:
       - run:
           name: Run tests
           command: |
+            #mkdir -p /tmp/test-reports
+            #gotestsum --junitfile /tmp/test-reports/unit-tests.xml
             make ci
+    #- store_test_results:
+    #    path: /tmp/test-reports
 
-  build-1-22-u:
+  build-1-23-u:
     working_directory: ~/repo
     docker:
-      - image: cimg/go:1.22
+      - image: cimg/go:1.23
     steps:
       - checkout
       - run:
@@ -79,9 +77,8 @@ jobs:
 workflows:
   pr-build-test:
     jobs:
-      - build-windows
-      - build-1-19
-      - build-1-20
+      # - build-windows
       - build-1-21
       - build-1-22
-      - build-1-22-u
+      - build-1-23
+      - build-1-23-u
