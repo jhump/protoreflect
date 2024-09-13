@@ -5,6 +5,8 @@
 // was used, v1 or v2, all sourceinfo for all files is available.
 package pinv1
 
+//lint:file-ignore SA1019 The old v1 package is deprecated, but this is not a real dependency...
+
 import "github.com/jhump/protoreflect/desc"
 
 var _ desc.Descriptor = nil
