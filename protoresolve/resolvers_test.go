@@ -9,17 +9,17 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 
-	"github.com/jhump/protoreflect/v2/internal/testdata"
+	"github.com/jhump/protoreflect/v2/internal/testprotos"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 func TestFindExtensionByNumber(t *testing.T) {
 	var files protoregistry.Files
-	err := files.RegisterFile(testdata.File_desc_test1_proto)
+	err := files.RegisterFile(testprotos.File_desc_test1_proto)
 	require.NoError(t, err)
-	err = files.RegisterFile(testdata.File_desc_test2_proto)
+	err = files.RegisterFile(testprotos.File_desc_test2_proto)
 	require.NoError(t, err)
-	err = files.RegisterFile(testdata.File_desc_test_complex_proto)
+	err = files.RegisterFile(testprotos.File_desc_test_complex_proto)
 	require.NoError(t, err)
 
 	extd := protoresolve.FindExtensionByNumber(&files, "testprotos.AnotherTestMessage", 100)
@@ -46,32 +46,32 @@ func TestFindExtensionByNumber(t *testing.T) {
 }
 
 func TestFindExtensionByNumberInFile(t *testing.T) {
-	extd := protoresolve.FindExtensionByNumberInFile(testdata.File_desc_test1_proto, "testprotos.AnotherTestMessage", 100)
+	extd := protoresolve.FindExtensionByNumberInFile(testprotos.File_desc_test1_proto, "testprotos.AnotherTestMessage", 100)
 	require.NotNil(t, extd)
 	assert.Equal(t, protoreflect.FullName("testprotos.xtm"), extd.FullName())
 	assert.Equal(t, protoreflect.MessageKind, extd.Kind())
 	assert.Equal(t, protoreflect.FullName("testprotos.TestMessage"), extd.Message().FullName())
 
-	extd = protoresolve.FindExtensionByNumberInFile(testdata.File_desc_test1_proto, "testprotos.AnotherTestMessage", 102)
+	extd = protoresolve.FindExtensionByNumberInFile(testprotos.File_desc_test1_proto, "testprotos.AnotherTestMessage", 102)
 	require.NotNil(t, extd)
 	assert.Equal(t, protoreflect.FullName("testprotos.xi"), extd.FullName())
 	assert.Equal(t, protoreflect.Int32Kind, extd.Kind())
 
-	extd = protoresolve.FindExtensionByNumberInFile(testdata.File_desc_test1_proto, "testprotos.AnotherTestMessage", 999)
+	extd = protoresolve.FindExtensionByNumberInFile(testprotos.File_desc_test1_proto, "testprotos.AnotherTestMessage", 999)
 	require.Nil(t, extd)
 
-	extd = protoresolve.FindExtensionByNumberInFile(testdata.File_desc_test1_proto, "google.protobuf.ExtensionRangeOptions", 20000)
+	extd = protoresolve.FindExtensionByNumberInFile(testprotos.File_desc_test1_proto, "google.protobuf.ExtensionRangeOptions", 20000)
 	require.Nil(t, extd)
 }
 
 func TestFindDescriptorByNameInFile(t *testing.T) {
-	d := protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.TestMessage")
+	d := protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.TestMessage")
 	require.NotNil(t, d)
 	md, ok := d.(protoreflect.MessageDescriptor)
 	assert.True(t, ok)
 	assert.Equal(t, protoreflect.FullName("testprotos.TestMessage"), md.FullName())
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.TestMessage.ne")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.TestMessage.ne")
 	require.NotNil(t, d)
 	fld, ok := d.(protoreflect.FieldDescriptor)
 	assert.True(t, ok)
@@ -79,19 +79,19 @@ func TestFindDescriptorByNameInFile(t *testing.T) {
 	assert.Equal(t, protoreflect.FieldNumber(4), fld.Number())
 	assert.False(t, fld.IsExtension())
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.AnotherTestMessage.atmoo")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.AnotherTestMessage.atmoo")
 	require.NotNil(t, d)
 	ood, ok := d.(protoreflect.OneofDescriptor)
 	assert.True(t, ok)
 	assert.Equal(t, protoreflect.FullName("testprotos.AnotherTestMessage.atmoo"), ood.FullName())
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.SomeEnum")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.SomeEnum")
 	require.NotNil(t, d)
 	ed, ok := d.(protoreflect.EnumDescriptor)
 	assert.True(t, ok)
 	assert.Equal(t, protoreflect.FullName("testprotos.SomeEnum"), ed.FullName())
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.SOME_VAL")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.SOME_VAL")
 	require.NotNil(t, d)
 	evd, ok := d.(protoreflect.EnumValueDescriptor)
 	assert.True(t, ok)
@@ -99,7 +99,7 @@ func TestFindDescriptorByNameInFile(t *testing.T) {
 	assert.Equal(t, protoreflect.FullName("testprotos.SomeEnum"), evd.Parent().FullName())
 	assert.Equal(t, protoreflect.EnumNumber(0), evd.Number())
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.xtm")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.xtm")
 	require.NotNil(t, d)
 	extd, ok := d.(protoreflect.ExtensionDescriptor)
 	assert.True(t, ok)
@@ -107,13 +107,13 @@ func TestFindDescriptorByNameInFile(t *testing.T) {
 	assert.Equal(t, protoreflect.FieldNumber(100), extd.Number())
 	assert.True(t, extd.IsExtension())
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.SomeService")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.SomeService")
 	require.NotNil(t, d)
 	sd, ok := d.(protoreflect.ServiceDescriptor)
 	assert.True(t, ok)
 	assert.Equal(t, protoreflect.FullName("testprotos.SomeService"), sd.FullName())
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.SomeService.SomeMethod")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.SomeService.SomeMethod")
 	require.NotNil(t, d)
 	mtd, ok := d.(protoreflect.MethodDescriptor)
 	assert.True(t, ok)
@@ -121,13 +121,13 @@ func TestFindDescriptorByNameInFile(t *testing.T) {
 
 	// Nested elements
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.TestMessage.NestedMessage.AnotherNestedMessage")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.TestMessage.NestedMessage.AnotherNestedMessage")
 	require.NotNil(t, d)
 	md, ok = d.(protoreflect.MessageDescriptor)
 	assert.True(t, ok)
 	assert.Equal(t, protoreflect.FullName("testprotos.TestMessage.NestedMessage.AnotherNestedMessage"), md.FullName())
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.TestMessage.NestedMessage.yanm")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.TestMessage.NestedMessage.yanm")
 	require.NotNil(t, d)
 	fld, ok = d.(protoreflect.FieldDescriptor)
 	assert.True(t, ok)
@@ -135,13 +135,13 @@ func TestFindDescriptorByNameInFile(t *testing.T) {
 	assert.Equal(t, protoreflect.FieldNumber(2), fld.Number())
 	assert.False(t, fld.IsExtension())
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum")
 	require.NotNil(t, d)
 	ed, ok = d.(protoreflect.EnumDescriptor)
 	assert.True(t, ok)
 	assert.Equal(t, protoreflect.FullName("testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum"), ed.FullName())
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.VALUE1")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.VALUE1")
 	require.NotNil(t, d)
 	evd, ok = d.(protoreflect.EnumValueDescriptor)
 	assert.True(t, ok)
@@ -149,7 +149,7 @@ func TestFindDescriptorByNameInFile(t *testing.T) {
 	assert.Equal(t, protoreflect.FullName("testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum"), evd.Parent().FullName())
 	assert.Equal(t, protoreflect.EnumNumber(1), evd.Number())
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.flags")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.flags")
 	require.NotNil(t, d)
 	extd, ok = d.(protoreflect.ExtensionDescriptor)
 	assert.True(t, ok)
@@ -158,17 +158,17 @@ func TestFindDescriptorByNameInFile(t *testing.T) {
 
 	// Not found
 
-	d = protoresolve.FindDescriptorByNameInFile(testdata.File_desc_test1_proto, "foo.bar")
+	d = protoresolve.FindDescriptorByNameInFile(testprotos.File_desc_test1_proto, "foo.bar")
 	require.Nil(t, d)
 }
 
 func TestRangeExtensionsByMessage(t *testing.T) {
 	var files protoregistry.Files
-	err := files.RegisterFile(testdata.File_desc_test1_proto)
+	err := files.RegisterFile(testprotos.File_desc_test1_proto)
 	require.NoError(t, err)
-	err = files.RegisterFile(testdata.File_desc_test2_proto)
+	err = files.RegisterFile(testprotos.File_desc_test2_proto)
 	require.NoError(t, err)
-	err = files.RegisterFile(testdata.File_desc_test_complex_proto)
+	err = files.RegisterFile(testprotos.File_desc_test_complex_proto)
 	require.NoError(t, err)
 
 	var exts []protoreflect.ExtensionDescriptor

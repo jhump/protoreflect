@@ -1,5 +1,5 @@
 syntax = "proto3";
-option go_package = "github.com/jhump/protoreflect/v2/internal/testdata";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testprotos";
 package testprotos;
 import "desc_test1.proto";
 import "pkg/desc_test_pkg.proto";

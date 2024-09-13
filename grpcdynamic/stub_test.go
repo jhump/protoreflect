@@ -15,8 +15,8 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/jhump/protoreflect/v2/grpcreflect"
-	grpctestdata "github.com/jhump/protoreflect/v2/internal/testdata/grpc"
 	grpctesting "github.com/jhump/protoreflect/v2/internal/testing"
+	grpctestprotos "github.com/jhump/protoreflect/v2/internal/testprotos/grpc"
 )
 
 var (
@@ -43,7 +43,7 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("Failed to listen to port: %s", err.Error()))
 	}
 	svr := grpc.NewServer()
-	grpctestdata.RegisterTestServiceServer(svr, grpctesting.TestService{})
+	grpctestprotos.RegisterTestServiceServer(svr, grpctesting.TestService{})
 	go func() {
 		_ = svr.Serve(l)
 	}()
@@ -73,13 +73,13 @@ func TestMain(m *testing.M) {
 	code = m.Run()
 }
 
-var payload = &grpctestdata.Payload{
-	Type: grpctestdata.PayloadType_RANDOM,
+var payload = &grpctestprotos.Payload{
+	Type: grpctestprotos.PayloadType_RANDOM,
 	Body: []byte{3, 14, 159, 2, 65, 35, 9},
 }
 
 func TestUnaryRpc(t *testing.T) {
-	resp, err := stub.InvokeRpc(context.Background(), unaryMd, &grpctestdata.SimpleRequest{Payload: payload})
+	resp, err := stub.InvokeRpc(context.Background(), unaryMd, &grpctestprotos.SimpleRequest{Payload: payload})
 	require.NoError(t, err, "Failed to invoke unary RPC")
 	refMsg := resp.ProtoReflect()
 	fd := refMsg.Descriptor().Fields().ByName("payload")
@@ -90,7 +90,7 @@ func TestUnaryRpc(t *testing.T) {
 func TestClientStreamingRpc(t *testing.T) {
 	cs, err := stub.InvokeRpcClientStream(context.Background(), clientStreamingMd)
 	require.NoError(t, err, "Failed to invoke client-streaming RPC")
-	req := &grpctestdata.StreamingInputCallRequest{Payload: payload}
+	req := &grpctestprotos.StreamingInputCallRequest{Payload: payload}
 	for i := 0; i < 3; i++ {
 		err = cs.SendMsg(req)
 		require.NoError(t, err, "Failed to send request message")
@@ -105,9 +105,9 @@ func TestClientStreamingRpc(t *testing.T) {
 }
 
 func TestServerStreamingRpc(t *testing.T) {
-	ss, err := stub.InvokeRpcServerStream(context.Background(), serverStreamingMd, &grpctestdata.StreamingOutputCallRequest{
+	ss, err := stub.InvokeRpcServerStream(context.Background(), serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{
 		Payload: payload,
-		ResponseParameters: []*grpctestdata.ResponseParameters{
+		ResponseParameters: []*grpctestprotos.ResponseParameters{
 			{}, {}, {}, // three entries means we'll get back three responses
 		},
 	})
@@ -127,7 +127,7 @@ func TestServerStreamingRpc(t *testing.T) {
 func TestBidiStreamingRpc(t *testing.T) {
 	bds, err := stub.InvokeRpcBidiStream(context.Background(), bidiStreamingMd)
 	require.NoError(t, err)
-	req := &grpctestdata.StreamingOutputCallRequest{Payload: payload}
+	req := &grpctestprotos.StreamingOutputCallRequest{Payload: payload}
 	for i := 0; i < 3; i++ {
 		err = bds.SendMsg(req)
 		require.NoError(t, err, "Failed to send request message")

@@ -19,8 +19,8 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 
-	_ "github.com/jhump/protoreflect/v2/internal/testdata"
 	prototesting "github.com/jhump/protoreflect/v2/internal/testing"
+	_ "github.com/jhump/protoreflect/v2/internal/testprotos"
 )
 
 const (
@@ -79,13 +79,13 @@ func TestPrinter(t *testing.T) {
 
 	// create descriptors to print
 	files := []string{
-		"../internal/testdata/desc_test_comments.protoset",
-		"../internal/testdata/desc_test_complex_source_info.protoset",
-		"../internal/testdata/desc_test_editions.protoset",
-		"../internal/testdata/desc_test_proto3.protoset",
-		"../internal/testdata/descriptor.protoset",
-		"../internal/testdata/desc_test1.protoset",
-		"../internal/testdata/proto3_optional/desc_test_proto3_optional.protoset",
+		"../internal/testprotos/desc_test_comments.protoset",
+		"../internal/testprotos/desc_test_complex_source_info.protoset",
+		"../internal/testprotos/desc_test_editions.protoset",
+		"../internal/testprotos/desc_test_proto3.protoset",
+		"../internal/testprotos/descriptor.protoset",
+		"../internal/testprotos/desc_test1.protoset",
+		"../internal/testprotos/proto3_optional/desc_test_proto3_optional.protoset",
 	}
 	fds := make([]protoreflect.FileDescriptor, len(files)+1)
 	for i, file := range files {
@@ -226,7 +226,7 @@ message SomeMessage {
 func TestPrintNonFileDescriptors(t *testing.T) {
 	compiler := protocompile.Compiler{
 		Resolver: protocompile.WithStandardImports(&protocompile.SourceResolver{
-			ImportPaths: []string{"../internal/testdata"},
+			ImportPaths: []string{"../internal/testprotos"},
 		}),
 		SourceInfoMode: protocompile.SourceInfoExtraComments,
 	}

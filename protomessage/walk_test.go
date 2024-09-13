@@ -18,7 +18,7 @@ import (
 )
 
 func TestWalk(t *testing.T) {
-	fd, err := prototesting.LoadProtoset("../internal/testdata/desc_test_complex_source_info.protoset")
+	fd, err := prototesting.LoadProtoset("../internal/testprotos/desc_test_complex_source_info.protoset")
 	require.NoError(t, err)
 
 	fdProto := protodesc.ToFileDescriptorProto(fd)

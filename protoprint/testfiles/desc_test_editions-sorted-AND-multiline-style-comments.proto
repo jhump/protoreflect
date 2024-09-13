@@ -4,7 +4,7 @@ package testprotos;
 
 option features = { enum_type: CLOSED };
 
-option go_package = "github.com/jhump/protoreflect/v2/internal/testdata";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testprotos";
 
 message Foo {
   int32 a = 1;

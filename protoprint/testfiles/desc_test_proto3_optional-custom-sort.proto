@@ -10,6 +10,6 @@ message MessageWithOptionalFields {
   optional int64 bar = 2;
 }
 
-option go_package = "github.com/jhump/protoreflect/v2/internal/testdata";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testprotos";
 
 import "google/protobuf/descriptor.proto";

@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 
-	_ "github.com/jhump/protoreflect/v2/internal/testdata"
+	_ "github.com/jhump/protoreflect/v2/internal/testprotos"
 	"github.com/jhump/protoreflect/v2/sourceinfo"
 )
 

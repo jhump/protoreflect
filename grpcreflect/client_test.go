@@ -37,7 +37,7 @@ import (
 	_ "google.golang.org/protobuf/types/known/typepb"
 	_ "google.golang.org/protobuf/types/pluginpb"
 
-	testprotosgrpc "github.com/jhump/protoreflect/v2/internal/testdata/grpc"
+	testprotosgrpc "github.com/jhump/protoreflect/v2/internal/testprotos/grpc"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 

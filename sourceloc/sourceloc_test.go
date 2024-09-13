@@ -48,20 +48,6 @@ func TestIsZero(t *testing.T) {
 	require.False(t, IsZero(loc))
 }
 
-func TestPathsEqual(t *testing.T) {
-	path1 := protoreflect.SourcePath{1, 2, 3}
-	path2 := protoreflect.SourcePath{}
-	require.False(t, PathsEqual(path1, path2))
-	require.True(t, PathsEqual(path1, path1))
-	require.True(t, PathsEqual(path2, path2))
-	path2 = protoreflect.SourcePath{1, 2, 4}
-	require.False(t, PathsEqual(path1, path2))
-	path2 = protoreflect.SourcePath{1, 2}
-	require.False(t, PathsEqual(path1, path2))
-	path2 = protoreflect.SourcePath{1, 2, 3, 4}
-	require.False(t, PathsEqual(path1, path2))
-}
-
 func TestIsSubpath(t *testing.T) {
 	path1 := protoreflect.SourcePath{1, 2, 3}
 	path2 := protoreflect.SourcePath{}
@@ -82,7 +68,7 @@ func TestIsSubpath(t *testing.T) {
 }
 
 func TestPathFor(t *testing.T) {
-	fd, err := prototesting.LoadProtoset("../internal/testdata/desc_test_complex_source_info.protoset")
+	fd, err := prototesting.LoadProtoset("../internal/testprotos/desc_test_complex_source_info.protoset")
 	require.NoError(t, err)
 	checkPathsForFile(t, fd)
 }

@@ -24,7 +24,7 @@ import (
 	"google.golang.org/protobuf/types/known/typepb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
-	"github.com/jhump/protoreflect/v2/internal/testdata"
+	"github.com/jhump/protoreflect/v2/internal/testprotos"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 	. "github.com/jhump/protoreflect/v2/protoresolve/remotereg"
 )
@@ -153,7 +153,7 @@ func TestRemoteRegistry_FindMessage_TypeFetcher(t *testing.T) {
 	mo := &descriptorpb.MessageOptions{
 		Deprecated: proto.Bool(true),
 	}
-	proto.SetExtension(mo, testdata.E_Mfubar, true)
+	proto.SetExtension(mo, testprotos.E_Mfubar, true)
 	protosEqual(t, mo, md.Options())
 
 	flds := md.Fields()
@@ -167,8 +167,8 @@ func TestRemoteRegistry_FindMessage_TypeFetcher(t *testing.T) {
 	fo := &descriptorpb.FieldOptions{
 		Deprecated: proto.Bool(true),
 	}
-	proto.SetExtension(fo, testdata.E_Ffubar, []string{"foo", "bar", "baz"})
-	proto.SetExtension(fo, testdata.E_Ffubarb, []byte{1, 2, 3, 4, 5, 6, 7, 8})
+	proto.SetExtension(fo, testprotos.E_Ffubar, []string{"foo", "bar", "baz"})
+	proto.SetExtension(fo, testprotos.E_Ffubarb, []byte{1, 2, 3, 4, 5, 6, 7, 8})
 	protosEqual(t, fo, flds.Get(0).Options())
 
 	require.Equal(t, "b", string(flds.Get(1).Name()))
@@ -351,15 +351,15 @@ func TestRemoteRegistry_FindEnum_TypeFetcher(t *testing.T) {
 		Deprecated: proto.Bool(true),
 		AllowAlias: proto.Bool(true),
 	}
-	proto.SetExtension(eo, testdata.E_Efubar, int32(-42))
+	proto.SetExtension(eo, testprotos.E_Efubar, int32(-42))
 	require.NoError(t, err)
-	proto.SetExtension(eo, testdata.E_Efubars, int32(-42))
+	proto.SetExtension(eo, testprotos.E_Efubars, int32(-42))
 	require.NoError(t, err)
-	proto.SetExtension(eo, testdata.E_Efubarsf, int32(-42))
+	proto.SetExtension(eo, testprotos.E_Efubarsf, int32(-42))
 	require.NoError(t, err)
-	proto.SetExtension(eo, testdata.E_Efubaru, uint32(42))
+	proto.SetExtension(eo, testprotos.E_Efubaru, uint32(42))
 	require.NoError(t, err)
-	proto.SetExtension(eo, testdata.E_Efubaruf, uint32(42))
+	proto.SetExtension(eo, testprotos.E_Efubaruf, uint32(42))
 	require.NoError(t, err)
 	protosEqual(t, eo, ed.Options())
 
@@ -371,15 +371,15 @@ func TestRemoteRegistry_FindEnum_TypeFetcher(t *testing.T) {
 	evo := &descriptorpb.EnumValueOptions{
 		Deprecated: proto.Bool(true),
 	}
-	proto.SetExtension(evo, testdata.E_Evfubar, int64(-420420420420))
+	proto.SetExtension(evo, testprotos.E_Evfubar, int64(-420420420420))
 	require.NoError(t, err)
-	proto.SetExtension(evo, testdata.E_Evfubars, int64(-420420420420))
+	proto.SetExtension(evo, testprotos.E_Evfubars, int64(-420420420420))
 	require.NoError(t, err)
-	proto.SetExtension(evo, testdata.E_Evfubarsf, int64(-420420420420))
+	proto.SetExtension(evo, testprotos.E_Evfubarsf, int64(-420420420420))
 	require.NoError(t, err)
-	proto.SetExtension(evo, testdata.E_Evfubaru, uint64(420420420420))
+	proto.SetExtension(evo, testprotos.E_Evfubaru, uint64(420420420420))
 	require.NoError(t, err)
-	proto.SetExtension(evo, testdata.E_Evfubaruf, uint64(420420420420))
+	proto.SetExtension(evo, testprotos.E_Evfubaruf, uint64(420420420420))
 	require.NoError(t, err)
 	protosEqual(t, evo, vals.Get(0).Options())
 
@@ -643,8 +643,8 @@ func TestDescriptorConverter_ToServiceDescriptor(t *testing.T) {
 	so := &descriptorpb.ServiceOptions{
 		Deprecated: proto.Bool(true),
 	}
-	proto.SetExtension(so, testdata.E_Sfubar, &testdata.ReallySimpleMessage{Id: proto.Uint64(100), Name: proto.String("deuce")})
-	proto.SetExtension(so, testdata.E_Sfubare, testdata.ReallySimpleEnum_VALUE)
+	proto.SetExtension(so, testprotos.E_Sfubar, &testprotos.ReallySimpleMessage{Id: proto.Uint64(100), Name: proto.String("deuce")})
+	proto.SetExtension(so, testprotos.E_Sfubare, testprotos.ReallySimpleEnum_VALUE)
 	protosEqual(t, so, sd.Options())
 
 	methods := sd.Methods()
@@ -656,8 +656,8 @@ func TestDescriptorConverter_ToServiceDescriptor(t *testing.T) {
 	mto := &descriptorpb.MethodOptions{
 		Deprecated: proto.Bool(true),
 	}
-	proto.SetExtension(mto, testdata.E_Mtfubar, []float32{3.14159, 2.71828})
-	proto.SetExtension(mto, testdata.E_Mtfubard, 10203040.506070809)
+	proto.SetExtension(mto, testprotos.E_Mtfubar, []float32{3.14159, 2.71828})
+	proto.SetExtension(mto, testprotos.E_Mtfubard, 10203040.506070809)
 	protosEqual(t, mto, methods.Get(0).Options())
 
 	require.Equal(t, "ClientStreamMethod", string(methods.Get(1).Name()))
@@ -720,10 +720,10 @@ func getApi(t *testing.T) *apipb.Api {
 	err = anypb.MarshalFrom(&flt2, &wrapperspb.FloatValue{Value: 2.71828}, proto.MarshalOptions{})
 	require.NoError(t, err)
 	var enu anypb.Any
-	err = anypb.MarshalFrom(&enu, &wrapperspb.Int32Value{Value: int32(testdata.ReallySimpleEnum_VALUE)}, proto.MarshalOptions{})
+	err = anypb.MarshalFrom(&enu, &wrapperspb.Int32Value{Value: int32(testprotos.ReallySimpleEnum_VALUE)}, proto.MarshalOptions{})
 	require.NoError(t, err)
 	var msg anypb.Any
-	err = anypb.MarshalFrom(&msg, &testdata.ReallySimpleMessage{Id: proto.Uint64(100), Name: proto.String("deuce")}, proto.MarshalOptions{})
+	err = anypb.MarshalFrom(&msg, &testprotos.ReallySimpleMessage{Id: proto.Uint64(100), Name: proto.String("deuce")}, proto.MarshalOptions{})
 	require.NoError(t, err)
 	return &apipb.Api{
 		Name: "some.Service",
@@ -798,13 +798,13 @@ func TestDescriptorConverter_DescriptorAsApi(t *testing.T) {
 	svcOpts := &descriptorpb.ServiceOptions{
 		Deprecated: proto.Bool(true),
 	}
-	proto.SetExtension(svcOpts, testdata.E_Sfubar, &testdata.ReallySimpleMessage{Id: proto.Uint64(1234), Name: proto.String("abc")})
-	proto.SetExtension(svcOpts, testdata.E_Sfubare, testdata.ReallySimpleEnum_VALUE)
+	proto.SetExtension(svcOpts, testprotos.E_Sfubar, &testprotos.ReallySimpleMessage{Id: proto.Uint64(1234), Name: proto.String("abc")})
+	proto.SetExtension(svcOpts, testprotos.E_Sfubare, testprotos.ReallySimpleEnum_VALUE)
 	mtdOpts := &descriptorpb.MethodOptions{
 		Deprecated: proto.Bool(true),
 	}
-	proto.SetExtension(mtdOpts, testdata.E_Mtfubar, []float32{0, 102.3040506, float32(math.Inf(-1)), 2030.40506})
-	proto.SetExtension(mtdOpts, testdata.E_Mtfubard, -98765.4321)
+	proto.SetExtension(mtdOpts, testprotos.E_Mtfubar, []float32{0, 102.3040506, float32(math.Inf(-1)), 2030.40506})
+	proto.SetExtension(mtdOpts, testprotos.E_Mtfubard, -98765.4321)
 	fdp := &descriptorpb.FileDescriptorProto{
 		Name:    proto.String("test.proto"),
 		Syntax:  proto.String("proto3"),
@@ -857,8 +857,8 @@ func TestDescriptorConverter_DescriptorAsApi(t *testing.T) {
 		},
 		Options: []*typepb.Option{
 			{Name: "deprecated", Value: asAny(t, &wrapperspb.BoolValue{Value: true})},
-			{Name: "testprotos.sfubar", Value: asAny(t, &testdata.ReallySimpleMessage{Id: proto.Uint64(1234), Name: proto.String("abc")})},
-			{Name: "testprotos.sfubare", Value: asAny(t, &wrapperspb.Int32Value{Value: int32(testdata.ReallySimpleEnum_VALUE)})},
+			{Name: "testprotos.sfubar", Value: asAny(t, &testprotos.ReallySimpleMessage{Id: proto.Uint64(1234), Name: proto.String("abc")})},
+			{Name: "testprotos.sfubare", Value: asAny(t, &wrapperspb.Int32Value{Value: int32(testprotos.ReallySimpleEnum_VALUE)})},
 		},
 		Methods: []*apipb.Method{
 			{
@@ -898,12 +898,12 @@ func TestDescriptorConverter_ToMessageDescriptor(t *testing.T) {
 	msgOpts := &descriptorpb.MessageOptions{
 		Deprecated: proto.Bool(true),
 	}
-	proto.SetExtension(msgOpts, testdata.E_Mfubar, true)
+	proto.SetExtension(msgOpts, testprotos.E_Mfubar, true)
 	fldOpts := &descriptorpb.FieldOptions{
 		Deprecated: proto.Bool(true),
 	}
-	proto.SetExtension(fldOpts, testdata.E_Ffubar, []string{"foo", "bar", "baz"})
-	proto.SetExtension(fldOpts, testdata.E_Ffubarb, []byte{1, 2, 3, 4, 5, 6, 7, 8})
+	proto.SetExtension(fldOpts, testprotos.E_Ffubar, []string{"foo", "bar", "baz"})
+	proto.SetExtension(fldOpts, testprotos.E_Ffubarb, []byte{1, 2, 3, 4, 5, 6, 7, 8})
 	expected := &descriptorpb.DescriptorProto{
 		Name:    proto.String("Type"),
 		Options: msgOpts,
@@ -1088,19 +1088,19 @@ func TestDescriptorConverter_ToEnumDescriptor(t *testing.T) {
 		Deprecated: proto.Bool(true),
 		AllowAlias: proto.Bool(true),
 	}
-	proto.SetExtension(enumOpts, testdata.E_Efubar, int32(-42))
-	proto.SetExtension(enumOpts, testdata.E_Efubars, int32(-42))
-	proto.SetExtension(enumOpts, testdata.E_Efubarsf, int32(-42))
-	proto.SetExtension(enumOpts, testdata.E_Efubaru, uint32(42))
-	proto.SetExtension(enumOpts, testdata.E_Efubaruf, uint32(42))
+	proto.SetExtension(enumOpts, testprotos.E_Efubar, int32(-42))
+	proto.SetExtension(enumOpts, testprotos.E_Efubars, int32(-42))
+	proto.SetExtension(enumOpts, testprotos.E_Efubarsf, int32(-42))
+	proto.SetExtension(enumOpts, testprotos.E_Efubaru, uint32(42))
+	proto.SetExtension(enumOpts, testprotos.E_Efubaruf, uint32(42))
 	enumValOpts := &descriptorpb.EnumValueOptions{
 		Deprecated: proto.Bool(true),
 	}
-	proto.SetExtension(enumValOpts, testdata.E_Evfubar, int64(-420420420420))
-	proto.SetExtension(enumValOpts, testdata.E_Evfubars, int64(-420420420420))
-	proto.SetExtension(enumValOpts, testdata.E_Evfubarsf, int64(-420420420420))
-	proto.SetExtension(enumValOpts, testdata.E_Evfubaru, uint64(420420420420))
-	proto.SetExtension(enumValOpts, testdata.E_Evfubaruf, uint64(420420420420))
+	proto.SetExtension(enumValOpts, testprotos.E_Evfubar, int64(-420420420420))
+	proto.SetExtension(enumValOpts, testprotos.E_Evfubars, int64(-420420420420))
+	proto.SetExtension(enumValOpts, testprotos.E_Evfubarsf, int64(-420420420420))
+	proto.SetExtension(enumValOpts, testprotos.E_Evfubaru, uint64(420420420420))
+	proto.SetExtension(enumValOpts, testprotos.E_Evfubaruf, uint64(420420420420))
 	expected := &descriptorpb.EnumDescriptorProto{
 		Name:    proto.String("Enum"),
 		Options: enumOpts,

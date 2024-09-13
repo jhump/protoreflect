@@ -52,7 +52,7 @@ option java_multiple_files = true;
 
 option java_generate_equals_and_hash = true;
 
-option go_package = "github.com/jhump/protoreflect/v2/internal/testdata";
+option go_package = "github.com/jhump/protoreflect/v2/internal/testprotos";
 
 option csharp_namespace = "jhump.protoreflect.testprotos";
 

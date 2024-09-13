@@ -23,7 +23,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	_ "github.com/jhump/protoreflect/v2/internal/testdata"
+	_ "github.com/jhump/protoreflect/v2/internal/testprotos"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
@@ -362,7 +362,7 @@ func TestBuildersFromDescriptors(t *testing.T) {
 }
 
 func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
-	files, err := loadProtoset("../internal/testdata/desc_test1.protoset")
+	files, err := loadProtoset("../internal/testprotos/desc_test1.protoset")
 	require.NoError(t, err)
 	fd, err := files.FindFileByPath("desc_test1.proto")
 	require.NoError(t, err)

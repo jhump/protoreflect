@@ -10,12 +10,12 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 
 	"github.com/jhump/protoreflect/v2/internal"
-	"github.com/jhump/protoreflect/v2/internal/testdata"
+	"github.com/jhump/protoreflect/v2/internal/testprotos"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 func TestReparse(t *testing.T) {
-	fileDescriptor := protodesc.ToFileDescriptorProto(testdata.File_desc_test_complex_proto)
+	fileDescriptor := protodesc.ToFileDescriptorProto(testprotos.File_desc_test_complex_proto)
 	// serialize to bytes and back, but use empty resolver when
 	// de-serializing so that custom options are unrecognized
 	data, err := proto.Marshal(fileDescriptor)
@@ -24,7 +24,7 @@ func TestReparse(t *testing.T) {
 	err = opts.Unmarshal(data, fileDescriptor)
 	require.NoError(t, err)
 
-	msgDescriptor := protodesc.ToDescriptorProto((&testdata.Another{}).ProtoReflect().Descriptor())
+	msgDescriptor := protodesc.ToDescriptorProto((&testprotos.Another{}).ProtoReflect().Descriptor())
 	// same thing for this message descriptor
 	data, err = proto.Marshal(msgDescriptor)
 	require.NoError(t, err)
@@ -34,7 +34,7 @@ func TestReparse(t *testing.T) {
 	// Now the above messages have unrecognized fields for custom options.
 	require.True(t, hasUnrecognized(fileDescriptor.ProtoReflect()))
 	require.True(t, hasUnrecognized(fileDescriptor.ProtoReflect()))
-	require.False(t, proto.HasExtension(msgDescriptor.Options, testdata.E_Rept))
+	require.False(t, proto.HasExtension(msgDescriptor.Options, testprotos.E_Rept))
 
 	// Unrecognized become recognized.
 	require.True(t, ReparseUnrecognized(fileDescriptor, protoregistry.GlobalTypes))
@@ -43,7 +43,7 @@ func TestReparse(t *testing.T) {
 
 	require.True(t, ReparseUnrecognized(msgDescriptor, protoregistry.GlobalTypes))
 	require.False(t, hasUnrecognized(msgDescriptor.ProtoReflect()))
-	require.True(t, proto.HasExtension(msgDescriptor.Options, testdata.E_Rept))
+	require.True(t, proto.HasExtension(msgDescriptor.Options, testprotos.E_Rept))
 }
 
 func hasUnrecognized(msg protoreflect.Message) bool {
