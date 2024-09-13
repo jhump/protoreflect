@@ -79,22 +79,12 @@ and/or dynamic code.
 *[Read more ≫](https://pkg.go.dev/github.com/jhump/protoreflect/v2/protomessage)*
 
 ```go
-import "github.com/jhump/protoreflect/v2/protowrap"
+import "github.com/jhump/protoreflect/v2/protodescs"
 ```
 
-The `protowrap` package defines interfaces for _wrapping_ the `protoreflect.Descriptor` interfaces.
-This is **experimental**. Implementations of the `protoreflect.Descriptor` interfaces outside of the
-Protobuf Go runtime are not officially supported by the Protobuf Go runtime. So though this package
-works as of this wrigin, it will likely be replaced with an alternate formulation for exposing the
-same functionality, to ensure long-term compatibility with the Protobuf Go runtime.
+The `protodescs` package contains miscellaneous helpers for working with descriptors.
 
-The main functionality provided is an efficient way to associate `descriptorpb` descriptor protos
-with their "richer" `protoreflect` descriptor cousins. Without this ability, acquiring a descriptor
-proto that is the underlying data for a descriptor requires a non-trivial conversion and likely
-application logic to memoize the results. This package provided the ability by _wrapping_ the
-descriptors and exposing an extra exported method for efficiently recovering the descriptor proto.
-
-*[Read more ≫](https://pkg.go.dev/github.com/jhump/protoreflect/v2/protowrap)*
+*[Read more ≫](https://pkg.go.dev/github.com/jhump/protoreflect/v2/protodescs)*
 
 ----
 ## Source Code Info
@@ -111,7 +101,7 @@ for restoring the source code information to the descriptors embedded in generat
 import "github.com/jhump/protoreflect/v2/sourceinfo"
 ```
 
-The `sourceinfo` package contains APIs that for retreiving descriptors for generated types that include
+The `sourceinfo` package contains APIs that for retrieving descriptors for generated types that include
 source code info. When generating Go code, source code information is not preserved. But if you also
 generate code using the included `protoc-gen-gosrcinfo` plugin and query for the descriptors using this
 package, you can access that information. The most immediate use of this information is to provide

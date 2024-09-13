@@ -25,7 +25,6 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/protoresolve"
-	"github.com/jhump/protoreflect/v2/protowrap"
 )
 
 // If we try the v1 reflection API and get back "not implemented", we'll wait
@@ -431,7 +430,7 @@ func (cr *Client) descriptorFromProto(fd *descriptorpb.FileDescriptorProto) (pro
 	if fd, err := cr.descriptors.FindFileByPath(fd.GetName()); err == nil {
 		return fd, nil
 	}
-	d, err := protowrap.FromFileDescriptorProto(fd, (*depResolver)(cr))
+	d, err := protodesc.NewFile(fd, (*depResolver)(cr))
 	if err == nil {
 		err = cr.descriptors.RegisterFile(d)
 	}

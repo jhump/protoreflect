@@ -1,15 +1,20 @@
-package protoresolve
+package protodescs
 
 import (
+	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/jhump/protoreflect/v2/internal/wrappers"
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 // GetEdition returns the edition for the given file. If it cannot be determined,
 // descriptorpb.Edition_EDITION_UNKNOWN is returned.
-func GetEdition(fd protoreflect.FileDescriptor) descriptorpb.Edition {
+//
+// The given protos value is optional. If non-nil, it will be consulted, if
+// necessary, to find the underlying file descriptor proto for the given fd, from
+// which the edition can be queried.
+func GetEdition(fd protoreflect.FileDescriptor, protos protoresolve.ProtoFileOracle) descriptorpb.Edition {
 	switch fd.Syntax() {
 	case protoreflect.Proto2:
 		return descriptorpb.Edition_EDITION_PROTO2
@@ -24,5 +29,11 @@ func GetEdition(fd protoreflect.FileDescriptor) descriptorpb.Edition {
 	if ed, ok := fd.(hasEdition); ok {
 		return descriptorpb.Edition(ed.Edition())
 	}
-	return wrappers.ProtoFromFileDescriptor(fd).GetEdition()
+	if protos != nil {
+		fileProto, err := protos.ProtoFromFileDescriptor(fd)
+		if err == nil {
+			return fileProto.GetEdition()
+		}
+	}
+	return protodesc.ToFileDescriptorProto(fd).GetEdition()
 }

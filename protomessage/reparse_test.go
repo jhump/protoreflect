@@ -1,4 +1,4 @@
-package protoresolve_test
+package protomessage
 
 import (
 	"testing"
@@ -37,10 +37,11 @@ func TestReparse(t *testing.T) {
 	require.False(t, proto.HasExtension(msgDescriptor.Options, testdata.E_Rept))
 
 	// Unrecognized become recognized.
-	protoresolve.ReparseUnrecognized(fileDescriptor, protoregistry.GlobalTypes)
+	require.True(t, ReparseUnrecognized(fileDescriptor, protoregistry.GlobalTypes))
 	require.False(t, hasUnrecognized(fileDescriptor.ProtoReflect()))
+	require.False(t, ReparseUnrecognized(fileDescriptor, protoregistry.GlobalTypes)) // no-op this time
 
-	protoresolve.ReparseUnrecognized(msgDescriptor, protoregistry.GlobalTypes)
+	require.True(t, ReparseUnrecognized(msgDescriptor, protoregistry.GlobalTypes))
 	require.False(t, hasUnrecognized(msgDescriptor.ProtoReflect()))
 	require.True(t, proto.HasExtension(msgDescriptor.Options, testdata.E_Rept))
 }

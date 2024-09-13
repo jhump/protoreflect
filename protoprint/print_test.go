@@ -15,12 +15,12 @@ import (
 	"github.com/bufbuild/protocompile/reporter"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 
 	_ "github.com/jhump/protoreflect/v2/internal/testdata"
 	prototesting "github.com/jhump/protoreflect/v2/internal/testing"
-	"github.com/jhump/protoreflect/v2/protowrap"
 )
 
 const (
@@ -99,7 +99,7 @@ func TestPrinter(t *testing.T) {
 	//     from the underlying registry, which will NOT have source code info.
 	fd, err := protoregistry.GlobalFiles.FindFileByPath("desc_test2.proto")
 	require.NoError(t, err)
-	fdp := protowrap.ProtoFromFileDescriptor(fd)
+	fdp := protodesc.ToFileDescriptorProto(fd)
 	require.Nil(t, fdp.SourceCodeInfo)
 	fds[len(files)] = fd
 
@@ -174,13 +174,13 @@ service TestService {
 	// Now we try again with descriptors where custom options are unrecognized.
 	// We do that by marshaling and then unmarshaling (w/out a resolver) the file
 	// descriptor protos.
-	fdProto := protowrap.ProtoFromFileDescriptor(fds[0])
+	fdProto := protodesc.ToFileDescriptorProto(fds[0])
 	fdBytes, err := proto.Marshal(fdProto)
 	require.NoError(t, err)
 	err = proto.Unmarshal(fdBytes, fdProto)
 	require.NoError(t, err)
 
-	fd, err := protowrap.FromFileDescriptorProto(fdProto, protoregistry.GlobalFiles)
+	fd, err := protodesc.NewFile(fdProto, protoregistry.GlobalFiles)
 	require.NoError(t, err)
 	// Sanity check that this resulted in unrecognized options
 	unk = fd.Services().ByName("TestService").Methods().ByName("Get").Options().ProtoReflect().GetUnknown()
@@ -217,7 +217,7 @@ message SomeMessage {
 	unint := fdProto.MessageType[1].Options.UninterpretedOption
 	require.NotEmpty(t, unint)
 
-	fd, err := protowrap.FromFileDescriptorProto(fdProto, protoregistry.GlobalFiles)
+	fd, err := protodesc.NewFile(fdProto, protoregistry.GlobalFiles)
 	require.NoError(t, err)
 
 	checkFile(t, &Printer{}, fd, "test-uninterpreted-options.proto")

@@ -8,10 +8,11 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/internal/fielddefault"
 	"github.com/jhump/protoreflect/v2/protomessage"
-	"github.com/jhump/protoreflect/v2/protowrap"
 )
 
 // FieldBuilder is a builder used to construct a protoreflect.FieldDescriptor. A field
@@ -212,8 +213,7 @@ func fromField(fld protoreflect.FieldDescriptor) (*FieldBuilder, error) {
 		flb.Cardinality = protoreflect.Optional
 	}
 	flb.Proto3Optional = fld.ContainingOneof() != nil && fld.ContainingOneof().IsSynthetic()
-	fldProto := protowrap.ProtoFromFieldDescriptor(fld)
-	flb.Default = fldProto.GetDefaultValue()
+	flb.Default = fielddefault.DefaultValue(fld)
 	if !fld.IsExtension() {
 		flb.JsonName = fld.JSONName()
 	}
@@ -598,11 +598,18 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 // resolving symbols referenced by the builder or failing to meet certain
 // validation rules, an error is returned.
 func (flb *FieldBuilder) Build() (protoreflect.FieldDescriptor, error) {
-	fld, err := flb.BuildDescriptor()
+	d, err := doBuild(flb, BuilderOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return fld.(protoreflect.FieldDescriptor), nil
+	fld := d.(protoreflect.FieldDescriptor)
+	if fld.IsExtension() {
+		if xtd, ok := fld.(protoreflect.ExtensionTypeDescriptor); ok {
+			return xtd, nil
+		}
+		return extensionTypeDescriptor{fld, dynamicpb.NewExtensionType(fld)}, nil
+	}
+	return fld, nil
 }
 
 // BuildDescriptor constructs a field descriptor based on the contents of this
@@ -610,7 +617,22 @@ func (flb *FieldBuilder) Build() (protoreflect.FieldDescriptor, error) {
 // a concrete descriptor type. This method is present to satisfy the Builder
 // interface.
 func (flb *FieldBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
-	return doBuild(flb, BuilderOptions{})
+	return flb.Build()
+}
+
+type extensionTypeDescriptor struct {
+	protoreflect.FieldDescriptor
+	xt protoreflect.ExtensionType
+}
+
+var _ protoreflect.ExtensionTypeDescriptor = extensionTypeDescriptor{}
+
+func (e extensionTypeDescriptor) Type() protoreflect.ExtensionType {
+	return e.xt
+}
+
+func (e extensionTypeDescriptor) Descriptor() protoreflect.ExtensionDescriptor {
+	return e.FieldDescriptor
 }
 
 // OneofBuilder is a builder used to construct a protoreflect.OneOfDescriptor. A oneof

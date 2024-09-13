@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 
+	"github.com/jhump/protoreflect/v2/protomessage"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
@@ -73,7 +74,7 @@ func (s *Stub) InvokeRpc(ctx context.Context, method protoreflect.MethodDescript
 		return nil, err
 	}
 	if s.resolver != nil {
-		protoresolve.ReparseUnrecognized(resp, s.resolver)
+		protomessage.ReparseUnrecognized(resp, s.resolver)
 	}
 	return resp, nil
 }
@@ -213,7 +214,7 @@ func (s *ServerStream) RecvMsg() (proto.Message, error) {
 		return nil, err
 	}
 	if s.resolver != nil {
-		protoresolve.ReparseUnrecognized(resp, s.resolver)
+		protomessage.ReparseUnrecognized(resp, s.resolver)
 	}
 	return resp, nil
 }
@@ -262,7 +263,7 @@ func (s *ClientStream) CloseAndReceive() (proto.Message, error) {
 		return nil, err
 	}
 	if s.resolver != nil {
-		protoresolve.ReparseUnrecognized(resp, s.resolver)
+		protomessage.ReparseUnrecognized(resp, s.resolver)
 	}
 
 	// make sure we get EOF for a second message
@@ -326,7 +327,7 @@ func (s *BidiStream) RecvMsg() (proto.Message, error) {
 		return nil, err
 	}
 	if s.resolver != nil {
-		protoresolve.ReparseUnrecognized(resp, s.resolver)
+		protomessage.ReparseUnrecognized(resp, s.resolver)
 	}
 	return resp, nil
 }

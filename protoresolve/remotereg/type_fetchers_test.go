@@ -1,4 +1,4 @@
-package protoresolve
+package remotereg
 
 import (
 	"bytes"
@@ -17,6 +17,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/sourcecontextpb"
 	"google.golang.org/protobuf/types/known/typepb"
+
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 func TestCachingTypeFetcher(t *testing.T) {
@@ -74,7 +76,7 @@ func TestCachingTypeFetcher_MismatchType(t *testing.T) {
 
 	// now ask for same URL, but swapped types
 	_, err = fetcher.FetchEnumType(context.Background(), "blah.blah.blah/fee.fi.fo.Fum")
-	var unexpectedTypeErr *ErrUnexpectedType
+	var unexpectedTypeErr *protoresolve.ErrUnexpectedType
 	require.ErrorAs(t, err, &unexpectedTypeErr)
 	require.ErrorContains(t, err, "expected an enum, got a message")
 	_, err = fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Foo")

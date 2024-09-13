@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -24,7 +25,6 @@ import (
 
 	_ "github.com/jhump/protoreflect/v2/internal/testdata"
 	"github.com/jhump/protoreflect/v2/protoresolve"
-	"github.com/jhump/protoreflect/v2/protowrap"
 )
 
 func TestSimpleDescriptorsFromScratch(t *testing.T) {
@@ -64,17 +64,17 @@ func TestSimpleDescriptorsFromScratch(t *testing.T) {
 	// building the others produces same results
 	ed, err := en.Build()
 	require.NoError(t, err)
-	diff := cmp.Diff(protowrap.ProtoFromDescriptor(ed), protowrap.ProtoFromDescriptor(fd.Enums().ByName("Options")), protocmp.Transform())
+	diff := cmp.Diff(protodesc.ToEnumDescriptorProto(ed), protodesc.ToEnumDescriptorProto(fd.Enums().ByName("Options")), protocmp.Transform())
 	require.Empty(t, diff)
 
 	md, err = msg.Build()
 	require.NoError(t, err)
-	diff = cmp.Diff(protowrap.ProtoFromDescriptor(md), protowrap.ProtoFromDescriptor(fd.Messages().ByName("FooRequest")), protocmp.Transform())
+	diff = cmp.Diff(protodesc.ToDescriptorProto(md), protodesc.ToDescriptorProto(fd.Messages().ByName("FooRequest")), protocmp.Transform())
 	require.Empty(t, diff)
 
 	sd, err := sb.Build()
 	require.NoError(t, err)
-	diff = cmp.Diff(protowrap.ProtoFromDescriptor(sd), protowrap.ProtoFromDescriptor(fd.Services().ByName("FooService")), protocmp.Transform())
+	diff = cmp.Diff(protodesc.ToServiceDescriptorProto(sd), protodesc.ToServiceDescriptorProto(fd.Services().ByName("FooService")), protocmp.Transform())
 	require.Empty(t, diff)
 }
 
@@ -120,12 +120,12 @@ func TestSimpleDescriptorsFromScratch_SyntheticFiles(t *testing.T) {
 	// building the others produces same results
 	ed, err := en.Build()
 	require.NoError(t, err)
-	diff := cmp.Diff(protowrap.ProtoFromDescriptor(ed), protowrap.ProtoFromDescriptor(fd2.Enums().ByName("Options")), protocmp.Transform())
+	diff := cmp.Diff(protodesc.ToEnumDescriptorProto(ed), protodesc.ToEnumDescriptorProto(fd2.Enums().ByName("Options")), protocmp.Transform())
 	require.Empty(t, diff)
 
 	md, err = msg.Build()
 	require.NoError(t, err)
-	diff = cmp.Diff(protowrap.ProtoFromDescriptor(md), protowrap.ProtoFromDescriptor(fd.Messages().ByName("FooRequest")), protocmp.Transform())
+	diff = cmp.Diff(protodesc.ToDescriptorProto(md), protodesc.ToDescriptorProto(fd.Messages().ByName("FooRequest")), protocmp.Transform())
 	require.Empty(t, diff)
 }
 
@@ -265,7 +265,7 @@ func TestCreatingGroupField(t *testing.T) {
 	// failed rename should not have modified any state
 	md2, err := mb.Build()
 	require.NoError(t, err)
-	diff := cmp.Diff(protowrap.ProtoFromDescriptor(md), protowrap.ProtoFromDescriptor(md2), protocmp.Transform())
+	diff := cmp.Diff(protodesc.ToDescriptorProto(md), protodesc.ToDescriptorProto(md2), protocmp.Transform())
 	require.Empty(t, diff)
 	// another attempt that will fail
 	err = grpFlb.TrySetName("foobarbaz")
@@ -273,7 +273,7 @@ func TestCreatingGroupField(t *testing.T) {
 	// again, no state should have been modified
 	md2, err = mb.Build()
 	require.NoError(t, err)
-	diff = cmp.Diff(protowrap.ProtoFromDescriptor(md), protowrap.ProtoFromDescriptor(md2), protocmp.Transform())
+	diff = cmp.Diff(protodesc.ToDescriptorProto(md), protodesc.ToDescriptorProto(md2), protocmp.Transform())
 	require.Empty(t, diff)
 
 	// and a rename that succeeds
@@ -312,7 +312,7 @@ func TestCreatingMapField(t *testing.T) {
 	// failed rename should not have modified any state
 	md2, err := mb.Build()
 	require.NoError(t, err)
-	diff := cmp.Diff(protowrap.ProtoFromDescriptor(md), protowrap.ProtoFromDescriptor(md2), protocmp.Transform())
+	diff := cmp.Diff(protodesc.ToDescriptorProto(md), protodesc.ToDescriptorProto(md2), protocmp.Transform())
 	require.Empty(t, diff)
 
 	// and a rename that succeeds
@@ -583,7 +583,7 @@ message SimpleMessage {
 	checkDescriptorComments(fd)
 }
 
-func loadProtoset(path string) (protoresolve.Resolver, error) {
+func loadProtoset(path string) (protoresolve.DependencyResolver, error) {
 	var fds descriptorpb.FileDescriptorSet
 	f, err := os.Open(path)
 	if err != nil {
@@ -599,7 +599,7 @@ func loadProtoset(path string) (protoresolve.Resolver, error) {
 	if err = proto.Unmarshal(bb, &fds); err != nil {
 		return nil, err
 	}
-	return protowrap.FromFileDescriptorSet(&fds)
+	return protodesc.NewFiles(&fds)
 }
 
 func roundTripFile(t *testing.T, fd protoreflect.FileDescriptor) {
@@ -658,7 +658,7 @@ func roundTripFile(t *testing.T, fd protoreflect.FileDescriptor) {
 	// nopkg/desc_test_nopkg_new.proto. So any file that depends on the
 	// former will be updated to instead depend on the latter (since it is
 	// the actual file that declares used elements).
-	fdp := protowrap.ProtoFromFileDescriptor(fd)
+	fdp := protodesc.ToFileDescriptorProto(fd)
 	needsNopkgNew := false
 	hasNoPkgNew := false
 	for _, dep := range fdp.Dependency {
@@ -683,16 +683,11 @@ func roundTripFile(t *testing.T, fd protoreflect.FileDescriptor) {
 	if fdp.GetPackage() == "" {
 		fdp.Package = nil
 	}
-	// Fix the one we loaded so it has syntax set instead of unset, since
-	// that is what builders produce.
-	if fdp.Syntax == nil {
-		fdp.Syntax = proto.String("proto2")
-	}
 
 	// Remove source code info: what the builder generates is not expected to
 	// match the original source.
 	fdp.SourceCodeInfo = nil
-	roundTrippedProto := protowrap.ProtoFromFileDescriptor(roundTripped)
+	roundTrippedProto := protodesc.ToFileDescriptorProto(roundTripped)
 	roundTrippedProto.SourceCodeInfo = nil
 
 	// Finally, sort the imports. That way they match the built result (which
@@ -787,8 +782,31 @@ func roundTripService(t *testing.T, sd protoreflect.ServiceDescriptor) {
 
 func checkDescriptors(t *testing.T, d1, d2 protoreflect.Descriptor) {
 	require.Equal(t, d1.FullName(), d2.FullName())
-	diff := cmp.Diff(protowrap.ProtoFromDescriptor(d1), protowrap.ProtoFromDescriptor(d2), protocmp.Transform())
+	diff := cmp.Diff(protoFromDescriptor(d1), protoFromDescriptor(d2), protocmp.Transform())
 	require.Empty(t, diff)
+}
+
+func protoFromDescriptor(d protoreflect.Descriptor) proto.Message {
+	switch d := d.(type) {
+	case protoreflect.FileDescriptor:
+		return protodesc.ToFileDescriptorProto(d)
+	case protoreflect.MessageDescriptor:
+		return protodesc.ToDescriptorProto(d)
+	case protoreflect.FieldDescriptor:
+		return protodesc.ToFieldDescriptorProto(d)
+	case protoreflect.OneofDescriptor:
+		return protodesc.ToOneofDescriptorProto(d)
+	case protoreflect.EnumDescriptor:
+		return protodesc.ToEnumDescriptorProto(d)
+	case protoreflect.EnumValueDescriptor:
+		return protodesc.ToEnumValueDescriptorProto(d)
+	case protoreflect.ServiceDescriptor:
+		return protodesc.ToServiceDescriptorProto(d)
+	case protoreflect.MethodDescriptor:
+		return protodesc.ToMethodDescriptorProto(d)
+	default:
+		panic(fmt.Sprintf("unexpected descriptor type: %T", d))
+	}
 }
 
 func TestAddRemoveMoveBuilders(t *testing.T) {

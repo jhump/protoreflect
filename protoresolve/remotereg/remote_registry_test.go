@@ -1,4 +1,4 @@
-package protoresolve_test
+package remotereg_test
 
 import (
 	"context"
@@ -25,12 +25,12 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/jhump/protoreflect/v2/internal/testdata"
-	. "github.com/jhump/protoreflect/v2/protoresolve"
-	"github.com/jhump/protoreflect/v2/protowrap"
+	"github.com/jhump/protoreflect/v2/protoresolve"
+	. "github.com/jhump/protoreflect/v2/protoresolve/remotereg"
 )
 
 func TestRemoteRegistry_Basic(t *testing.T) {
-	rr := &RemoteRegistry{Fallback: &Registry{} /* empty fallback */}
+	rr := &Registry{Fallback: &protoresolve.Registry{} /* empty fallback */}
 
 	// register some types
 	md := (*descriptorpb.DescriptorProto)(nil).ProtoReflect().Descriptor()
@@ -53,24 +53,24 @@ func TestRemoteRegistry_Basic(t *testing.T) {
 
 	// right name but wrong domain? not found
 	_, err = rr.FindMessageByURL("type.googleapis.com/google.protobuf.DescriptorProto")
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, protoresolve.ErrNotFound)
 	_, err = rr.FindEnumByURL("type.googleapis.com/google.protobuf.FieldDescriptorProto.Type")
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, err, protoresolve.ErrNotFound)
 
 	// wrong type
 	_, err = rr.FindMessageByURL("foo.bar/google.protobuf.FieldDescriptorProto.Type")
-	var unexpectedTypeErr *ErrUnexpectedType
+	var unexpectedTypeErr *protoresolve.ErrUnexpectedType
 	require.ErrorAs(t, err, &unexpectedTypeErr)
 	_, err = rr.FindEnumByURL("foo.bar/google.protobuf.DescriptorProto")
 	require.ErrorAs(t, err, &unexpectedTypeErr)
 
 	// unmarshal any successfully finds the registered type
-	b, err := proto.Marshal(protowrap.ProtoFromMessageDescriptor(md))
+	b, err := proto.Marshal(protodesc.ToDescriptorProto(md))
 	require.NoError(t, err)
 	a := &anypb.Any{TypeUrl: "foo.bar/google.protobuf.DescriptorProto", Value: b}
 	pm, err := anypb.UnmarshalNew(a, proto.UnmarshalOptions{Resolver: rr.AsTypeResolver()})
 	require.NoError(t, err)
-	protosEqual(t, protowrap.ProtoFromMessageDescriptor(md), pm)
+	protosEqual(t, protodesc.ToDescriptorProto(md), pm)
 	require.Equal(t, reflect.TypeOf((*dynamicpb.Message)(nil)), reflect.TypeOf(pm))
 
 	fd, err := protoregistry.GlobalFiles.FindFileByPath("desc_test1.proto")
@@ -110,7 +110,7 @@ func TestRemoteRegistry_Basic(t *testing.T) {
 }
 
 func TestRemoteRegistry_Fallback(t *testing.T) {
-	rr := &RemoteRegistry{}
+	rr := &Registry{}
 
 	md := (*descriptorpb.DescriptorProto)(nil).ProtoReflect().Descriptor()
 	ed := md.ParentFile().Messages().ByName("FieldDescriptorProto").Enums().ByName("Type")
@@ -138,7 +138,7 @@ func TestRemoteRegistry_FindMessage_TypeFetcher(t *testing.T) {
 	tf := createFetcher(t)
 	// we want "defaults" for the message factory so that we can properly process
 	// known extensions (which the type fetcher puts into the descriptor options)
-	rr := &RemoteRegistry{TypeFetcher: tf}
+	rr := &Registry{TypeFetcher: tf}
 
 	md, err := rr.FindMessageByURL("foo.bar/some.Type")
 	require.NoError(t, err)
@@ -206,7 +206,7 @@ func TestRemoteRegistry_FindMessage_TypeFetcher(t *testing.T) {
 	require.Equal(t, protoreflect.Proto2, md2.ParentFile().Syntax())
 
 	nmd := md2.Messages().Get(0)
-	protosEqual(t, protowrap.ProtoFromMessageDescriptor(nmd), protowrap.ProtoFromMessageDescriptor(md2.Fields().ByName("a").Message()))
+	protosEqual(t, protodesc.ToDescriptorProto(nmd), protodesc.ToDescriptorProto(md2.Fields().ByName("a").Message()))
 	require.Equal(t, "AnotherType", string(nmd.Name()))
 	require.Equal(t, "some.OtherType.AnotherType", string(nmd.FullName()))
 	require.Equal(t, "some", string(nmd.ParentFile().Package()))
@@ -302,11 +302,11 @@ func TestRemoteRegistry_FindMessage_Mixed(t *testing.T) {
 		Syntax: typepb.Syntax_SYNTAX_PROTO3,
 	}
 
-	rr := &RemoteRegistry{TypeFetcher: TypeFetcherFunc(func(_ context.Context, url string, enum bool) (proto.Message, error) {
+	rr := &Registry{TypeFetcher: TypeFetcherFunc(func(_ context.Context, url string, enum bool) (proto.Message, error) {
 		if url == "https://foo.test.com/foo.Bar" && !enum {
 			return msgType, nil
 		}
-		return nil, ErrNotFound
+		return nil, protoresolve.ErrNotFound
 	})}
 
 	// Make sure we successfully get back a descriptor
@@ -337,7 +337,7 @@ func TestRemoteRegistry_FindEnum_TypeFetcher(t *testing.T) {
 	tf := createFetcher(t)
 	// we want "defaults" for the message factory so that we can properly process
 	// known extensions (which the type fetcher puts into the descriptor options)
-	rr := &RemoteRegistry{TypeFetcher: tf}
+	rr := &Registry{TypeFetcher: tf}
 
 	ed, err := rr.FindEnumByURL("foo.bar/some.Enum")
 	require.NoError(t, err)
@@ -629,7 +629,7 @@ func TestDescriptorConverter_ToServiceDescriptor(t *testing.T) {
 	tf := createFetcher(t)
 	// we want "defaults" for the message factory so that we can properly process
 	// known extensions (which the type fetcher puts into the descriptor options)
-	rr := &RemoteRegistry{TypeFetcher: tf}
+	rr := &Registry{TypeFetcher: tf}
 	dc := rr.AsDescriptorConverter()
 
 	sd, err := dc.ToServiceDescriptor(context.Background(), getApi(t))
@@ -846,7 +846,7 @@ func TestDescriptorConverter_DescriptorAsApi(t *testing.T) {
 	fd, err := protodesc.NewFile(fdp, protoregistry.GlobalFiles)
 	require.NoError(t, err)
 
-	rr := &RemoteRegistry{DefaultBaseURL: "foo.com"}
+	rr := &Registry{DefaultBaseURL: "foo.com"}
 	api := rr.AsDescriptorConverter().DescriptorAsApi(fd.Services().Get(0))
 
 	expected := &apipb.Api{
@@ -887,13 +887,13 @@ func TestDescriptorConverter_ToMessageDescriptor(t *testing.T) {
 	msg, err := tf.FetchMessageType(context.Background(), "https://foo.bar/some.Type")
 	require.NoError(t, err)
 
-	md, err := (&RemoteRegistry{TypeFetcher: tf}).AsDescriptorConverter().ToMessageDescriptor(context.Background(), msg)
+	md, err := (&Registry{TypeFetcher: tf}).AsDescriptorConverter().ToMessageDescriptor(context.Background(), msg)
 	require.NoError(t, err)
 
 	require.Equal(t, "foo.proto", md.ParentFile().Path())
 	require.Equal(t, "some", string(md.ParentFile().Package()))
 	require.Equal(t, protoreflect.Proto3, md.ParentFile().Syntax())
-	mdProto := protowrap.ProtoFromMessageDescriptor(md)
+	mdProto := protodesc.ToDescriptorProto(md)
 
 	msgOpts := &descriptorpb.MessageOptions{
 		Deprecated: proto.Bool(true),
@@ -1013,7 +1013,7 @@ func TestDescriptorConverter_DescriptorAsType(t *testing.T) {
 	fd, err := protodesc.NewFile(fdp, nil)
 	require.NoError(t, err)
 
-	msg := (&RemoteRegistry{}).AsDescriptorConverter().DescriptorAsType(fd.Messages().Get(0))
+	msg := (&Registry{}).AsDescriptorConverter().DescriptorAsType(fd.Messages().Get(0))
 
 	expected := &typepb.Type{
 		Name:   "foo.Bar",
@@ -1076,13 +1076,13 @@ func TestDescriptorConverter_ToEnumDescriptor(t *testing.T) {
 	enum, err := tf.FetchEnumType(context.Background(), "https://foo.bar/some.Enum")
 	require.NoError(t, err)
 
-	ed, err := (&RemoteRegistry{TypeFetcher: tf}).AsDescriptorConverter().ToEnumDescriptor(context.Background(), enum)
+	ed, err := (&Registry{TypeFetcher: tf}).AsDescriptorConverter().ToEnumDescriptor(context.Background(), enum)
 	require.NoError(t, err)
 
 	require.Equal(t, "foo.proto", ed.ParentFile().Path())
 	require.Equal(t, "some", string(ed.ParentFile().Package()))
 	require.Equal(t, protoreflect.Proto3, ed.ParentFile().Syntax())
-	edProto := protowrap.ProtoFromEnumDescriptor(ed)
+	edProto := protodesc.ToEnumDescriptorProto(ed)
 
 	enumOpts := &descriptorpb.EnumOptions{
 		Deprecated: proto.Bool(true),
@@ -1162,7 +1162,7 @@ func TestDescriptorConverter_DescriptorAsEnum(t *testing.T) {
 	fd, err := protodesc.NewFile(fdp, nil)
 	require.NoError(t, err)
 
-	enum := (&RemoteRegistry{}).AsDescriptorConverter().DescriptorAsEnum(fd.Enums().Get(0))
+	enum := (&Registry{}).AsDescriptorConverter().DescriptorAsEnum(fd.Enums().Get(0))
 
 	expected := &typepb.Enum{
 		Name:   "foo.Bar",

@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/protodescs"
 	"github.com/jhump/protoreflect/v2/protomessage"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
@@ -92,7 +93,7 @@ func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
 	fb := NewFile(fd.Path())
 	fb.Syntax = fd.Syntax()
 	if fb.Syntax == protoreflect.Editions {
-		fb.Edition = protoresolve.GetEdition(fd)
+		fb.Edition = protodescs.GetEdition(fd, nil)
 	}
 	fb.Package = fd.Package()
 	var err error

@@ -1,4 +1,4 @@
-package protoresolve
+package remotereg
 
 import (
 	"bytes"
@@ -26,19 +26,19 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/jhump/protoreflect/v2/internal"
-	"github.com/jhump/protoreflect/v2/internal/wrappers"
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 // DescriptorConverter is a type that can be used to convert between descriptors and the
 // other representations of types and services: google.protobuf.Type, google.protobuf.Enum,
 // and google.protobuf.Api.
 //
-// It uses a RemoteRegistry to convert the alternate representations, which may involve
+// It uses a Registry to convert the alternate representations, which may involve
 // fetching remote types by type URL in order to create a complete representation of the
 // transitive closure of the type or service.
 //
-// See RemoteRegistry.AsDescriptorConverter.
-type DescriptorConverter RemoteRegistry
+// See Registry.AsDescriptorConverter.
+type DescriptorConverter Registry
 
 // ToServiceDescriptor converts the given Api message into a service descriptor. Since
 // the service's referenced types may not yet be known, they may be fetched, which could
@@ -46,11 +46,11 @@ type DescriptorConverter RemoteRegistry
 func (dc *DescriptorConverter) ToServiceDescriptor(ctx context.Context, api *apipb.Api) (protoreflect.ServiceDescriptor, error) {
 	msgs := map[protoreflect.FullName]protoreflect.MessageDescriptor{}
 	unresolved := map[string]struct{}{}
-	reg := (*RemoteRegistry)(dc)
+	reg := (*Registry)(dc)
 	for _, m := range api.Methods {
 		// request type
 		md, err := reg.FindMessageByURLContext(ctx, m.RequestTypeUrl)
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, protoresolve.ErrNotFound) {
 			if dc.TypeFetcher == nil {
 				return nil, fmt.Errorf("could not resolve type URL %s for request of method %s.%s", m.RequestTypeUrl, api.Name, m.Name)
 			}
@@ -58,11 +58,11 @@ func (dc *DescriptorConverter) ToServiceDescriptor(ctx context.Context, api *api
 		} else if err != nil {
 			return nil, err
 		} else {
-			msgs[TypeNameFromURL(m.RequestTypeUrl)] = md
+			msgs[protoresolve.TypeNameFromURL(m.RequestTypeUrl)] = md
 		}
 		// and response type
 		md, err = reg.FindMessageByURLContext(ctx, m.ResponseTypeUrl)
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, protoresolve.ErrNotFound) {
 			if dc.TypeFetcher == nil {
 				return nil, fmt.Errorf("could not resolve type URL %s for response of method %s.%s", m.ResponseTypeUrl, api.Name, m.Name)
 			}
@@ -70,7 +70,7 @@ func (dc *DescriptorConverter) ToServiceDescriptor(ctx context.Context, api *api
 		} else if err != nil {
 			return nil, err
 		} else {
-			msgs[TypeNameFromURL(m.ResponseTypeUrl)] = md
+			msgs[protoresolve.TypeNameFromURL(m.ResponseTypeUrl)] = md
 		}
 	}
 
@@ -84,7 +84,7 @@ func (dc *DescriptorConverter) ToServiceDescriptor(ctx context.Context, api *api
 			return nil, err
 		}
 		for u, md := range mp {
-			msgs[TypeNameFromURL(u)] = md
+			msgs[protoresolve.TypeNameFromURL(u)] = md
 		}
 	}
 
@@ -103,13 +103,13 @@ func (dc *DescriptorConverter) ToServiceDescriptor(ctx context.Context, api *api
 	fe.types.addType(api.Name, createServiceDescriptor(api, (*remoteSubResolver)(reg)))
 	added := newNameTracker()
 	for _, md := range msgs {
-		addDescriptors(fileName, files, md, msgs, added)
+		dc.addDescriptors(fileName, files, md, msgs, added)
 	}
 
 	// build resulting file descriptor(s) and return the final service descriptor
-	var fallback FileResolver
+	var fallback protoresolve.FileResolver
 	if dc.Fallback != nil {
-		fallback, _ = dc.Fallback.(FileResolver)
+		fallback, _ = dc.Fallback.(protoresolve.FileResolver)
 	} else {
 		fallback = protoregistry.GlobalFiles
 	}
@@ -124,7 +124,7 @@ func (dc *DescriptorConverter) ToServiceDescriptor(ctx context.Context, api *api
 	sd, ok := desc.(protoreflect.ServiceDescriptor)
 	if !ok {
 		// should not be possible?
-		return nil, NewUnexpectedTypeError(DescriptorKindService, desc, "")
+		return nil, protoresolve.NewUnexpectedTypeError(protoresolve.DescriptorKindService, desc, "")
 	}
 	return sd, nil
 }
@@ -133,7 +133,7 @@ func (dc *DescriptorConverter) ToServiceDescriptor(ctx context.Context, api *api
 // the message's fields may reference other types that are not yet known, other types
 // may be fetched, which could warrant interruption by providing a cancellable context.
 func (dc *DescriptorConverter) ToMessageDescriptor(ctx context.Context, msg *typepb.Type) (protoreflect.MessageDescriptor, error) {
-	reg := (*RemoteRegistry)(dc)
+	reg := (*Registry)(dc)
 	cc := newConvertContext(reg, dc.TypeFetcher)
 	typeName := protoreflect.FullName(msg.Name)
 	typeURL := reg.urlForType(typeName, typeName.Parent())
@@ -147,7 +147,7 @@ func (dc *DescriptorConverter) ToMessageDescriptor(ctx context.Context, msg *typ
 	md, ok := desc.(protoreflect.MessageDescriptor)
 	if !ok {
 		// should not be possible?
-		return nil, NewUnexpectedTypeError(DescriptorKindMessage, desc, "")
+		return nil, protoresolve.NewUnexpectedTypeError(protoresolve.DescriptorKindMessage, desc, "")
 	}
 	return md, nil
 }
@@ -159,7 +159,7 @@ func (dc *DescriptorConverter) ToEnumDescriptor(ctx context.Context, enum *typep
 	//     But there's no spec for discovering/downloading extensions, only types.
 	_ = ctx
 
-	reg := (*RemoteRegistry)(dc)
+	reg := (*Registry)(dc)
 	cc := newConvertContext(reg, dc.TypeFetcher)
 	typeName := protoreflect.FullName(enum.Name)
 	typeURL := reg.urlForType(typeName, typeName.Parent())
@@ -171,7 +171,7 @@ func (dc *DescriptorConverter) ToEnumDescriptor(ctx context.Context, enum *typep
 	ed, ok := desc.(protoreflect.EnumDescriptor)
 	if !ok {
 		// should not be possible?
-		return nil, NewUnexpectedTypeError(DescriptorKindEnum, desc, "")
+		return nil, protoresolve.NewUnexpectedTypeError(protoresolve.DescriptorKindEnum, desc, "")
 	}
 	return ed, nil
 }
@@ -179,7 +179,7 @@ func (dc *DescriptorConverter) ToEnumDescriptor(ctx context.Context, enum *typep
 // DescriptorAsApi produces an Api message that represents the given service descriptor.
 func (dc *DescriptorConverter) DescriptorAsApi(sd protoreflect.ServiceDescriptor) *apipb.Api {
 	ms := sd.Methods()
-	reg := (*RemoteRegistry)(dc)
+	reg := (*Registry)(dc)
 	methods := make([]*apipb.Method, ms.Len())
 	for i, length := 0, ms.Len(); i < length; i++ {
 		mtd := ms.Get(i)
@@ -251,7 +251,7 @@ func (dc *DescriptorConverter) descriptorAsField(fld protoreflect.FieldDescripto
 		card = typepb.Field_CARDINALITY_REQUIRED
 	}
 
-	reg := (*RemoteRegistry)(dc)
+	reg := (*Registry)(dc)
 	var url string
 	var kind typepb.Field_Kind
 	switch fld.Kind() {
@@ -537,7 +537,7 @@ func newNameTracker() tracker {
 	}
 }
 
-func addDescriptors(ref string, files map[string]*fileEntry, d protoreflect.Descriptor, msgs map[protoreflect.FullName]protoreflect.MessageDescriptor, onAdd tracker) {
+func (dc *DescriptorConverter) addDescriptors(ref string, files map[string]*fileEntry, d protoreflect.Descriptor, msgs map[protoreflect.FullName]protoreflect.MessageDescriptor, onAdd tracker) {
 	name := d.FullName()
 
 	fileName := d.ParentFile().Path()
@@ -561,7 +561,18 @@ func addDescriptors(ref string, files map[string]*fileEntry, d protoreflect.Desc
 		files[fileName] = fe
 	}
 
-	fe.types.addType(string(name), protoFromDescriptor(d))
+	descProto := dc.descProtos[d]
+	if descProto == nil {
+		switch d := d.(type) {
+		case protoreflect.MessageDescriptor:
+			descProto = protodesc.ToDescriptorProto(d)
+		case protoreflect.EnumDescriptor:
+			descProto = protodesc.ToEnumDescriptorProto(d)
+		}
+	}
+	if descProto != nil {
+		fe.types.addType(string(name), descProto)
+	}
 
 	if md, ok := d.(protoreflect.MessageDescriptor); ok {
 		fields := md.Fields()
@@ -573,9 +584,9 @@ func addDescriptors(ref string, files map[string]*fileEntry, d protoreflect.Desc
 				if md == nil {
 					md = fld.Message()
 				}
-				addDescriptors(fileName, files, md, msgs, onAdd)
+				dc.addDescriptors(fileName, files, md, msgs, onAdd)
 			} else if fld.Kind() == protoreflect.EnumKind {
-				addDescriptors(fileName, files, fld.Enum(), msgs, onAdd)
+				dc.addDescriptors(fileName, files, fld.Enum(), msgs, onAdd)
 			}
 		}
 	}
@@ -584,7 +595,7 @@ func addDescriptors(ref string, files map[string]*fileEntry, d protoreflect.Desc
 // convertContext provides the state for a resolution operation, accumulating details about
 // type descriptions and the files that contain them.
 type convertContext struct {
-	reg     *RemoteRegistry
+	reg     *Registry
 	res     *remoteSubResolver
 	fetcher TypeFetcher
 
@@ -595,7 +606,7 @@ type convertContext struct {
 	typeLocations map[string]string
 }
 
-func newConvertContext(reg *RemoteRegistry, fetcher TypeFetcher) *convertContext {
+func newConvertContext(reg *Registry, fetcher TypeFetcher) *convertContext {
 	return &convertContext{
 		reg:           reg,
 		res:           (*remoteSubResolver)(reg),
@@ -616,7 +627,7 @@ func (cc *convertContext) addType(ctx context.Context, url string, enum bool) er
 	if enum {
 		var err error
 		et, err := cc.fetcher.FetchEnumType(ctx, url)
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, protoresolve.ErrNotFound) {
 			return cc.findWithFallback(url, enum)
 		}
 		if err != nil {
@@ -627,7 +638,7 @@ func (cc *convertContext) addType(ctx context.Context, url string, enum bool) er
 	}
 
 	mt, err := cc.fetcher.FetchMessageType(ctx, url)
-	if errors.Is(err, ErrNotFound) {
+	if errors.Is(err, protoresolve.ErrNotFound) {
 		return cc.findWithFallback(url, enum)
 	}
 	if err != nil {
@@ -751,7 +762,8 @@ func (cc *convertContext) recordDescriptor(url, ref string, d protoreflect.Descr
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
 
-	addDescriptors(ref, cc.files, d, nil, func(dsc protoreflect.Descriptor) bool {
+	dc := (*DescriptorConverter)(cc.reg)
+	dc.addDescriptors(ref, cc.files, d, nil, func(dsc protoreflect.Descriptor) bool {
 		u := ensureScheme(cc.reg.urlForType(dsc.FullName(), dsc.Parent().FullName()))
 		if _, ok := cc.typeLocations[u]; ok {
 			// already seen this one
@@ -781,7 +793,7 @@ func (cc *convertContext) findWithFallback(url string, enum bool) (err error) {
 	if fb == nil {
 		fb = protoregistry.GlobalFiles
 	}
-	d, err = fb.FindDescriptorByName(TypeNameFromURL(url))
+	d, err = fb.FindDescriptorByName(protoresolve.TypeNameFromURL(url))
 	if err != nil {
 		return err
 	}
@@ -795,20 +807,20 @@ func (cc *convertContext) findWithFallback(url string, enum bool) (err error) {
 			return nil
 		}
 	}
-	var wanted DescriptorKind
+	var wanted protoresolve.DescriptorKind
 	if enum {
-		wanted = DescriptorKindEnum
+		wanted = protoresolve.DescriptorKindEnum
 	} else {
-		wanted = DescriptorKindMessage
+		wanted = protoresolve.DescriptorKindMessage
 	}
-	return NewUnexpectedTypeError(wanted, d, url)
+	return protoresolve.NewUnexpectedTypeError(wanted, d, url)
 }
 
 // toFileDescriptors converts the information in the context into a map of file names to file descriptors.
-func (cc *convertContext) toFileDescriptors() (*protoregistry.Files, error) {
-	var fallback FileResolver
+func (cc *convertContext) toFileDescriptors() (*protoresolve.Registry, error) {
+	var fallback protoresolve.FileResolver
 	if cc.res.Fallback != nil {
-		fallback, _ = cc.res.Fallback.(FileResolver)
+		fallback, _ = cc.res.Fallback.(protoresolve.FileResolver)
 	} else {
 		fallback = protoregistry.GlobalFiles
 	}
@@ -823,7 +835,7 @@ func (cc *convertContext) toFileDescriptors() (*protoregistry.Files, error) {
 
 // converts a map of file entries into a map of file descriptors using the given function to convert
 // each trie node into a descriptor proto.
-func toFileDescriptors(files map[string]*fileEntry, fallback FileResolver, trieFn func(*typeTrie, string) (proto.Message, error)) (*protoregistry.Files, error) {
+func toFileDescriptors(files map[string]*fileEntry, fallback protoresolve.FileResolver, trieFn func(*typeTrie, string) (proto.Message, error)) (*protoresolve.Registry, error) {
 	fdps := map[string]*descriptorpb.FileDescriptorProto{}
 	for name, file := range files {
 		fdp, err := file.toFileDescriptor(name, trieFn)
@@ -832,7 +844,7 @@ func toFileDescriptors(files map[string]*fileEntry, fallback FileResolver, trieF
 		}
 		fdps[name] = fdp
 	}
-	var reg protoregistry.Files
+	var reg protoresolve.Registry
 	for _, fdp := range fdps {
 		if err := addToRegistry(fdp, &reg, fdps, fallback); err != nil {
 			return nil, err
@@ -841,7 +853,7 @@ func toFileDescriptors(files map[string]*fileEntry, fallback FileResolver, trieF
 	return &reg, nil
 }
 
-func addToRegistry(fdp *descriptorpb.FileDescriptorProto, reg *protoregistry.Files, fdps map[string]*descriptorpb.FileDescriptorProto, fallback FileResolver) error {
+func addToRegistry(fdp *descriptorpb.FileDescriptorProto, reg *protoresolve.Registry, fdps map[string]*descriptorpb.FileDescriptorProto, fallback protoresolve.FileResolver) error {
 	if _, err := reg.FindFileByPath(fdp.GetName()); err == nil {
 		return nil // already registered
 	}
@@ -864,10 +876,7 @@ func addToRegistry(fdp *descriptorpb.FileDescriptorProto, reg *protoregistry.Fil
 			return err
 		}
 	}
-	fd, err := protodesc.NewFile(fdp, reg)
-	if err == nil {
-		err = reg.RegisterFile(wrappers.WrapFile(fd, fdp))
-	}
+	_, err := reg.RegisterFileProto(fdp)
 	return err
 }
 
@@ -951,7 +960,7 @@ func (t *typeTrie) addType(key string, typ proto.Message) {
 	if t.children == nil {
 		t.children = map[string]*typeTrie{}
 	}
-	curr, rest := split(key)
+	curr, rest, _ := strings.Cut(key, ".")
 	child := t.children[curr]
 	if child == nil {
 		child = &typeTrie{}
@@ -970,7 +979,7 @@ func (t *typeTrie) addType(key string, typ proto.Message) {
 // *descriptor.EnumDescriptorProto then it is returned as is. This function
 // should not be used in type tries that may have service descriptors. That will
 // result in a panic.
-func (t *typeTrie) typeToDescriptor(name string, res SerializationResolver) (*descriptorpb.DescriptorProto, *descriptorpb.EnumDescriptorProto) {
+func (t *typeTrie) typeToDescriptor(name string, res protoresolve.SerializationResolver) (*descriptorpb.DescriptorProto, *descriptorpb.EnumDescriptorProto) {
 	switch typ := t.typ.(type) {
 	case *descriptorpb.EnumDescriptorProto:
 		return nil, typ
@@ -1056,15 +1065,7 @@ func (t *typeTrie) rewriteDescriptor(name string) (proto.Message, error) {
 	return mdp, nil
 }
 
-func split(s string) (string, string) {
-	pos := strings.Index(s, ".")
-	if pos >= 0 {
-		return s[:pos], s[pos+1:]
-	}
-	return s, ""
-}
-
-func createEnumDescriptor(e *typepb.Enum, res SerializationResolver) *descriptorpb.EnumDescriptorProto {
+func createEnumDescriptor(e *typepb.Enum, res protoresolve.SerializationResolver) *descriptorpb.EnumDescriptorProto {
 	var opts *descriptorpb.EnumOptions
 	if len(e.Options) > 0 {
 		opts = &descriptorpb.EnumOptions{}
@@ -1084,7 +1085,7 @@ func createEnumDescriptor(e *typepb.Enum, res SerializationResolver) *descriptor
 	}
 }
 
-func createEnumValueDescriptor(v *typepb.EnumValue, res SerializationResolver) *descriptorpb.EnumValueDescriptorProto {
+func createEnumValueDescriptor(v *typepb.EnumValue, res protoresolve.SerializationResolver) *descriptorpb.EnumValueDescriptorProto {
 	var opts *descriptorpb.EnumValueOptions
 	if len(v.Options) > 0 {
 		opts = &descriptorpb.EnumValueOptions{}
@@ -1098,7 +1099,7 @@ func createEnumValueDescriptor(v *typepb.EnumValue, res SerializationResolver) *
 	}
 }
 
-func createMessageDescriptor(m *typepb.Type, res SerializationResolver) *descriptorpb.DescriptorProto {
+func createMessageDescriptor(m *typepb.Type, res protoresolve.SerializationResolver) *descriptorpb.DescriptorProto {
 	var opts *descriptorpb.MessageOptions
 	if len(m.Options) > 0 {
 		opts = &descriptorpb.MessageOptions{}
@@ -1125,7 +1126,7 @@ func createMessageDescriptor(m *typepb.Type, res SerializationResolver) *descrip
 	}
 }
 
-func createFieldDescriptor(f *typepb.Field, res SerializationResolver) *descriptorpb.FieldDescriptorProto {
+func createFieldDescriptor(f *typepb.Field, res protoresolve.SerializationResolver) *descriptorpb.FieldDescriptorProto {
 	var opts *descriptorpb.FieldOptions
 	if len(f.Options) > 0 {
 		opts = &descriptorpb.FieldOptions{}
@@ -1216,7 +1217,7 @@ func createFieldDescriptor(f *typepb.Field, res SerializationResolver) *descript
 	}
 }
 
-func createServiceDescriptor(a *apipb.Api, res SerializationResolver) *descriptorpb.ServiceDescriptorProto {
+func createServiceDescriptor(a *apipb.Api, res protoresolve.SerializationResolver) *descriptorpb.ServiceDescriptorProto {
 	var opts *descriptorpb.ServiceOptions
 	if len(a.Options) > 0 {
 		opts = &descriptorpb.ServiceOptions{}
@@ -1235,7 +1236,7 @@ func createServiceDescriptor(a *apipb.Api, res SerializationResolver) *descripto
 	}
 }
 
-func createMethodDescriptor(m *apipb.Method, res SerializationResolver) *descriptorpb.MethodDescriptorProto {
+func createMethodDescriptor(m *apipb.Method, res protoresolve.SerializationResolver) *descriptorpb.MethodDescriptorProto {
 	var opts *descriptorpb.MethodOptions
 	if len(m.Options) > 0 {
 		opts = &descriptorpb.MethodOptions{}
@@ -1284,7 +1285,7 @@ func createFileDescriptor(name, pkg string, proto3 bool, deps map[string]struct{
 	}
 }
 
-func processOptions(options []*typepb.Option, optsMsg protoreflect.Message, res SerializationResolver) {
+func processOptions(options []*typepb.Option, optsMsg protoreflect.Message, res protoresolve.SerializationResolver) {
 	// these are created "best effort" so entries which are unresolvable
 	// (or seemingly invalid) are simply ignored...
 	optsDesc := optsMsg.Descriptor()
@@ -1306,7 +1307,7 @@ func processOptions(options []*typepb.Option, optsMsg protoreflect.Message, res 
 		if msgValue == nil {
 			continue
 		}
-		if TypeNameFromURL(o.Value.TypeUrl) != msgValue.Descriptor().FullName() {
+		if protoresolve.TypeNameFromURL(o.Value.TypeUrl) != msgValue.Descriptor().FullName() {
 			continue
 		}
 		err := o.Value.UnmarshalTo(msgValue.Interface())
@@ -1408,39 +1409,5 @@ func unwrap(msg proto.Message, isEnum bool) protoreflect.Value {
 		return protoreflect.ValueOfString(m.Value)
 	default:
 		return protoreflect.Value{}
-	}
-}
-
-// Ideally, we'd use methods in protowrap to try to unwrap an underlying
-// descriptor proto. However, that would cause an import cycle. So we
-// reproduce just enough here to accomplish the same thing.
-func protoFromDescriptor(d protoreflect.Descriptor) proto.Message {
-	switch d := d.(type) {
-	case protoreflect.MessageDescriptor:
-		if res, ok := d.(interface {
-			MessageDescriptorProto() *descriptorpb.DescriptorProto
-		}); ok {
-			return res.MessageDescriptorProto()
-		}
-		if res, ok := d.(interface{ AsProto() proto.Message }); ok {
-			if md, ok := res.AsProto().(*descriptorpb.DescriptorProto); ok {
-				return md
-			}
-		}
-		return protodesc.ToDescriptorProto(d)
-	case protoreflect.EnumDescriptor:
-		if res, ok := d.(interface {
-			EnumDescriptorProto() *descriptorpb.EnumDescriptorProto
-		}); ok {
-			return res.EnumDescriptorProto()
-		}
-		if res, ok := d.(interface{ AsProto() proto.Message }); ok {
-			if ed, ok := res.AsProto().(*descriptorpb.EnumDescriptorProto); ok {
-				return ed
-			}
-		}
-		return protodesc.ToEnumDescriptorProto(d)
-	default:
-		return nil
 	}
 }

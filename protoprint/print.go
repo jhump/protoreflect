@@ -21,9 +21,8 @@ import (
 
 	"github.com/jhump/protoreflect/v2/internal"
 	"github.com/jhump/protoreflect/v2/internal/register"
+	"github.com/jhump/protoreflect/v2/protodescs"
 	"github.com/jhump/protoreflect/v2/protomessage"
-	"github.com/jhump/protoreflect/v2/protoresolve"
-	"github.com/jhump/protoreflect/v2/protowrap"
 	"github.com/jhump/protoreflect/v2/sourceloc"
 )
 
@@ -450,7 +449,7 @@ func (p *Printer) printFile(
 			_, _ = fmt.Fprintf(w, "syntax = %q;", syn.String())
 			return
 		}
-		_, _ = fmt.Fprintf(w, "edition = %q;", strings.TrimPrefix(protoresolve.GetEdition(fd).String(), "EDITION_"))
+		_, _ = fmt.Fprintf(w, "edition = %q;", strings.TrimPrefix(protodescs.GetEdition(fd, nil).String(), "EDITION_"))
 	})
 	p.newLine(w)
 
@@ -696,13 +695,6 @@ func (p *Printer) qualifyElementName(pkg, scope, fqn protoreflect.FullName, requ
 func (p *Printer) typeString(fld protoreflect.FieldDescriptor, scope protoreflect.FullName) string {
 	if fld.IsMap() {
 		return fmt.Sprintf("map<%s, %s>", p.typeString(fld.MapKey(), scope), p.typeString(fld.MapValue(), scope))
-	}
-	fldProto := protowrap.ProtoFromFieldDescriptor(fld)
-	if fldProto.Type == nil && fldProto.TypeName != nil {
-		// In an unlinked proto, the type may be absent because it is not known
-		// whether the symbol is a message or an enum. In that case, just return
-		// the type name.
-		return fldProto.GetTypeName()
 	}
 	switch fld.Kind() {
 	case protoreflect.EnumKind:
@@ -1917,7 +1909,7 @@ func extendOptionLocations(fd protoreflect.FileDescriptor) protoreflect.SourceLo
 }
 
 func (p *Printer) extractOptions(dsc protoreflect.Descriptor, reg *protoregistry.Types, opts proto.Message) (map[protoreflect.FieldNumber][]option, error) {
-	protoresolve.ReparseUnrecognized(opts, reg)
+	protomessage.ReparseUnrecognized(opts, reg)
 
 	pkg := dsc.ParentFile().Package()
 	var scope protoreflect.FullName

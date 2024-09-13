@@ -1,4 +1,4 @@
-package protoresolve
+package remotereg
 
 import (
 	"bytes"
@@ -12,6 +12,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/apipb"
 	"google.golang.org/protobuf/types/known/typepb"
+
+	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
 // TypeFetcher is a value that knows how to fetch type definitions for a URL.
@@ -43,7 +45,7 @@ func (t TypeFetcherFunc) FetchMessageType(ctx context.Context, url string) (*typ
 	if typ, ok := msg.(*typepb.Type); ok {
 		return typ, nil
 	}
-	return nil, newUnexpectedTypeError(DescriptorKindMessage, msg, url)
+	return nil, newUnexpectedTypeError(protoresolve.DescriptorKindMessage, msg, url)
 }
 
 // FetchEnumType implements the TypeFetcher interface.
@@ -55,28 +57,28 @@ func (t TypeFetcherFunc) FetchEnumType(ctx context.Context, url string) (*typepb
 	if en, ok := msg.(*typepb.Enum); ok {
 		return en, nil
 	}
-	return nil, newUnexpectedTypeError(DescriptorKindEnum, msg, url)
+	return nil, newUnexpectedTypeError(protoresolve.DescriptorKindEnum, msg, url)
 }
 
-func newUnexpectedTypeError(expecting DescriptorKind, typ proto.Message, url string) *ErrUnexpectedType {
-	var actualKind DescriptorKind
+func newUnexpectedTypeError(expecting protoresolve.DescriptorKind, typ proto.Message, url string) *protoresolve.ErrUnexpectedType {
+	var actualKind protoresolve.DescriptorKind
 	switch typ.(type) {
 	case *typepb.Type:
-		actualKind = DescriptorKindMessage
+		actualKind = protoresolve.DescriptorKindMessage
 	case *typepb.Field:
-		actualKind = DescriptorKindField
+		actualKind = protoresolve.DescriptorKindField
 	case *typepb.Enum:
-		actualKind = DescriptorKindEnum
+		actualKind = protoresolve.DescriptorKindEnum
 	case *typepb.EnumValue:
-		actualKind = DescriptorKindEnumValue
+		actualKind = protoresolve.DescriptorKindEnumValue
 	case *apipb.Api:
-		actualKind = DescriptorKindService
+		actualKind = protoresolve.DescriptorKindService
 	case *apipb.Method:
-		actualKind = DescriptorKindMethod
+		actualKind = protoresolve.DescriptorKindMethod
 	default:
-		actualKind = DescriptorKindUnknown
+		actualKind = protoresolve.DescriptorKindUnknown
 	}
-	return &ErrUnexpectedType{
+	return &protoresolve.ErrUnexpectedType{
 		URL:       url,
 		Expecting: expecting,
 		Actual:    actualKind,
@@ -138,11 +140,11 @@ func (c *cachingFetcher) fetchType(ctx context.Context, url string, enum bool) (
 			return m, nil
 		}
 	}
-	var wanted DescriptorKind
+	var wanted protoresolve.DescriptorKind
 	if enum {
-		wanted = DescriptorKindEnum
+		wanted = protoresolve.DescriptorKindEnum
 	} else {
-		wanted = DescriptorKindMessage
+		wanted = protoresolve.DescriptorKindMessage
 	}
 	return nil, newUnexpectedTypeError(wanted, m, url)
 }
@@ -214,7 +216,7 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 				resp.StatusCode == http.StatusNotImplemented ||
 				(resp.StatusCode >= 300 && resp.StatusCode <= 499) {
 				// No content, unimplemented, redirect, or request error? Treat as "not found".
-				return nil, fmt.Errorf("%w: HTTP request returned status code %s", ErrNotFound, resp.Status)
+				return nil, fmt.Errorf("%w: HTTP request returned status code %s", protoresolve.ErrNotFound, resp.Status)
 			}
 			return nil, fmt.Errorf("HTTP request returned unsupported status code: %s", resp.Status)
 		}

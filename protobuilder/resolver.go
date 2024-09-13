@@ -7,13 +7,13 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal/register"
 	"github.com/jhump/protoreflect/v2/protoresolve"
-	"github.com/jhump/protoreflect/v2/protowrap"
 )
 
 type dependencies struct {
@@ -170,7 +170,7 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 			return nil, err
 		}
 	}
-	return protowrap.AddToRegistry(fp, &r.registry)
+	return r.registry.RegisterFileProto(fp)
 }
 
 type filesByPath map[string]protoreflect.FileDescriptor
@@ -189,8 +189,17 @@ func isDuplicateDependency(dep protoreflect.FileDescriptor, files protoresolve.F
 	if err != nil {
 		return false, nil
 	}
-	prevFDP := protowrap.ProtoFromFileDescriptor(existing)
-	depFDP := protowrap.ProtoFromFileDescriptor(dep)
+	var prevFDP, depFDP *descriptorpb.FileDescriptorProto
+	if oracle, ok := files.(protoresolve.ProtoFileOracle); ok {
+		prevFDP, _ = oracle.ProtoFromFileDescriptor(existing)
+		depFDP, _ = oracle.ProtoFromFileDescriptor(dep)
+	}
+	if prevFDP == nil {
+		prevFDP = protodesc.ToFileDescriptorProto(existing)
+	}
+	if depFDP == nil {
+		depFDP = protodesc.ToFileDescriptorProto(dep)
+	}
 
 	// temporarily reset source code info: builders do not have them
 	defer setSourceCodeInfo(prevFDP, nil)()

@@ -5,10 +5,9 @@ import (
 	"os"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
-
-	"github.com/jhump/protoreflect/v2/protowrap"
 )
 
 // LoadProtoset loads the compiled protoset file at the given path. It returns
@@ -30,7 +29,7 @@ func LoadProtoset(path string) (protoreflect.FileDescriptor, error) {
 	if err = proto.Unmarshal(bb, &fds); err != nil {
 		return nil, err
 	}
-	res, err := protowrap.FromFileDescriptorSet(&fds)
+	res, err := protodesc.NewFiles(&fds)
 	if err != nil {
 		return nil, err
 	}
