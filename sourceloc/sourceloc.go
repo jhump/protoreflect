@@ -17,22 +17,18 @@ func IsZero(loc protoreflect.SourceLocation) bool {
 		loc.TrailingComments == ""
 }
 
-// PathsEqual returns true if a and b represent the same source path.
-func PathsEqual(a, b protoreflect.SourcePath) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
 // IsSubpathOf returns true if the given candidate is a subpath of the given path.
 func IsSubpathOf(candidate, path protoreflect.SourcePath) bool {
-	return len(candidate) >= len(path) && PathsEqual(candidate[:len(path)], path)
+	return len(candidate) >= len(path) && candidate[:len(path)].Equal(path)
+}
+
+// IsSubspanOf returns true if the given candidate is a subspan (i.e. contained
+// within) the given loc.
+func IsSubspanOf(candidate, loc protoreflect.SourceLocation) bool {
+	return (candidate.StartLine > loc.StartLine ||
+		candidate.StartLine == loc.StartLine && candidate.StartColumn >= loc.StartColumn) &&
+		(candidate.EndLine < loc.EndLine ||
+			candidate.EndLine == loc.EndLine && candidate.EndColumn <= loc.EndColumn)
 }
 
 // PathFor computes the source path for the given descriptor. It returns nil if
@@ -131,5 +127,77 @@ func PathFor(desc protoreflect.Descriptor) protoreflect.SourcePath {
 		default:
 			return nil
 		}
+	}
+}
+
+// ForExtendBlock returns the source code location of the "extend" block that
+// contains the given extension.
+func ForExtendBlock(ext protoreflect.ExtensionDescriptor) protoreflect.SourceLocation {
+	if !ext.IsExtension() {
+		return protoreflect.SourceLocation{}
+	}
+	var path protoreflect.SourcePath
+	switch parent := ext.Parent().(type) {
+	case protoreflect.FileDescriptor:
+		path = protoreflect.SourcePath{internal.FileExtensionsTag, int32(ext.Index())}
+	case protoreflect.MessageDescriptor:
+		path = append(PathFor(parent), internal.MessageExtensionsTag, int32(ext.Index()))
+	default:
+		return protoreflect.SourceLocation{}
+	}
+	return enclosingParent(ext.ParentFile().SourceLocations(), path)
+}
+
+// ForReservedNamesStatement returns the source code location of the "reserved"
+// statement that contains the reserved name at the given index. This
+// corresponds to msg.ReservedNames().Get(reservedNameIndex).
+func ForReservedNamesStatement(msg protoreflect.MessageDescriptor, reservedNameIndex int) protoreflect.SourceLocation {
+	if reservedNameIndex >= msg.ReservedNames().Len() {
+		return protoreflect.SourceLocation{}
+	}
+	path := append(PathFor(msg), internal.MessageReservedNameTag, int32(reservedNameIndex))
+	return enclosingParent(msg.ParentFile().SourceLocations(), path)
+}
+
+// ForReservedRangesStatement returns the source code location of the "reserved"
+// statement that contains the reserved range at the given index. This
+// corresponds to msg.ReservedRanges().Get(reservedRangeIndex).
+func ForReservedRangesStatement(msg protoreflect.MessageDescriptor, reservedRangeIndex int) protoreflect.SourceLocation {
+	if reservedRangeIndex >= msg.ReservedRanges().Len() {
+		return protoreflect.SourceLocation{}
+	}
+	path := append(PathFor(msg), internal.MessageReservedRangeTag, int32(reservedRangeIndex))
+	return enclosingParent(msg.ParentFile().SourceLocations(), path)
+}
+
+// ForExtensionsStatement returns the source code location of the "extensions"
+// statement that defines the extension range at the given index. This
+// corresponds to msg.ExtensionRanges().Get(extensionRangeIndex).
+func ForExtensionsStatement(msg protoreflect.MessageDescriptor, extensionRangeIndex int) protoreflect.SourceLocation {
+	if extensionRangeIndex >= msg.ExtensionRanges().Len() {
+		return protoreflect.SourceLocation{}
+	}
+	path := append(PathFor(msg), internal.MessageExtensionRangeTag, int32(extensionRangeIndex))
+	return enclosingParent(msg.ParentFile().SourceLocations(), path)
+}
+
+func enclosingParent(srcLocs protoreflect.SourceLocations, path protoreflect.SourcePath) protoreflect.SourceLocation {
+	loc := srcLocs.ByPath(path)
+	if IsZero(loc) {
+		return loc
+	}
+	parentPath := path[:len(path)-1]
+	parentLoc := srcLocs.ByPath(parentPath)
+	if IsZero(parentLoc) {
+		return loc
+	}
+	for {
+		if IsSubspanOf(loc, parentLoc) {
+			return parentLoc
+		}
+		if parentLoc.Next == 0 {
+			return protoreflect.SourceLocation{}
+		}
+		parentLoc = srcLocs.Get(parentLoc.Next)
 	}
 }
