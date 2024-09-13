@@ -8,15 +8,19 @@ and also provides reflection APIs for [gRPC](https://grpc.io/) as well.
 [![GoDoc](https://pkg.go.dev/github.com/jhump/protoreflect/v2?status.svg)](https://pkg.go.dev/github.com/jhump/protoreflect/v2)
 
 > [!NOTE]
-> This v2 branch is a work in progress. It is basically feature complete, but still needs more tests for the new functionality
-> and may also need some changes to the API to ensure long-term compatibility with interfaces in the Protobuf Go runtime.
+> This v2 branch is a work in progress. It is basically feature complete, but still needs more tests for
+> the new functionality and may also need some changes to the API to ensure long-term compatibility with
+> interfaces in the Protobuf Go runtime.
 >
 > You can try it out by getting a pre-release version:
 > ```
-> go get github.com/jhump/protoreflect/v2@c9ae7caed596cda2e3c4a90f5973a46081a371a
+> go get github.com/jhump/protoreflect/v2@v2.0.0-beta.1
 > ```
 >
-> Note that the APIs are likely to change a little bit between now and a formal v2 release. Also note that some packages in the v2 still need more tests, so you may find some bugs, but that is mostly for new functionality. If you're just trying to update your code from v1 of this repo, those packages should be rock-solid and least likely to see any further API changes.
+> Note that the APIs are likely to change a little bit between now and a formal v2 release. Also note
+> that some packages in the v2 still need more tests, so you may find some bugs, but that is mostly
+> for new functionality. If you're just trying to update your code from v1 of this repo, those packages
+> should be rock-solid and least likely to see any further API changes.
 
 ----
 ## Descriptors and Reflection Utilities
