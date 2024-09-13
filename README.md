@@ -11,6 +11,12 @@ RPC services.
 
 [![GoDoc](https://godoc.org/github.com/jhump/protoreflect?status.svg)](https://godoc.org/github.com/jhump/protoreflect)
 
+> [!NOTE]
+> This branch is for maintenance of the v1.x line of releases. After v1.17.0, the `main` branch was replaced with the in-progress
+> work for v2.0.0. All future work will be in the v2.x line of releases, and this branch can be used if any changes or fixes need
+> need to be back-ported to v1.x.
+
+
 > [!IMPORTANT]
 > This repo was originally built to work with the "V1" API of the Protobuf runtime for Go: `github.com/golang/protobuf`.
 >
@@ -22,16 +28,6 @@ RPC services.
 > Most protobuf users have certainly upgraded to that newer runtime by now and thus encounter some friction using this repo. It is now recommended to use the above packages in the V2 Protobuf API _instead of_ using the corresponding packages in this repo. But that still leaves a lot of functionality in this repo, such as the `desc/builder`, `desc/protoparse`, `desc/protoprint`, `dynamic/grpcdynamic`, `dynamic/msgregistry`, and `grpcreflect` packages herein. And all of these packages build on the core `desc.Descriptor` types in this repo. As of v1.15.0, you can convert between this repo's `desc.Descriptor` types and the V2 API's `protoreflect.Descriptor` types using `Wrap` functions in the `desc` package and `Unwrap` methods on the `desc.Descriptor` types. That allows easier interop between these remaining useful packages and new V2 API descriptor implementations.
 >
 > If you have code that uses the `dynamic` package in this repo and are trying to interop with V2 APIs, in some cases you can use the [`proto.MessageV2`](https://pkg.go.dev/github.com/golang/protobuf/proto#MessageV2) converter function (defined in the V1 `proto` package in `github.com/golang/protobuf/proto`). However, this wrapper does not provide 100% complete interop, so in some cases you may have to port your code over to the V2 API's `dynamicpb` package. (Sorry!)
-
-> [!NOTE]
-> We've had a v2 of this whole repo in the works for some time. A lot of what's in this repo is no longer necessary, but some features still are. The v2 will _drop_ functionality now provided by the V2 Protobuf API. The remaining packages will be updated to make direct use of the V2 Protobuf API and have no more references to the old V1 API. One exception is that a v2 of this repo will _not_ include a new version of the `desc/protoparse` package in this repo -- that is already available in a brand new module named [`protocompile`](https://pkg.go.dev/github.com/bufbuild/protocompile).
->
-> If you want to try out the v2, you can do so by getting a pre-release version:
-> ```
-> go get github.com/jhump/protoreflect/v2@c9ae7caed596cda2e3c4a90f5973a46081a371a
-> ```
->
-> Note that the APIs are likely to change a little bit between now and a formal v2 release. Also note that some packages in the v2 still need more tests, so you may find some bugs, but that is mostly for new functionality. If you're just trying to update your code from v1 of this repo, those packages should be rock-solid and least likely to see any further API changes.
 
 ## Descriptors: The Language Model of Protocol Buffers
 
