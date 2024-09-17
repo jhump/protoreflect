@@ -13,7 +13,7 @@ and also provides reflection APIs for [gRPC](https://grpc.io/) as well.
 >
 > You can try it out by getting a pre-release version:
 > ```
-> go get github.com/jhump/protoreflect/v2@v2.0.0-beta.1
+> go get github.com/jhump/protoreflect/v2@v2.0.0-beta.2
 > ```
 >
 > Note that the APIs may change a little bit between now and a final v2.0.0 release. Also note
