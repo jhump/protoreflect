@@ -449,7 +449,7 @@ func defaultValueString(k protoreflect.Kind, v protoreflect.Value, evd protorefl
 		return v.String()
 	case protoreflect.BytesKind:
 		b := v.Bytes()
-		s := make([]byte, len(b))
+		s := make([]byte, 0, len(b))
 		for _, c := range b {
 			switch c {
 			case '\n':
