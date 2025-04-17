@@ -46,7 +46,7 @@ golint:
 
 .PHONY: errcheck
 errcheck:
-	@go install github.com/kisielk/errcheck@v1.7.0
+	@go install github.com/kisielk/errcheck@v1.9.0
 	errcheck ./...
 
 .PHONY: test
