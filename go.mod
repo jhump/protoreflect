@@ -1,7 +1,6 @@
 module github.com/jhump/protoreflect/v2
 
-go 1.21
-toolchain go1.24.1
+go 1.23.0
 
 require (
 	github.com/bufbuild/protocompile v0.14.1
