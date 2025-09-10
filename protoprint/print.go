@@ -519,6 +519,7 @@ func (p *Printer) printFile(
 			var modifier string
 			if d.IsPublic {
 				modifier = "public "
+				//lint:ignore SA1019 not using weak import functionality, but must inspect this flag even though it's deprecated
 			} else if d.IsWeak {
 				modifier = "weak "
 

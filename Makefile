@@ -36,7 +36,7 @@ staticcheck:
 .PHONY: ineffassign
 ineffassign:
 	@go install github.com/gordonklaus/ineffassign@v0.2.0
-	ineffassign .
+	ineffassign ./...
 
 # Intentionally omitted from CI, but target here for ad-hoc reports.
 .PHONY: golint
