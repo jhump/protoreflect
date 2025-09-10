@@ -35,7 +35,7 @@ staticcheck:
 
 .PHONY: ineffassign
 ineffassign:
-	@go install github.com/gordonklaus/ineffassign@v0.0.0-20200309095847-7953dde2c7bf
+	@go install github.com/gordonklaus/ineffassign@v0.2.0
 	ineffassign .
 
 # Intentionally omitted from CI, but target here for ad-hoc reports.
@@ -56,7 +56,7 @@ test: generate
 
 .PHONY: generate
 generate:
-	@go install golang.org/x/tools/cmd/goimports@v0.14.0
+	@go install golang.org/x/tools/cmd/goimports@v0.37.0
 	go generate ./...
 	go generate ./internal/testprotos
 	goimports -w -local github.com/jhump/protoreflect/v2 .
