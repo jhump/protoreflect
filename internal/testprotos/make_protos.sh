@@ -30,7 +30,7 @@ if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc ${PROTOC_VERSION}" ]]; 
   cd ./protoc && unzip protoc.zip && cd ..
 fi
 
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.34.2
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.9
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 go install github.com/jhump/protoreflect/v2/sourceinfo/cmd/protoc-gen-gosrcinfo
 
