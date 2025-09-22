@@ -28,9 +28,10 @@
 package grpc
 
 import (
-	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	reflect "github.com/goccy/go-reflect"
 
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"

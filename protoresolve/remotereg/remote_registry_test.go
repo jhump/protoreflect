@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"reflect"
 	"testing"
+
+	"github.com/goccy/go-reflect"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"

@@ -8,10 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"reflect"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/goccy/go-reflect"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

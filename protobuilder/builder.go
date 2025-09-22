@@ -3,7 +3,8 @@ package protobuilder
 import (
 	"bytes"
 	"fmt"
-	"reflect"
+
+	"github.com/goccy/go-reflect"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"

@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/goccy/go-reflect"
 
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"

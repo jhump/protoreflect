@@ -2,8 +2,9 @@ package protobuilder
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
+
+	"github.com/goccy/go-reflect"
 
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
