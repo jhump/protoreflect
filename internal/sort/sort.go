@@ -20,8 +20,8 @@ func SortFiles(files []*descriptorpb.FileDescriptorProto) error {
 	}
 	origLen := len(files)
 	files = files[:0]
-	for _, file := range files {
-		if err := addFileSorted(file, allFiles, &files); err != nil {
+	for _, file := range allFiles {
+		if err := addFileSorted(file.file, allFiles, &files); err != nil {
 			return err
 		}
 	}
