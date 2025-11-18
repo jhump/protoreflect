@@ -56,6 +56,12 @@ const (
 	// FileSyntaxTag is the tag number of the syntax element in a file
 	// descriptor proto.
 	FileSyntaxTag = 12
+	// FileEditionTag is the tag number of the edition element in a file
+	// descriptor proto.
+	FileEditionTag = 14
+	// FileOptionDependencyTag is the tag number of the option dependencies
+	// element in a file descriptor proto.
+	FileOptionDependencyTag = 15
 	// MessageNameTag is the tag number of the name element in a message
 	// descriptor proto.
 	MessageNameTag = 1
@@ -86,6 +92,9 @@ const (
 	// MessageReservedNameTag is the tag number of the reserved names element
 	// in a message descriptor proto.
 	MessageReservedNameTag = 10
+	// MessageVisibilityTag is the tag number of the visibility modifier element
+	// in a message descriptor proto.
+	MessageVisibilityTag = 11
 	// ExtensionRangeStartTag is the tag number of the start index in an
 	// extension range proto.
 	ExtensionRangeStartTag = 1
@@ -152,6 +161,9 @@ const (
 	// EnumReservedNameTag is the tag number of the reserved names element in
 	// an enum descriptor proto.
 	EnumReservedNameTag = 5
+	// EnumVisibilityTag is the tag number of the visibility modifier element
+	// in an enum descriptor proto.
+	EnumVisibilityTag = 6
 	// EnumValueNameTag is the tag number of the name element in an enum value
 	// descriptor proto.
 	EnumValueNameTag = 1
@@ -219,6 +231,19 @@ const (
 	// uninterpreted option name proto.
 	UninterpretedNameNameTag = 1
 )
+
+// HasOptionImports is an optional interface that can be implemented by a
+// [protoreflect.FileDescriptor] that supports Edition 2024.
+type HasOptionImports interface {
+	OptionImports() protoreflect.FileImports
+}
+
+// HasVisibility is an optional interface that can be implemented by a
+// [protoreflect.MessageDescriptor] or [protoreflect.EnumDescriptor] that
+// supports Edition 2024.
+type HasVisibility interface {
+	Visibility() int32
+}
 
 // JsonName returns the default JSON name for a field with the given name.
 // This mirrors the algorithm in protoc:

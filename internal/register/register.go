@@ -4,17 +4,27 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
+
+	"github.com/jhump/protoreflect/v2/internal"
 )
 
 // RegisterTypesVisibleToFile registers types (extensions and messages) that are
 // visible to the given file. This includes types defined in file as well as types
 // defined in the files that it imports (and any public imports thereof, etc).
+// This includes visible symbols in option imports.
 func RegisterTypesVisibleToFile(file protoreflect.FileDescriptor, reg *protoregistry.Types, includeMessages bool) {
 	registerTypes(file, reg, includeMessages)
 	imports := file.Imports()
 	for i, length := 0, imports.Len(); i < length; i++ {
 		dep := imports.Get(i).FileDescriptor
 		RegisterTypesInImportedFile(dep, reg, includeMessages)
+	}
+	if fileWithOptionImports, ok := file.(internal.HasOptionImports); ok {
+		imports := fileWithOptionImports.OptionImports()
+		for i, length := 0, imports.Len(); i < length; i++ {
+			dep := imports.Get(i).FileDescriptor
+			RegisterTypesInImportedFile(dep, reg, includeMessages)
+		}
 	}
 }
 

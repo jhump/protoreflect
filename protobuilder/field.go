@@ -2,6 +2,7 @@ package protobuilder
 
 import (
 	"fmt"
+	"iter"
 	"strings"
 	"unicode"
 
@@ -35,19 +36,26 @@ type FieldBuilder struct {
 	msgType   *MessageBuilder
 	fieldType *FieldType
 
-	Options     *descriptorpb.FieldOptions
+	Options *descriptorpb.FieldOptions
+	// Cardinality indicates if the field is required, optional, or repeated.
+	// Required can only be used for fields in files with "proto2" syntax.
+	// If the file's syntax is not "proto2", it cannot be set to
+	// [protoreflect.Required].
+	//
+	// To create a required field in files that use "editions", set the
+	// FieldPresence field of Options.Features to LEGACY_REQUIRED.
 	Cardinality protoreflect.Cardinality
 
 	// Proto3Optional indicates if the field is a proto3 optional field. This
 	// only applies to fields in files with "proto3" syntax whose Cardinality
-	// is set to protoreflect.Optional.
+	// is set to [protoreflect.Optional].
 	//
 	// If the file's syntax is not "proto3", this may not be set to true.
 	//
 	// This allows setting a field in a proto3 file to have explicit field
 	// presence. To manage field presence for fields in files that use
-	// "editions", set the field_presence field of the features option in
-	// Options.
+	// "editions", set the FieldPresence field of Options.Features to
+	// IMPLICIT.
 	Proto3Optional bool
 
 	Default  string
@@ -292,11 +300,12 @@ func (flb *FieldBuilder) setParent(newParent Builder) {
 // Children returns any builders assigned to this field builder. The only
 // kind of children a field can have are message types, that correspond to the
 // field's map entry type or group type (for map and group fields respectively).
-func (flb *FieldBuilder) Children() []Builder {
-	if flb.msgType != nil {
-		return []Builder{flb.msgType}
+func (flb *FieldBuilder) Children() iter.Seq[Builder] {
+	return func(yield func(Builder) bool) {
+		if flb.msgType != nil {
+			yield(flb.msgType)
+		}
 	}
-	return nil
 }
 
 func (flb *FieldBuilder) findChild(name protoreflect.Name) Builder {
@@ -551,6 +560,9 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 		}
 		lbl = (descriptorpb.FieldDescriptorProto_Label)(flb.Cardinality).Enum()
 	}
+	if flb.ParentFile().Syntax != protoreflect.Proto2 && flb.fieldType.Kind() == protoreflect.GroupKind {
+		return nil, fmt.Errorf("field %s: only proto2 allows group fields", FullName(flb))
+	}
 	var typeName *string
 	tn := flb.fieldType.TypeName()
 	if tn != "" {
@@ -732,12 +744,14 @@ func (oob *OneofBuilder) SetComments(c Comments) *OneofBuilder {
 
 // Children returns any builders assigned to this oneof builder. These will
 // be choices for the oneof, each of which will be a field builder.
-func (oob *OneofBuilder) Children() []Builder {
-	var ch []Builder
-	for _, evb := range oob.choices {
-		ch = append(ch, evb)
+func (oob *OneofBuilder) Children() iter.Seq[Builder] {
+	return func(yield func(Builder) bool) {
+		for _, flb := range oob.choices {
+			if !yield(flb) {
+				return
+			}
+		}
 	}
-	return ch
 }
 
 func (oob *OneofBuilder) parent() *MessageBuilder {

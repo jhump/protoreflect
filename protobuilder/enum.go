@@ -2,6 +2,7 @@ package protobuilder
 
 import (
 	"fmt"
+	"iter"
 	"sort"
 
 	"google.golang.org/protobuf/proto"
@@ -27,6 +28,8 @@ type EnumBuilder struct {
 	Options        *descriptorpb.EnumOptions
 	ReservedRanges []EnumRange
 	ReservedNames  []protoreflect.Name
+	// Visibility can only be set when enclosing file uses Edition 2024 or newer.
+	Visibility descriptorpb.SymbolVisibility
 
 	values  []*EnumValueBuilder
 	symbols map[protoreflect.Name]*EnumValueBuilder
@@ -126,12 +129,14 @@ func (eb *EnumBuilder) SetComments(c Comments) *EnumBuilder {
 
 // Children returns any builders assigned to this enum builder. These will be
 // the enum's values.
-func (eb *EnumBuilder) Children() []Builder {
-	var ch []Builder
-	for _, evb := range eb.values {
-		ch = append(ch, evb)
+func (eb *EnumBuilder) Children() iter.Seq[Builder] {
+	return func(yield func(Builder) bool) {
+		for _, evb := range eb.values {
+			if !yield(evb) {
+				return
+			}
+		}
 	}
-	return ch
 }
 
 func (eb *EnumBuilder) findChild(name protoreflect.Name) Builder {
@@ -426,9 +431,9 @@ func (evb *EnumValueBuilder) SetComments(c Comments) *EnumValueBuilder {
 
 // Children returns nil, since enum values cannot have child elements. It is
 // present to satisfy the Builder interface.
-func (evb *EnumValueBuilder) Children() []Builder {
+func (evb *EnumValueBuilder) Children() iter.Seq[Builder] {
 	// enum values do not have children
-	return nil
+	return func(func(Builder) bool) {}
 }
 
 func (evb *EnumValueBuilder) findChild(_ protoreflect.Name) Builder {

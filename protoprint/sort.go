@@ -40,7 +40,8 @@ type Element interface {
 	// Name returns the element name. This is NOT applicable to syntax,
 	// extension range, and reserved range kinds and will return the empty
 	// string for these kinds. For custom options, this will be the
-	// fully-qualified name of the corresponding extension.
+	// fully-qualified name of the corresponding extension. For imports,
+	// it will be the path of the imported file.
 	Name() string
 	// Number returns the element number. This is only applicable to field,
 	// extension, and enum value kinds and will return zero for all other kinds.
@@ -52,9 +53,9 @@ type Element interface {
 	// Extendee is the extended message for the extension element. Elements
 	// other than extensions will return the empty string.
 	Extendee() string
-	// IsCustomOption returns true if the element is a custom option. If it is
-	// not (including if the element kind is not option) then this method will
-	// return false.
+	// IsCustomOption returns true if the element is a custom option or if it
+	// is an import with the "option" keyword. If it is neither of these then
+	// this method always returns false.
 	IsCustomOption() bool
 }
 
@@ -64,6 +65,8 @@ func asElement(v interface{}) Element {
 		return pkgElement(v)
 	case protoreflect.FileImport:
 		return impElement(v.Path())
+	case optionImport:
+		return optImpElement(v.Path())
 	case []option:
 		return (*optionElement)(&v[0])
 	case reservedRange:
@@ -143,6 +146,34 @@ func (i impElement) Extendee() string {
 
 func (i impElement) IsCustomOption() bool {
 	return false
+}
+
+type optImpElement string
+
+var _ Element = optImpElement("")
+
+func (i optImpElement) Kind() ElementKind {
+	return KindImport
+}
+
+func (i optImpElement) Name() string {
+	return string(i)
+}
+
+func (i optImpElement) Number() int32 {
+	return 0
+}
+
+func (i optImpElement) NumberRange() (int32, int32) {
+	return 0, 0
+}
+
+func (i optImpElement) Extendee() string {
+	return ""
+}
+
+func (i optImpElement) IsCustomOption() bool {
+	return true
 }
 
 type optionElement option

@@ -245,13 +245,13 @@ func (p *Printer) PrintProtosToFileSystem(fds []protoreflect.FileDescriptor, roo
 	})
 }
 
-// pkg represents a package name
+// pkg represents a package name.
 type pkg string
 
-// ident represents an identifier
+// ident represents an identifier.
 type ident string
 
-// messageVal represents a message value for an option
+// messageVal represents a message value for an option.
 type messageVal struct {
 	// the package and scope in which the option value is defined
 	pkg, scope protoreflect.FullName
@@ -259,22 +259,25 @@ type messageVal struct {
 	msg proto.Message
 }
 
-// option represents a resolved descriptor option
+// option represents a resolved descriptor option.
 type option struct {
 	name string
 	val  interface{}
 }
 
-// reservedRange represents a reserved range from a message or enum
+// reservedRange represents a reserved range from a message or enum.
 type reservedRange struct {
 	start, end int32
 }
 
-// extensionRange represents an extension range from a message
+// extensionRange represents an extension range from a message.
 type extensionRange struct {
 	start, end protoreflect.FieldNumber
 	opts       proto.Message
 }
+
+// optionImport represents an options-only import from a file.
+type optionImport protoreflect.FileImport
 
 // PrintProtoFile prints the given single file descriptor to the given writer.
 func (p *Printer) PrintProtoFile(fd protoreflect.FileDescriptor, out io.Writer) error {
@@ -463,6 +466,12 @@ func (p *Printer) printFile(
 	for i, length := 0, imps.Len(); i < length; i++ {
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.FileDependencyTag, elementIndex: i, order: -2})
 	}
+	if fileWithOptionImports, ok := fd.(internal.HasOptionImports); ok {
+		imps := fileWithOptionImports.OptionImports()
+		for i, length := 0, imps.Len(); i < length; i++ {
+			elements.addrs = append(elements.addrs, elementAddr{elementType: internal.FileOptionDependencyTag, elementIndex: i, order: -2})
+		}
+	}
 	elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.FileOptionsTag, -1, opts)...)
 	msgs := fd.Messages()
 	for i, length := 0, msgs.Len(); i < length; i++ {
@@ -522,10 +531,14 @@ func (p *Printer) printFile(
 				//lint:ignore SA1019 not using weak import functionality, but must inspect this flag even though it's deprecated
 			} else if d.IsWeak {
 				modifier = "weak "
-
 			}
 			p.printElement(false, si, w, 0, func(w *writer) {
 				_, _ = fmt.Fprintf(w, "import %s%q;", modifier, d.Path())
+			})
+		case optionImport:
+			si := sourceInfo.ByPath(path)
+			p.printElement(false, si, w, 0, func(w *writer) {
+				_, _ = fmt.Fprintf(w, "import option %q;", d.Path())
 			})
 		case []option:
 			p.printOptionsLong(d, reg, w, sourceInfo, path, 0)
@@ -711,6 +724,16 @@ func (p *Printer) typeString(fld protoreflect.FieldDescriptor, scope protoreflec
 		return fld.Kind().String()
 	}
 }
+func (p *Printer) printVisibility(desc protoreflect.Descriptor, w *writer) {
+	if descWithVisibility, ok := desc.(internal.HasVisibility); ok {
+		switch descWithVisibility.Visibility() {
+		case int32(descriptorpb.SymbolVisibility_VISIBILITY_LOCAL):
+			_, _ = fmt.Fprint(w, "local ")
+		case int32(descriptorpb.SymbolVisibility_VISIBILITY_EXPORT):
+			_, _ = fmt.Fprint(w, "export ")
+		}
+	}
+}
 
 func (p *Printer) printMessage(
 	md protoreflect.MessageDescriptor,
@@ -724,6 +747,7 @@ func (p *Printer) printMessage(
 	p.printBlockElement(true, si, w, indent, func(w *writer, trailer func(int, bool)) {
 		p.indent(w, indent)
 
+		p.printVisibility(md, w)
 		_, _ = fmt.Fprint(w, "message ")
 		nameSi := sourceInfo.ByPath(append(path, internal.MessageNameTag))
 		p.printElementString(nameSi, w, indent, string(md.Name()))
@@ -1292,6 +1316,7 @@ func (p *Printer) printEnum(
 	p.printBlockElement(true, si, w, indent, func(w *writer, trailer func(int, bool)) {
 		p.indent(w, indent)
 
+		p.printVisibility(ed, w)
 		_, _ = fmt.Fprint(w, "enum ")
 		nameSi := sourceInfo.ByPath(append(path, internal.EnumNameTag))
 		p.printElementString(nameSi, w, indent, string(ed.Name()))
@@ -2281,6 +2306,8 @@ func (a elementAddrs) at(addr elementAddr) interface{} {
 			return pkg(dsc.Package())
 		case internal.FileDependencyTag:
 			return dsc.Imports().Get(addr.elementIndex)
+		case internal.FileOptionDependencyTag:
+			return optionImport(dsc.(internal.HasOptionImports).OptionImports().Get(addr.elementIndex))
 		case internal.FileOptionsTag:
 			return a.opts[protoreflect.FieldNumber(addr.elementIndex)]
 		case internal.FileMessagesTag:

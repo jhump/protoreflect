@@ -2,7 +2,6 @@ package protobuilder
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	"google.golang.org/protobuf/encoding/protowire"
@@ -17,22 +16,35 @@ import (
 )
 
 type dependencies struct {
-	descs map[protoreflect.FileDescriptor]struct{}
+	descs map[protoreflect.FileDescriptor]bool
 	res   protoregistry.Types
 }
 
 func newDependencies() *dependencies {
 	return &dependencies{
-		descs: map[protoreflect.FileDescriptor]struct{}{},
+		descs: map[protoreflect.FileDescriptor]bool{},
 	}
 }
 
 func (d *dependencies) add(fd protoreflect.FileDescriptor) {
-	if _, ok := d.descs[fd]; ok {
+	d.addAs(fd, false)
+}
+
+func (d *dependencies) addOptionOnly(fd protoreflect.FileDescriptor) {
+	d.addAs(fd, true)
+}
+
+func (d *dependencies) addAs(fd protoreflect.FileDescriptor, optionOnly bool) {
+	if existingOptionOnly, ok := d.descs[fd]; ok {
 		// already added
+		if existingOptionOnly && !optionOnly {
+			// New mode is normal import, which takes precedence over
+			// existing mode which is options-only import
+			d.descs[fd] = optionOnly
+		}
 		return
 	}
-	d.descs[fd] = struct{}{}
+	d.descs[fd] = optionOnly
 	register.RegisterTypesInImportedFile(fd, &d.res, false)
 }
 
@@ -93,10 +105,10 @@ func (r *dependencyResolver) resolveElement(b Builder, seen []Builder) (protoref
 func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []Builder) (protoreflect.FileDescriptor, error) {
 	deps := newDependencies()
 	// add explicit imports first
-	for fd := range fb.explicitImports {
-		deps.add(fd)
+	for fd, optionOnly := range fb.explicitImports {
+		deps.addAs(fd, optionOnly)
 	}
-	for dep := range fb.explicitDeps {
+	for dep, optionOnly := range fb.explicitDeps {
 		if dep == fb {
 			// ignore erroneous self references
 			continue
@@ -105,7 +117,7 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 		if err != nil {
 			return nil, err
 		}
-		deps.add(fd)
+		deps.addAs(fd, optionOnly)
 	}
 	// now accumulate implicit dependencies based on other types referenced
 	for _, mb := range fb.messages {
@@ -131,22 +143,29 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 	}
 
 	depSlice := make([]protoreflect.FileDescriptor, 0, len(deps.descs))
+	optionDepSlice := make([]protoreflect.FileDescriptor, 0, len(deps.descs))
 	depMap := make(filesByPath, len(deps.descs))
-	for dep := range deps.descs {
+	for dep, optionOnly := range deps.descs {
 		isDuplicate, err := isDuplicateDependency(dep, depMap)
 		if err != nil {
 			return nil, err
 		}
 		if !isDuplicate {
 			depMap[dep.Path()] = dep
-			depSlice = append(depSlice, dep)
+			if optionOnly {
+				optionDepSlice = append(optionDepSlice, dep)
+			} else {
+				depSlice = append(depSlice, dep)
+			}
 		}
 	}
 
-	fp, err := fb.buildProto(depSlice)
+	fp, err := fb.buildProto(depSlice, optionDepSlice)
 	if err != nil {
 		return nil, err
 	}
+	// From here, we just need a single slice of all deps
+	depSlice = append(depSlice, optionDepSlice...)
 
 	// make sure this file path doesn't collide with any of its dependencies
 	fileNames := map[string]struct{}{}
@@ -264,8 +283,22 @@ func (r *dependencyResolver) resolveSyntheticFile(b Builder, seen []Builder) (pr
 	default:
 		panic(fmt.Sprintf("Unrecognized kind of builder: %T", b))
 	}
-	curr.setParent(f)
 
+	edition, err := computeSyntaxOrEdition(b, r.opts)
+	if err != nil {
+		return nil, err
+	}
+	switch edition {
+	case descriptorpb.Edition_EDITION_PROTO2:
+		f.Syntax = protoreflect.Proto2
+	case descriptorpb.Edition_EDITION_PROTO3:
+		f.Syntax = protoreflect.Proto3
+	default:
+		f.Syntax = protoreflect.Editions
+		f.Edition = edition
+	}
+
+	curr.setParent(f)
 	// don't forget to reset when done
 	defer func() {
 		curr.setParent(nil)
@@ -456,7 +489,7 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts protor
 	if opts == nil {
 		return nil
 	}
-	if rv := reflect.ValueOf(opts); rv.Kind() == reflect.Ptr && rv.IsNil() {
+	if !opts.ProtoReflect().IsValid() {
 		return nil
 	}
 
@@ -517,7 +550,7 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts protor
 		if r.opts.Resolver != nil {
 			if extd, err := r.opts.Resolver.FindExtensionByNumber(msgName, tag); err == nil {
 				// extension registry recognized it!
-				deps.add(extd.TypeDescriptor().ParentFile())
+				deps.addOptionOnly(extd.TypeDescriptor().ParentFile())
 				continue
 			}
 		}
@@ -525,7 +558,7 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts protor
 		if fileExts != nil {
 			if extd, err := fileExts.FindExtensionByNumber(msgName, tag); err == nil {
 				// file extensions recognized it!
-				deps.add(extd.TypeDescriptor().ParentFile())
+				deps.addOptionOnly(extd.TypeDescriptor().ParentFile())
 				continue
 			}
 		}
@@ -533,7 +566,7 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts protor
 		if xt != nil {
 			// known extension? add its file to builder's deps
 			fd := xt.TypeDescriptor().ParentFile()
-			deps.add(fd)
+			deps.addOptionOnly(fd)
 			continue
 		}
 

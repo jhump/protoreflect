@@ -2,6 +2,7 @@ package protobuilder
 
 import (
 	"fmt"
+	"iter"
 	"sort"
 	"strings"
 
@@ -40,6 +41,8 @@ type MessageBuilder struct {
 	ExtensionRanges []ExtensionRange
 	ReservedRanges  []FieldRange
 	ReservedNames   []protoreflect.Name
+	// Visibility can only be set when enclosing file uses Edition 2024 or newer.
+	Visibility descriptorpb.SymbolVisibility
 
 	fieldsAndOneofs  []Builder
 	fieldTags        map[protoreflect.FieldNumber]*FieldBuilder
@@ -241,18 +244,29 @@ func (mb *MessageBuilder) SetComments(c Comments) *MessageBuilder {
 // Children returns any builders assigned to this message builder. These will
 // include the message's fields and one-ofs as well as any nested messages,
 // extensions, and enums.
-func (mb *MessageBuilder) Children() []Builder {
-	ch := append([]Builder(nil), mb.fieldsAndOneofs...)
-	for _, nmb := range mb.nestedMessages {
-		ch = append(ch, nmb)
+func (mb *MessageBuilder) Children() iter.Seq[Builder] {
+	return func(yield func(Builder) bool) {
+		for _, b := range mb.fieldsAndOneofs {
+			if !yield(b) {
+				return
+			}
+		}
+		for _, nmb := range mb.nestedMessages {
+			if !yield(nmb) {
+				return
+			}
+		}
+		for _, exb := range mb.nestedExtensions {
+			if !yield(exb) {
+				return
+			}
+		}
+		for _, eb := range mb.nestedEnums {
+			if !yield(eb) {
+				return
+			}
+		}
 	}
-	for _, exb := range mb.nestedExtensions {
-		ch = append(ch, exb)
-	}
-	for _, eb := range mb.nestedEnums {
-		ch = append(ch, eb)
-	}
-	return ch
 }
 
 func (mb *MessageBuilder) findChild(name protoreflect.Name) Builder {
@@ -753,15 +767,23 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 	addCommentsTo(sourceInfo, path, &mb.comments)
 
 	var needTagsAssigned []*descriptorpb.FieldDescriptorProto
-	nestedMessages := make([]*descriptorpb.DescriptorProto, 0, len(mb.nestedMessages))
 	oneofCount := 0
+	oneofFieldCount := 0
+	fieldChildMessageCount := 0
 	for _, b := range mb.fieldsAndOneofs {
-		if _, ok := b.(*OneofBuilder); ok {
+		switch b := b.(type) {
+		case *OneofBuilder:
 			oneofCount++
+			oneofFieldCount += len(b.choices)
+		case *FieldBuilder:
+			if b.msgType != nil {
+				fieldChildMessageCount++
+			}
 		}
 	}
 
-	fields := make([]*descriptorpb.FieldDescriptorProto, 0, len(mb.fieldsAndOneofs)-oneofCount)
+	nestedMessages := make([]*descriptorpb.DescriptorProto, 0, len(mb.nestedMessages)+fieldChildMessageCount)
+	fields := make([]*descriptorpb.FieldDescriptorProto, 0, len(mb.fieldsAndOneofs)-oneofCount+oneofFieldCount)
 	oneofs := make([]*descriptorpb.OneofDescriptorProto, 0, oneofCount)
 
 	addField := func(flb *FieldBuilder, fld *descriptorpb.FieldDescriptorProto) error {

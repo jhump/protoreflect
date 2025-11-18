@@ -2,6 +2,7 @@ package protobuilder
 
 import (
 	"fmt"
+	"iter"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -102,12 +103,14 @@ func (sb *ServiceBuilder) SetComments(c Comments) *ServiceBuilder {
 
 // Children returns any builders assigned to this service builder. These will
 // be the service's methods.
-func (sb *ServiceBuilder) Children() []Builder {
-	var ch []Builder
-	for _, mtb := range sb.methods {
-		ch = append(ch, mtb)
+func (sb *ServiceBuilder) Children() iter.Seq[Builder] {
+	return func(yield func(Builder) bool) {
+		for _, mtb := range sb.methods {
+			if !yield(mtb) {
+				return
+			}
+		}
 	}
-	return ch
 }
 
 func (sb *ServiceBuilder) findChild(name protoreflect.Name) Builder {
@@ -329,9 +332,9 @@ func (mtb *MethodBuilder) SetComments(c Comments) *MethodBuilder {
 
 // Children returns nil, since methods cannot have child elements. It is
 // present to satisfy the Builder interface.
-func (mtb *MethodBuilder) Children() []Builder {
+func (mtb *MethodBuilder) Children() iter.Seq[Builder] {
 	// methods do not have children
-	return nil
+	return func(func(Builder) bool) {}
 }
 
 func (mtb *MethodBuilder) findChild(_ protoreflect.Name) Builder {

@@ -3,6 +3,7 @@ package protobuilder
 import (
 	"errors"
 	"fmt"
+	"iter"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -69,8 +70,8 @@ type FileBuilder struct {
 	symbols    map[protoreflect.Name]Builder
 
 	origExts        protoregistry.Types
-	explicitDeps    map[*FileBuilder]struct{}
-	explicitImports map[protoreflect.FileDescriptor]struct{}
+	explicitDeps    map[*FileBuilder]bool
+	explicitImports map[protoreflect.FileDescriptor]bool
 }
 
 var _ Builder = (*FileBuilder)(nil)
@@ -91,22 +92,27 @@ func NewFile(path string) *FileBuilder {
 // descriptor will have just the comment info (no location information).
 func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
 	fb := NewFile(fd.Path())
+
 	fb.Syntax = fd.Syntax()
+	var path []int32
 	if fb.Syntax == protoreflect.Editions {
 		fb.Edition = protodescs.GetEdition(fd, nil)
+		path = []int32{internal.FileEditionTag}
+	} else {
+		path = []int32{internal.FileSyntaxTag}
 	}
+	setComments(&fb.SyntaxComments, fd.SourceLocations().ByPath(path))
+
 	fb.Package = fd.Package()
+	path = []int32{internal.FilePackageTag}
+	setComments(&fb.PackageComments, fd.SourceLocations().ByPath(path))
+
 	var err error
 	fb.Options, err = protomessage.As[*descriptorpb.FileOptions](fd.Options())
 	if err != nil {
 		return nil, err
 	}
 	setComments(&fb.comments, fd.SourceLocations().ByPath(protoreflect.SourcePath{}))
-
-	path := []int32{internal.FileSyntaxTag}
-	setComments(&fb.SyntaxComments, fd.SourceLocations().ByPath(path))
-	path = []int32{internal.FilePackageTag}
-	setComments(&fb.PackageComments, fd.SourceLocations().ByPath(path))
 
 	// add imports explicitly
 	imps := fd.Imports()
@@ -316,21 +322,29 @@ func (fb *FileBuilder) ParentFile() *FileBuilder {
 
 // Children returns builders for all nested elements, including all top-level
 // messages, enums, extensions, and services.
-func (fb *FileBuilder) Children() []Builder {
-	var ch []Builder
-	for _, mb := range fb.messages {
-		ch = append(ch, mb)
+func (fb *FileBuilder) Children() iter.Seq[Builder] {
+	return func(yield func(Builder) bool) {
+		for _, mb := range fb.messages {
+			if !yield(mb) {
+				return
+			}
+		}
+		for _, exb := range fb.extensions {
+			if !yield(exb) {
+				return
+			}
+		}
+		for _, eb := range fb.enums {
+			if !yield(eb) {
+				return
+			}
+		}
+		for _, sb := range fb.services {
+			if !yield(sb) {
+				return
+			}
+		}
 	}
-	for _, exb := range fb.extensions {
-		ch = append(ch, exb)
-	}
-	for _, eb := range fb.enums {
-		ch = append(ch, eb)
-	}
-	for _, sb := range fb.services {
-		ch = append(ch, sb)
-	}
-	return ch
 }
 
 func (fb *FileBuilder) findChild(name protoreflect.Name) Builder {
@@ -643,36 +657,64 @@ func (fb *FileBuilder) addExtensionsFromImport(dep protoreflect.FileDescriptor) 
 // for the file that contains the custom options.
 //
 // Knowledge of custom options can also be provided by using BuilderOptions with
-// an ExtensionRegistry, when building the file.
+// an [protoresolve.ExtensionTypeResolver], when building the file.
 func (fb *FileBuilder) AddDependency(dep *FileBuilder) *FileBuilder {
+	return fb.addDep(dep, false)
+}
+
+// AddOptionDependency adds the given file as an explicit option import. This is
+// just like AddDependency but it is for options-only imports. When the file uses
+// Edition 2024 or newer, these dependencies appear in a different part of the file
+// descriptor so that they don't establish a hard runtime requirement for the
+// dependency. In source, they use "import option" statements instead of normal
+// "import" statements.
+func (fb *FileBuilder) AddOptionDependency(dep *FileBuilder) *FileBuilder {
+	return fb.addDep(dep, true)
+}
+
+func (fb *FileBuilder) addDep(dep *FileBuilder, optionOnly bool) *FileBuilder {
 	if fb.explicitDeps == nil {
-		fb.explicitDeps = map[*FileBuilder]struct{}{}
+		fb.explicitDeps = map[*FileBuilder]bool{}
 	}
-	fb.explicitDeps[dep] = struct{}{}
+	fb.explicitDeps[dep] = optionOnly
 	return fb
 }
 
 // AddImportedDependency adds the given file as an explicit import. Normally,
 // dependencies can be inferred during the build process by finding the files
 // for all referenced types (such as message and enum types used in this file).
-// However, this does not work for custom options, which must be known in order
-// to be interpretable. And they aren't known unless an explicit import is added
-// for the file that contains the custom options.
+// However, this may not work for custom options, which must be known in order
+// to be interpretable. And they may not be known unless an explicit import is
+// added for the file that contains the custom options.
 //
 // Knowledge of custom options can also be provided by using BuilderOptions with
-// an ExtensionRegistry, when building the file.
+// an [protoresolve.ExtensionTypeResolver], when building the file.
 func (fb *FileBuilder) AddImportedDependency(dep protoreflect.FileDescriptor) *FileBuilder {
+	return fb.addImport(dep, false)
+}
+
+// AddImportedOptionDependency adds the given file as an explicit option import.
+// This is just like AddImportedDependency but it is for options-only imports. When
+// the file uses Edition 2024 or newer, these dependencies appear in a different
+// part of the file descriptor so that they don't establish a hard runtime
+// requirement for the dependency. In source, they use "import option" statements
+// instead of normal "import" statements.
+func (fb *FileBuilder) AddImportedOptionDependency(dep protoreflect.FileDescriptor) *FileBuilder {
+	return fb.addImport(dep, true)
+}
+
+func (fb *FileBuilder) addImport(dep protoreflect.FileDescriptor, optionOnly bool) *FileBuilder {
 	if fb.explicitImports == nil {
-		fb.explicitImports = map[protoreflect.FileDescriptor]struct{}{}
+		fb.explicitImports = map[protoreflect.FileDescriptor]bool{}
 	}
-	fb.explicitImports[dep] = struct{}{}
+	fb.explicitImports[dep] = optionOnly
 	return fb
 }
 
 // PruneUnusedDependencies removes all imports that are not actually used in the
 // file. Note that this undoes any calls to AddDependency or AddImportedDependency
 // which means that custom options may be missing from the resulting built
-// descriptor unless BuilderOptions are used that include an ExtensionRegistry with
+// descriptor unless BuilderOptions are used that include an extension resolver with
 // knowledge of all custom options.
 //
 // When FromFile is used to create a FileBuilder from an existing descriptor, all
@@ -720,7 +762,7 @@ func (fb *FileBuilder) SetEdition(edition descriptorpb.Edition) *FileBuilder {
 	return fb
 }
 
-func (fb *FileBuilder) buildProto(deps []protoreflect.FileDescriptor) (*descriptorpb.FileDescriptorProto, error) {
+func (fb *FileBuilder) buildProto(deps, optionDeps []protoreflect.FileDescriptor) (*descriptorpb.FileDescriptorProto, error) {
 	filePath := fb.path
 	if filePath == "" {
 		filePath = uniqueFilePath()
@@ -732,7 +774,7 @@ func (fb *FileBuilder) buildProto(deps []protoreflect.FileDescriptor) (*descript
 		syntax = proto.String("proto3")
 	case protoreflect.Proto2:
 		syntax = proto.String("proto2")
-	case 0: // default (unset) is proto2 unless and edition was specified
+	case 0: // default (unset) is proto2 unless an edition was specified
 		if fb.Edition == 0 {
 			syntax = proto.String("proto2")
 			break
@@ -743,8 +785,12 @@ func (fb *FileBuilder) buildProto(deps []protoreflect.FileDescriptor) (*descript
 		case fb.Edition < descriptorpb.Edition_EDITION_PROTO2 ||
 			fb.Edition >= descriptorpb.Edition_EDITION_MAX ||
 			descriptorpb.Edition_name[int32(fb.Edition)] == "" ||
-			strings.HasSuffix(fb.Edition.String(), "_TEST_ONLY"):
+			strings.HasSuffix(fb.Edition.String(), "_TEST_ONLY") ||
+			// TODO: reference generated constant for this once there's a release of protobuf-go with it
+			fb.Edition.String() == "EDITION_UNSTABLE":
 			return nil, fmt.Errorf("builder contains unknown or invalid edition: %v", fb.Edition)
+		case fb.Edition > maxSupportedEdition:
+			return nil, fmt.Errorf("builder uses an edition that is not yet supported: %v", fb.Edition)
 		case fb.Edition == descriptorpb.Edition_EDITION_PROTO2 && fb.Syntax == 0:
 			// Edition set to proto2 instead of syntax? We'll allow it.
 			syntax = proto.String("proto2")
@@ -771,11 +817,31 @@ func (fb *FileBuilder) buildProto(deps []protoreflect.FileDescriptor) (*descript
 	addCommentsTo(&sourceInfo, append(path, internal.FileSyntaxTag), &fb.SyntaxComments)
 	addCommentsTo(&sourceInfo, append(path, internal.FilePackageTag), &fb.PackageComments)
 
-	imports := make([]string, 0, len(deps))
-	for _, dep := range deps {
-		imports = append(imports, dep.Path())
+	var imports, optionImports []string
+	if edition != nil && *edition >= descriptorpb.Edition_EDITION_2024 {
+		// We can use option-only imports.
+		imports = make([]string, 0, len(deps))
+		for _, dep := range deps {
+			imports = append(imports, dep.Path())
+		}
+		sort.Strings(imports)
+		optionImports = make([]string, 0, len(optionDeps))
+		for _, optionDep := range optionDeps {
+			optionImports = append(optionImports, optionDep.Path())
+		}
+		sort.Strings(optionImports)
+	} else {
+		// We can't use option-only imports, so put them all together
+		// as normal imports.
+		imports = make([]string, 0, len(deps)+len(optionDeps))
+		for _, dep := range deps {
+			imports = append(imports, dep.Path())
+		}
+		for _, dep := range optionDeps {
+			imports = append(imports, dep.Path())
+		}
+		sort.Strings(imports)
 	}
-	sort.Strings(imports)
 
 	messages := make([]*descriptorpb.DescriptorProto, 0, len(fb.messages))
 	for _, mb := range fb.messages {
@@ -818,17 +884,18 @@ func (fb *FileBuilder) buildProto(deps []protoreflect.FileDescriptor) (*descript
 	}
 
 	return &descriptorpb.FileDescriptorProto{
-		Name:           proto.String(filePath),
-		Package:        pkg,
-		Dependency:     imports,
-		Options:        fb.Options,
-		Syntax:         syntax,
-		Edition:        edition,
-		MessageType:    messages,
-		EnumType:       enums,
-		Extension:      extensions,
-		Service:        services,
-		SourceCodeInfo: &sourceInfo,
+		Name:             proto.String(filePath),
+		Package:          pkg,
+		Dependency:       imports,
+		OptionDependency: optionImports,
+		Options:          fb.Options,
+		Syntax:           syntax,
+		Edition:          edition,
+		MessageType:      messages,
+		EnumType:         enums,
+		Extension:        extensions,
+		Service:          services,
+		SourceCodeInfo:   &sourceInfo,
 	}, nil
 }
 

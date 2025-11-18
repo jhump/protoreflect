@@ -3,6 +3,7 @@ package protobuilder
 import (
 	"bytes"
 	"fmt"
+	"iter"
 	"reflect"
 
 	"google.golang.org/protobuf/proto"
@@ -47,7 +48,7 @@ type Builder interface {
 	// and extensions, etc. Children will generally be grouped by type and,
 	// within a group, in the same order as the children were added to their
 	// parent.
-	Children() []Builder
+	Children() iter.Seq[Builder]
 
 	// Comments returns the comments for this element. If the element has no
 	// comments then the returned struct will have all empty fields. Comments
@@ -105,6 +106,25 @@ type BuilderOptions struct {
 	// known to the calling program nor recognized by Resolver, trying to build
 	// the descriptor will fail.
 	RequireInterpretedOptions bool
+
+	// When set, indicates the default syntax level or edition to use for files
+	// that are synthesized to enclose detached builders. If this is not set,
+	// "proto2" syntax is the default. If a detached element requires a
+	// particular syntax or edition, the enclosing file will use that syntax or
+	// edition instead of this default. For example, calling Build on a detached
+	// message builder that has a field with Proto3Optional set will synthesize
+	// a file with "proto3" syntax, regardless of this value.
+	//
+	// Though the type of this field is an edition, a non-editions syntax can be
+	// specified using the special EDITION_PROTO2 and EDITION_PROTO3 values. Use
+	// of EDITION_UNSTABLE, EDITION_MAX, or any of the *_TEST_ONLY values is not
+	// allowed. Both EDITION_UNKNOWN (the default value when this field is never
+	// set) and EDITION_LEGACY are treated as if the value were EDITION_PROTO2.
+	//
+	// This package has a maximum edition that it knows about and can correctly
+	// support -- currently Edition 2024. If this field is set to a newer edition,
+	// it will be treated as if the value were the maximum supported edition.
+	DefaultSyntaxOrEdition descriptorpb.Edition
 }
 
 // Build processes the given builder into a descriptor using these options.

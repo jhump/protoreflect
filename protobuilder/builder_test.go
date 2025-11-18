@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"iter"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -333,9 +335,9 @@ func TestProto3Optional(t *testing.T) {
 	mb := NewMessage("Foo")
 	flb := NewField("bar", FieldTypeBool()).SetProto3Optional(true)
 	mb.AddField(flb)
-
-	_, err := flb.Build()
-	require.NotNil(t, err) // file does not have proto3 syntax
+	md, err := flb.Build()
+	require.NoError(t, err) // file gets assigned proto3 syntax due to use of proto3 optional
+	require.Equal(t, protoreflect.Proto3, md.ParentFile().Syntax())
 
 	fb := NewFile("foo.proto").SetSyntax(protoreflect.Proto3)
 	fb.AddMessage(mb)
@@ -394,7 +396,7 @@ func TestBuildersFromDescriptors_PreserveComments(t *testing.T) {
 			require.Equal(t, fmt.Sprintf(" Comment for %s\n", b.Name()), b.Comments().LeadingComment,
 				"wrong comment for builder %s", FullName(b))
 		}
-		for _, ch := range b.Children() {
+		for ch := range b.Children() {
 			checkBuilderComments(ch)
 		}
 	}
@@ -955,13 +957,13 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 }
 
 func checkChildren(t *testing.T, parent Builder, children ...Builder) {
-	require.Equal(t, len(children), len(parent.Children()), "Wrong number of children for %s (%T)", FullName(parent), parent)
+	require.Equal(t, len(children), count(parent.Children()), "Wrong number of children for %s (%T)", FullName(parent), parent)
 	ch := map[Builder]struct{}{}
 	for _, child := range children {
 		require.Equal(t, child.Parent(), parent, "Child %s (%T) does not report %s (%T) as its parent", child.Name(), child, FullName(parent), parent)
 		ch[child] = struct{}{}
 	}
-	for _, child := range parent.Children() {
+	for child := range parent.Children() {
 		_, ok := ch[child]
 		require.True(t, ok, "Child %s (%T) does appear in list of children for %s (%T)", child.Name(), child, FullName(parent), parent)
 	}
@@ -970,7 +972,7 @@ func checkChildren(t *testing.T, parent Builder, children ...Builder) {
 func checkFailedAdd(t *testing.T, err error, parent Builder, child Builder, errorMsg string) {
 	require.ErrorContains(t, err, errorMsg, "Expecting error assigning %s (%T) to %s (%T)", child.Name(), child, FullName(parent), parent)
 	require.Equal(t, nil, child.Parent(), "Child %s (%T) should not have a parent after failed add", child.Name(), child)
-	for _, ch := range parent.Children() {
+	for ch := range parent.Children() {
 		require.True(t, ch != child, "Child %s (%T) should not appear in list of children for %s (%T) but does", child.Name(), child, FullName(parent), parent)
 	}
 }
@@ -1536,7 +1538,7 @@ func TestRemoveField(t *testing.T) {
 		AddField(NewField("three", FieldTypeString()))
 
 	ok := msg.TryRemoveField("two")
-	children := msg.Children()
+	children := slices.Collect(msg.Children())
 
 	require.True(t, ok)
 	require.Equal(t, 2, len(children))
@@ -1693,7 +1695,7 @@ func TestInvalid(t *testing.T) {
 						NewMessage("Foo").AddField(NewGroupField(NewMessage("Bar"))),
 					)
 			},
-			expectedError: "invalid group: invalid under proto3 semantics",
+			expectedError: "only proto2 allows group fields",
 		},
 		{
 			name: "default value in proto3",
@@ -1763,4 +1765,12 @@ func TestInvalid(t *testing.T) {
 			require.ErrorContains(t, err, testCase.expectedError, "unexpected error: want %q, got %q", testCase.expectedError, err.Error())
 		})
 	}
+}
+
+func count[E any](itr iter.Seq[E]) int {
+	var count int
+	for range itr {
+		count++
+	}
+	return count
 }
