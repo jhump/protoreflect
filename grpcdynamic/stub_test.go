@@ -143,3 +143,24 @@ func TestBidiStreamingRpc(t *testing.T) {
 	_, err = bds.RecvMsg()
 	require.Equal(t, io.EOF, err, "Incorrect number of messages in response")
 }
+func TestUnaryRpc_WrongInputType(t *testing.T) {
+	// unaryMd expects SimpleRequest. We pass StreamingInputCallRequest to verify type checking.
+	wrongReq := &grpctestprotos.StreamingInputCallRequest{Payload: payload}
+
+	_, err := stub.InvokeRpc(context.Background(), unaryMd, wrongReq)
+
+	require.Error(t, err, "Expected error when invoking RPC with wrong message type")
+	require.Contains(t, err.Error(), "expecting message of type grpc.testing.SimpleRequest; got grpc.testing.StreamingInputCallRequest")
+}
+
+func TestClientStreamingRpc_WrongInputType(t *testing.T) {
+	cs, err := stub.InvokeRpcClientStream(context.Background(), clientStreamingMd)
+	require.NoError(t, err)
+
+	// clientStreamingMd expects StreamingInputCallRequest. We pass SimpleRequest.
+	wrongReq := &grpctestprotos.SimpleRequest{Payload: payload}
+	err = cs.SendMsg(wrongReq)
+
+	require.Error(t, err, "Expected error when sending wrong message type to stream")
+	require.Contains(t, err.Error(), "expecting message of type grpc.testing.StreamingInputCallRequest; got grpc.testing.SimpleRequest")
+}
