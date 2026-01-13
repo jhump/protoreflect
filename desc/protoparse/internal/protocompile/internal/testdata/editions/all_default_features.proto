@@ -1,0 +1,45 @@
+edition = "2023";
+
+package foo.bar;
+
+message Foo {
+  message Bar {
+    string abc = 1;
+    enum Baz {
+      BAZ_ZERO = 0;
+      BAZ_ONE = 1;
+    }
+  }
+  extensions 100 to 150;
+}
+
+message Fubar {
+  string name = 1;
+  uint64 id = 2;
+  repeated string labels = 3;
+  map<string, string> attrs = 4;
+  oneof disposition {
+    FooState state = 5;
+    Void larval = 6;
+    Fubar cloned_from = 7;
+  }
+}
+
+enum Void {
+  UNIT = 0;
+}
+
+enum FooState {
+  FOO_STATE_UNSET = 0;
+  FOO_STATE_PENDING = 1;
+  FOO_STATE_RUNNING = 2;
+  FOO_STATE_COMPLETE = 3;
+  FOO_STATE_FAILED = 4;
+  FOO_STATE_CANCELLED = 5;
+  FOO_STATE_PAUSED = 6;
+}
+
+service FooService {
+  rpc NewFubar(Fubar) returns (Fubar);
+  rpc UpdateFubar(Fubar) returns (Fubar);
+}

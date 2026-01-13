@@ -1,0 +1,230 @@
+// This file is for testing the binary representation of options in protocompile,
+// to make sure it matches the representation used by protoc.
+//
+// This file defines the custom options. It uses proto2 so it can define extendable
+// messages, to test custom options that themselves have extensions.
+syntax = "proto2";
+
+package bufbuild.protocompile.test;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/descriptor.proto";
+
+message Extendable {
+  optional string foo = 1;
+  optional int32 bar = 2;
+  repeated bool baz = 3;
+
+  extensions 100 to 1000;
+}
+
+message AllTypes {
+  enum AnEnum {
+    ZED = 0;
+    UNO = 1;
+    DOS = 2;
+  }
+
+  optional int32 i32 = 1;
+  optional int64 i64 = 2;
+  optional uint32 u32 = 3;
+  optional uint64 u64 = 4;
+  optional sint32 s32 = 5;
+  optional sint64 s64 = 6;
+  optional fixed32 f32 = 7;
+  optional fixed64 f64 = 8;
+  optional sfixed32 sf32 = 9;
+  optional sfixed64 sf64 = 10;
+  optional float fl32 = 11;
+  optional double fl64 = 12;
+  optional bool flag = 13;
+  optional AnEnum en = 14;
+  optional bytes b = 15;
+  optional string str = 16;
+  optional Extendable msg = 17;
+  optional group Grp = 18 {
+    optional string foo = 1;
+    optional int32 bar = 2;
+    repeated bool baz = 3;
+  }
+
+  repeated int32 r_i32 = 21;
+  repeated int64 r_i64 = 22;
+  repeated uint32 r_u32 = 23;
+  repeated uint64 r_u64 = 24;
+  repeated sint32 r_s32 = 25;
+  repeated sint64 r_s64 = 26;
+  repeated fixed32 r_f32 = 27;
+  repeated fixed64 r_f64 = 28;
+  repeated sfixed32 r_sf32 = 29;
+  repeated sfixed64 r_sf64 = 30;
+  repeated float r_fl32 = 31;
+  repeated double r_fl64 = 32;
+  repeated bool r_flag = 33;
+  repeated AnEnum r_en = 34;
+  repeated bytes r_b = 35;
+  repeated string r_str = 36;
+  repeated Extendable r_msg = 37;
+  repeated group R_Grp = 38 {
+    optional string foo = 1;
+    optional int32 bar = 2;
+    repeated bool baz = 3;
+  }
+
+  repeated int32 pr_i32 = 41 [packed=true];
+  repeated int64 pr_i64 = 42 [packed=true];
+  repeated uint32 pr_u32 = 43 [packed=true];
+  repeated uint64 pr_u64 = 44 [packed=true];
+  repeated sint32 pr_s32 = 45 [packed=true];
+  repeated sint64 pr_s64 = 46 [packed=true];
+  repeated fixed32 pr_f32 = 47 [packed=true];
+  repeated fixed64 pr_f64 = 48 [packed=true];
+  repeated sfixed32 pr_sf32 = 49 [packed=true];
+  repeated sfixed64 pr_sf64 = 50 [packed=true];
+  repeated float pr_fl32 = 51 [packed=true];
+  repeated double pr_fl64 = 52 [packed=true];
+  repeated bool pr_flag = 53 [packed=true];
+  repeated AnEnum pr_en = 55 [packed=true];
+
+  map<int32, int32> m_i32 = 61;
+  map<int64, int64> m_i64 = 62;
+  map<uint32, uint32> m_u32 = 63;
+  map<uint64, uint64> m_u64 = 64;
+  map<sint32, sint32> m_s32 = 65;
+  map<sint64, sint64> m_s64 = 66;
+  map<fixed32, fixed32> m_f32 = 67;
+  map<fixed64, fixed64> m_f64 = 68;
+  map<sfixed32, sfixed32> m_sf32 = 69;
+  map<sfixed64, sfixed64> m_sf64 = 70;
+  map<string, float> m_fl32 = 71;
+  map<string, double> m_fl64 = 72;
+  map<string, bool> m_flag = 73;
+  map<string, AnEnum> m_en = 74;
+  map<string, bytes> m_b = 75;
+  map<string, string> m_str = 76;
+  map<string, Extendable> m_msg = 77;
+  map<string, Grp> m_grp = 78;
+
+  oneof int {
+    int32 oo_i32 = 81;
+    int64 oo_i64 = 82;
+    uint32 oo_u32 = 83;
+    uint64 oo_u64 = 84;
+    sint32 oo_s32 = 85;
+    sint64 oo_s64 = 86;
+  }
+  oneof fixed {
+    fixed32 oo_f32 = 87;
+    fixed64 oo_f64 = 88;
+    sfixed32 oo_sf32 = 89;
+    sfixed64 oo_sf64 = 90;
+  }
+  oneof other_scalar {
+    float oo_fl32 = 91;
+    double oo_fl64 = 92;
+    bool oo_flag = 93;
+    AnEnum oo_en = 94;
+  }
+  oneof bytes {
+    bytes oo_b = 95;
+    string oo_str = 96;
+    Extendable oo_msg = 97;
+    group OO_Grp = 98 {
+      optional string foo = 1;
+      optional int32 bar = 2;
+      repeated bool baz = 3;
+    }
+  }
+}
+
+extend Extendable {
+  repeated string ext_s = 101;
+  optional uint64 ext_u = 102;
+  optional AllTypes t = 103;
+}
+
+extend google.protobuf.FileOptions {
+  optional AllTypes file = 1001;
+  repeated int32 file_i = 1002 [packed = true];
+}
+
+extend google.protobuf.MessageOptions {
+  optional AllTypes msg = 1001;
+  repeated int32 msg_i = 1002 [packed = true];
+}
+
+extend google.protobuf.FieldOptions {
+  optional AllTypes fld = 1001;
+  repeated int32 fld_i = 1002 [packed = true];
+}
+
+extend google.protobuf.OneofOptions {
+  optional AllTypes oo = 1001;
+  repeated int32 oo_i = 1002 [packed = true];
+}
+
+extend google.protobuf.ExtensionRangeOptions {
+  optional AllTypes ext = 1001;
+  repeated int32 ext_i = 1002 [packed = true];
+}
+
+extend google.protobuf.EnumOptions {
+  optional AllTypes en = 1001;
+  repeated int32 en_i = 1002 [packed = true];
+}
+
+extend google.protobuf.EnumValueOptions {
+  optional AllTypes env = 1001;
+  repeated int32 env_i = 1002 [packed = true];
+}
+
+extend google.protobuf.ServiceOptions {
+  optional AllTypes svc = 1001;
+  repeated int32 svc_i = 1002 [packed = true];
+}
+
+extend google.protobuf.MethodOptions {
+  optional AllTypes rpc = 1001;
+  repeated int32 rpc_i = 1002 [packed = true];
+}
+
+// Also test encoding of options where option is defined in
+// the same file as the usage. This makes sure we correctly
+// defer computation of option bytes until we know enough
+// to do so correctly (since option bytes encoding could
+// depend on interpretation of other options in this file).
+extend google.protobuf.FileOptions {
+  optional group FileGroup = 1003 {
+    optional string s = 1;
+    optional int32 i32 = 2;
+    repeated int32 array = 3 [packed=true];
+  }
+  repeated group FileGroups = 1004 {
+    optional string s = 1;
+    optional int32 i32 = 2;
+  }
+  optional google.protobuf.Any any = 1005;
+}
+
+option (filegroup) = {
+  array: [1,2,3,4,5,6,7,8]
+};
+option (filegroup).s = "abc";
+option (filegroup).i32 = -123;
+
+option (filegroups) = {
+  s: "abc"
+  i32: 123
+};
+
+option (filegroups) = {
+  s: "xyz"
+  i32: 456
+};
+
+option (any) = {
+  [type.googleapis.com/bufbuild.protocompile.test.AllTypes]: {
+    pr_i32: [0,1,2,3]
+    str: "foo"
+  }
+};

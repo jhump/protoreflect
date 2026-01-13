@@ -1,0 +1,12 @@
+edition = "2023";
+
+package foo.bar.baz;
+
+option features.message_encoding = DELIMITED;
+
+message TestMessage {
+  TestMessage child = 1;
+  repeated TestMessage descendants = 2;
+  map<string, string> string_map = 3;
+  map<string, TestMessage> message_map = 4;
+}
