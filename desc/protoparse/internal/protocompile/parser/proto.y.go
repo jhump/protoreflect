@@ -23,7 +23,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/bufbuild/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
 )
 
 type protoSymType struct {

@@ -20,7 +20,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/bufbuild/protocompile/internal/cases"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/cases"
 )
 
 func TestWords(t *testing.T) {

@@ -21,8 +21,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/bufbuild/protocompile/ast"
-	"github.com/bufbuild/protocompile/reporter"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
 )
 
 // The path ../.tmp/bin/goyacc is built when using `make generate` from repo root.

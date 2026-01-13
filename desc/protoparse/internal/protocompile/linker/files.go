@@ -23,7 +23,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 
-	"github.com/bufbuild/protocompile/walk"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/walk"
 )
 
 // File is like a super-powered protoreflect.FileDescriptor. It includes helpful

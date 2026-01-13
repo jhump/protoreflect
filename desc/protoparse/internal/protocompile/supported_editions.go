@@ -17,7 +17,7 @@ package protocompile
 import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/bufbuild/protocompile/internal/editions"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/editions"
 )
 
 // IsEditionSupported returns true if this module can compile sources for

@@ -39,7 +39,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/bufbuild/protocompile/internal"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal"
 )
 
 // Descriptors walks all descriptors in the given file using a depth-first

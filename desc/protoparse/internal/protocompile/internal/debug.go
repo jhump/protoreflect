@@ -45,7 +45,7 @@ func DebugLog(context []any, operation string, format string, args ...any) {
 
 	fn := runtime.FuncForPC(pc)
 	pkg := fn.Name()
-	pkg = strings.TrimPrefix(pkg, "github.com/bufbuild/protocompile/")
+	pkg = strings.TrimPrefix(pkg, "github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/")
 	pkg = pkg[:strings.Index(pkg, ".")]
 
 	file = filepath.Base(file)

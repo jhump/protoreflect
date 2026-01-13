@@ -27,8 +27,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/bufbuild/protocompile/ast"
-	"github.com/bufbuild/protocompile/internal"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal"
 )
 
 // OptionIndex is a mapping of AST nodes that define options to corresponding

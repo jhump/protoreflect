@@ -15,7 +15,7 @@
 package parser
 
 import (
-	"github.com/bufbuild/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
 )
 
 // the types below are accumulator types, just used in intermediate productions

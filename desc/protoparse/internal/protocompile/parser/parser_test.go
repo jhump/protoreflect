@@ -28,8 +28,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/bufbuild/protocompile/internal"
-	"github.com/bufbuild/protocompile/reporter"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
 )
 
 func TestEmptyParse(t *testing.T) {

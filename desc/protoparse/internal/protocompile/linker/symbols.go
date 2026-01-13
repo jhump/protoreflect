@@ -20,11 +20,11 @@ import (
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/bufbuild/protocompile/ast"
-	"github.com/bufbuild/protocompile/internal"
-	"github.com/bufbuild/protocompile/protoutil"
-	"github.com/bufbuild/protocompile/reporter"
-	"github.com/bufbuild/protocompile/walk"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/protoutil"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/walk"
 )
 
 const unknownFilePath = "<unknown file>"

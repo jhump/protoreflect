@@ -23,9 +23,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/bufbuild/protocompile/ast"
-	"github.com/bufbuild/protocompile/parser"
-	"github.com/bufbuild/protocompile/reporter"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/parser"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
 )
 
 func TestItems(t *testing.T) {

@@ -19,8 +19,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/bufbuild/protocompile/ast"
-	"github.com/bufbuild/protocompile/reporter"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
 )
 
 var closeSymbol = map[tokenType]tokenType{

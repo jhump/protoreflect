@@ -28,9 +28,9 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/bufbuild/protocompile"
-	"github.com/bufbuild/protocompile/internal/prototest"
-	"github.com/bufbuild/protocompile/protoutil"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/prototest"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/protoutil"
 )
 
 func TestFields(t *testing.T) {

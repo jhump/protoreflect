@@ -22,7 +22,7 @@ import (
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/bufbuild/protocompile/internal/cases"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/cases"
 )
 
 // JSONName returns the default JSON name for a field with the given name.

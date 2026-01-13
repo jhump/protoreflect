@@ -30,7 +30,7 @@ import (
 	_ "google.golang.org/protobuf/types/known/wrapperspb"
 	_ "google.golang.org/protobuf/types/pluginpb"
 
-	"github.com/bufbuild/protocompile/internal/featuresext"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/featuresext"
 )
 
 // All files that are included with protoc are also included with this package

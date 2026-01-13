@@ -17,7 +17,7 @@ package internal
 import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/bufbuild/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
 )
 
 type hasOptionNode interface {

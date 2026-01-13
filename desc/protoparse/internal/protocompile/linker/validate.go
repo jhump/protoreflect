@@ -22,12 +22,12 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/bufbuild/protocompile/ast"
-	"github.com/bufbuild/protocompile/internal"
-	"github.com/bufbuild/protocompile/internal/cases"
-	"github.com/bufbuild/protocompile/protoutil"
-	"github.com/bufbuild/protocompile/reporter"
-	"github.com/bufbuild/protocompile/walk"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/cases"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/protoutil"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/walk"
 )
 
 // ValidateOptions runs some validation checks on the result that can only

@@ -20,7 +20,7 @@ package reporter
 import (
 	"sync"
 
-	"github.com/bufbuild/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
 )
 
 // ErrorReporter is responsible for reporting the given error. If the reporter

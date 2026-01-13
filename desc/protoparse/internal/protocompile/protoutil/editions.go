@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
 
-	"github.com/bufbuild/protocompile/internal/editions"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/editions"
 )
 
 // GetFeatureDefault gets the default value for the given feature and the given

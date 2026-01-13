@@ -29,10 +29,10 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/bufbuild/protocompile"
-	"github.com/bufbuild/protocompile/internal/prototest"
-	"github.com/bufbuild/protocompile/linker"
-	"github.com/bufbuild/protocompile/protoutil"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/prototest"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/linker"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/protoutil"
 )
 
 func TestSourceCodeInfo(t *testing.T) {
