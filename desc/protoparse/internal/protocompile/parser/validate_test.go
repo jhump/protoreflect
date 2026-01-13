@@ -15,15 +15,12 @@
 package parser
 
 import (
-	"errors"
-	"os/exec"
+	//"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/protoc"
+	//"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/protoc"
 	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
 )
 
@@ -1236,23 +1233,26 @@ func TestBasicValidation(t *testing.T) {
 				assert.EqualError(t, err, tc.expectedErr, "bad error message")
 			}
 
-			expectSuccess := tc.expectedErr == ""
-			if tc.expectedDiffWithProtoc {
-				expectSuccess = !expectSuccess
-			}
-			testByProtoc(t, tc.contents, expectSuccess)
+			//expectSuccess := tc.expectedErr == ""
+			//if tc.expectedDiffWithProtoc {
+			//	expectSuccess = !expectSuccess
+			//}
+			//testByProtoc(t, tc.contents, expectSuccess)
 		})
 	}
 }
 
-func testByProtoc(t *testing.T, fileContents string, expectSuccess bool) {
-	t.Helper()
-	stdout, err := protoc.Compile(map[string]string{"test.proto": fileContents}, nil)
-	if execErr := new(exec.ExitError); errors.As(err, &execErr) {
-		t.Logf("protoc stdout:\n%s\nprotoc stderr:\n%s\n", stdout, execErr.Stderr)
-		require.False(t, expectSuccess)
-		return
-	}
-	require.NoError(t, err)
-	require.True(t, expectSuccess)
-}
+// Running protoc is disabled in this fork of protocompile, mainly to avoid copying over all
+// the machinery associated with downloading and managing protoc.
+
+//func testByProtoc(t *testing.T, fileContents string, expectSuccess bool) {
+//	t.Helper()
+//	stdout, err := protoc.Compile(map[string]string{"test.proto": fileContents}, nil)
+//	if execErr := new(exec.ExitError); errors.As(err, &execErr) {
+//		t.Logf("protoc stdout:\n%s\nprotoc stderr:\n%s\n", stdout, execErr.Stderr)
+//		require.False(t, expectSuccess)
+//		return
+//	}
+//	require.NoError(t, err)
+//	require.True(t, expectSuccess)
+//}

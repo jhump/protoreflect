@@ -18,7 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os/exec"
+	//"os/exec"
 	"sort"
 	"strings"
 	"sync"
@@ -35,7 +35,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile"
 	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/messageset"
-	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/protoc"
+	//"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/protoc"
 	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/internal/prototest"
 	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/linker"
 	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/protoutil"
@@ -3937,25 +3937,25 @@ func TestLinkerValidation(t *testing.T) {
 				}
 			}
 
-			// parse with protoc
-			passProtoc := testByProtoc(t, tc.input, tc.inputOrder)
-			if tc.expectedErr == "" {
-				if tc.expectedDiffWithProtoc {
-					// We can explicitly check different result is produced by protoc. When the bug is fixed,
-					// we can change the tc.expectedDiffWithProtoc field to false and delete the comment.
-					require.False(t, passProtoc, "expected protoc to disallow the case, but it allows it")
-				} else {
-					// if the test case passes protocompile, it should also pass protoc.
-					require.True(t, passProtoc, "protoc should allow the case")
-				}
-			} else {
-				if tc.expectedDiffWithProtoc {
-					require.True(t, passProtoc, "expected protoc to allow the case, but it disallows it")
-				} else {
-					// if the test case fails protocompile, it should also fail protoc.
-					require.False(t, passProtoc, "protoc should disallow the case")
-				}
-			}
+			//// parse with protoc
+			//passProtoc := testByProtoc(t, tc.input, tc.inputOrder)
+			//if tc.expectedErr == "" {
+			//	if tc.expectedDiffWithProtoc {
+			//		// We can explicitly check different result is produced by protoc. When the bug is fixed,
+			//		// we can change the tc.expectedDiffWithProtoc field to false and delete the comment.
+			//		require.False(t, passProtoc, "expected protoc to disallow the case, but it allows it")
+			//	} else {
+			//		// if the test case passes protocompile, it should also pass protoc.
+			//		require.True(t, passProtoc, "protoc should allow the case")
+			//	}
+			//} else {
+			//	if tc.expectedDiffWithProtoc {
+			//		require.True(t, passProtoc, "expected protoc to allow the case, but it disallows it")
+			//	} else {
+			//		// if the test case fails protocompile, it should also fail protoc.
+			//		require.False(t, passProtoc, "protoc should disallow the case")
+			//	}
+			//}
 		})
 	}
 }
@@ -4048,12 +4048,12 @@ func TestProto3Enums(t *testing.T) {
 			fc2 := getFileContents(file2, o2)
 
 			// now parse the protos with protoc
-			testFiles := map[string]string{
-				"f1.proto": fc1,
-				"f2.proto": fc2,
-			}
-			fileNames := []string{"f1.proto", "f2.proto"}
-			passProtoc := testByProtoc(t, testFiles, fileNames)
+			//testFiles := map[string]string{
+			//	"f1.proto": fc1,
+			//	"f2.proto": fc2,
+			//}
+			//fileNames := []string{"f1.proto", "f2.proto"}
+			//passProtoc := testByProtoc(t, testFiles, fileNames)
 			// parse the protos with protocompile
 			acc := func(filename string) (io.ReadCloser, error) {
 				var data string
@@ -4080,12 +4080,12 @@ func TestProto3Enums(t *testing.T) {
 				} else if err.Error() != expected {
 					t.Errorf("expecting validation error %q; instead got: %q", expected, err)
 				}
-				require.False(t, passProtoc)
+				//require.False(t, passProtoc)
 			} else {
 				// other cases succeed (okay to for proto2 to use enum from proto3 file and
 				// obviously okay for proto2 importing proto2 and proto3 importing proto3)
 				require.NoError(t, err)
-				require.True(t, passProtoc)
+				//require.True(t, passProtoc)
 			}
 		}
 	}
@@ -4329,8 +4329,8 @@ func TestSyntheticOneofCollisions(t *testing.T) {
 	assert.Equal(t, expected, actual)
 
 	// parse and check with protoc
-	passed := testByProtoc(t, input, nil)
-	require.False(t, passed)
+	//passed := testByProtoc(t, input, nil)
+	//require.False(t, passed)
 }
 
 func TestCustomJSONNameWarnings(t *testing.T) {
@@ -4497,16 +4497,19 @@ func TestCustomJSONNameWarnings(t *testing.T) {
 	//  we are focusing on other test cases first before protoc is fixed.
 }
 
-func testByProtoc(t *testing.T, files map[string]string, fileNames []string) bool {
-	t.Helper()
-	stdout, err := protoc.Compile(files, fileNames)
-	if execErr := new(exec.ExitError); errors.As(err, &execErr) {
-		t.Logf("protoc stdout:\n%s\nprotoc stderr:\n%s\n", stdout, execErr.Stderr)
-		return false
-	}
-	require.NoError(t, err)
-	return true
-}
+// Running protoc is disabled in this fork of protocompile, mainly to avoid copying over all
+// the machinery associated with downloading and managing protoc.
+
+//func testByProtoc(t *testing.T, files map[string]string, fileNames []string) bool {
+//	t.Helper()
+//	stdout, err := protoc.Compile(files, fileNames)
+//	if execErr := new(exec.ExitError); errors.As(err, &execErr) {
+//		t.Logf("protoc stdout:\n%s\nprotoc stderr:\n%s\n", stdout, execErr.Stderr)
+//		return false
+//	}
+//	require.NoError(t, err)
+//	return true
+//}
 
 func convertToProtoreflectDescriptors(files linker.Files) error {
 	allFiles := make(map[string]*descriptorpb.FileDescriptorProto, len(files))
