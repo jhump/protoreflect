@@ -3,7 +3,7 @@ package desc
 import (
 	"fmt"
 
-	"github.com/bufbuild/protocompile/protoutil"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/protoutil"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

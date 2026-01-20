@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bufbuild/protocompile/parser"
-	"github.com/bufbuild/protocompile/reporter"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/parser"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 

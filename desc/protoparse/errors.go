@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bufbuild/protocompile/linker"
-	"github.com/bufbuild/protocompile/parser"
-	"github.com/bufbuild/protocompile/reporter"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/linker"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/parser"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
 
 	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
