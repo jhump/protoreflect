@@ -439,6 +439,20 @@ func (t *task) asFile(ctx context.Context, name string, r SearchResult) (linker.
 	fileDescriptorProto := parseRes.FileDescriptorProto()
 	var wantsDescriptorProto bool
 	imports := fileDescriptorProto.Dependency
+	var importsIsCopy bool
+	if len(fileDescriptorProto.OptionDependency) > 0 {
+		if len(imports) == 0 {
+			imports = fileDescriptorProto.OptionDependency
+		} else {
+			// We are combining slices, so we make a copy so as not to mutate
+			// the backing array owned by the descriptor.
+			importsIsCopy = true
+			importsCopy := make([]string, len(imports)+len(fileDescriptorProto.OptionDependency))
+			copy(importsCopy, imports)
+			copy(importsCopy[len(imports):], fileDescriptorProto.OptionDependency)
+			imports = importsCopy
+		}
+	}
 
 	if t.e.hasOverrideDescriptorProto() {
 		// we only consider implicitly including descriptor.proto if it's overridden
@@ -452,12 +466,17 @@ func (t *task) asFile(ctx context.Context, name string, r SearchResult) (linker.
 			}
 			if !includesDescriptorProto {
 				wantsDescriptorProto = true
-				// make a defensive copy so we don't inadvertently mutate
-				// slice's backing array when adding this implicit dep
-				importsCopy := make([]string, len(imports)+1)
-				copy(importsCopy, imports)
-				importsCopy[len(imports)] = descriptorProtoPath
-				imports = importsCopy
+				if importsIsCopy {
+					// imports is already a copy; no need to make another copy
+					imports = append(imports, descriptorProtoPath)
+				} else {
+					// make a defensive copy so we don't inadvertently mutate
+					// slice's backing array when adding this implicit dep
+					importsCopy := make([]string, len(imports)+1)
+					copy(importsCopy, imports)
+					importsCopy[len(imports)] = descriptorProtoPath
+					imports = importsCopy
+				}
 			}
 		}
 	}
@@ -466,22 +485,24 @@ func (t *task) asFile(ctx context.Context, name string, r SearchResult) (linker.
 	if len(imports) > 0 {
 		t.r.setBlockedOn(imports)
 
-		results := make([]*result, len(fileDescriptorProto.Dependency))
+		results := make([]*result, 0, len(fileDescriptorProto.Dependency)+len(fileDescriptorProto.OptionDependency))
 		checked := map[string]struct{}{}
-		for i, dep := range fileDescriptorProto.Dependency {
-			span := findImportSpan(parseRes, dep)
-			if name == dep {
-				// doh! file imports itself
-				handleImportCycle(t.h, span, []string{name}, dep)
-				return nil, t.h.Error()
-			}
+		for _, depList := range [][]string{fileDescriptorProto.Dependency, fileDescriptorProto.OptionDependency} {
+			for _, dep := range depList {
+				span := findImportSpan(parseRes, dep)
+				if name == dep {
+					// doh! file imports itself
+					handleImportCycle(t.h, span, []string{name}, dep)
+					return nil, t.h.Error()
+				}
 
-			res := t.e.compile(ctx, dep)
-			// check for dependency cycle to prevent deadlock
-			if err := t.e.checkForDependencyCycle(res, []string{name, dep}, span, checked); err != nil {
-				return nil, err
+				res := t.e.compile(ctx, dep)
+				// check for dependency cycle to prevent deadlock
+				if err := t.e.checkForDependencyCycle(res, []string{name, dep}, span, checked); err != nil {
+					return nil, err
+				}
+				results = append(results, res)
 			}
-			results[i] = res
 		}
 		deps = make([]linker.File, len(results))
 		var descriptorProtoRes *result
