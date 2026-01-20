@@ -37,7 +37,7 @@ func TestEmptyParse(t *testing.T) {
 	errHandler := reporter.NewHandler(nil)
 	ast, err := Parse("foo.proto", bytes.NewReader(nil), errHandler)
 	require.NoError(t, err)
-	result, err := ResultFromAST(ast, true, errHandler)
+	result, err := ResultFromAST(ast, true, errHandler, false)
 	require.NoError(t, err)
 	fd := result.FileDescriptorProto()
 	assert.Equal(t, "foo.proto", fd.GetName())
@@ -92,7 +92,7 @@ func runParseErrorTestCases(t *testing.T, testCases map[string]parseErrorTestCas
 			protoName := name + ".proto"
 			ast, err := Parse(protoName, strings.NewReader(testCase.NoError), reporter.NewHandler(nil))
 			require.NoError(t, err)
-			_, err = ResultFromAST(ast, true, reporter.NewHandler(nil))
+			_, err = ResultFromAST(ast, true, reporter.NewHandler(nil), false)
 			require.NoError(t, err)
 
 			producedError := false
@@ -106,7 +106,7 @@ func runParseErrorTestCases(t *testing.T, testCases map[string]parseErrorTestCas
 			}, nil))
 			file, err := Parse(protoName, strings.NewReader(testCase.Error), errHandler)
 			if err == nil {
-				_, _ = ResultFromAST(file, true, errHandler)
+				_, _ = ResultFromAST(file, true, errHandler, false)
 			}
 			require.Truef(t, producedError, "expected error containing %q, got %v", expected, errs)
 		})
@@ -878,7 +878,7 @@ func TestExportLocalInIdentifiers(t *testing.T) {
 		}`
 	ast, err := Parse("test.proto", strings.NewReader(source), reporter.NewHandler(nil))
 	require.NoError(t, err)
-	res, err := ResultFromAST(ast, true, reporter.NewHandler(nil))
+	res, err := ResultFromAST(ast, true, reporter.NewHandler(nil), false)
 	require.NoError(t, err)
 	msgProto := res.FileDescriptorProto().GetMessageType()[0]
 	assert.Equal(t, "export", msgProto.GetField()[0].GetTypeName())
@@ -904,7 +904,7 @@ func parseFileForTest(filename string) (Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ResultFromAST(res, true, errHandler)
+	return ResultFromAST(res, true, errHandler, false)
 }
 
 func hasExtension(fd *descriptorpb.FileDescriptorProto, name string) bool {
@@ -975,7 +975,7 @@ func TestBasicSuccess(t *testing.T) {
 	fileNode, err := Parse("largeproto.proto", r, handler)
 	require.NoError(t, err)
 
-	result, err := ResultFromAST(fileNode, true, handler)
+	result, err := ResultFromAST(fileNode, true, handler, false)
 	require.NoError(t, err)
 	require.NoError(t, handler.Error())
 
@@ -996,7 +996,7 @@ func BenchmarkBasicSuccess(b *testing.B) {
 		fileNode, err := Parse("largeproto.proto", byteReader, handler)
 		require.NoError(b, err)
 
-		result, err := ResultFromAST(fileNode, true, handler)
+		result, err := ResultFromAST(fileNode, true, handler, false)
 		require.NoError(b, err)
 		require.NoError(b, handler.Error())
 
@@ -1060,7 +1060,7 @@ func TestPathological(t *testing.T) {
 				fileNode, err := Parse(fileName, r, handler)
 				if testCases[fileName] {
 					require.NoError(t, err)
-					_, err = ResultFromAST(fileNode, true, handler)
+					_, err = ResultFromAST(fileNode, true, handler, false)
 				}
 				require.Error(t, err)
 			}
@@ -1082,7 +1082,7 @@ func TestExportLocalIdentifier(t *testing.T) {
 		ast, err := Parse("test.proto", strings.NewReader(proto3Content), errHandler)
 		require.NoError(t, err, "Should be able to parse export/local as field names in proto3")
 
-		result, err := ResultFromAST(ast, true, errHandler)
+		result, err := ResultFromAST(ast, true, errHandler, false)
 		require.NoError(t, err, "Should be able to create result from AST")
 
 		fd := result.FileDescriptorProto()
@@ -1109,7 +1109,7 @@ func TestExportLocalIdentifier(t *testing.T) {
 		ast, err := Parse("test.proto", strings.NewReader(proto2Content), errHandler)
 		require.NoError(t, err, "Should be able to parse export/local as type names in proto2")
 
-		result, err := ResultFromAST(ast, true, errHandler)
+		result, err := ResultFromAST(ast, true, errHandler, false)
 		require.NoError(t, err, "Should be able to create result from AST")
 
 		fd := result.FileDescriptorProto()

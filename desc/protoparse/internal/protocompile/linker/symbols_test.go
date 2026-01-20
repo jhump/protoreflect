@@ -197,7 +197,7 @@ func parseAndLink(t *testing.T, contents string) Result {
 	h := reporter.NewHandler(nil)
 	fileAst, err := parser.Parse("test.proto", strings.NewReader(contents), h)
 	require.NoError(t, err)
-	parseResult, err := parser.ResultFromAST(fileAst, true, h)
+	parseResult, err := parser.ResultFromAST(fileAst, true, h, false)
 	require.NoError(t, err)
 	dep, err := protoregistry.GlobalFiles.FindFileByPath("google/protobuf/descriptor.proto")
 	require.NoError(t, err)

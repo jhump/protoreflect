@@ -1221,7 +1221,7 @@ func TestBasicValidation(t *testing.T) {
 			t.Parallel()
 			errs := reporter.NewHandler(nil)
 			if ast, err := Parse("test.proto", strings.NewReader(tc.contents), errs); err == nil {
-				_, _ = ResultFromAST(ast, true, errs)
+				_, _ = ResultFromAST(ast, true, errs, false)
 			}
 
 			err := errs.Error()

@@ -37,7 +37,7 @@ func TestClone(t *testing.T) {
 	handler := reporter.NewHandler(nil)
 	fileNode, err := Parse("desc_test_complex.proto", bytes.NewReader(data), handler)
 	require.NoError(t, err)
-	result, err := ResultFromAST(fileNode, true, handler)
+	result, err := ResultFromAST(fileNode, true, handler, false)
 	require.NoError(t, err)
 
 	t.Run("known result impl", func(t *testing.T) {

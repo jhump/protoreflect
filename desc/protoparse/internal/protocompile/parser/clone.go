@@ -63,7 +63,7 @@ func Clone(r Result) Result {
 	}
 	// Otherwise, we have an AST, but no way to clone the result's
 	// internals. So just re-create them from scratch.
-	res, err := ResultFromAST(r.AST(), false, reporter.NewHandler(nil))
+	res, err := ResultFromAST(r.AST(), false, reporter.NewHandler(nil), true)
 	if err != nil {
 		panic(err)
 	}

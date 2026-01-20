@@ -60,10 +60,10 @@ func ResultWithoutAST(proto *descriptorpb.FileDescriptorProto) Result {
 //
 // The given handler is used to report any errors or warnings encountered. If any
 // errors are reported, this function returns a non-nil error.
-func ResultFromAST(file *ast.FileNode, validate bool, handler *reporter.Handler) (Result, error) {
+func ResultFromAST(file *ast.FileNode, validate bool, handler *reporter.Handler, experimentalEditions bool) (Result, error) {
 	filename := file.Name()
 	r := &result{file: file, nodes: map[proto.Message]ast.Node{}}
-	r.createFileDescriptor(filename, file, handler)
+	r.createFileDescriptor(filename, file, handler, experimentalEditions)
 	if validate {
 		validateBasic(r, handler)
 	}
@@ -83,7 +83,7 @@ func (r *result) FileDescriptorProto() *descriptorpb.FileDescriptorProto {
 	return r.proto
 }
 
-func (r *result) createFileDescriptor(filename string, file *ast.FileNode, handler *reporter.Handler) {
+func (r *result) createFileDescriptor(filename string, file *ast.FileNode, handler *reporter.Handler, experimentalEditions bool) {
 	fd := &descriptorpb.FileDescriptorProto{Name: proto.String(filename)}
 	r.proto = fd
 
@@ -113,7 +113,13 @@ func (r *result) createFileDescriptor(filename string, file *ast.FileNode, handl
 		syntax = protoreflect.Editions
 
 		fd.Syntax = proto.String("editions")
-		editionEnum, ok := editions.SupportedEditions[edition]
+		var supportedEditions map[string]descriptorpb.Edition
+		if !experimentalEditions {
+			supportedEditions = editions.SupportedEditions
+		} else {
+			supportedEditions = editions.KnownEditions // widen the set of allowed editions
+		}
+		editionEnum, ok := supportedEditions[edition]
 		if !ok {
 			nodeInfo := file.NodeInfo(file.Edition.Edition)
 			if _, isKnown := editions.KnownEditions[edition]; isKnown {
@@ -121,8 +127,8 @@ func (r *result) createFileDescriptor(filename string, file *ast.FileNode, handl
 					return
 				}
 			} else {
-				editionStrs := make([]string, 0, len(editions.SupportedEditions))
-				for supportedEdition := range editions.SupportedEditions {
+				editionStrs := make([]string, 0, len(supportedEditions))
+				for supportedEdition := range supportedEditions {
 					editionStrs = append(editionStrs, fmt.Sprintf("%q", supportedEdition))
 				}
 				sort.Strings(editionStrs)
@@ -148,12 +154,19 @@ func (r *result) createFileDescriptor(filename string, file *ast.FileNode, handl
 		case *ast.ExtendNode:
 			r.addExtensions(decl, &fd.Extension, &fd.MessageType, syntax, handler, 0)
 		case *ast.ImportNode:
-			index := len(fd.Dependency)
-			fd.Dependency = append(fd.Dependency, decl.Name.AsString())
-			if decl.Public != nil {
-				fd.PublicDependency = append(fd.PublicDependency, int32(index))
-			} else if decl.Weak != nil {
-				fd.WeakDependency = append(fd.WeakDependency, int32(index))
+			if decl.Modifier != nil && decl.Modifier.Val == "option" {
+				fd.OptionDependency = append(fd.OptionDependency, decl.Name.AsString())
+			} else {
+				index := len(fd.Dependency)
+				fd.Dependency = append(fd.Dependency, decl.Name.AsString())
+				if decl.Modifier != nil {
+					switch decl.Modifier.Val {
+					case "public":
+						fd.PublicDependency = append(fd.PublicDependency, int32(index))
+					case "weak":
+						fd.WeakDependency = append(fd.WeakDependency, int32(index))
+					}
+				}
 			}
 		case *ast.MessageNode:
 			fd.MessageType = append(fd.MessageType, r.asMessageDescriptor(decl, syntax, handler, 1))
@@ -494,6 +507,14 @@ func (r *result) asMethodDescriptor(node *ast.RPCNode) *descriptorpb.MethodDescr
 
 func (r *result) asEnumDescriptor(en *ast.EnumNode, syntax protoreflect.Syntax, handler *reporter.Handler) *descriptorpb.EnumDescriptorProto {
 	ed := &descriptorpb.EnumDescriptorProto{Name: proto.String(en.Name.Val)}
+	if en.Visibility != nil {
+		switch en.Visibility.Val {
+		case "export":
+			ed.Visibility = descriptorpb.SymbolVisibility_VISIBILITY_EXPORT.Enum()
+		case "local":
+			ed.Visibility = descriptorpb.SymbolVisibility_VISIBILITY_LOCAL.Enum()
+		}
+	}
 	r.putEnumNode(ed, en)
 	rsvdNames := map[string]ast.SourcePos{}
 	for _, decl := range en.Decls {
@@ -527,6 +548,14 @@ func (r *result) asEnumReservedRange(rng *ast.RangeNode, handler *reporter.Handl
 
 func (r *result) asMessageDescriptor(node *ast.MessageNode, syntax protoreflect.Syntax, handler *reporter.Handler, depth int) *descriptorpb.DescriptorProto {
 	msgd := &descriptorpb.DescriptorProto{Name: proto.String(node.Name.Val)}
+	if node.Visibility != nil {
+		switch node.Visibility.Val {
+		case "export":
+			msgd.Visibility = descriptorpb.SymbolVisibility_VISIBILITY_EXPORT.Enum()
+		case "local":
+			msgd.Visibility = descriptorpb.SymbolVisibility_VISIBILITY_LOCAL.Enum()
+		}
+	}
 	r.putMessageNode(msgd, node)
 	// don't bother processing body if we've exceeded depth
 	if r.checkDepth(depth, node, handler) {

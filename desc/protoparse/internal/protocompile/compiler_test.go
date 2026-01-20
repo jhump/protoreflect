@@ -261,7 +261,7 @@ func TestDataRace(t *testing.T) {
 	require.NoError(t, err)
 	ast, err := parser.Parse("desc_test_complex.proto", bytes.NewReader(data), reporter.NewHandler(nil))
 	require.NoError(t, err)
-	parseResult, err := parser.ResultFromAST(ast, true, reporter.NewHandler(nil))
+	parseResult, err := parser.ResultFromAST(ast, true, reporter.NewHandler(nil), false)
 	require.NoError(t, err)
 	// let's also produce a resolved proto
 	files, err := (&Compiler{

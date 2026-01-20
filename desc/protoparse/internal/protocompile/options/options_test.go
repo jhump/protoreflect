@@ -237,7 +237,7 @@ func TestOptionsInUnlinkedFiles(t *testing.T) {
 			h := reporter.NewHandler(nil)
 			ast, err := parser.Parse("test.proto", strings.NewReader(tc.contents), h)
 			require.NoError(t, err, "failed to parse")
-			res, err := parser.ResultFromAST(ast, true, h)
+			res, err := parser.ResultFromAST(ast, true, h, false)
 			require.NoError(t, err, "failed to produce descriptor proto")
 			_, err = options.InterpretUnlinkedOptions(res)
 			require.NoError(t, err, "failed to interpret options")
@@ -263,7 +263,7 @@ func TestOptionsInUnlinkedFileInvalid(t *testing.T) {
 			    option features.utf8_validation = NONE;`,
 		), h)
 	require.NoError(t, err, "failed to parse")
-	res, err := parser.ResultFromAST(ast, false, h)
+	res, err := parser.ResultFromAST(ast, false, h, false)
 	require.NoError(t, err, "failed to produce descriptor proto")
 	_, err = options.InterpretUnlinkedOptions(res)
 	require.ErrorContains(t, err,
@@ -455,7 +455,7 @@ func TestInterpretOptionsWithoutAST(t *testing.T) {
 				if err != nil {
 					return res, err
 				}
-				parseResult, err := parser.ResultFromAST(fileNode, true, reporter.NewHandler(nil))
+				parseResult, err := parser.ResultFromAST(fileNode, true, reporter.NewHandler(nil), false)
 				if err != nil {
 					return res, err
 				}
