@@ -1,0 +1,363 @@
+// Copyright 2020-2025 Buf Technologies, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package buf.compiler.v1alpha1;
+
+import "buf/compiler/v1alpha1/report.proto";
+
+// A parsed AST file. This is the root file for the whole Protocompile AST.
+message File {
+  // The original filesystem file this file was parsed from.
+  Report.File file = 1;
+  // Declarations in this file.
+  repeated Decl decls = 2;
+}
+
+// A source code span for a specific `File`.
+//
+// This only contains byte offsets for the span; all other information
+// (such as the line number) should be re-computed as needed.
+message Span {
+  uint32 start = 1;
+  uint32 end = 2;
+}
+
+// A path in a Protobuf file. This models all identifiers (simple, compound,
+// and fully-qualified). It also models option names, which contain nested
+// paths, and Any URLs, which contain a single slash.
+//
+// To do so, it models the maximal union of these syntax constructs, permitting
+// arbitrary nesting and mixed . and / separators. Many paths representable with
+// this message do not correspond to valid Protobuf syntax, but they are
+// accepted by the parser.
+message Path {
+  // A path component.
+  message Component {
+    enum Separator {
+      SEPARATOR_UNSPECIFIED = 0;
+      SEPARATOR_DOT = 1;
+      SEPARATOR_SLASH = 2;
+    }
+
+    // May be missing altogether, for invalid paths like `foo..bar`.
+    oneof component {
+      // A single identifier.
+      string ident = 1;
+      // A nested extension path.
+      Path extension = 2;
+    }
+
+    // The type of separator this component had before it.
+    // If this is SEPARATOR_UNSPECIFIED, this is the first
+    // component, and the path is not absolute.
+    Separator separator = 3;
+
+    // The span of the component's value.
+    Span component_span = 10;
+    // The span of this component's leading dot, if any.
+    Span separator_span = 11;
+  }
+
+  repeated Component components = 1;
+
+  // The span for the whole path.
+  Span span = 10;
+}
+
+// A declaration in a Protobuf file.
+message Decl {
+  // An empty declaration.
+  message Empty {
+    Span span = 10;
+  }
+
+  // A language pragma, such as a syntax or edition declaration.
+  message Syntax {
+    enum Kind {
+      KIND_UNSPECIFIED = 0;
+      KIND_SYNTAX = 1;
+      KIND_EDITION = 2;
+    }
+
+    Kind kind = 1;
+    Expr value = 2;
+    Options options = 3;
+
+    Span span = 10;
+    Span keyword_span = 11;
+    Span equals_span = 12;
+    Span semicolon_span = 13;
+  }
+
+  // A package declaration.
+  message Package {
+    Path path = 1;
+    Options options = 2;
+
+    Span span = 10;
+    Span keyword_span = 11;
+    Span semicolon_span = 12;
+  }
+
+  // An import declaration.
+  message Import {
+    enum Modifier {
+      MODIFIER_UNSPECIFIED = 0;
+      MODIFIER_WEAK = 1;
+      MODIFIER_PUBLIC = 2;
+    }
+
+    repeated Modifier modifier = 1;
+    Expr import_path = 2;
+    Options options = 3;
+
+    Span span = 10;
+    Span keyword_span = 11;
+    repeated Span modifier_span = 12;
+    Span import_path_span = 13;
+    Span semicolon_span = 14;
+  }
+
+  // The body of a message, enum, or similar declaration, which
+  // itself contains declarations.
+  message Body {
+    repeated Decl decls = 1;
+
+    Span span = 10;
+  }
+
+  // An extensions or reserved range within a message. Both productions are
+  // extremely similar, so they share an AST node.
+  message Range {
+    enum Kind {
+      KIND_UNSPECIFIED = 0;
+      KIND_EXTENSIONS = 1;
+      KIND_RESERVED = 2;
+    }
+
+    Kind kind = 1;
+    repeated Expr ranges = 2;
+    Options options = 3;
+
+    Span span = 10;
+    Span keyword_span = 11;
+    Span semicolon_span = 12;
+  }
+
+  oneof decl {
+    Empty empty = 1;
+    Syntax syntax = 2;
+    Import import = 3;
+    Package package = 4;
+    Def def = 5;
+    Body body = 6;
+    Range range = 7;
+  }
+}
+
+// A definition is a particular kind of declaration that combines the syntactic
+// elements of type definitions, fields, options, and service methods.
+//
+// This allows the parser to accept and represent many invalid but plausible productions.
+message Def {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_MESSAGE = 1;
+    KIND_ENUM = 2;
+    KIND_SERVICE = 3;
+    KIND_EXTEND = 4;
+    KIND_FIELD = 5;
+    KIND_ENUM_VALUE = 6;
+    KIND_ONEOF = 7;
+    KIND_GROUP = 8;
+    KIND_METHOD = 9;
+    KIND_OPTION = 10;
+  }
+
+  // Definitions without a clear kind may be marked as `KIND_UNSPECIFIED`.
+  Kind kind = 1;
+  Path name = 2;
+
+  // The type for a `KIND_FIELD` definition.
+  Type type = 3;
+
+  // A method signature. This appears on `KIND_METHOD`, for example.
+  message Signature {
+    repeated Type inputs = 1;
+    repeated Type outputs = 2;
+
+    Span span = 10;
+    Span input_span = 11;
+    Span returns_span = 12;
+    Span output_span = 13;
+  }
+  Signature signature = 4;
+
+  // This is the tag number of `KIND_FIELD` or `KIND_ENUM_VALUE,
+  // or the value of `KIND_OPTION`.
+  Expr value = 5;
+
+  // This is options appearing in `[...]`, such as on `KIND_FIELD`
+  // or `KIND_GROUP`. This will NOT include options on a oneof, since
+  // those are represented as `KIND_OPTION` `Def` in `body`.
+  Options options = 6;
+
+  // This is a braced body at the end of the definition.
+  Decl.Body body = 7;
+
+  Span span = 10;
+  Span keyword_span = 11;
+  Span equals_span = 12;
+  Span semicolon_span = 13;
+}
+
+// Compact options after a declaration, in `[...]`.
+message Options {
+  message Entry {
+    Path path = 1;
+    Expr value = 2;
+
+    Span equals_span = 10;
+  }
+  repeated Entry entries = 1;
+
+  Span span = 10;
+}
+
+// An expression, such as the value of an option or the tag of a field.
+message Expr {
+  // A literal value: a number or a string.
+  message Literal {
+    // None of these may be set, in the case of an integer with an invalid or
+    // out-of-range format.
+    oneof value {
+      uint64 int_value = 1;
+      double float_value = 2;
+      string string_value = 3;
+    }
+
+    Span span = 10;
+  }
+
+  // An expression with some kind of prefix, such as a minus sign.
+  message Prefixed {
+    enum Prefix {
+      PREFIX_UNSPECIFIED = 0;
+      PREFIX_MINUS = 1;
+    }
+
+    Prefix prefix = 1;
+    Expr expr = 2;
+
+    Span span = 10;
+    Span prefix_span = 11;
+  }
+
+  // A range expression, i.e. something like `1 to 10`. `1 to max` is not
+  // special syntax; `max` is realized as a path expression.
+  //
+  // Ranges are inclusive.
+  message Range {
+    Expr start = 1;
+    Expr end = 2;
+
+    Span span = 10;
+    Span to_span = 11;
+  }
+
+  // An array literal, a sequence of expressions bound by square brackets.
+  message Array {
+    repeated Expr elements = 1;
+
+    Span span = 10;
+    Span open_span = 11;
+    Span close_span = 12;
+    repeated Span comma_spans = 13;
+  }
+
+  // A dictionary literal, a sequence of key-value pairs bound by curly braces.
+  message Dict {
+    repeated Expr.Field entries = 1;
+
+    Span span = 10;
+    Span open_span = 11;
+    Span close_span = 12;
+    repeated Span comma_spans = 13;
+  }
+
+  // A key-value pair expression, which usually will appear inside of an
+  // `Expr.Dict`.
+  message Field {
+    Expr key = 1;
+    Expr value = 2;
+
+    Span span = 10;
+    Span colon_span = 11;
+  }
+
+  oneof expr {
+    Literal literal = 1;
+    Path path = 2;
+    Prefixed prefixed = 3;
+    Range range = 4;
+    Array array = 5;
+    Dict dict = 6;
+    Field field = 7;
+  }
+}
+
+// A type, such as the prefix of a field.
+//
+// This AST includes many types not present in ordinary Protobuf, such as representations
+// for `repeated repeated int32` and `Arbitrary<int32>`, among others.
+message Type {
+  // A type with a modifier prefix in front of it, such as `repeated` or `stream`.
+  message Prefixed {
+    enum Prefix {
+      PREFIX_UNSPECIFIED = 0;
+      PREFIX_OPTIONAL = 1;
+      PREFIX_REPEATED = 2;
+      PREFIX_REQUIRED = 3;
+      PREFIX_STREAM = 4;
+    }
+
+    Prefix prefix = 1;
+    Type type = 2;
+
+    Span span = 10;
+    Span prefix_span = 11;
+  }
+
+  // A type with generic arguments, such as `map<string, int32>`.
+  //
+  // Note that no other generic types are part of Protobuf, but we support arbitrary generic
+  // types since it is a more natural way to define the AST.
+  message Generic {
+    Path path = 1;
+    repeated Type args = 2;
+
+    Span span = 10;
+    Span open_span = 11;
+    Span close_span = 12;
+    repeated Span comma_spans = 13;
+  }
+
+  oneof type {
+    Path path = 1;
+    Prefixed prefixed = 2;
+    Generic generic = 3;
+  }
+}

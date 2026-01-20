@@ -1,0 +1,2667 @@
+desc_test_complex.proto:
+   Span: 1:1 -> 298:2
+
+desc_test_complex.proto > syntax:
+   Span: 1:1 -> 1:19
+
+desc_test_complex.proto > package:
+   Span: 3:1 -> 3:17
+
+desc_test_complex.proto > options:
+   Span: 5:1 -> 5:76
+
+desc_test_complex.proto > options > go_package:
+   Span: 5:1 -> 5:76
+
+desc_test_complex.proto > dependency[0]:
+   Span: 7:1 -> 7:43
+
+desc_test_complex.proto > message_type[0]:
+   Span: 9:1 -> 14:2
+
+desc_test_complex.proto > message_type[0] > name:
+   Span: 9:9 -> 9:15
+
+desc_test_complex.proto > message_type[0] > field[0]:
+   Span: 10:9 -> 10:34
+
+desc_test_complex.proto > message_type[0] > field[0] > label:
+   Span: 10:9 -> 10:17
+
+desc_test_complex.proto > message_type[0] > field[0] > type:
+   Span: 10:18 -> 10:24
+
+desc_test_complex.proto > message_type[0] > field[0] > name:
+   Span: 10:25 -> 10:29
+
+desc_test_complex.proto > message_type[0] > field[0] > number:
+   Span: 10:32 -> 10:33
+
+desc_test_complex.proto > message_type[0] > field[1]:
+   Span: 11:9 -> 11:32
+
+desc_test_complex.proto > message_type[0] > field[1] > label:
+   Span: 11:9 -> 11:17
+
+desc_test_complex.proto > message_type[0] > field[1] > type:
+   Span: 11:18 -> 11:24
+
+desc_test_complex.proto > message_type[0] > field[1] > name:
+   Span: 11:25 -> 11:27
+
+desc_test_complex.proto > message_type[0] > field[1] > number:
+   Span: 11:30 -> 11:31
+
+desc_test_complex.proto > message_type[0] > field[2]:
+   Span: 12:9 -> 12:35
+   Trailing Comments:
+ default JSON name will be capitalized
+
+desc_test_complex.proto > message_type[0] > field[2] > label:
+   Span: 12:9 -> 12:17
+
+desc_test_complex.proto > message_type[0] > field[2] > type:
+   Span: 12:18 -> 12:23
+
+desc_test_complex.proto > message_type[0] > field[2] > name:
+   Span: 12:24 -> 12:30
+
+desc_test_complex.proto > message_type[0] > field[2] > number:
+   Span: 12:33 -> 12:34
+
+desc_test_complex.proto > message_type[0] > field[3]:
+   Span: 13:9 -> 13:29
+   Trailing Comments:
+ default JSON name will be empty(!)
+
+desc_test_complex.proto > message_type[0] > field[3] > label:
+   Span: 13:9 -> 13:17
+
+desc_test_complex.proto > message_type[0] > field[3] > type:
+   Span: 13:18 -> 13:22
+
+desc_test_complex.proto > message_type[0] > field[3] > name:
+   Span: 13:23 -> 13:24
+
+desc_test_complex.proto > message_type[0] > field[3] > number:
+   Span: 13:27 -> 13:28
+
+desc_test_complex.proto > extension:
+   Span: 16:1 -> 20:2
+
+desc_test_complex.proto > extension[0]:
+   Span: 19:9 -> 19:39
+
+desc_test_complex.proto > extension[0] > extendee:
+   Span: 16:8 -> 18:25
+
+desc_test_complex.proto > extension[0] > label:
+   Span: 19:9 -> 19:17
+
+desc_test_complex.proto > extension[0] > type:
+   Span: 19:18 -> 19:24
+
+desc_test_complex.proto > extension[0] > name:
+   Span: 19:25 -> 19:30
+
+desc_test_complex.proto > extension[0] > number:
+   Span: 19:33 -> 19:38
+
+desc_test_complex.proto > message_type[1]:
+   Span: 22:1 -> 61:2
+
+desc_test_complex.proto > message_type[1] > name:
+   Span: 22:9 -> 22:13
+
+desc_test_complex.proto > message_type[1] > field[0]:
+   Span: 23:9 -> 23:55
+
+desc_test_complex.proto > message_type[1] > field[0] > label:
+   Span: 23:9 -> 23:17
+
+desc_test_complex.proto > message_type[1] > field[0] > type:
+   Span: 23:18 -> 23:24
+
+desc_test_complex.proto > message_type[1] > field[0] > name:
+   Span: 23:25 -> 23:28
+
+desc_test_complex.proto > message_type[1] > field[0] > number:
+   Span: 23:31 -> 23:32
+
+desc_test_complex.proto > message_type[1] > field[0] > options:
+   Span: 23:33 -> 23:54
+
+desc_test_complex.proto > message_type[1] > field[0] > json_name:
+   Span: 23:34 -> 23:53
+
+desc_test_complex.proto > message_type[1] > field[1]:
+   Span: 24:9 -> 24:34
+
+desc_test_complex.proto > message_type[1] > field[1] > label:
+   Span: 24:9 -> 24:17
+
+desc_test_complex.proto > message_type[1] > field[1] > type:
+   Span: 24:18 -> 24:23
+
+desc_test_complex.proto > message_type[1] > field[1] > name:
+   Span: 24:24 -> 24:29
+
+desc_test_complex.proto > message_type[1] > field[1] > number:
+   Span: 24:32 -> 24:33
+
+desc_test_complex.proto > message_type[1] > field[2]:
+   Span: 25:9 -> 25:31
+
+desc_test_complex.proto > message_type[1] > field[2] > label:
+   Span: 25:9 -> 25:17
+
+desc_test_complex.proto > message_type[1] > field[2] > type_name:
+   Span: 25:18 -> 25:24
+
+desc_test_complex.proto > message_type[1] > field[2] > name:
+   Span: 25:25 -> 25:26
+
+desc_test_complex.proto > message_type[1] > field[2] > number:
+   Span: 25:29 -> 25:30
+
+desc_test_complex.proto > message_type[1] > field[3]:
+   Span: 26:9 -> 26:31
+
+desc_test_complex.proto > message_type[1] > field[3] > label:
+   Span: 26:9 -> 26:17
+
+desc_test_complex.proto > message_type[1] > field[3] > type_name:
+   Span: 26:18 -> 26:24
+
+desc_test_complex.proto > message_type[1] > field[3] > name:
+   Span: 26:25 -> 26:26
+
+desc_test_complex.proto > message_type[1] > field[3] > number:
+   Span: 26:29 -> 26:30
+
+desc_test_complex.proto > message_type[1] > field[4]:
+   Span: 27:9 -> 27:34
+
+desc_test_complex.proto > message_type[1] > field[4] > type_name:
+   Span: 27:9 -> 27:27
+
+desc_test_complex.proto > message_type[1] > field[4] > name:
+   Span: 27:28 -> 27:29
+
+desc_test_complex.proto > message_type[1] > field[4] > number:
+   Span: 27:32 -> 27:33
+
+desc_test_complex.proto > message_type[1] > field[5]:
+   Span: 29:9 -> 29:67
+
+desc_test_complex.proto > message_type[1] > field[5] > label:
+   Span: 29:9 -> 29:17
+
+desc_test_complex.proto > message_type[1] > field[5] > type:
+   Span: 29:18 -> 29:23
+
+desc_test_complex.proto > message_type[1] > field[5] > name:
+   Span: 29:24 -> 29:25
+
+desc_test_complex.proto > message_type[1] > field[5] > number:
+   Span: 29:28 -> 29:29
+
+desc_test_complex.proto > message_type[1] > field[5] > options:
+   Span: 29:30 -> 29:66
+
+desc_test_complex.proto > message_type[1] > field[5] > default_value:
+   Span: 29:31 -> 29:65
+
+desc_test_complex.proto > message_type[1] > extension_range:
+   Span: 31:9 -> 31:31
+
+desc_test_complex.proto > message_type[1] > extension_range[0]:
+   Span: 31:20 -> 31:30
+
+desc_test_complex.proto > message_type[1] > extension_range[0] > start:
+   Span: 31:20 -> 31:23
+
+desc_test_complex.proto > message_type[1] > extension_range[0] > end:
+   Span: 31:27 -> 31:30
+
+desc_test_complex.proto > message_type[1] > extension_range:
+   Span: 33:9 -> 33:81
+
+desc_test_complex.proto > message_type[1] > extension_range[1]:
+   Span: 33:20 -> 33:23
+
+desc_test_complex.proto > message_type[1] > extension_range[1] > start:
+   Span: 33:20 -> 33:23
+
+desc_test_complex.proto > message_type[1] > extension_range[1] > end:
+   Span: 33:20 -> 33:23
+
+desc_test_complex.proto > message_type[1] > extension_range[2]:
+   Span: 33:25 -> 33:35
+
+desc_test_complex.proto > message_type[1] > extension_range[2] > start:
+   Span: 33:25 -> 33:28
+
+desc_test_complex.proto > message_type[1] > extension_range[2] > end:
+   Span: 33:32 -> 33:35
+
+desc_test_complex.proto > message_type[1] > extension_range[3]:
+   Span: 33:37 -> 33:47
+
+desc_test_complex.proto > message_type[1] > extension_range[3] > start:
+   Span: 33:37 -> 33:40
+
+desc_test_complex.proto > message_type[1] > extension_range[3] > end:
+   Span: 33:44 -> 33:47
+
+desc_test_complex.proto > message_type[1] > extension_range[4]:
+   Span: 33:49 -> 33:61
+
+desc_test_complex.proto > message_type[1] > extension_range[4] > start:
+   Span: 33:49 -> 33:54
+
+desc_test_complex.proto > message_type[1] > extension_range[4] > end:
+   Span: 33:58 -> 33:61
+
+desc_test_complex.proto > message_type[1] > extension_range[1] > options:
+   Span: 33:62 -> 33:80
+
+desc_test_complex.proto > message_type[1] > extension_range[1] > options > (foo.bar.label):
+   Span: 33:63 -> 33:79
+
+desc_test_complex.proto > message_type[1] > extension_range[2] > options:
+   Span: 33:62 -> 33:80
+
+desc_test_complex.proto > message_type[1] > extension_range[2] > options > (foo.bar.label):
+   Span: 33:63 -> 33:79
+
+desc_test_complex.proto > message_type[1] > extension_range[3] > options:
+   Span: 33:62 -> 33:80
+
+desc_test_complex.proto > message_type[1] > extension_range[3] > options > (foo.bar.label):
+   Span: 33:63 -> 33:79
+
+desc_test_complex.proto > message_type[1] > extension_range[4] > options:
+   Span: 33:62 -> 33:80
+
+desc_test_complex.proto > message_type[1] > extension_range[4] > options > (foo.bar.label):
+   Span: 33:63 -> 33:79
+
+desc_test_complex.proto > message_type[1] > nested_type[1]:
+   Span: 35:9 -> 60:10
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > name:
+   Span: 35:17 -> 35:23
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > extension:
+   Span: 36:17 -> 38:18
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > extension[0]:
+   Span: 37:25 -> 37:56
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > extension[0] > extendee:
+   Span: 36:24 -> 36:54
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > extension[0] > label:
+   Span: 37:25 -> 37:33
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > extension[0] > type:
+   Span: 37:34 -> 37:39
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > extension[0] > name:
+   Span: 37:40 -> 37:47
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > extension[0] > number:
+   Span: 37:50 -> 37:55
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0]:
+   Span: 39:17 -> 59:18
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > name:
+   Span: 39:25 -> 39:38
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0]:
+   Span: 40:25 -> 48:26
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > name:
+   Span: 40:30 -> 40:33
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[0]:
+   Span: 41:33 -> 41:40
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[0] > name:
+   Span: 41:33 -> 41:35
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[0] > number:
+   Span: 41:38 -> 41:39
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[1]:
+   Span: 42:33 -> 42:40
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[1] > name:
+   Span: 42:33 -> 42:35
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[1] > number:
+   Span: 42:38 -> 42:39
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[2]:
+   Span: 43:33 -> 43:40
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[2] > name:
+   Span: 43:33 -> 43:35
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[2] > number:
+   Span: 43:38 -> 43:39
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[3]:
+   Span: 44:33 -> 44:40
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[3] > name:
+   Span: 44:33 -> 44:35
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[3] > number:
+   Span: 44:38 -> 44:39
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[4]:
+   Span: 45:33 -> 45:40
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[4] > name:
+   Span: 45:33 -> 45:35
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[4] > number:
+   Span: 45:38 -> 45:39
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[5]:
+   Span: 46:33 -> 46:40
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[5] > name:
+   Span: 46:33 -> 46:35
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[5] > number:
+   Span: 46:38 -> 46:39
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[6]:
+   Span: 47:33 -> 47:40
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[6] > name:
+   Span: 47:33 -> 47:35
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > enum_type[0] > value[6] > number:
+   Span: 47:38 -> 47:39
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > options:
+   Span: 49:25 -> 49:50
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > options > (foo.bar.Test.Nested.fooblez):
+   Span: 49:25 -> 49:50
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > extension:
+   Span: 50:25 -> 52:26
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > extension[0]:
+   Span: 51:33 -> 51:64
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > extension[0] > extendee:
+   Span: 50:32 -> 50:36
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > extension[0] > label:
+   Span: 51:33 -> 51:41
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > extension[0] > type:
+   Span: 51:42 -> 51:48
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > extension[0] > name:
+   Span: 51:49 -> 51:57
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > extension[0] > number:
+   Span: 51:60 -> 51:63
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > options:
+   Span: 53:25 -> 53:108
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > options > (foo.bar.rept)[0]:
+   Span: 53:25 -> 53:108
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0]:
+   Span: 54:25 -> 58:26
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > name:
+   Span: 54:33 -> 54:51
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > options:
+   Span: 55:33 -> 55:109
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > options > (foo.bar.rept)[0]:
+   Span: 55:33 -> 55:109
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > field[0]:
+   Span: 57:33 -> 57:56
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > field[0] > label:
+   Span: 57:33 -> 57:41
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > field[0] > type_name:
+   Span: 57:42 -> 57:46
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > field[0] > name:
+   Span: 57:47 -> 57:51
+
+desc_test_complex.proto > message_type[1] > nested_type[1] > nested_type[0] > nested_type[0] > field[0] > number:
+   Span: 57:54 -> 57:55
+
+desc_test_complex.proto > enum_type[0]:
+   Span: 63:1 -> 72:2
+
+desc_test_complex.proto > enum_type[0] > name:
+   Span: 63:6 -> 63:26
+
+desc_test_complex.proto > enum_type[0] > value[0]:
+   Span: 64:9 -> 64:15
+
+desc_test_complex.proto > enum_type[0] > value[0] > name:
+   Span: 64:9 -> 64:10
+
+desc_test_complex.proto > enum_type[0] > value[0] > number:
+   Span: 64:13 -> 64:14
+
+desc_test_complex.proto > enum_type[0] > value[1]:
+   Span: 65:9 -> 65:15
+
+desc_test_complex.proto > enum_type[0] > value[1] > name:
+   Span: 65:9 -> 65:10
+
+desc_test_complex.proto > enum_type[0] > value[1] > number:
+   Span: 65:13 -> 65:14
+
+desc_test_complex.proto > enum_type[0] > value[2]:
+   Span: 66:9 -> 66:15
+
+desc_test_complex.proto > enum_type[0] > value[2] > name:
+   Span: 66:9 -> 66:10
+
+desc_test_complex.proto > enum_type[0] > value[2] > number:
+   Span: 66:13 -> 66:14
+
+desc_test_complex.proto > enum_type[0] > reserved_range:
+   Span: 67:9 -> 67:30
+
+desc_test_complex.proto > enum_type[0] > reserved_range[0]:
+   Span: 67:18 -> 67:29
+
+desc_test_complex.proto > enum_type[0] > reserved_range[0] > start:
+   Span: 67:18 -> 67:22
+
+desc_test_complex.proto > enum_type[0] > reserved_range[0] > end:
+   Span: 67:26 -> 67:29
+
+desc_test_complex.proto > enum_type[0] > reserved_range:
+   Span: 68:9 -> 68:26
+
+desc_test_complex.proto > enum_type[0] > reserved_range[1]:
+   Span: 68:18 -> 68:25
+
+desc_test_complex.proto > enum_type[0] > reserved_range[1] > start:
+   Span: 68:18 -> 68:20
+
+desc_test_complex.proto > enum_type[0] > reserved_range[1] > end:
+   Span: 68:24 -> 68:25
+
+desc_test_complex.proto > enum_type[0] > reserved_range:
+   Span: 69:9 -> 69:40
+
+desc_test_complex.proto > enum_type[0] > reserved_range[2]:
+   Span: 69:18 -> 69:25
+
+desc_test_complex.proto > enum_type[0] > reserved_range[2] > start:
+   Span: 69:18 -> 69:19
+
+desc_test_complex.proto > enum_type[0] > reserved_range[2] > end:
+   Span: 69:23 -> 69:25
+
+desc_test_complex.proto > enum_type[0] > reserved_range[3]:
+   Span: 69:27 -> 69:35
+
+desc_test_complex.proto > enum_type[0] > reserved_range[3] > start:
+   Span: 69:27 -> 69:29
+
+desc_test_complex.proto > enum_type[0] > reserved_range[3] > end:
+   Span: 69:33 -> 69:35
+
+desc_test_complex.proto > enum_type[0] > reserved_range[4]:
+   Span: 69:37 -> 69:39
+
+desc_test_complex.proto > enum_type[0] > reserved_range[4] > start:
+   Span: 69:37 -> 69:39
+
+desc_test_complex.proto > enum_type[0] > reserved_range[4] > end:
+   Span: 69:37 -> 69:39
+
+desc_test_complex.proto > enum_type[0] > reserved_range:
+   Span: 70:9 -> 70:27
+
+desc_test_complex.proto > enum_type[0] > reserved_range[5]:
+   Span: 70:18 -> 70:26
+
+desc_test_complex.proto > enum_type[0] > reserved_range[5] > start:
+   Span: 70:18 -> 70:20
+
+desc_test_complex.proto > enum_type[0] > reserved_range[5] > end:
+   Span: 70:24 -> 70:26
+
+desc_test_complex.proto > enum_type[0] > reserved_name:
+   Span: 71:9 -> 71:32
+
+desc_test_complex.proto > enum_type[0] > reserved_name[0]:
+   Span: 71:18 -> 71:21
+
+desc_test_complex.proto > enum_type[0] > reserved_name[1]:
+   Span: 71:23 -> 71:26
+
+desc_test_complex.proto > enum_type[0] > reserved_name[2]:
+   Span: 71:28 -> 71:31
+
+desc_test_complex.proto > message_type[2]:
+   Span: 74:1 -> 78:2
+
+desc_test_complex.proto > message_type[2] > name:
+   Span: 74:9 -> 74:32
+
+desc_test_complex.proto > message_type[2] > reserved_range:
+   Span: 75:9 -> 75:40
+
+desc_test_complex.proto > message_type[2] > reserved_range[0]:
+   Span: 75:18 -> 75:25
+
+desc_test_complex.proto > message_type[2] > reserved_range[0] > start:
+   Span: 75:18 -> 75:19
+
+desc_test_complex.proto > message_type[2] > reserved_range[0] > end:
+   Span: 75:23 -> 75:25
+
+desc_test_complex.proto > message_type[2] > reserved_range[1]:
+   Span: 75:27 -> 75:35
+
+desc_test_complex.proto > message_type[2] > reserved_range[1] > start:
+   Span: 75:27 -> 75:29
+
+desc_test_complex.proto > message_type[2] > reserved_range[1] > end:
+   Span: 75:33 -> 75:35
+
+desc_test_complex.proto > message_type[2] > reserved_range[2]:
+   Span: 75:37 -> 75:39
+
+desc_test_complex.proto > message_type[2] > reserved_range[2] > start:
+   Span: 75:37 -> 75:39
+
+desc_test_complex.proto > message_type[2] > reserved_range[2] > end:
+   Span: 75:37 -> 75:39
+
+desc_test_complex.proto > message_type[2] > reserved_range:
+   Span: 76:9 -> 76:30
+
+desc_test_complex.proto > message_type[2] > reserved_range[3]:
+   Span: 76:18 -> 76:29
+
+desc_test_complex.proto > message_type[2] > reserved_range[3] > start:
+   Span: 76:18 -> 76:22
+
+desc_test_complex.proto > message_type[2] > reserved_range[3] > end:
+   Span: 76:26 -> 76:29
+
+desc_test_complex.proto > message_type[2] > reserved_name:
+   Span: 77:9 -> 77:32
+
+desc_test_complex.proto > message_type[2] > reserved_name[0]:
+   Span: 77:18 -> 77:21
+
+desc_test_complex.proto > message_type[2] > reserved_name[1]:
+   Span: 77:23 -> 77:26
+
+desc_test_complex.proto > message_type[2] > reserved_name[2]:
+   Span: 77:28 -> 77:31
+
+desc_test_complex.proto > message_type[3]:
+   Span: 80:1 -> 82:2
+
+desc_test_complex.proto > message_type[3] > name:
+   Span: 80:9 -> 80:23
+
+desc_test_complex.proto > message_type[3] > field[0]:
+   Span: 81:9 -> 81:38
+
+desc_test_complex.proto > message_type[3] > field[0] > type_name:
+   Span: 81:9 -> 81:28
+
+desc_test_complex.proto > message_type[3] > field[0] > name:
+   Span: 81:29 -> 81:33
+
+desc_test_complex.proto > message_type[3] > field[0] > number:
+   Span: 81:36 -> 81:37
+
+desc_test_complex.proto > extension:
+   Span: 84:1 -> 89:2
+
+desc_test_complex.proto > extension[1]:
+   Span: 85:9 -> 85:36
+
+desc_test_complex.proto > extension[1] > extendee:
+   Span: 84:8 -> 84:38
+
+desc_test_complex.proto > extension[1] > label:
+   Span: 85:9 -> 85:17
+
+desc_test_complex.proto > extension[1] > type_name:
+   Span: 85:18 -> 85:22
+
+desc_test_complex.proto > extension[1] > name:
+   Span: 85:23 -> 85:27
+
+desc_test_complex.proto > extension[1] > number:
+   Span: 85:30 -> 85:35
+
+desc_test_complex.proto > extension[2]:
+   Span: 86:9 -> 86:60
+
+desc_test_complex.proto > extension[2] > extendee:
+   Span: 84:8 -> 84:38
+
+desc_test_complex.proto > extension[2] > label:
+   Span: 86:9 -> 86:17
+
+desc_test_complex.proto > extension[2] > type_name:
+   Span: 86:18 -> 86:47
+
+desc_test_complex.proto > extension[2] > name:
+   Span: 86:48 -> 86:51
+
+desc_test_complex.proto > extension[2] > number:
+   Span: 86:54 -> 86:59
+
+desc_test_complex.proto > extension[3]:
+   Span: 87:9 -> 87:36
+
+desc_test_complex.proto > extension[3] > extendee:
+   Span: 84:8 -> 84:38
+
+desc_test_complex.proto > extension[3] > label:
+   Span: 87:9 -> 87:17
+
+desc_test_complex.proto > extension[3] > type_name:
+   Span: 87:18 -> 87:25
+
+desc_test_complex.proto > extension[3] > name:
+   Span: 87:26 -> 87:27
+
+desc_test_complex.proto > extension[3] > number:
+   Span: 87:30 -> 87:35
+
+desc_test_complex.proto > extension[4]:
+   Span: 88:9 -> 88:50
+
+desc_test_complex.proto > extension[4] > extendee:
+   Span: 84:8 -> 84:38
+
+desc_test_complex.proto > extension[4] > label:
+   Span: 88:9 -> 88:17
+
+desc_test_complex.proto > extension[4] > type_name:
+   Span: 88:18 -> 88:32
+
+desc_test_complex.proto > extension[4] > name:
+   Span: 88:33 -> 88:41
+
+desc_test_complex.proto > extension[4] > number:
+   Span: 88:44 -> 88:49
+
+desc_test_complex.proto > message_type[4]:
+   Span: 91:1 -> 111:2
+
+desc_test_complex.proto > message_type[4] > name:
+   Span: 91:9 -> 91:16
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 92:5 -> 92:130
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.rept)[0]:
+   Span: 92:5 -> 92:130
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 93:5 -> 93:115
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.rept)[1]:
+   Span: 93:5 -> 93:115
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 94:5 -> 94:36
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.rept)[2]:
+   Span: 94:5 -> 94:36
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 95:5 -> 95:23
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.eee):
+   Span: 95:5 -> 95:23
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 96:9 -> 96:34
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.a):
+   Span: 96:9 -> 96:34
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 97:9 -> 97:86
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.a) > test:
+   Span: 97:9 -> 97:86
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 98:9 -> 98:37
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.a) > test > foo:
+   Span: 98:9 -> 98:37
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 99:9 -> 99:41
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.a) > test > s > name:
+   Span: 99:9 -> 99:41
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 100:5 -> 100:34
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.a) > test > s > id:
+   Span: 100:5 -> 100:34
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 101:5 -> 101:31
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.a) > test > array[0]:
+   Span: 101:5 -> 101:31
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 102:5 -> 102:31
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.a) > test > array[1]:
+   Span: 102:5 -> 102:31
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 103:5 -> 103:78
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.a) > test > (foo.bar.Test.Nested._NestedNested._garblez):
+   Span: 103:5 -> 103:78
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 105:9 -> 105:37
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.map_vals) > vals[0]:
+   Span: 105:9 -> 105:37
+   Trailing Comments:
+ no key, no value
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 106:9 -> 106:47
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.map_vals) > vals[1]:
+   Span: 106:9 -> 106:47
+   Trailing Comments:
+ no value
+
+desc_test_complex.proto > message_type[4] > options:
+   Span: 107:9 -> 107:69
+
+desc_test_complex.proto > message_type[4] > options > (foo.bar.map_vals) > vals[2]:
+   Span: 107:9 -> 107:69
+
+desc_test_complex.proto > message_type[4] > field[0]:
+   Span: 109:5 -> 109:28
+
+desc_test_complex.proto > message_type[4] > field[0] > label:
+   Span: 109:5 -> 109:13
+
+desc_test_complex.proto > message_type[4] > field[0] > type_name:
+   Span: 109:14 -> 109:18
+
+desc_test_complex.proto > message_type[4] > field[0] > name:
+   Span: 109:19 -> 109:23
+
+desc_test_complex.proto > message_type[4] > field[0] > number:
+   Span: 109:26 -> 109:27
+
+desc_test_complex.proto > message_type[4] > field[1]:
+   Span: 110:5 -> 110:67
+
+desc_test_complex.proto > message_type[4] > field[1] > label:
+   Span: 110:5 -> 110:13
+
+desc_test_complex.proto > message_type[4] > field[1] > type_name:
+   Span: 110:14 -> 110:43
+
+desc_test_complex.proto > message_type[4] > field[1] > name:
+   Span: 110:44 -> 110:47
+
+desc_test_complex.proto > message_type[4] > field[1] > number:
+   Span: 110:50 -> 110:51
+
+desc_test_complex.proto > message_type[4] > field[1] > options:
+   Span: 110:52 -> 110:66
+
+desc_test_complex.proto > message_type[4] > field[1] > default_value:
+   Span: 110:53 -> 110:65
+
+desc_test_complex.proto > message_type[5]:
+   Span: 113:1 -> 127:2
+
+desc_test_complex.proto > message_type[5] > name:
+   Span: 113:9 -> 113:18
+
+desc_test_complex.proto > message_type[5] > field[0]:
+   Span: 114:9 -> 114:41
+
+desc_test_complex.proto > message_type[5] > field[0] > label:
+   Span: 114:9 -> 114:17
+
+desc_test_complex.proto > message_type[5] > field[0] > type:
+   Span: 114:18 -> 114:22
+
+desc_test_complex.proto > message_type[5] > field[0] > name:
+   Span: 114:23 -> 114:36
+
+desc_test_complex.proto > message_type[5] > field[0] > number:
+   Span: 114:39 -> 114:40
+
+desc_test_complex.proto > message_type[5] > enum_type[0]:
+   Span: 116:9 -> 120:10
+
+desc_test_complex.proto > message_type[5] > enum_type[0] > name:
+   Span: 116:14 -> 116:20
+
+desc_test_complex.proto > message_type[5] > enum_type[0] > value[0]:
+   Span: 117:17 -> 117:27
+
+desc_test_complex.proto > message_type[5] > enum_type[0] > value[0] > name:
+   Span: 117:17 -> 117:22
+
+desc_test_complex.proto > message_type[5] > enum_type[0] > value[0] > number:
+   Span: 117:25 -> 117:26
+
+desc_test_complex.proto > message_type[5] > enum_type[0] > value[1]:
+   Span: 118:17 -> 118:26
+
+desc_test_complex.proto > message_type[5] > enum_type[0] > value[1] > name:
+   Span: 118:17 -> 118:21
+
+desc_test_complex.proto > message_type[5] > enum_type[0] > value[1] > number:
+   Span: 118:24 -> 118:25
+
+desc_test_complex.proto > message_type[5] > enum_type[0] > value[2]:
+   Span: 119:17 -> 119:27
+
+desc_test_complex.proto > message_type[5] > enum_type[0] > value[2] > name:
+   Span: 119:17 -> 119:22
+
+desc_test_complex.proto > message_type[5] > enum_type[0] > value[2] > number:
+   Span: 119:25 -> 119:26
+
+desc_test_complex.proto > message_type[5] > nested_type[0]:
+   Span: 121:9 -> 124:10
+
+desc_test_complex.proto > message_type[5] > nested_type[0] > name:
+   Span: 121:17 -> 121:27
+
+desc_test_complex.proto > message_type[5] > nested_type[0] > field[0]:
+   Span: 122:17 -> 122:44
+
+desc_test_complex.proto > message_type[5] > nested_type[0] > field[0] > label:
+   Span: 122:17 -> 122:25
+
+desc_test_complex.proto > message_type[5] > nested_type[0] > field[0] > type_name:
+   Span: 122:26 -> 122:32
+
+desc_test_complex.proto > message_type[5] > nested_type[0] > field[0] > name:
+   Span: 122:33 -> 122:39
+
+desc_test_complex.proto > message_type[5] > nested_type[0] > field[0] > number:
+   Span: 122:42 -> 122:43
+
+desc_test_complex.proto > message_type[5] > nested_type[0] > field[1]:
+   Span: 123:17 -> 123:44
+
+desc_test_complex.proto > message_type[5] > nested_type[0] > field[1] > label:
+   Span: 123:17 -> 123:25
+
+desc_test_complex.proto > message_type[5] > nested_type[0] > field[1] > type:
+   Span: 123:26 -> 123:32
+
+desc_test_complex.proto > message_type[5] > nested_type[0] > field[1] > name:
+   Span: 123:33 -> 123:39
+
+desc_test_complex.proto > message_type[5] > nested_type[0] > field[1] > number:
+   Span: 123:42 -> 123:43
+
+desc_test_complex.proto > message_type[5] > field[1]:
+   Span: 126:9 -> 126:44
+
+desc_test_complex.proto > message_type[5] > field[1] > label:
+   Span: 126:9 -> 126:17
+
+desc_test_complex.proto > message_type[5] > field[1] > type_name:
+   Span: 126:18 -> 126:28
+
+desc_test_complex.proto > message_type[5] > field[1] > name:
+   Span: 126:29 -> 126:39
+
+desc_test_complex.proto > message_type[5] > field[1] > number:
+   Span: 126:42 -> 126:43
+
+desc_test_complex.proto > extension:
+   Span: 129:1 -> 131:2
+
+desc_test_complex.proto > extension[5]:
+   Span: 130:9 -> 130:46
+
+desc_test_complex.proto > extension[5] > extendee:
+   Span: 129:8 -> 129:37
+
+desc_test_complex.proto > extension[5] > label:
+   Span: 130:9 -> 130:17
+
+desc_test_complex.proto > extension[5] > type_name:
+   Span: 130:18 -> 130:27
+
+desc_test_complex.proto > extension[5] > name:
+   Span: 130:28 -> 130:37
+
+desc_test_complex.proto > extension[5] > number:
+   Span: 130:40 -> 130:45
+
+desc_test_complex.proto > service[0]:
+   Span: 133:1 -> 152:2
+
+desc_test_complex.proto > service[0] > name:
+   Span: 133:9 -> 133:24
+
+desc_test_complex.proto > service[0] > method[0]:
+   Span: 134:9 -> 142:10
+
+desc_test_complex.proto > service[0] > method[0] > name:
+   Span: 134:13 -> 134:21
+
+desc_test_complex.proto > service[0] > method[0] > input_type:
+   Span: 134:22 -> 134:26
+
+desc_test_complex.proto > service[0] > method[0] > output_type:
+   Span: 134:37 -> 134:41
+
+desc_test_complex.proto > service[0] > method[0] > options:
+   Span: 135:17 -> 141:19
+
+desc_test_complex.proto > service[0] > method[0] > options > (foo.bar.validator):
+   Span: 135:17 -> 141:19
+
+desc_test_complex.proto > service[0] > method[1]:
+   Span: 143:9 -> 151:10
+
+desc_test_complex.proto > service[0] > method[1] > name:
+   Span: 143:13 -> 143:16
+
+desc_test_complex.proto > service[0] > method[1] > input_type:
+   Span: 143:17 -> 143:21
+
+desc_test_complex.proto > service[0] > method[1] > output_type:
+   Span: 143:32 -> 143:36
+
+desc_test_complex.proto > service[0] > method[1] > options:
+   Span: 144:17 -> 150:19
+
+desc_test_complex.proto > service[0] > method[1] > options > (foo.bar.validator):
+   Span: 144:17 -> 150:19
+
+desc_test_complex.proto > message_type[6]:
+   Span: 154:1 -> 180:2
+
+desc_test_complex.proto > message_type[6] > name:
+   Span: 154:9 -> 154:13
+
+desc_test_complex.proto > message_type[6] > nested_type[0]:
+   Span: 155:3 -> 160:4
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > name:
+   Span: 155:11 -> 155:21
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[0]:
+   Span: 156:5 -> 156:33
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[0] > label:
+   Span: 156:5 -> 156:13
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[0] > type:
+   Span: 156:14 -> 156:20
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[0] > name:
+   Span: 156:21 -> 156:28
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[0] > number:
+   Span: 156:31 -> 156:32
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[1]:
+   Span: 157:5 -> 157:35
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[1] > label:
+   Span: 157:5 -> 157:13
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[1] > type:
+   Span: 157:14 -> 157:18
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[1] > name:
+   Span: 157:19 -> 157:30
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[1] > number:
+   Span: 157:33 -> 157:34
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[2]:
+   Span: 158:5 -> 158:32
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[2] > label:
+   Span: 158:5 -> 158:13
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[2] > type:
+   Span: 158:14 -> 158:19
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[2] > name:
+   Span: 158:20 -> 158:27
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[2] > number:
+   Span: 158:30 -> 158:31
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[3]:
+   Span: 159:5 -> 159:32
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[3] > label:
+   Span: 159:5 -> 159:13
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[3] > type:
+   Span: 159:14 -> 159:19
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[3] > name:
+   Span: 159:20 -> 159:27
+
+desc_test_complex.proto > message_type[6] > nested_type[0] > field[3] > number:
+   Span: 159:30 -> 159:31
+
+desc_test_complex.proto > message_type[6] > nested_type[1]:
+   Span: 161:3 -> 164:4
+
+desc_test_complex.proto > message_type[6] > nested_type[1] > name:
+   Span: 161:11 -> 161:18
+
+desc_test_complex.proto > message_type[6] > nested_type[1] > field[0]:
+   Span: 162:5 -> 162:32
+
+desc_test_complex.proto > message_type[6] > nested_type[1] > field[0] > label:
+   Span: 162:5 -> 162:13
+
+desc_test_complex.proto > message_type[6] > nested_type[1] > field[0] > type:
+   Span: 162:14 -> 162:19
+
+desc_test_complex.proto > message_type[6] > nested_type[1] > field[0] > name:
+   Span: 162:20 -> 162:27
+
+desc_test_complex.proto > message_type[6] > nested_type[1] > field[0] > number:
+   Span: 162:30 -> 162:31
+
+desc_test_complex.proto > message_type[6] > nested_type[1] > field[1]:
+   Span: 163:5 -> 163:33
+
+desc_test_complex.proto > message_type[6] > nested_type[1] > field[1] > label:
+   Span: 163:5 -> 163:13
+
+desc_test_complex.proto > message_type[6] > nested_type[1] > field[1] > type:
+   Span: 163:14 -> 163:20
+
+desc_test_complex.proto > message_type[6] > nested_type[1] > field[1] > name:
+   Span: 163:21 -> 163:28
+
+desc_test_complex.proto > message_type[6] > nested_type[1] > field[1] > number:
+   Span: 163:31 -> 163:32
+
+desc_test_complex.proto > message_type[6] > nested_type[2]:
+   Span: 165:3 -> 170:4
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > name:
+   Span: 165:11 -> 165:23
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[0]:
+   Span: 166:5 -> 166:35
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[0] > label:
+   Span: 166:5 -> 166:13
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[0] > type:
+   Span: 166:14 -> 166:18
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[0] > name:
+   Span: 166:19 -> 166:30
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[0] > number:
+   Span: 166:33 -> 166:34
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[1]:
+   Span: 167:5 -> 167:34
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[1] > label:
+   Span: 167:5 -> 167:13
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[1] > type:
+   Span: 167:14 -> 167:19
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[1] > name:
+   Span: 167:20 -> 167:29
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[1] > number:
+   Span: 167:32 -> 167:33
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[2]:
+   Span: 168:5 -> 168:34
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[2] > label:
+   Span: 168:5 -> 168:13
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[2] > type:
+   Span: 168:14 -> 168:19
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[2] > name:
+   Span: 168:20 -> 168:29
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[2] > number:
+   Span: 168:32 -> 168:33
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[3]:
+   Span: 169:5 -> 169:29
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[3] > label:
+   Span: 169:5 -> 169:13
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[3] > type_name:
+   Span: 169:14 -> 169:18
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[3] > name:
+   Span: 169:19 -> 169:24
+
+desc_test_complex.proto > message_type[6] > nested_type[2] > field[3] > number:
+   Span: 169:27 -> 169:28
+
+desc_test_complex.proto > message_type[6] > oneof_decl[0]:
+   Span: 171:3 -> 179:4
+
+desc_test_complex.proto > message_type[6] > oneof_decl[0] > name:
+   Span: 171:9 -> 171:13
+
+desc_test_complex.proto > message_type[6] > field[0]:
+   Span: 172:5 -> 172:27
+
+desc_test_complex.proto > message_type[6] > field[0] > type_name:
+   Span: 172:5 -> 172:15
+
+desc_test_complex.proto > message_type[6] > field[0] > name:
+   Span: 172:16 -> 172:22
+
+desc_test_complex.proto > message_type[6] > field[0] > number:
+   Span: 172:25 -> 172:26
+
+desc_test_complex.proto > message_type[6] > field[1]:
+   Span: 173:5 -> 173:31
+
+desc_test_complex.proto > message_type[6] > field[1] > type_name:
+   Span: 173:5 -> 173:17
+
+desc_test_complex.proto > message_type[6] > field[1] > name:
+   Span: 173:18 -> 173:26
+
+desc_test_complex.proto > message_type[6] > field[1] > number:
+   Span: 173:29 -> 173:30
+
+desc_test_complex.proto > message_type[6] > field[2]:
+   Span: 174:5 -> 174:21
+
+desc_test_complex.proto > message_type[6] > field[2] > type_name:
+   Span: 174:5 -> 174:12
+
+desc_test_complex.proto > message_type[6] > field[2] > name:
+   Span: 174:13 -> 174:16
+
+desc_test_complex.proto > message_type[6] > field[2] > number:
+   Span: 174:19 -> 174:20
+
+desc_test_complex.proto > message_type[6] > field[3]:
+   Span: 175:9 -> 178:10
+
+desc_test_complex.proto > message_type[6] > field[3] > type:
+   Span: 175:9 -> 175:14
+
+desc_test_complex.proto > message_type[6] > field[3] > name:
+   Span: 175:15 -> 175:24
+
+desc_test_complex.proto > message_type[6] > field[3] > number:
+   Span: 175:27 -> 175:28
+
+desc_test_complex.proto > message_type[6] > nested_type[3]:
+   Span: 175:9 -> 178:10
+
+desc_test_complex.proto > message_type[6] > nested_type[3] > name:
+   Span: 175:15 -> 175:24
+
+desc_test_complex.proto > message_type[6] > field[3] > type_name:
+   Span: 175:15 -> 175:24
+
+desc_test_complex.proto > message_type[6] > nested_type[3] > field[0]:
+   Span: 176:17 -> 176:45
+
+desc_test_complex.proto > message_type[6] > nested_type[3] > field[0] > label:
+   Span: 176:17 -> 176:25
+
+desc_test_complex.proto > message_type[6] > nested_type[3] > field[0] > type:
+   Span: 176:26 -> 176:32
+
+desc_test_complex.proto > message_type[6] > nested_type[3] > field[0] > name:
+   Span: 176:33 -> 176:40
+
+desc_test_complex.proto > message_type[6] > nested_type[3] > field[0] > number:
+   Span: 176:43 -> 176:44
+
+desc_test_complex.proto > message_type[6] > nested_type[3] > field[1]:
+   Span: 177:17 -> 177:45
+
+desc_test_complex.proto > message_type[6] > nested_type[3] > field[1] > label:
+   Span: 177:17 -> 177:25
+
+desc_test_complex.proto > message_type[6] > nested_type[3] > field[1] > type:
+   Span: 177:26 -> 177:32
+
+desc_test_complex.proto > message_type[6] > nested_type[3] > field[1] > name:
+   Span: 177:33 -> 177:40
+
+desc_test_complex.proto > message_type[6] > nested_type[3] > field[1] > number:
+   Span: 177:43 -> 177:44
+
+desc_test_complex.proto > extension:
+   Span: 182:1 -> 184:2
+
+desc_test_complex.proto > extension[6]:
+   Span: 183:3 -> 183:30
+
+desc_test_complex.proto > extension[6] > extendee:
+   Span: 182:8 -> 182:36
+
+desc_test_complex.proto > extension[6] > label:
+   Span: 183:3 -> 183:11
+
+desc_test_complex.proto > extension[6] > type_name:
+   Span: 183:12 -> 183:16
+
+desc_test_complex.proto > extension[6] > name:
+   Span: 183:17 -> 183:22
+
+desc_test_complex.proto > extension[6] > number:
+   Span: 183:25 -> 183:29
+
+desc_test_complex.proto > message_type[7]:
+   Span: 186:1 -> 192:2
+
+desc_test_complex.proto > message_type[7] > name:
+   Span: 186:9 -> 186:24
+
+desc_test_complex.proto > message_type[7] > field[0]:
+   Span: 187:5 -> 191:11
+
+desc_test_complex.proto > message_type[7] > field[0] > label:
+   Span: 187:5 -> 187:13
+
+desc_test_complex.proto > message_type[7] > field[0] > type:
+   Span: 187:14 -> 187:20
+
+desc_test_complex.proto > message_type[7] > field[0] > name:
+   Span: 187:21 -> 187:29
+
+desc_test_complex.proto > message_type[7] > field[0] > number:
+   Span: 187:32 -> 187:33
+
+desc_test_complex.proto > message_type[7] > field[0] > options:
+   Span: 188:7 -> 191:10
+
+desc_test_complex.proto > message_type[7] > field[0] > options > (foo.bar.rules) > repeated:
+   Span: 188:8 -> 191:9
+
+desc_test_complex.proto > message_type[8]:
+   Span: 196:1 -> 232:2
+   Detached Comments:
+ tests cases where field names collide with keywords
+
+desc_test_complex.proto > message_type[8] > name:
+   Span: 196:9 -> 196:26
+
+desc_test_complex.proto > message_type[8] > field[0]:
+   Span: 197:9 -> 197:34
+
+desc_test_complex.proto > message_type[8] > field[0] > label:
+   Span: 197:9 -> 197:17
+
+desc_test_complex.proto > message_type[8] > field[0] > type:
+   Span: 197:18 -> 197:22
+
+desc_test_complex.proto > message_type[8] > field[0] > name:
+   Span: 197:23 -> 197:29
+
+desc_test_complex.proto > message_type[8] > field[0] > number:
+   Span: 197:32 -> 197:33
+
+desc_test_complex.proto > message_type[8] > field[1]:
+   Span: 198:9 -> 198:34
+
+desc_test_complex.proto > message_type[8] > field[1] > label:
+   Span: 198:9 -> 198:17
+
+desc_test_complex.proto > message_type[8] > field[1] > type:
+   Span: 198:18 -> 198:22
+
+desc_test_complex.proto > message_type[8] > field[1] > name:
+   Span: 198:23 -> 198:29
+
+desc_test_complex.proto > message_type[8] > field[1] > number:
+   Span: 198:32 -> 198:33
+
+desc_test_complex.proto > message_type[8] > field[2]:
+   Span: 199:9 -> 199:34
+
+desc_test_complex.proto > message_type[8] > field[2] > label:
+   Span: 199:9 -> 199:17
+
+desc_test_complex.proto > message_type[8] > field[2] > type:
+   Span: 199:18 -> 199:22
+
+desc_test_complex.proto > message_type[8] > field[2] > name:
+   Span: 199:23 -> 199:29
+
+desc_test_complex.proto > message_type[8] > field[2] > number:
+   Span: 199:32 -> 199:33
+
+desc_test_complex.proto > message_type[8] > field[3]:
+   Span: 200:9 -> 200:32
+
+desc_test_complex.proto > message_type[8] > field[3] > label:
+   Span: 200:9 -> 200:17
+
+desc_test_complex.proto > message_type[8] > field[3] > type:
+   Span: 200:18 -> 200:22
+
+desc_test_complex.proto > message_type[8] > field[3] > name:
+   Span: 200:23 -> 200:27
+
+desc_test_complex.proto > message_type[8] > field[3] > number:
+   Span: 200:30 -> 200:31
+
+desc_test_complex.proto > message_type[8] > field[4]:
+   Span: 201:9 -> 201:35
+
+desc_test_complex.proto > message_type[8] > field[4] > label:
+   Span: 201:9 -> 201:17
+
+desc_test_complex.proto > message_type[8] > field[4] > type:
+   Span: 201:18 -> 201:22
+
+desc_test_complex.proto > message_type[8] > field[4] > name:
+   Span: 201:23 -> 201:30
+
+desc_test_complex.proto > message_type[8] > field[4] > number:
+   Span: 201:33 -> 201:34
+
+desc_test_complex.proto > message_type[8] > field[5]:
+   Span: 202:9 -> 202:36
+
+desc_test_complex.proto > message_type[8] > field[5] > label:
+   Span: 202:9 -> 202:17
+
+desc_test_complex.proto > message_type[8] > field[5] > type:
+   Span: 202:18 -> 202:24
+
+desc_test_complex.proto > message_type[8] > field[5] > name:
+   Span: 202:25 -> 202:31
+
+desc_test_complex.proto > message_type[8] > field[5] > number:
+   Span: 202:34 -> 202:35
+
+desc_test_complex.proto > message_type[8] > field[6]:
+   Span: 203:9 -> 203:34
+
+desc_test_complex.proto > message_type[8] > field[6] > label:
+   Span: 203:9 -> 203:17
+
+desc_test_complex.proto > message_type[8] > field[6] > type:
+   Span: 203:18 -> 203:23
+
+desc_test_complex.proto > message_type[8] > field[6] > name:
+   Span: 203:24 -> 203:29
+
+desc_test_complex.proto > message_type[8] > field[6] > number:
+   Span: 203:32 -> 203:33
+
+desc_test_complex.proto > message_type[8] > field[7]:
+   Span: 204:9 -> 204:34
+
+desc_test_complex.proto > message_type[8] > field[7] > label:
+   Span: 204:9 -> 204:17
+
+desc_test_complex.proto > message_type[8] > field[7] > type:
+   Span: 204:18 -> 204:23
+
+desc_test_complex.proto > message_type[8] > field[7] > name:
+   Span: 204:24 -> 204:29
+
+desc_test_complex.proto > message_type[8] > field[7] > number:
+   Span: 204:32 -> 204:33
+
+desc_test_complex.proto > message_type[8] > field[8]:
+   Span: 205:9 -> 205:34
+
+desc_test_complex.proto > message_type[8] > field[8] > label:
+   Span: 205:9 -> 205:17
+
+desc_test_complex.proto > message_type[8] > field[8] > type:
+   Span: 205:18 -> 205:23
+
+desc_test_complex.proto > message_type[8] > field[8] > name:
+   Span: 205:24 -> 205:29
+
+desc_test_complex.proto > message_type[8] > field[8] > number:
+   Span: 205:32 -> 205:33
+
+desc_test_complex.proto > message_type[8] > field[9]:
+   Span: 206:9 -> 206:37
+
+desc_test_complex.proto > message_type[8] > field[9] > label:
+   Span: 206:9 -> 206:17
+
+desc_test_complex.proto > message_type[8] > field[9] > type:
+   Span: 206:18 -> 206:24
+
+desc_test_complex.proto > message_type[8] > field[9] > name:
+   Span: 206:25 -> 206:31
+
+desc_test_complex.proto > message_type[8] > field[9] > number:
+   Span: 206:34 -> 206:36
+
+desc_test_complex.proto > message_type[8] > field[10]:
+   Span: 207:9 -> 207:37
+
+desc_test_complex.proto > message_type[8] > field[10] > label:
+   Span: 207:9 -> 207:17
+
+desc_test_complex.proto > message_type[8] > field[10] > type:
+   Span: 207:18 -> 207:24
+
+desc_test_complex.proto > message_type[8] > field[10] > name:
+   Span: 207:25 -> 207:31
+
+desc_test_complex.proto > message_type[8] > field[10] > number:
+   Span: 207:34 -> 207:36
+
+desc_test_complex.proto > message_type[8] > field[11]:
+   Span: 208:9 -> 208:37
+
+desc_test_complex.proto > message_type[8] > field[11] > label:
+   Span: 208:9 -> 208:17
+
+desc_test_complex.proto > message_type[8] > field[11] > type:
+   Span: 208:18 -> 208:24
+
+desc_test_complex.proto > message_type[8] > field[11] > name:
+   Span: 208:25 -> 208:31
+
+desc_test_complex.proto > message_type[8] > field[11] > number:
+   Span: 208:34 -> 208:36
+
+desc_test_complex.proto > message_type[8] > field[12]:
+   Span: 209:9 -> 209:37
+
+desc_test_complex.proto > message_type[8] > field[12] > label:
+   Span: 209:9 -> 209:17
+
+desc_test_complex.proto > message_type[8] > field[12] > type:
+   Span: 209:18 -> 209:24
+
+desc_test_complex.proto > message_type[8] > field[12] > name:
+   Span: 209:25 -> 209:31
+
+desc_test_complex.proto > message_type[8] > field[12] > number:
+   Span: 209:34 -> 209:36
+
+desc_test_complex.proto > message_type[8] > field[13]:
+   Span: 210:9 -> 210:39
+
+desc_test_complex.proto > message_type[8] > field[13] > label:
+   Span: 210:9 -> 210:17
+
+desc_test_complex.proto > message_type[8] > field[13] > type:
+   Span: 210:18 -> 210:25
+
+desc_test_complex.proto > message_type[8] > field[13] > name:
+   Span: 210:26 -> 210:33
+
+desc_test_complex.proto > message_type[8] > field[13] > number:
+   Span: 210:36 -> 210:38
+
+desc_test_complex.proto > message_type[8] > field[14]:
+   Span: 211:9 -> 211:39
+
+desc_test_complex.proto > message_type[8] > field[14] > label:
+   Span: 211:9 -> 211:17
+
+desc_test_complex.proto > message_type[8] > field[14] > type:
+   Span: 211:18 -> 211:25
+
+desc_test_complex.proto > message_type[8] > field[14] > name:
+   Span: 211:26 -> 211:33
+
+desc_test_complex.proto > message_type[8] > field[14] > number:
+   Span: 211:36 -> 211:38
+
+desc_test_complex.proto > message_type[8] > field[15]:
+   Span: 212:9 -> 212:41
+
+desc_test_complex.proto > message_type[8] > field[15] > label:
+   Span: 212:9 -> 212:17
+
+desc_test_complex.proto > message_type[8] > field[15] > type:
+   Span: 212:18 -> 212:26
+
+desc_test_complex.proto > message_type[8] > field[15] > name:
+   Span: 212:27 -> 212:35
+
+desc_test_complex.proto > message_type[8] > field[15] > number:
+   Span: 212:38 -> 212:40
+
+desc_test_complex.proto > message_type[8] > field[16]:
+   Span: 213:9 -> 213:41
+
+desc_test_complex.proto > message_type[8] > field[16] > label:
+   Span: 213:9 -> 213:17
+
+desc_test_complex.proto > message_type[8] > field[16] > type:
+   Span: 213:18 -> 213:26
+
+desc_test_complex.proto > message_type[8] > field[16] > name:
+   Span: 213:27 -> 213:35
+
+desc_test_complex.proto > message_type[8] > field[16] > number:
+   Span: 213:38 -> 213:40
+
+desc_test_complex.proto > message_type[8] > field[17]:
+   Span: 214:9 -> 214:33
+
+desc_test_complex.proto > message_type[8] > field[17] > label:
+   Span: 214:9 -> 214:17
+
+desc_test_complex.proto > message_type[8] > field[17] > type:
+   Span: 214:18 -> 214:22
+
+desc_test_complex.proto > message_type[8] > field[17] > name:
+   Span: 214:23 -> 214:27
+
+desc_test_complex.proto > message_type[8] > field[17] > number:
+   Span: 214:30 -> 214:32
+
+desc_test_complex.proto > message_type[8] > field[18]:
+   Span: 215:9 -> 215:35
+
+desc_test_complex.proto > message_type[8] > field[18] > label:
+   Span: 215:9 -> 215:17
+
+desc_test_complex.proto > message_type[8] > field[18] > type:
+   Span: 215:18 -> 215:23
+
+desc_test_complex.proto > message_type[8] > field[18] > name:
+   Span: 215:24 -> 215:29
+
+desc_test_complex.proto > message_type[8] > field[18] > number:
+   Span: 215:32 -> 215:34
+
+desc_test_complex.proto > message_type[8] > field[19]:
+   Span: 216:9 -> 216:37
+
+desc_test_complex.proto > message_type[8] > field[19] > label:
+   Span: 216:9 -> 216:17
+
+desc_test_complex.proto > message_type[8] > field[19] > type:
+   Span: 216:18 -> 216:24
+
+desc_test_complex.proto > message_type[8] > field[19] > name:
+   Span: 216:25 -> 216:31
+
+desc_test_complex.proto > message_type[8] > field[19] > number:
+   Span: 216:34 -> 216:36
+
+desc_test_complex.proto > message_type[8] > field[20]:
+   Span: 217:9 -> 217:37
+
+desc_test_complex.proto > message_type[8] > field[20] > label:
+   Span: 217:9 -> 217:17
+
+desc_test_complex.proto > message_type[8] > field[20] > type:
+   Span: 217:18 -> 217:22
+
+desc_test_complex.proto > message_type[8] > field[20] > name:
+   Span: 217:23 -> 217:31
+
+desc_test_complex.proto > message_type[8] > field[20] > number:
+   Span: 217:34 -> 217:36
+
+desc_test_complex.proto > message_type[8] > field[21]:
+   Span: 218:9 -> 218:37
+
+desc_test_complex.proto > message_type[8] > field[21] > label:
+   Span: 218:9 -> 218:17
+
+desc_test_complex.proto > message_type[8] > field[21] > type:
+   Span: 218:18 -> 218:22
+
+desc_test_complex.proto > message_type[8] > field[21] > name:
+   Span: 218:23 -> 218:31
+
+desc_test_complex.proto > message_type[8] > field[21] > number:
+   Span: 218:34 -> 218:36
+
+desc_test_complex.proto > message_type[8] > field[22]:
+   Span: 219:9 -> 219:37
+
+desc_test_complex.proto > message_type[8] > field[22] > label:
+   Span: 219:9 -> 219:17
+
+desc_test_complex.proto > message_type[8] > field[22] > type:
+   Span: 219:18 -> 219:22
+
+desc_test_complex.proto > message_type[8] > field[22] > name:
+   Span: 219:23 -> 219:31
+
+desc_test_complex.proto > message_type[8] > field[22] > number:
+   Span: 219:34 -> 219:36
+
+desc_test_complex.proto > message_type[8] > field[23]:
+   Span: 220:9 -> 220:36
+
+desc_test_complex.proto > message_type[8] > field[23] > label:
+   Span: 220:9 -> 220:17
+
+desc_test_complex.proto > message_type[8] > field[23] > type:
+   Span: 220:18 -> 220:22
+
+desc_test_complex.proto > message_type[8] > field[23] > name:
+   Span: 220:23 -> 220:30
+
+desc_test_complex.proto > message_type[8] > field[23] > number:
+   Span: 220:33 -> 220:35
+
+desc_test_complex.proto > message_type[8] > field[24]:
+   Span: 221:9 -> 221:33
+
+desc_test_complex.proto > message_type[8] > field[24] > label:
+   Span: 221:9 -> 221:17
+
+desc_test_complex.proto > message_type[8] > field[24] > type:
+   Span: 221:18 -> 221:22
+
+desc_test_complex.proto > message_type[8] > field[24] > name:
+   Span: 221:23 -> 221:27
+
+desc_test_complex.proto > message_type[8] > field[24] > number:
+   Span: 221:30 -> 221:32
+
+desc_test_complex.proto > message_type[8] > field[25]:
+   Span: 222:9 -> 222:36
+
+desc_test_complex.proto > message_type[8] > field[25] > label:
+   Span: 222:9 -> 222:17
+
+desc_test_complex.proto > message_type[8] > field[25] > type:
+   Span: 222:18 -> 222:22
+
+desc_test_complex.proto > message_type[8] > field[25] > name:
+   Span: 222:23 -> 222:30
+
+desc_test_complex.proto > message_type[8] > field[25] > number:
+   Span: 222:33 -> 222:35
+
+desc_test_complex.proto > message_type[8] > field[26]:
+   Span: 223:9 -> 223:32
+
+desc_test_complex.proto > message_type[8] > field[26] > label:
+   Span: 223:9 -> 223:17
+
+desc_test_complex.proto > message_type[8] > field[26] > type:
+   Span: 223:18 -> 223:22
+
+desc_test_complex.proto > message_type[8] > field[26] > name:
+   Span: 223:23 -> 223:26
+
+desc_test_complex.proto > message_type[8] > field[26] > number:
+   Span: 223:29 -> 223:31
+
+desc_test_complex.proto > message_type[8] > field[27]:
+   Span: 224:9 -> 224:35
+
+desc_test_complex.proto > message_type[8] > field[27] > label:
+   Span: 224:9 -> 224:17
+
+desc_test_complex.proto > message_type[8] > field[27] > type:
+   Span: 224:18 -> 224:22
+
+desc_test_complex.proto > message_type[8] > field[27] > name:
+   Span: 224:23 -> 224:29
+
+desc_test_complex.proto > message_type[8] > field[27] > number:
+   Span: 224:32 -> 224:34
+
+desc_test_complex.proto > message_type[8] > field[28]:
+   Span: 225:9 -> 225:35
+
+desc_test_complex.proto > message_type[8] > field[28] > label:
+   Span: 225:9 -> 225:17
+
+desc_test_complex.proto > message_type[8] > field[28] > type:
+   Span: 225:18 -> 225:22
+
+desc_test_complex.proto > message_type[8] > field[28] > name:
+   Span: 225:23 -> 225:29
+
+desc_test_complex.proto > message_type[8] > field[28] > number:
+   Span: 225:32 -> 225:34
+
+desc_test_complex.proto > message_type[8] > field[29]:
+   Span: 226:9 -> 226:39
+
+desc_test_complex.proto > message_type[8] > field[29] > label:
+   Span: 226:9 -> 226:17
+
+desc_test_complex.proto > message_type[8] > field[29] > type:
+   Span: 226:18 -> 226:22
+
+desc_test_complex.proto > message_type[8] > field[29] > name:
+   Span: 226:23 -> 226:33
+
+desc_test_complex.proto > message_type[8] > field[29] > number:
+   Span: 226:36 -> 226:38
+
+desc_test_complex.proto > message_type[8] > field[30]:
+   Span: 227:9 -> 227:37
+
+desc_test_complex.proto > message_type[8] > field[30] > label:
+   Span: 227:9 -> 227:17
+
+desc_test_complex.proto > message_type[8] > field[30] > type:
+   Span: 227:18 -> 227:22
+
+desc_test_complex.proto > message_type[8] > field[30] > name:
+   Span: 227:23 -> 227:31
+
+desc_test_complex.proto > message_type[8] > field[30] > number:
+   Span: 227:34 -> 227:36
+
+desc_test_complex.proto > message_type[8] > field[31]:
+   Span: 228:9 -> 228:31
+
+desc_test_complex.proto > message_type[8] > field[31] > label:
+   Span: 228:9 -> 228:17
+
+desc_test_complex.proto > message_type[8] > field[31] > type:
+   Span: 228:18 -> 228:22
+
+desc_test_complex.proto > message_type[8] > field[31] > name:
+   Span: 228:23 -> 228:25
+
+desc_test_complex.proto > message_type[8] > field[31] > number:
+   Span: 228:28 -> 228:30
+
+desc_test_complex.proto > message_type[8] > field[32]:
+   Span: 229:9 -> 229:34
+
+desc_test_complex.proto > message_type[8] > field[32] > label:
+   Span: 229:9 -> 229:17
+
+desc_test_complex.proto > message_type[8] > field[32] > type:
+   Span: 229:18 -> 229:23
+
+desc_test_complex.proto > message_type[8] > field[32] > name:
+   Span: 229:24 -> 229:28
+
+desc_test_complex.proto > message_type[8] > field[32] > number:
+   Span: 229:31 -> 229:33
+
+desc_test_complex.proto > message_type[8] > field[33]:
+   Span: 230:9 -> 230:35
+
+desc_test_complex.proto > message_type[8] > field[33] > label:
+   Span: 230:9 -> 230:17
+
+desc_test_complex.proto > message_type[8] > field[33] > type:
+   Span: 230:18 -> 230:23
+
+desc_test_complex.proto > message_type[8] > field[33] > name:
+   Span: 230:24 -> 230:29
+
+desc_test_complex.proto > message_type[8] > field[33] > number:
+   Span: 230:32 -> 230:34
+
+desc_test_complex.proto > message_type[8] > field[34]:
+   Span: 231:9 -> 231:37
+
+desc_test_complex.proto > message_type[8] > field[34] > label:
+   Span: 231:9 -> 231:17
+
+desc_test_complex.proto > message_type[8] > field[34] > type:
+   Span: 231:18 -> 231:23
+
+desc_test_complex.proto > message_type[8] > field[34] > name:
+   Span: 231:24 -> 231:31
+
+desc_test_complex.proto > message_type[8] > field[34] > number:
+   Span: 231:34 -> 231:36
+
+desc_test_complex.proto > extension:
+   Span: 234:1 -> 271:2
+
+desc_test_complex.proto > extension[7]:
+   Span: 235:9 -> 235:38
+
+desc_test_complex.proto > extension[7] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[7] > label:
+   Span: 235:9 -> 235:17
+
+desc_test_complex.proto > extension[7] > type:
+   Span: 235:18 -> 235:22
+
+desc_test_complex.proto > extension[7] > name:
+   Span: 235:23 -> 235:29
+
+desc_test_complex.proto > extension[7] > number:
+   Span: 235:32 -> 235:37
+
+desc_test_complex.proto > extension[8]:
+   Span: 236:9 -> 236:38
+
+desc_test_complex.proto > extension[8] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[8] > label:
+   Span: 236:9 -> 236:17
+
+desc_test_complex.proto > extension[8] > type:
+   Span: 236:18 -> 236:22
+
+desc_test_complex.proto > extension[8] > name:
+   Span: 236:23 -> 236:29
+
+desc_test_complex.proto > extension[8] > number:
+   Span: 236:32 -> 236:37
+
+desc_test_complex.proto > extension[9]:
+   Span: 237:9 -> 237:38
+
+desc_test_complex.proto > extension[9] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[9] > label:
+   Span: 237:9 -> 237:17
+
+desc_test_complex.proto > extension[9] > type:
+   Span: 237:18 -> 237:22
+
+desc_test_complex.proto > extension[9] > name:
+   Span: 237:23 -> 237:29
+
+desc_test_complex.proto > extension[9] > number:
+   Span: 237:32 -> 237:37
+
+desc_test_complex.proto > extension[10]:
+   Span: 238:9 -> 238:36
+
+desc_test_complex.proto > extension[10] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[10] > label:
+   Span: 238:9 -> 238:17
+
+desc_test_complex.proto > extension[10] > type:
+   Span: 238:18 -> 238:22
+
+desc_test_complex.proto > extension[10] > name:
+   Span: 238:23 -> 238:27
+
+desc_test_complex.proto > extension[10] > number:
+   Span: 238:30 -> 238:35
+
+desc_test_complex.proto > extension[11]:
+   Span: 239:9 -> 239:39
+
+desc_test_complex.proto > extension[11] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[11] > label:
+   Span: 239:9 -> 239:17
+
+desc_test_complex.proto > extension[11] > type:
+   Span: 239:18 -> 239:22
+
+desc_test_complex.proto > extension[11] > name:
+   Span: 239:23 -> 239:30
+
+desc_test_complex.proto > extension[11] > number:
+   Span: 239:33 -> 239:38
+
+desc_test_complex.proto > extension[12]:
+   Span: 240:9 -> 240:40
+
+desc_test_complex.proto > extension[12] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[12] > label:
+   Span: 240:9 -> 240:17
+
+desc_test_complex.proto > extension[12] > type:
+   Span: 240:18 -> 240:24
+
+desc_test_complex.proto > extension[12] > name:
+   Span: 240:25 -> 240:31
+
+desc_test_complex.proto > extension[12] > number:
+   Span: 240:34 -> 240:39
+
+desc_test_complex.proto > extension[13]:
+   Span: 241:9 -> 241:38
+
+desc_test_complex.proto > extension[13] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[13] > label:
+   Span: 241:9 -> 241:17
+
+desc_test_complex.proto > extension[13] > type:
+   Span: 241:18 -> 241:23
+
+desc_test_complex.proto > extension[13] > name:
+   Span: 241:24 -> 241:29
+
+desc_test_complex.proto > extension[13] > number:
+   Span: 241:32 -> 241:37
+
+desc_test_complex.proto > extension[14]:
+   Span: 242:9 -> 242:38
+
+desc_test_complex.proto > extension[14] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[14] > label:
+   Span: 242:9 -> 242:17
+
+desc_test_complex.proto > extension[14] > type:
+   Span: 242:18 -> 242:23
+
+desc_test_complex.proto > extension[14] > name:
+   Span: 242:24 -> 242:29
+
+desc_test_complex.proto > extension[14] > number:
+   Span: 242:32 -> 242:37
+
+desc_test_complex.proto > extension[15]:
+   Span: 243:9 -> 243:38
+
+desc_test_complex.proto > extension[15] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[15] > label:
+   Span: 243:9 -> 243:17
+
+desc_test_complex.proto > extension[15] > type:
+   Span: 243:18 -> 243:23
+
+desc_test_complex.proto > extension[15] > name:
+   Span: 243:24 -> 243:29
+
+desc_test_complex.proto > extension[15] > number:
+   Span: 243:32 -> 243:37
+
+desc_test_complex.proto > extension[16]:
+   Span: 244:9 -> 244:40
+
+desc_test_complex.proto > extension[16] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[16] > label:
+   Span: 244:9 -> 244:17
+
+desc_test_complex.proto > extension[16] > type:
+   Span: 244:18 -> 244:24
+
+desc_test_complex.proto > extension[16] > name:
+   Span: 244:25 -> 244:31
+
+desc_test_complex.proto > extension[16] > number:
+   Span: 244:34 -> 244:39
+
+desc_test_complex.proto > extension[17]:
+   Span: 245:9 -> 245:40
+
+desc_test_complex.proto > extension[17] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[17] > label:
+   Span: 245:9 -> 245:17
+
+desc_test_complex.proto > extension[17] > type:
+   Span: 245:18 -> 245:24
+
+desc_test_complex.proto > extension[17] > name:
+   Span: 245:25 -> 245:31
+
+desc_test_complex.proto > extension[17] > number:
+   Span: 245:34 -> 245:39
+
+desc_test_complex.proto > extension[18]:
+   Span: 246:9 -> 246:40
+
+desc_test_complex.proto > extension[18] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[18] > label:
+   Span: 246:9 -> 246:17
+
+desc_test_complex.proto > extension[18] > type:
+   Span: 246:18 -> 246:24
+
+desc_test_complex.proto > extension[18] > name:
+   Span: 246:25 -> 246:31
+
+desc_test_complex.proto > extension[18] > number:
+   Span: 246:34 -> 246:39
+
+desc_test_complex.proto > extension[19]:
+   Span: 247:9 -> 247:40
+
+desc_test_complex.proto > extension[19] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[19] > label:
+   Span: 247:9 -> 247:17
+
+desc_test_complex.proto > extension[19] > type:
+   Span: 247:18 -> 247:24
+
+desc_test_complex.proto > extension[19] > name:
+   Span: 247:25 -> 247:31
+
+desc_test_complex.proto > extension[19] > number:
+   Span: 247:34 -> 247:39
+
+desc_test_complex.proto > extension[20]:
+   Span: 248:9 -> 248:42
+
+desc_test_complex.proto > extension[20] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[20] > label:
+   Span: 248:9 -> 248:17
+
+desc_test_complex.proto > extension[20] > type:
+   Span: 248:18 -> 248:25
+
+desc_test_complex.proto > extension[20] > name:
+   Span: 248:26 -> 248:33
+
+desc_test_complex.proto > extension[20] > number:
+   Span: 248:36 -> 248:41
+
+desc_test_complex.proto > extension[21]:
+   Span: 249:9 -> 249:42
+
+desc_test_complex.proto > extension[21] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[21] > label:
+   Span: 249:9 -> 249:17
+
+desc_test_complex.proto > extension[21] > type:
+   Span: 249:18 -> 249:25
+
+desc_test_complex.proto > extension[21] > name:
+   Span: 249:26 -> 249:33
+
+desc_test_complex.proto > extension[21] > number:
+   Span: 249:36 -> 249:41
+
+desc_test_complex.proto > extension[22]:
+   Span: 250:9 -> 250:44
+
+desc_test_complex.proto > extension[22] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[22] > label:
+   Span: 250:9 -> 250:17
+
+desc_test_complex.proto > extension[22] > type:
+   Span: 250:18 -> 250:26
+
+desc_test_complex.proto > extension[22] > name:
+   Span: 250:27 -> 250:35
+
+desc_test_complex.proto > extension[22] > number:
+   Span: 250:38 -> 250:43
+
+desc_test_complex.proto > extension[23]:
+   Span: 251:9 -> 251:44
+
+desc_test_complex.proto > extension[23] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[23] > label:
+   Span: 251:9 -> 251:17
+
+desc_test_complex.proto > extension[23] > type:
+   Span: 251:18 -> 251:26
+
+desc_test_complex.proto > extension[23] > name:
+   Span: 251:27 -> 251:35
+
+desc_test_complex.proto > extension[23] > number:
+   Span: 251:38 -> 251:43
+
+desc_test_complex.proto > extension[24]:
+   Span: 252:9 -> 252:36
+
+desc_test_complex.proto > extension[24] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[24] > label:
+   Span: 252:9 -> 252:17
+
+desc_test_complex.proto > extension[24] > type:
+   Span: 252:18 -> 252:22
+
+desc_test_complex.proto > extension[24] > name:
+   Span: 252:23 -> 252:27
+
+desc_test_complex.proto > extension[24] > number:
+   Span: 252:30 -> 252:35
+
+desc_test_complex.proto > extension[25]:
+   Span: 253:9 -> 253:38
+
+desc_test_complex.proto > extension[25] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[25] > label:
+   Span: 253:9 -> 253:17
+
+desc_test_complex.proto > extension[25] > type:
+   Span: 253:18 -> 253:23
+
+desc_test_complex.proto > extension[25] > name:
+   Span: 253:24 -> 253:29
+
+desc_test_complex.proto > extension[25] > number:
+   Span: 253:32 -> 253:37
+
+desc_test_complex.proto > extension[26]:
+   Span: 254:9 -> 254:40
+
+desc_test_complex.proto > extension[26] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[26] > label:
+   Span: 254:9 -> 254:17
+
+desc_test_complex.proto > extension[26] > type:
+   Span: 254:18 -> 254:24
+
+desc_test_complex.proto > extension[26] > name:
+   Span: 254:25 -> 254:31
+
+desc_test_complex.proto > extension[26] > number:
+   Span: 254:34 -> 254:39
+
+desc_test_complex.proto > extension[27]:
+   Span: 255:9 -> 255:40
+
+desc_test_complex.proto > extension[27] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[27] > label:
+   Span: 255:9 -> 255:17
+
+desc_test_complex.proto > extension[27] > type:
+   Span: 255:18 -> 255:22
+
+desc_test_complex.proto > extension[27] > name:
+   Span: 255:23 -> 255:31
+
+desc_test_complex.proto > extension[27] > number:
+   Span: 255:34 -> 255:39
+
+desc_test_complex.proto > extension[28]:
+   Span: 256:9 -> 256:40
+
+desc_test_complex.proto > extension[28] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[28] > label:
+   Span: 256:9 -> 256:17
+
+desc_test_complex.proto > extension[28] > type:
+   Span: 256:18 -> 256:22
+
+desc_test_complex.proto > extension[28] > name:
+   Span: 256:23 -> 256:31
+
+desc_test_complex.proto > extension[28] > number:
+   Span: 256:34 -> 256:39
+
+desc_test_complex.proto > extension[29]:
+   Span: 257:9 -> 257:40
+
+desc_test_complex.proto > extension[29] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[29] > label:
+   Span: 257:9 -> 257:17
+
+desc_test_complex.proto > extension[29] > type:
+   Span: 257:18 -> 257:22
+
+desc_test_complex.proto > extension[29] > name:
+   Span: 257:23 -> 257:31
+
+desc_test_complex.proto > extension[29] > number:
+   Span: 257:34 -> 257:39
+
+desc_test_complex.proto > extension[30]:
+   Span: 258:9 -> 258:39
+
+desc_test_complex.proto > extension[30] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[30] > label:
+   Span: 258:9 -> 258:17
+
+desc_test_complex.proto > extension[30] > type:
+   Span: 258:18 -> 258:22
+
+desc_test_complex.proto > extension[30] > name:
+   Span: 258:23 -> 258:30
+
+desc_test_complex.proto > extension[30] > number:
+   Span: 258:33 -> 258:38
+
+desc_test_complex.proto > extension[31]:
+   Span: 259:9 -> 259:36
+
+desc_test_complex.proto > extension[31] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[31] > label:
+   Span: 259:9 -> 259:17
+
+desc_test_complex.proto > extension[31] > type:
+   Span: 259:18 -> 259:22
+
+desc_test_complex.proto > extension[31] > name:
+   Span: 259:23 -> 259:27
+
+desc_test_complex.proto > extension[31] > number:
+   Span: 259:30 -> 259:35
+
+desc_test_complex.proto > extension[32]:
+   Span: 260:9 -> 260:39
+
+desc_test_complex.proto > extension[32] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[32] > label:
+   Span: 260:9 -> 260:17
+
+desc_test_complex.proto > extension[32] > type:
+   Span: 260:18 -> 260:22
+
+desc_test_complex.proto > extension[32] > name:
+   Span: 260:23 -> 260:30
+
+desc_test_complex.proto > extension[32] > number:
+   Span: 260:33 -> 260:38
+
+desc_test_complex.proto > extension[33]:
+   Span: 261:9 -> 261:35
+
+desc_test_complex.proto > extension[33] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[33] > label:
+   Span: 261:9 -> 261:17
+
+desc_test_complex.proto > extension[33] > type:
+   Span: 261:18 -> 261:22
+
+desc_test_complex.proto > extension[33] > name:
+   Span: 261:23 -> 261:26
+
+desc_test_complex.proto > extension[33] > number:
+   Span: 261:29 -> 261:34
+
+desc_test_complex.proto > extension[34]:
+   Span: 262:9 -> 262:38
+
+desc_test_complex.proto > extension[34] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[34] > label:
+   Span: 262:9 -> 262:17
+
+desc_test_complex.proto > extension[34] > type:
+   Span: 262:18 -> 262:22
+
+desc_test_complex.proto > extension[34] > name:
+   Span: 262:23 -> 262:29
+
+desc_test_complex.proto > extension[34] > number:
+   Span: 262:32 -> 262:37
+
+desc_test_complex.proto > extension[35]:
+   Span: 263:9 -> 263:38
+
+desc_test_complex.proto > extension[35] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[35] > label:
+   Span: 263:9 -> 263:17
+
+desc_test_complex.proto > extension[35] > type:
+   Span: 263:18 -> 263:22
+
+desc_test_complex.proto > extension[35] > name:
+   Span: 263:23 -> 263:29
+
+desc_test_complex.proto > extension[35] > number:
+   Span: 263:32 -> 263:37
+
+desc_test_complex.proto > extension[36]:
+   Span: 264:9 -> 264:42
+
+desc_test_complex.proto > extension[36] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[36] > label:
+   Span: 264:9 -> 264:17
+
+desc_test_complex.proto > extension[36] > type:
+   Span: 264:18 -> 264:22
+
+desc_test_complex.proto > extension[36] > name:
+   Span: 264:23 -> 264:33
+
+desc_test_complex.proto > extension[36] > number:
+   Span: 264:36 -> 264:41
+
+desc_test_complex.proto > extension[37]:
+   Span: 265:9 -> 265:40
+
+desc_test_complex.proto > extension[37] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[37] > label:
+   Span: 265:9 -> 265:17
+
+desc_test_complex.proto > extension[37] > type:
+   Span: 265:18 -> 265:22
+
+desc_test_complex.proto > extension[37] > name:
+   Span: 265:23 -> 265:31
+
+desc_test_complex.proto > extension[37] > number:
+   Span: 265:34 -> 265:39
+
+desc_test_complex.proto > extension[38]:
+   Span: 266:9 -> 266:34
+
+desc_test_complex.proto > extension[38] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[38] > label:
+   Span: 266:9 -> 266:17
+
+desc_test_complex.proto > extension[38] > type:
+   Span: 266:18 -> 266:22
+
+desc_test_complex.proto > extension[38] > name:
+   Span: 266:23 -> 266:25
+
+desc_test_complex.proto > extension[38] > number:
+   Span: 266:28 -> 266:33
+
+desc_test_complex.proto > extension[39]:
+   Span: 267:9 -> 267:37
+
+desc_test_complex.proto > extension[39] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[39] > label:
+   Span: 267:9 -> 267:17
+
+desc_test_complex.proto > extension[39] > type:
+   Span: 267:18 -> 267:23
+
+desc_test_complex.proto > extension[39] > name:
+   Span: 267:24 -> 267:28
+
+desc_test_complex.proto > extension[39] > number:
+   Span: 267:31 -> 267:36
+
+desc_test_complex.proto > extension[40]:
+   Span: 268:9 -> 268:38
+
+desc_test_complex.proto > extension[40] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[40] > label:
+   Span: 268:9 -> 268:17
+
+desc_test_complex.proto > extension[40] > type:
+   Span: 268:18 -> 268:23
+
+desc_test_complex.proto > extension[40] > name:
+   Span: 268:24 -> 268:29
+
+desc_test_complex.proto > extension[40] > number:
+   Span: 268:32 -> 268:37
+
+desc_test_complex.proto > extension[41]:
+   Span: 269:9 -> 269:40
+
+desc_test_complex.proto > extension[41] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[41] > label:
+   Span: 269:9 -> 269:17
+
+desc_test_complex.proto > extension[41] > type:
+   Span: 269:18 -> 269:23
+
+desc_test_complex.proto > extension[41] > name:
+   Span: 269:24 -> 269:31
+
+desc_test_complex.proto > extension[41] > number:
+   Span: 269:34 -> 269:39
+
+desc_test_complex.proto > extension[42]:
+   Span: 270:9 -> 270:49
+
+desc_test_complex.proto > extension[42] > extendee:
+   Span: 234:8 -> 234:36
+
+desc_test_complex.proto > extension[42] > label:
+   Span: 270:9 -> 270:17
+
+desc_test_complex.proto > extension[42] > type_name:
+   Span: 270:18 -> 270:35
+
+desc_test_complex.proto > extension[42] > name:
+   Span: 270:36 -> 270:40
+
+desc_test_complex.proto > extension[42] > number:
+   Span: 270:43 -> 270:48
+
+desc_test_complex.proto > message_type[9]:
+   Span: 273:1 -> 298:2
+
+desc_test_complex.proto > message_type[9] > name:
+   Span: 273:9 -> 273:32
+
+desc_test_complex.proto > message_type[9] > field[0]:
+   Span: 274:9 -> 284:11
+
+desc_test_complex.proto > message_type[9] > field[0] > label:
+   Span: 274:9 -> 274:17
+
+desc_test_complex.proto > message_type[9] > field[0] > type:
+   Span: 274:18 -> 274:24
+
+desc_test_complex.proto > message_type[9] > field[0] > name:
+   Span: 274:25 -> 274:27
+
+desc_test_complex.proto > message_type[9] > field[0] > number:
+   Span: 274:30 -> 274:31
+
+desc_test_complex.proto > message_type[9] > field[0] > options:
+   Span: 274:32 -> 284:10
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.syntax):
+   Span: 275:17 -> 275:32
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.import):
+   Span: 275:34 -> 275:49
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.public):
+   Span: 275:51 -> 275:66
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.weak):
+   Span: 275:68 -> 275:81
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.package):
+   Span: 275:83 -> 275:99
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.string):
+   Span: 276:17 -> 276:36
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.bytes):
+   Span: 276:38 -> 276:55
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.bool):
+   Span: 276:57 -> 276:70
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.float):
+   Span: 277:17 -> 277:31
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.double):
+   Span: 277:33 -> 277:51
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.int32):
+   Span: 278:17 -> 278:29
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.int64):
+   Span: 278:31 -> 278:43
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.uint32):
+   Span: 278:45 -> 278:60
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.uint64):
+   Span: 278:62 -> 278:77
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.sint32):
+   Span: 278:79 -> 278:93
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.sint64):
+   Span: 278:95 -> 278:109
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.fixed32):
+   Span: 279:17 -> 279:33
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.fixed64):
+   Span: 279:35 -> 279:51
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.sfixed32):
+   Span: 279:53 -> 279:71
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.sfixed64):
+   Span: 279:73 -> 279:91
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.optional):
+   Span: 280:17 -> 280:34
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.repeated):
+   Span: 280:36 -> 280:53
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.required):
+   Span: 280:55 -> 280:72
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.message):
+   Span: 281:17 -> 281:33
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.enum):
+   Span: 281:35 -> 281:48
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.service):
+   Span: 281:50 -> 281:66
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.rpc):
+   Span: 281:68 -> 281:80
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.option):
+   Span: 282:17 -> 282:32
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.extend):
+   Span: 282:34 -> 282:49
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.extensions):
+   Span: 282:51 -> 282:70
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.reserved):
+   Span: 282:72 -> 282:89
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.to):
+   Span: 283:17 -> 283:28
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.true):
+   Span: 283:30 -> 283:42
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.false):
+   Span: 283:44 -> 283:58
+
+desc_test_complex.proto > message_type[9] > field[0] > options > (foo.bar.default):
+   Span: 283:60 -> 283:75
+
+desc_test_complex.proto > message_type[9] > field[1]:
+   Span: 285:9 -> 297:11
+
+desc_test_complex.proto > message_type[9] > field[1] > label:
+   Span: 285:9 -> 285:17
+
+desc_test_complex.proto > message_type[9] > field[1] > type:
+   Span: 285:18 -> 285:24
+
+desc_test_complex.proto > message_type[9] > field[1] > name:
+   Span: 285:25 -> 285:29
+
+desc_test_complex.proto > message_type[9] > field[1] > number:
+   Span: 285:32 -> 285:33
+
+desc_test_complex.proto > message_type[9] > field[1] > options:
+   Span: 285:34 -> 297:10
+
+desc_test_complex.proto > message_type[9] > field[1] > options > (foo.bar.boom):
+   Span: 286:17 -> 296:18

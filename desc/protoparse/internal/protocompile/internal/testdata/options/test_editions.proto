@@ -1,0 +1,86 @@
+edition = "2023";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/descriptor.proto";
+
+message Foo {
+  string name = 1;
+  Bar bar = 2 [
+    (any) = {
+      [type.googleapis.com/Foo]: {
+        Bar: {
+          name: "abc",
+        }
+      }
+    },
+    features.message_encoding = DELIMITED
+  ];
+  message Bar {
+    string name = 1;
+    Val val = 2;
+  }
+  Bar other = 3;
+  Val val = 4;
+  repeated Child child = 5 [features.message_encoding = DELIMITED];
+  message Child {
+    string name = 1;
+    Val val = 2;
+  }
+}
+
+message Foos {
+  string name = 1;
+  Val val = 2;
+}
+
+
+enum Val {
+  option features.enum_type = CLOSED;
+  VAL0 = 0;
+  VAL1 = 1;
+}
+
+extend google.protobuf.FileOptions {
+  Foo foo = 10101 [features.message_encoding = DELIMITED];
+  Foo other = 10102;
+  repeated Foos foos = 10103 [features.message_encoding = DELIMITED];
+  repeated Foos others = 10104;
+}
+
+extend google.protobuf.FieldOptions {
+  google.protobuf.Any any = 10101;
+}
+
+option (foo).name = "123";
+option (foo).bar.name = "abc";
+option (foo).bar.val = VAL1;
+option (foo).other.name = "xyz";
+option (foo).other.val = VAL0;
+option (foo).child = {name: "name"};
+option (foo).child = {name: "nom"};
+
+option (other) = {
+  name: "123"
+  val: VAL0
+  Bar <name:"456">
+  Child <name: "abc">
+  Child <name: "789" val: VAL1>
+};
+
+option (foos) = {
+  name: "ABC"
+  val: 1
+};
+option (foos) = {
+  name: "XYZ"
+  val: 1
+};
+
+option (others) = {
+  name: "123"
+  val: 0
+};
+option (foos) = {
+  name: "1234"
+  val: 0
+};

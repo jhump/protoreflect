@@ -10,15 +10,15 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bufbuild/protocompile"
-	ast2 "github.com/bufbuild/protocompile/ast"
-	"github.com/bufbuild/protocompile/linker"
-	"github.com/bufbuild/protocompile/options"
-	"github.com/bufbuild/protocompile/parser"
-	"github.com/bufbuild/protocompile/protoutil"
-	"github.com/bufbuild/protocompile/reporter"
-	"github.com/bufbuild/protocompile/sourceinfo"
-	"github.com/bufbuild/protocompile/walk"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile"
+	ast2 "github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/linker"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/options"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/parser"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/protoutil"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/sourceinfo"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/walk"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -128,6 +128,14 @@ type Parser struct {
 
 	// A custom reporter of warnings. If not specified, warning messages are ignored.
 	WarningReporter WarningReporter
+
+	// Allows the use of editions that have not been fully implemented. As of this
+	// writing, this includes only Edition 2024. Edition 2024 is not completely
+	// implemented, so this package does not enforce all the rules or semantics
+	// that protoc enforces. But setting this flag will at least allow this package
+	// to successfully parse files in Edition 2024, including the new "export" and
+	// "local" keywords for symbol visibility and "import option" statements.
+	AllowExperimentalEditions bool
 }
 
 // ParseFiles parses the named files into descriptors. The returned slice has
@@ -156,7 +164,7 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 
 	if p.InferImportPaths {
 		// we must first compile everything to protos
-		results, err := parseToProtosRecursive(res, filenames, reporter.NewHandler(rep), srcSpanAddr)
+		results, err := parseToProtosRecursive(res, filenames, reporter.NewHandler(rep), p.AllowExperimentalEditions, srcSpanAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -181,10 +189,11 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	}
 
 	c := protocompile.Compiler{
-		Resolver:       res,
-		MaxParallelism: 1,
-		SourceInfoMode: srcInfoMode,
-		Reporter:       rep,
+		Resolver:                  res,
+		MaxParallelism:            1,
+		SourceInfoMode:            srcInfoMode,
+		Reporter:                  rep,
+		AllowExperimentalEditions: p.AllowExperimentalEditions,
 	}
 	results, err := c.Compile(context.Background(), filenames...)
 	if err != nil {
@@ -248,7 +257,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*descriptorpb.Fil
 	rep := newReporter(p.ErrorReporter, p.WarningReporter)
 	p.ImportPaths = nil // not used for this "do not link" operation.
 	res, _ := p.getResolver(filenames)
-	results, err := parseToProtos(res, filenames, reporter.NewHandler(rep), p.ValidateUnlinkedFiles)
+	results, err := parseToProtos(res, filenames, reporter.NewHandler(rep), p.ValidateUnlinkedFiles, p.AllowExperimentalEditions)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +372,7 @@ func parseToASTs(res protocompile.Resolver, filenames []string, rep *reporter.Ha
 	return asts, results, rep.Error()
 }
 
-func parseToProtos(res protocompile.Resolver, filenames []string, rep *reporter.Handler, validate bool) ([]parser.Result, error) {
+func parseToProtos(res protocompile.Resolver, filenames []string, rep *reporter.Handler, validate bool, experimentalEditions bool) ([]parser.Result, error) {
 	asts, results, err := parseToASTs(res, filenames, rep)
 	if err != nil {
 		return nil, err
@@ -373,7 +382,7 @@ func parseToProtos(res protocompile.Resolver, filenames []string, rep *reporter.
 			continue
 		}
 		var err error
-		results[i], err = parser.ResultFromAST(asts[i], validate, rep)
+		results[i], err = parser.ResultFromAST(asts[i], validate, rep, experimentalEditions)
 		if err != nil {
 			return nil, err
 		}
@@ -381,17 +390,17 @@ func parseToProtos(res protocompile.Resolver, filenames []string, rep *reporter.
 	return results, nil
 }
 
-func parseToProtosRecursive(res protocompile.Resolver, filenames []string, rep *reporter.Handler, srcSpanAddr *ast2.SourceSpan) (map[string]parser.Result, error) {
+func parseToProtosRecursive(res protocompile.Resolver, filenames []string, rep *reporter.Handler, experimentalEditions bool, srcSpanAddr *ast2.SourceSpan) (map[string]parser.Result, error) {
 	results := make(map[string]parser.Result, len(filenames))
 	for _, filename := range filenames {
-		if err := parseToProtoRecursive(res, filename, rep, srcSpanAddr, results); err != nil {
+		if err := parseToProtoRecursive(res, filename, rep, experimentalEditions, srcSpanAddr, results); err != nil {
 			return results, err
 		}
 	}
 	return results, rep.Error()
 }
 
-func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *reporter.Handler, srcSpanAddr *ast2.SourceSpan, results map[string]parser.Result) error {
+func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *reporter.Handler, experimentalEditions bool, srcSpanAddr *ast2.SourceSpan, results map[string]parser.Result) error {
 	if _, ok := results[filename]; ok {
 		// already processed this one
 		return nil
@@ -403,7 +412,7 @@ func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *repo
 		return err
 	}
 	if parseResult == nil {
-		parseResult, err = parser.ResultFromAST(astRoot, true, rep)
+		parseResult, err = parser.ResultFromAST(astRoot, true, rep, experimentalEditions)
 		if err != nil {
 			return err
 		}
@@ -424,7 +433,7 @@ func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *repo
 					*srcSpanAddr = orig
 				}()
 
-				return parseToProtoRecursive(res, imp.Name.AsString(), rep, srcSpanAddr, results)
+				return parseToProtoRecursive(res, imp.Name.AsString(), rep, experimentalEditions, srcSpanAddr, results)
 			}()
 			if err != nil {
 				return err
@@ -474,7 +483,7 @@ func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *repo
 				*srcSpanAddr = orig
 			}()
 
-			return parseToProtoRecursive(res, dep, rep, srcSpanAddr, results)
+			return parseToProtoRecursive(res, dep, rep, experimentalEditions, srcSpanAddr, results)
 		}()
 		if err != nil {
 			return err

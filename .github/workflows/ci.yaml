@@ -1,0 +1,42 @@
+name: ci
+on:
+  push:
+    branches: [main, v1]
+    tags: ['v*']
+  pull_request:
+    branches: [main, v1]
+  schedule:
+    - cron: '35 5 * * 2' # Tuesdays, 5:35am
+  workflow_dispatch: {} # support manual runs
+permissions:
+  contents: read
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [1.24.x,1.25.x]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-protoreflect-ci-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-protoreflect-ci-
+      - name: Run tests
+        if: matrix.go-version != '1.25.x' # run fast test step for older versions of Go
+        run: make deps test
+      - name: Run Tests and Lint
+        if: matrix.go-version == '1.25.x' # only run linters for latest version of Go
+        run: make ci
+      - name: Run Tests against Latest Deps
+        if: matrix.go-version == '1.25.x' # only update deps with latest version of Go
+        run: go get -u ./... && go mod tidy && make deps test

@@ -1864,6 +1864,13 @@ func (p *Printer) extractOptions(dsc desc.Descriptor, opts proto.Message) (map[i
 	ref.Range(func(fld protoreflect.FieldDescriptor, val protoreflect.Value) bool {
 		var name string
 		if fld.IsExtension() {
+			parentFile := fld.ParentFile()
+			if (parentFile == nil && !checkElementVisibility(dsc.GetFile(), string(fld.FullName()))) ||
+				(parentFile != nil && !checkFileVisibility(dsc.GetFile(), parentFile.Path())) {
+				// We have no import for this extension. If we printed it then we'd produce
+				// invalid source code. So skip it.
+				return true
+			}
 			var n string
 			if isMessage {
 				n = p.qualifyMessageOptionName(pkg, scope, string(fld.FullName()))
@@ -2741,4 +2748,53 @@ func (w *writer) Write(p []byte) (int, error) {
 		num++
 	}
 	return num, err
+}
+
+func checkElementVisibility(file *desc.FileDescriptor, fqn string) bool {
+	var found bool
+	visitVisibleFiles(file, func(descriptor *desc.FileDescriptor) bool {
+		if descriptor.FindSymbol(fqn) != nil {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+func checkFileVisibility(file *desc.FileDescriptor, path string) bool {
+	var found bool
+	visitVisibleFiles(file, func(descriptor *desc.FileDescriptor) bool {
+		if descriptor.GetName() == path {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+func visitVisibleFiles(file *desc.FileDescriptor, visit func(*desc.FileDescriptor) bool) {
+	if !visit(file) {
+		return
+	}
+	visitDeps(file, false, visit)
+}
+
+func visitDeps(file *desc.FileDescriptor, publicOnly bool, visit func(*desc.FileDescriptor) bool) bool {
+	var deps []*desc.FileDescriptor
+	if publicOnly {
+		deps = file.GetPublicDependencies()
+	} else {
+		deps = file.GetDependencies()
+	}
+	for _, dep := range deps {
+		if !visit(dep) {
+			return false
+		}
+		if !visitDeps(dep, true, visit) {
+			return false
+		}
+	}
+	return true
 }

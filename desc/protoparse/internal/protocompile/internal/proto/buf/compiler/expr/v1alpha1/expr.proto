@@ -1,0 +1,218 @@
+// Copyright 2020-2025 Buf Technologies, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package buf.compiler.expr.v1alpha1;
+
+// An expression parsed from some file.
+message Expr {
+  oneof expr {
+    Block block = 1;
+    Call call = 2;
+    Control control = 3;
+    For for = 4;
+    Func func = 5;
+    If if = 6;
+    Op op = 7;
+    Params record = 8;
+    Switch switch = 9;
+    Token token = 10;
+  }
+}
+
+// An expr.Block.
+message Block {
+  repeated Expr exprs = 1;
+  Span span = 10;
+}
+
+// An expr.Call.
+message Call {
+  Expr callee = 1;
+  Params params = 2;
+
+  Span span = 10;
+}
+
+// An expr.Control.
+message Control {
+  // buf:lint:ignore ENUM_VALUE_PREFIX
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+
+    RETURN = 1;
+    BREAK = 2;
+    CONTINUE = 3;
+  }
+
+  Kind kind = 1;
+  Params args = 2;
+  Expr cond = 3;
+
+  Span span = 10;
+  Span kw_span = 11;
+  Span if_span = 12;
+}
+
+// An expr.For.
+message For {
+  Params vars = 1;
+  Expr iter = 2;
+  Block block = 3;
+
+  Span span = 10;
+  Span for_span = 11;
+  Span in_span = 12;
+}
+
+message Func {
+  string name = 1;
+  Params params = 2;
+  Expr return = 3;
+  Expr body = 4;
+
+  Span span = 10;
+  Span func_span = 11;
+  Span name_span = 12;
+  Span arrow_span = 13;
+}
+
+// An expr.If.
+message If {
+  Expr cond = 1;
+  Block block = 2;
+  If else = 3;
+
+  Span span = 10;
+  Span else_span = 11;
+  Span if_span = 12;
+}
+
+// An expr.Op.
+message Op {
+  // buf:lint:ignore ENUM_VALUE_PREFIX
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+
+    ASSIGN = 1;
+    ASSIGN_NEW = 2;
+    ASSIGN_ADD = 3;
+    ASSIGN_SUB = 4;
+    ASSIGN_MUL = 5;
+    ASSIGN_DIV = 6;
+    ASSIGN_REM = 7;
+
+    COMMA = 8;
+
+    OR = 9;
+    AND = 10;
+    NOT = 11;
+
+    EQ = 12;
+    NE = 13;
+    LT = 14;
+    GT = 15;
+    LE = 16;
+    GE = 17;
+
+    RANGE = 18;
+    RANGE_EQ = 19;
+    TO = 20;
+
+    ADD = 21;
+    SUB = 22;
+    MUL = 23;
+    DIV = 24;
+    REM = 25;
+    
+    PROPERTY = 26;
+  }
+
+  Expr left = 1;
+  Expr right = 2;
+  Kind op = 3;
+
+  Span span = 10;
+  Span op_span = 11;
+}
+
+// An expr.Switch.
+message Switch {
+  message Case {
+    bool else = 1;
+    Params alts = 2;
+    Block block = 3;
+
+    Span span = 10;
+    Span kw_span = 11;
+    Span colon_span = 12;
+  }
+
+  Expr arg = 1;
+  repeated Case cases = 2;
+
+  Span span = 10;
+  Span switch_span = 11;
+  Span block_span = 12;
+}
+
+// An expr.Token.
+message Token {
+  // None of these may be set, in the case of an invalid value.
+  oneof value {
+    uint64 int = 1;
+    double float = 2;
+    string string = 3;
+    string ident = 4;
+  }
+
+  Span span = 10;
+}
+
+// An expr.Params.
+message Params {
+  message Param {
+    Expr name = 1;
+    Expr expr = 2;
+    Expr cond = 3;
+
+    Span span = 10;
+    Span colon_span = 11;
+    Span if_span = 12;
+  }
+
+  Brackets brackets = 1;
+  repeated Param params = 2;
+  Span span = 10;
+}
+
+// A source code span for a specific `File`.
+//
+// This only contains byte offsets for the span; all other information
+// (such as the line number) should be re-computed as needed.
+message Span {
+  uint32 start = 1;
+  uint32 end = 2;
+}
+
+// Brackets is one of the various known bracket types.
+// buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX
+enum Brackets {
+  BRACKETS_NONE = 0;
+  BRACKETS_PARENS = 1;
+  BRACKETS_SQUARE = 2;
+  BRACKETS_CURLY = 3;
+  BRACKETS_ANGLE = 4;
+}

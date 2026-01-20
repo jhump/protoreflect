@@ -1,7 +1,7 @@
 package ast
 
 import (
-	"github.com/bufbuild/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
 )
 
 // SourcePos identifies a location in a proto source file.

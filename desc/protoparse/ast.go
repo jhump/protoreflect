@@ -3,7 +3,7 @@ package protoparse
 import (
 	"fmt"
 
-	"github.com/bufbuild/protocompile/ast"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/ast"
 
 	ast2 "github.com/jhump/protoreflect/desc/protoparse/ast"
 )

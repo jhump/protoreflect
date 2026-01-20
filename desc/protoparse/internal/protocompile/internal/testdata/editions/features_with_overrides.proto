@@ -1,0 +1,58 @@
+edition = "2023";
+
+package foo.bar.baz;
+
+// proto3-style default semantics
+option features.field_presence = IMPLICIT;
+option features.enum_type = OPEN;
+
+message Foo {
+  uint64 id = 1 [features.field_presence = LEGACY_REQUIRED];
+  string abc = 2 [features.field_presence = EXPLICIT];
+  int32 def = 3;
+  repeated bool ghi = 4 [features.repeated_field_encoding = EXPANDED];
+  map<string, string> jkl = 5 [features.utf8_validation = NONE];
+  Bar mno = 6 [features.message_encoding = DELIMITED];
+  repeated double pqr = 7;
+  map<string, Bar> stu = 8;
+}
+
+message Bar {
+  string name = 1;
+  EyeColor left = 2 [features.field_presence = EXPLICIT];
+  EyeColor right = 3 [features.field_presence = EXPLICIT];
+
+  enum WakeState {
+    UNKNOWN_STATE = 0;
+    REM_SLEEP = 1;
+    NREM_SLEEP = 2;
+    SOMNAMBULISTIC = 3;
+    AWAKE = 4;
+  }
+  WakeState wake_state = 4;
+}
+
+enum EyeColor {
+  option features.enum_type = CLOSED;
+  UNKNOWN = 1;
+  BROWN = 2;
+  BLUE = 3;
+  GREEN = -1;
+  HAZEL = 4;
+  YELLOW = 5;
+  RED = 6;
+  BLACK = 7;
+  AQUA = 8;
+  GRAY = 9;
+}
+
+service FooService {
+  rpc DoSomething(Foo) returns (Foo);
+}
+
+message Baz {
+  Group group = 1 [features.message_encoding=DELIMITED]; // looks like a group
+  message Group {
+    string name = 1;
+  }
+}

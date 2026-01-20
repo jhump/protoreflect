@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bufbuild/protocompile/parser"
-	"github.com/bufbuild/protocompile/reporter"
 	"github.com/golang/protobuf/proto"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/parser"
+	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
@@ -179,7 +179,7 @@ func parseFileForTest(filename string) (parser.Result, error) {
 	filenames := []string{filename}
 	res, _ := Parser{}.getResolver(filenames)
 	rep := reporter.NewHandler(nil)
-	results, err := parseToProtos(res, filenames, rep, true)
+	results, err := parseToProtos(res, filenames, rep, true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -543,4 +543,94 @@ func TestParseFilesButDoNotLink_DoesNotUseImportPaths(t *testing.T) {
 	fds, err := p.ParseFilesButDoNotLink(mainPath)
 	testutil.Ok(t, err)
 	testutil.Eq(t, 1, len(fds))
+}
+
+func TestParseFiles_ExperimentalEditions(t *testing.T) {
+	testCases := []struct {
+		name                       string
+		source                     string
+		expectErr                  string
+		enableExperimentalEditions bool
+	}{
+		{
+			name: "edition-2023-cannot-use-import-option",
+			source: `
+				edition = "2023";
+				import option "google/protobuf/descriptor.proto";
+				`,
+			expectErr: `import option syntax is only allowed in edition 2024`,
+		},
+		{
+			name: "edition-2023-cannot-use-export",
+			source: `
+				edition = "2023";
+				export message Foo{}
+				`,
+			expectErr: `export keyword is only allowed in edition 2024`,
+		},
+		{
+			name: "edition-2023-cannot-use-local",
+			source: `
+				edition = "2023";
+				local message Foo{}
+				`,
+			expectErr: `local keyword is only allowed in edition 2024`,
+		},
+		{
+			name: "edition-2023-cannot-use-visibility-feature",
+			source: `
+				edition = "2023";
+				option features.default_symbol_visibility = LOCAL_ALL;
+				`,
+			expectErr: `field "google.protobuf.FeatureSet.default_symbol_visibility" was not introduced until edition 2024`,
+		},
+		{
+			name: "edition-2024-experimental-disallowed",
+			source: `
+				edition = "2024";
+				import option "google/protobuf/descriptor.proto";
+				option features.default_symbol_visibility = LOCAL_ALL;
+				export message Foo{
+					local message Bar{}
+				}
+				`,
+			expectErr: `edition "2024" not yet fully supported; latest supported edition "2023"`,
+		},
+		{
+			name: "edition-2024-experimental-allowed",
+			source: `
+				edition = "2024";
+				import option "google/protobuf/descriptor.proto";
+				option features.default_symbol_visibility = LOCAL_ALL;
+				export message Foo{
+					local message Bar{}
+				}
+				`,
+			enableExperimentalEditions: true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			p := Parser{
+				Accessor: FileContentsFromMap(map[string]string{"test.proto": testCase.source}),
+				LookupImport: func(path string) (*desc.FileDescriptor, error) {
+					if path == "google/protobuf/descriptor.proto" {
+						return desc.WrapFile(descriptorpb.File_google_protobuf_descriptor_proto)
+					}
+					return nil, os.ErrNotExist
+				},
+			}
+			if testCase.enableExperimentalEditions {
+				p.AllowExperimentalEditions = true
+			}
+			descs, err := p.ParseFiles("test.proto")
+			if testCase.expectErr != "" {
+				testutil.Nok(t, err)
+				testutil.Require(t, strings.Contains(err.Error(), testCase.expectErr))
+			} else {
+				testutil.Ok(t, err)
+				testutil.Eq(t, 1, len(descs))
+			}
+		})
+	}
 }

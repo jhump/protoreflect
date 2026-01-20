@@ -1,0 +1,118 @@
+// Copyright 2020-2025 Buf Technologies, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package buf.compiler.v1alpha1;
+
+// A set of symbol tables.
+message SymbolSet {
+    map<string, SymbolTable> tables = 1;
+}
+
+// Symbol information for a particular Protobuf file.
+message SymbolTable {
+    repeated Import imports = 1;
+    repeated Feature features = 4;
+    repeated Symbol symbols = 2;
+    Value options = 3;
+}
+
+// Metadata associated with a transitive import.
+message Import {
+    string path = 1;
+
+    bool public = 2;
+    bool weak = 3;
+    bool transitive = 4;
+    bool visible = 5;
+    bool used = 6;
+}
+
+// A feature associated with a symbol.
+message Feature {
+    string extn = 1;
+    string name = 2;
+
+    // The value as a textproto string.
+    string value = 3;
+    // Whether this feature is set explicitly.
+    bool explicit = 4;
+}
+
+// A symbol in a file.
+message Symbol {
+    string fqn = 1;
+
+    enum Kind {
+        // Numbers synced with those in symbol_kind.go
+        KIND_UNSPECIFIED = 0;
+        KIND_PACKAGE = 1;
+        KIND_SCALAR = 2;
+        KIND_MESSAGE = 3;
+        KIND_ENUM = 4;
+        KIND_FIELD = 5;
+        KIND_ENUM_VALUE = 6;
+        KIND_EXTENSION = 7;
+        KIND_ONEOF = 8;
+    }
+    Kind kind = 2;
+
+    // The file this symbol came from.
+    string file = 3;
+    
+    // The index of this kind of entity in that file.
+    uint32 index = 4;
+
+    // Whether this symbol can be validly referenced in the current file.
+    bool visible = 5;
+
+    Value options = 6;
+
+    repeated Feature features = 7;
+}
+
+// An option value attached to a symbol.
+message Value {
+    message Message {
+        map<string, Value> fields = 1;
+        map<string, Value> extns = 2;
+    }
+    message Repeated {
+        repeated Value values = 1;
+    }
+    message Any {
+        string url = 1;
+        Value value = 2;
+    }
+
+    oneof value {
+        int32 i32 = 1;
+        uint32 u32 = 2;
+        float f32 = 3;
+        int64 i64 = 4;
+        uint64 u64 = 5;
+        double f64 = 6;
+        
+        bool bool = 7;
+        bytes string = 8;
+        Repeated repeated = 9;
+        
+        Message message = 10;
+        Any any = 11;
+
+        // Cyclic message. This is how many uprefs away the cycle element is.
+        int32 cycle = 20;
+    }
+}
