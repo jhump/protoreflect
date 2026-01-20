@@ -15,7 +15,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/parser"
 	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
+	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal/testprotos"
@@ -613,12 +616,6 @@ func TestParseFiles_ExperimentalEditions(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			p := Parser{
 				Accessor: FileContentsFromMap(map[string]string{"test.proto": testCase.source}),
-				LookupImport: func(path string) (*desc.FileDescriptor, error) {
-					if path == "google/protobuf/descriptor.proto" {
-						return desc.WrapFile(descriptorpb.File_google_protobuf_descriptor_proto)
-					}
-					return nil, os.ErrNotExist
-				},
 			}
 			if testCase.enableExperimentalEditions {
 				p.AllowExperimentalEditions = true
@@ -633,4 +630,80 @@ func TestParseFiles_ExperimentalEditions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseFiles_Edition2024(t *testing.T) {
+	sources := map[string]string{
+		"test.proto": `
+			edition = "2024";
+			import "google/protobuf/descriptor.proto";
+			import "google/protobuf/empty.proto";
+			import option "opt.proto";
+			option features.default_symbol_visibility = LOCAL_ALL;
+			export message Foo{
+				local message Bar{}
+			}
+			message Baz{
+				option (str) = "abc";
+			}`,
+		"opt.proto": `
+			syntax = "proto3";
+			import "google/protobuf/descriptor.proto";
+			extend google.protobuf.MessageOptions {
+				string str = 10101;
+			}
+			`,
+	}
+	p := Parser{
+		Accessor:                  FileContentsFromMap(sources),
+		AllowExperimentalEditions: true, // required to parse edition 2024 file
+	}
+	descs, err := p.ParseFiles("test.proto", "opt.proto")
+	testutil.Ok(t, err)
+
+	customOptionType := dynamicpb.NewExtensionType(descs[1].UnwrapFile().Extensions().Get(0))
+	fdp := protodesc.ToFileDescriptorProto(descs[0].UnwrapFile())
+	// Make sure it round trips back to a proto in the expected way
+	msgOpts := &descriptorpb.MessageOptions{}
+	msgOpts.ProtoReflect().Set(customOptionType.TypeDescriptor(), protoreflect.ValueOfString("abc"))
+	data, err := proto.Marshal(msgOpts)
+	testutil.Ok(t, err)
+	msgOpts.Reset()
+	err = proto.Unmarshal(data, msgOpts) // custom option will be unrecognized, which is how the compile result looks too
+	testutil.Ok(t, err)
+	expectedFdp := &descriptorpb.FileDescriptorProto{
+		Name:             proto.String("test.proto"),
+		Syntax:           proto.String("editions"),
+		Edition:          descriptorpb.Edition_EDITION_2024.Enum(),
+		Dependency:       []string{"google/protobuf/descriptor.proto", "google/protobuf/empty.proto"},
+		OptionDependency: []string{"opt.proto"},
+		Options: &descriptorpb.FileOptions{
+			Features: &descriptorpb.FeatureSet{
+				DefaultSymbolVisibility: descriptorpb.FeatureSet_VisibilityFeature_LOCAL_ALL.Enum(),
+			},
+		},
+		MessageType: []*descriptorpb.DescriptorProto{
+			{
+				Name:       proto.String("Foo"),
+				Visibility: descriptorpb.SymbolVisibility_VISIBILITY_EXPORT.Enum(),
+				NestedType: []*descriptorpb.DescriptorProto{
+					{
+						Name:       proto.String("Bar"),
+						Visibility: descriptorpb.SymbolVisibility_VISIBILITY_LOCAL.Enum(),
+					},
+				},
+			},
+			{
+				Name: proto.String("Baz"),
+				// We have to populate below since its only contents are an extension field.
+				Options: msgOpts,
+			},
+		},
+	}
+
+	testutil.Require(t,
+		proto.Equal(fdp, expectedFdp),
+		"want: %s\ngot: %s",
+		expectedFdp, fdp,
+	)
 }
