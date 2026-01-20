@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/parser"
 	"github.com/jhump/protoreflect/desc/protoparse/internal/protocompile/reporter"
-	"github.com/golang/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
@@ -179,7 +179,7 @@ func parseFileForTest(filename string) (parser.Result, error) {
 	filenames := []string{filename}
 	res, _ := Parser{}.getResolver(filenames)
 	rep := reporter.NewHandler(nil)
-	results, err := parseToProtos(res, filenames, rep, true)
+	results, err := parseToProtos(res, filenames, rep, true, false)
 	if err != nil {
 		return nil, err
 	}
