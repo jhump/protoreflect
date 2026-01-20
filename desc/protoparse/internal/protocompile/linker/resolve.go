@@ -68,25 +68,34 @@ func resolveInFile[T any](f File, publicImportsOnly bool, checked []string, fn f
 		return zero, err
 	}
 
-	imports := f.Imports()
-	for i, l := 0, imports.Len(); i < l; i++ {
-		imp := imports.Get(i)
-		if publicImportsOnly && !imp.IsPublic {
-			continue
-		}
-		res, err := resolveInFile(f.FindImportByPath(imp.Path()), true, checked, fn)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		if err != nil {
-			return zero, err
-		}
-		if !imp.IsPublic {
-			if r, ok := f.(*result); ok {
-				r.markUsed(imp.Path())
+	importSets := []protoreflect.FileImports{f.Imports()}
+	type hasOptionImports interface {
+		OptionImports() protoreflect.FileImports
+	}
+	if opts, ok := f.(hasOptionImports); ok {
+		importSets = []protoreflect.FileImports{f.Imports(), opts.OptionImports()}
+	}
+
+	for _, imports := range importSets {
+		for i, l := 0, imports.Len(); i < l; i++ {
+			imp := imports.Get(i)
+			if publicImportsOnly && !imp.IsPublic {
+				continue
 			}
+			res, err := resolveInFile(f.FindImportByPath(imp.Path()), true, checked, fn)
+			if errors.Is(err, protoregistry.NotFound) {
+				continue
+			}
+			if err != nil {
+				return zero, err
+			}
+			if !imp.IsPublic {
+				if r, ok := f.(*result); ok {
+					r.markUsed(imp.Path())
+				}
+			}
+			return res, nil
 		}
-		return res, nil
 	}
 	return zero, err
 }
