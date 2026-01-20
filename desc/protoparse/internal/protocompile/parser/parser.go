@@ -26,7 +26,7 @@ import (
 )
 
 // The path ../.tmp/bin/goyacc is built when using `make generate` from repo root.
-//go:generate ../.tmp/bin/goyacc -o proto.y.go -l -p proto proto.y
+////go:generate ../.tmp/bin/goyacc -o proto.y.go -l -p proto proto.y
 
 func init() {
 	protoErrorVerbose = true

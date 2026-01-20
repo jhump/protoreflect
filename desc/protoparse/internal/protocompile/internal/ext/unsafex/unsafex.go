@@ -43,18 +43,6 @@ func Size[T any]() int {
 	return int(unsafe.Sizeof(v))
 }
 
-// Add is like [unsafe.Add], but it operates on a typed pointer and scales the
-// offset by that type's size, similar to pointer arithmetic in Rust or C.
-//
-// This function has the same safety caveats as [unsafe.Add].
-//
-//go:nosplit
-func Add[P ~*E, E any, I Int](p P, idx I) P {
-	raw := unsafe.Pointer(p)
-	raw = unsafe.Add(raw, int(idx)*Size[E]())
-	return P(raw)
-}
-
 // Bitcast bit-casts a value of type From to a value of type To.
 //
 // This operation is very dangerous, because it can be used to break package
@@ -139,35 +127,4 @@ func StringAlias[S ~[]E, E any](data S) string {
 		Bitcast[*byte](unsafe.SliceData(data)),
 		len(data)*Size[E](),
 	)
-}
-
-// BytesAlias is the inverse of [StringAlias].
-//
-// The same caveats apply as with [StringAlias] around mutating `data`.
-//
-//go:nosplit
-func BytesAlias[S ~[]B, B ~byte](data string) []B {
-	return unsafe.Slice(
-		Bitcast[*B](unsafe.StringData(data)),
-		len(data),
-	)
-}
-
-// NoEscape makes a copy of a pointer which is hidden from the compiler's
-// escape analysis. If the return value of this function appears to escape, the
-// compiler will *not* treat its input as escaping, potentially allowing stack
-// promotion of values which escape. This function is essentially the opposite
-// of runtime.KeepAlive.
-//
-// This is only safe when the return value does not actually escape to the heap,
-// but only appears to, such as by being passed to a virtual call which does not
-// actually result in a heap escape.
-//
-//go:nosplit
-func NoEscape[P ~*E, E any](ptr P) P {
-	p := unsafe.Pointer(ptr)
-	// Xoring the address with zero is a reliable way to hide a pointer from
-	// the compiler.
-	p = unsafe.Pointer(uintptr(p) ^ 0) //nolint:staticcheck
-	return P(p)
 }
