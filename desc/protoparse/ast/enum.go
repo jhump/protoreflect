@@ -9,6 +9,7 @@ type EnumNode struct {
 	compositeNode
 	Keyword    *KeywordNode
 	Name       *IdentNode
+	Visibility *KeywordNode // may be nil
 	OpenBrace  *RuneNode
 	Decls      []EnumElement
 	CloseBrace *RuneNode
@@ -26,6 +27,12 @@ func (*EnumNode) msgElement()  {}
 //   - decls: All declarations inside the enum body.
 //   - closeBrace: The token corresponding to the "}" rune that ends the body.
 func NewEnumNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []EnumElement, closeBrace *RuneNode) *EnumNode {
+	return NewEnumNodeWithVisibility(nil, keyword, name, openBrace, decls, closeBrace)
+}
+
+// NewEnumNodeWithVisibility is just like v but it allows the caller to supply
+// a keyword node for the visibility modifier.
+func NewEnumNodeWithVisibility(visibility, keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []EnumElement, closeBrace *RuneNode) *EnumNode {
 	if keyword == nil {
 		panic("keyword is nil")
 	}
@@ -38,7 +45,14 @@ func NewEnumNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, dec
 	if closeBrace == nil {
 		panic("closeBrace is nil")
 	}
-	children := make([]Node, 0, 4+len(decls))
+	numChildren := 4 + len(decls)
+	if visibility != nil {
+		numChildren++
+	}
+	children := make([]Node, 0, numChildren)
+	if visibility != nil {
+		children = append(children, visibility)
+	}
 	children = append(children, keyword, name, openBrace)
 	for _, decl := range decls {
 		children = append(children, decl)

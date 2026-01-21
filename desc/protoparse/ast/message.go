@@ -29,8 +29,9 @@ var _ MessageDeclNode = NoSourceNode{}
 //	}
 type MessageNode struct {
 	compositeNode
-	Keyword *KeywordNode
-	Name    *IdentNode
+	Keyword    *KeywordNode
+	Name       *IdentNode
+	Visibility *KeywordNode // may be nil
 	MessageBody
 }
 
@@ -44,6 +45,12 @@ func (*MessageNode) msgElement()  {}
 //   - decls: All declarations inside the message body.
 //   - closeBrace: The token corresponding to the "}" rune that ends the body.
 func NewMessageNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []MessageElement, closeBrace *RuneNode) *MessageNode {
+	return NewMessageNodeWithVisibility(nil, keyword, name, openBrace, decls, closeBrace)
+}
+
+// NewMessageNodeWithVisibility is just like NewMessageNode but it allows the
+// caller to supply a keyword node for the visibility modifier.
+func NewMessageNodeWithVisibility(visibility, keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []MessageElement, closeBrace *RuneNode) *MessageNode {
 	if keyword == nil {
 		panic("keyword is nil")
 	}
@@ -56,7 +63,14 @@ func NewMessageNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, 
 	if closeBrace == nil {
 		panic("closeBrace is nil")
 	}
-	children := make([]Node, 0, 4+len(decls))
+	numChildren := 4 + len(decls)
+	if visibility != nil {
+		numChildren++
+	}
+	children := make([]Node, 0, numChildren)
+	if visibility != nil {
+		children = append(children, visibility)
+	}
 	children = append(children, keyword, name, openBrace)
 	for _, decl := range decls {
 		children = append(children, decl)

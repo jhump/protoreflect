@@ -142,10 +142,14 @@ func NewSyntaxNode(keyword *KeywordNode, equals *RuneNode, syntax StringValueNod
 type ImportNode struct {
 	compositeNode
 	Keyword *KeywordNode
+
 	// Optional; if present indicates this is a public import
 	Public *KeywordNode
 	// Optional; if present indicates this is a weak import
-	Weak      *KeywordNode
+	Weak *KeywordNode
+	// Optional; if present indicates this is an option import
+	Option *KeywordNode
+
 	Name      StringValueNode
 	Semicolon *RuneNode
 }
@@ -162,6 +166,14 @@ type ImportNode struct {
 //   - name: The actual imported file name.
 //   - semicolon: The token corresponding to the ";" rune that ends the declaration.
 func NewImportNode(keyword *KeywordNode, public *KeywordNode, weak *KeywordNode, name StringValueNode, semicolon *RuneNode) *ImportNode {
+	return newImportNode(keyword, public, weak, nil, name, semicolon)
+}
+
+func NewImportOptionNode(keyword *KeywordNode, option *KeywordNode, name StringValueNode, semicolon *RuneNode) *ImportNode {
+	return newImportNode(keyword, nil, nil, option, name, semicolon)
+}
+
+func newImportNode(keyword *KeywordNode, public, weak, option *KeywordNode, name StringValueNode, semicolon *RuneNode) *ImportNode {
 	if keyword == nil {
 		panic("keyword is nil")
 	}
@@ -172,7 +184,7 @@ func NewImportNode(keyword *KeywordNode, public *KeywordNode, weak *KeywordNode,
 		panic("semicolon is nil")
 	}
 	numChildren := 3
-	if public != nil || weak != nil {
+	if public != nil || weak != nil || option != nil {
 		numChildren++
 	}
 	children := make([]Node, 0, numChildren)
@@ -181,6 +193,8 @@ func NewImportNode(keyword *KeywordNode, public *KeywordNode, weak *KeywordNode,
 		children = append(children, public)
 	} else if weak != nil {
 		children = append(children, weak)
+	} else if option != nil {
+		children = append(children, option)
 	}
 	children = append(children, name, semicolon)
 

@@ -53,12 +53,25 @@ func convertASTFileElement(f *ast.FileNode, el ast.FileElement) ast2.FileElement
 }
 
 func convertASTImport(f *ast.FileNode, imp *ast.ImportNode) *ast2.ImportNode {
-	var public, weak *ast2.KeywordNode
-	if imp.Public != nil {
-		public = convertASTKeyword(f, imp.Public)
+	var public, weak, option *ast2.KeywordNode
+	if imp.Modifier != nil {
+		modifier := convertASTKeyword(f, imp.Modifier)
+		switch imp.Modifier.Val {
+		case "public":
+			public = modifier
+		case "weak":
+			weak = modifier
+		case "option":
+			option = modifier
+		}
 	}
-	if imp.Weak != nil {
-		weak = convertASTKeyword(f, imp.Weak)
+	if option != nil {
+		return ast2.NewImportOptionNode(
+			convertASTKeyword(f, imp.Keyword),
+			option,
+			convertASTString(f, imp.Name),
+			convertASTRune(f, imp.Semicolon),
+		)
 	}
 	return ast2.NewImportNode(
 		convertASTKeyword(f, imp.Keyword),
@@ -131,7 +144,12 @@ func convertASTMessage(f *ast.FileNode, m *ast.MessageNode) *ast2.MessageNode {
 	for i := range m.Decls {
 		decls[i] = convertASTMessageElement(f, m.Decls[i])
 	}
-	return ast2.NewMessageNode(
+	var visibility *ast2.KeywordNode
+	if m.Visibility != nil {
+		visibility = convertASTKeyword(f, m.Visibility)
+	}
+	return ast2.NewMessageNodeWithVisibility(
+		visibility,
 		convertASTKeyword(f, m.Keyword),
 		convertASTIdentToken(f, m.Name),
 		convertASTRune(f, m.OpenBrace),
@@ -340,7 +358,12 @@ func convertASTEnum(f *ast.FileNode, e *ast.EnumNode) *ast2.EnumNode {
 	for i := range e.Decls {
 		decls[i] = convertASTEnumElement(f, e.Decls[i])
 	}
-	return ast2.NewEnumNode(
+	var visibility *ast2.KeywordNode
+	if e.Visibility != nil {
+		visibility = convertASTKeyword(f, e.Visibility)
+	}
+	return ast2.NewEnumNodeWithVisibility(
+		visibility,
 		convertASTKeyword(f, e.Keyword),
 		convertASTIdentToken(f, e.Name),
 		convertASTRune(f, e.OpenBrace),
