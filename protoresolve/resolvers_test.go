@@ -241,11 +241,27 @@ func TestGlobalDescriptors(t *testing.T) {
 }
 
 func TestResolverFromPool(t *testing.T) {
-	// TODO
-	testResolver(t, protoresolve.ResolverFromPool(nil))
+	var files protoregistry.Files
+	require.NoError(t, files.RegisterFile(testprotos.File_desc_test1_proto))
+	require.NoError(t, files.RegisterFile(testprotos.File_desc_test2_proto))
+	require.NoError(t, files.RegisterFile(testprotos.File_desc_test_complex_proto))
+
+	// Wrap the registry in the ResolverFromPool adapter
+	res := protoresolve.ResolverFromPool(&files)
+
+	// Run the standard validation suite (defined in this package)
+	testResolver(t, res)
 }
 
 func TestResolverFromPools(t *testing.T) {
-	// TODO
-	testResolver(t, protoresolve.ResolverFromPools(nil, nil))
+	var files protoregistry.Files
+	require.NoError(t, files.RegisterFile(testprotos.File_desc_test1_proto))
+	require.NoError(t, files.RegisterFile(testprotos.File_desc_test2_proto))
+	require.NoError(t, files.RegisterFile(testprotos.File_desc_test_complex_proto))
+
+	// Wrap the registry in the ResolverFromPools adapter using GlobalTypes
+	res := protoresolve.ResolverFromPools(&files, protoregistry.GlobalTypes)
+
+	// Run the standard validation suite (defined in this package)
+	testResolver(t, res)
 }
