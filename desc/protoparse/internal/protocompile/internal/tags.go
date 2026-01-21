@@ -82,6 +82,9 @@ const (
 	// FileEditionTag is the tag number of the edition element in a file
 	// descriptor proto.
 	FileEditionTag = 14
+	// FileOptionDependencyTag is the tag number of the option dependency element
+	// in a file descriptor proto.
+	FileOptionDependencyTag = 15
 	// MessageNameTag is the tag number of the name element in a message
 	// descriptor proto.
 	MessageNameTag = 1
@@ -115,6 +118,9 @@ const (
 	// MessageReservedNamesTag is the tag number of the reserved names element
 	// in a message descriptor proto.
 	MessageReservedNamesTag = 10
+	// MessageVisibilityTag is the tag number of the visibility element in a
+	// message descriptor proto.
+	MessageVisibilityTag = 11
 	// ExtensionRangeStartTag is the tag number of the start index in an
 	// extension range proto.
 	ExtensionRangeStartTag = 1
@@ -234,6 +240,9 @@ const (
 	// EnumReservedNamesTag is the tag number of the reserved names element in
 	// an enum descriptor proto.
 	EnumReservedNamesTag = 5
+	// EnumVisibilityTag is the tag number of the visibility element in an enum
+	// descriptor proto.
+	EnumVisibilityTag = 6
 	// EnumValNameTag is the tag number of the name element in an enum value
 	// descriptor proto.
 	EnumValNameTag = 1

@@ -152,19 +152,28 @@ func generateSourceInfoForFile(opts OptionIndex, sci *sourceCodeInfo, file *ast.
 		sci.newLocWithComments(file.Edition, append(path, internal.FileEditionTag))
 	}
 
-	var depIndex, pubDepIndex, weakDepIndex, optIndex, msgIndex, enumIndex, extendIndex, svcIndex int32
+	var depIndex, pubDepIndex, weakDepIndex, optionDepIndex, optIndex, msgIndex, enumIndex, extendIndex, svcIndex int32
 
 	for _, child := range file.Decls {
 		switch child := child.(type) {
 		case *ast.ImportNode:
-			sci.newLocWithComments(child, append(path, internal.FileDependencyTag, depIndex))
-			depIndex++
-			if child.Public != nil {
-				sci.newLoc(child.Public, append(path, internal.FilePublicDependencyTag, pubDepIndex))
-				pubDepIndex++
-			} else if child.Weak != nil {
-				sci.newLoc(child.Weak, append(path, internal.FileWeakDependencyTag, weakDepIndex))
-				weakDepIndex++
+			if child.Modifier != nil && child.Modifier.Val == "option" {
+				sci.newLocWithComments(child, append(path, internal.FileOptionDependencyTag, optionDepIndex))
+				optionDepIndex++
+
+			} else {
+				sci.newLocWithComments(child, append(path, internal.FileDependencyTag, depIndex))
+				depIndex++
+				if child.Modifier != nil {
+					switch child.Modifier.Val {
+					case "public":
+						sci.newLoc(child.Public, append(path, internal.FilePublicDependencyTag, pubDepIndex))
+						pubDepIndex++
+					case "weak":
+						sci.newLoc(child.Weak, append(path, internal.FileWeakDependencyTag, weakDepIndex))
+						weakDepIndex++
+					}
+				}
 			}
 		case *ast.PackageNode:
 			sci.newLocWithComments(child, append(path, internal.FilePackageTag))
@@ -307,13 +316,14 @@ func generateSourceInfoForOptionChildren(sci *sourceCodeInfo, n ast.ValueNode, p
 }
 
 func generateSourceCodeInfoForMessage(opts OptionIndex, sci *sourceCodeInfo, n ast.MessageDeclNode, fieldPath []int32, path []int32) {
-	var openBrace ast.Node
-
+	var openBrace *ast.RuneNode
+	var visibility *ast.KeywordNode
 	var decls []ast.MessageElement
 	switch n := n.(type) {
 	case *ast.MessageNode:
 		openBrace = n.OpenBrace
 		decls = n.Decls
+		visibility = n.Visibility
 	case *ast.SyntheticGroupMessageNode:
 		openBrace = n.OpenBrace
 		decls = n.Decls
@@ -325,6 +335,9 @@ func generateSourceCodeInfoForMessage(opts OptionIndex, sci *sourceCodeInfo, n a
 	sci.newBlockLocWithComments(n, openBrace, path)
 
 	sci.newLoc(n.MessageName(), append(path, internal.MessageNameTag))
+	if visibility != nil {
+		sci.newLoc(visibility, append(path, internal.MessageVisibilityTag))
+	}
 	// matching protoc, which emits the corresponding field type name (for group fields)
 	// right after the source location for the group message name
 	if fieldPath != nil {
@@ -399,6 +412,9 @@ func generateSourceCodeInfoForMessage(opts OptionIndex, sci *sourceCodeInfo, n a
 func generateSourceCodeInfoForEnum(opts OptionIndex, sci *sourceCodeInfo, n *ast.EnumNode, path []int32) {
 	sci.newBlockLocWithComments(n, n.OpenBrace, path)
 	sci.newLoc(n.Name, append(path, internal.EnumNameTag))
+	if n.Visibility != nil {
+		sci.newLoc(n.Visibility, append(path, internal.EnumVisibilityTag))
+	}
 
 	var optIndex, valIndex, reservedNameIndex, reservedRangeIndex int32
 	for _, child := range n.Decls {
