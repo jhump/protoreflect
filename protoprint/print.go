@@ -699,8 +699,9 @@ func (p *Printer) qualifyElementName(pkg, scope, fqn protoreflect.FullName, requ
 // that takes a different grammar branch at the start of a field
 // declaration, extend block, or RPC method type. The keyword set is the
 // union of the keywords the spec excludes from field-type identifiers in
-// regular, oneof, and extension field declarations and from RPC method
-// type identifiers.
+// regular, oneof, and extension field declarations, from RPC method type
+// identifiers, and from the visibility-modifier position introduced by
+// editions.
 func (p *Printer) qualifyTypeName(pkg, scope, fqn protoreflect.FullName) string {
 	name := p.qualifyName(pkg, scope, fqn)
 	if p.ForceFullyQualifiedNames || strings.HasPrefix(name, ".") {
@@ -714,7 +715,9 @@ func (p *Printer) qualifyTypeName(pkg, scope, fqn protoreflect.FullName) string 
 		"message", "enum", "oneof",
 		"reserved", "extensions", "extend",
 		"option",
-		"stream":
+		"stream",
+		// Added in edition 2024.
+		"export", "local":
 		if fqn[0] != '.' {
 			return "." + string(fqn)
 		}

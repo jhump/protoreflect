@@ -48,6 +48,33 @@ message Foo {
 		})
 	}
 
+	// "export" and "local" are visibility modifiers introduced in edition
+	// 2024; protoc rejects the relative form there. Test inputs use edition
+	// 2023 (which accepts the relative form) because protocompile does not
+	// yet support 2024, so these subtests detect the bug only via the
+	// substring assertion.
+	//
+	// TODO: Update to use newer protocompile which supports edition 2024.
+	for _, kw := range []string{"export", "local"} {
+		t.Run("editions_message_field_type_in_subpackage_"+kw, func(t *testing.T) {
+			t.Parallel()
+			files := map[string]string{
+				fmt.Sprintf("pkg/%s/dep.proto", kw): fmt.Sprintf(`edition = "2023";
+package pkg.%s;
+message X {
+  string name = 1;
+}`, kw),
+				"pkg/root.proto": fmt.Sprintf(`edition = "2023";
+package pkg;
+import "pkg/%[1]s/dep.proto";
+message Foo {
+  pkg.%[1]s.X v = 1;
+}`, kw),
+			}
+			runPrintTest(t, files, "pkg/root.proto", fmt.Sprintf(".pkg.%s.X", kw))
+		})
+	}
+
 	t.Run("rpc_type_in_subpackage_stream", func(t *testing.T) {
 		t.Parallel()
 		files := map[string]string{
@@ -102,9 +129,6 @@ func runPrintTest(t *testing.T, files map[string]string, entry, wantTypeRef stri
 	require.NoError(t, err, "PrintProtoFile returned error")
 	printed := buf.String()
 
-	require.Contains(t, printed, wantTypeRef,
-		"printed output uses the relative form instead of leading-dot FQN")
-
 	roundTripFiles := maps.Clone(files)
 	roundTripFiles[entry] = printed
 
@@ -115,4 +139,7 @@ func runPrintTest(t *testing.T, files map[string]string, entry, wantTypeRef stri
 	}
 	_, err = roundTrip.Compile(t.Context(), entry)
 	require.NoError(t, err, "round-trip compile failed; printed output is not valid proto:\n%s", printed)
+
+	require.Contains(t, printed, wantTypeRef,
+		"printed output uses the relative form instead of leading-dot FQN")
 }
