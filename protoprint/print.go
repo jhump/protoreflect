@@ -656,6 +656,7 @@ func (p *Printer) qualifyExtensionLiteralName(pkg, scope, fqn protoreflect.FullN
 	return p.qualifyElementName(pkg, scope, fqn, -1)
 }
 
+// TODO: Neeeds to be reconciled with https://protobuf.com/docs/language-spec#reference-resolution.
 func (p *Printer) qualifyName(pkg, scope, fqn protoreflect.FullName) string {
 	return p.qualifyElementName(pkg, scope, fqn, 0)
 }
