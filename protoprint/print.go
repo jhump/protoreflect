@@ -335,7 +335,7 @@ func (p *Printer) printProto(dsc protoreflect.Descriptor, out io.Writer) error {
 		if d.IsExtension() {
 			_, _ = fmt.Fprint(w, "extend ")
 			extNameSi := sourceInfo.ByPath(append(path, internal.FieldExtendeeTag))
-			p.printElementString(extNameSi, w, 0, p.qualifyName(d.ParentFile().Package(), scope, d.ContainingMessage().FullName()))
+			p.printElementString(extNameSi, w, 0, p.qualifyTypeName(d.ParentFile().Package(), scope, d.ContainingMessage().FullName()))
 			_, _ = fmt.Fprintln(w, "{")
 
 			p.printField(d, &reg, w, sourceInfo, path, scope, 1)
@@ -656,6 +656,7 @@ func (p *Printer) qualifyExtensionLiteralName(pkg, scope, fqn protoreflect.FullN
 	return p.qualifyElementName(pkg, scope, fqn, -1)
 }
 
+// TODO: Neeeds to be reconciled with https://protobuf.com/docs/language-spec#reference-resolution.
 func (p *Printer) qualifyName(pkg, scope, fqn protoreflect.FullName) string {
 	return p.qualifyElementName(pkg, scope, fqn, 0)
 }
@@ -693,20 +694,52 @@ func (p *Printer) qualifyElementName(pkg, scope, fqn protoreflect.FullName, requ
 	return string(fqn)
 }
 
+// qualifyTypeName is like qualifyName but falls back to a fully-qualified
+// leading-dot form if the relative result would begin with a proto keyword
+// that takes a different grammar branch at the start of a field
+// declaration, extend block, or RPC method type. The keyword set is the
+// union of the keywords the spec excludes from field-type identifiers in
+// regular, oneof, and extension field declarations, from RPC method type
+// identifiers, and from the visibility-modifier position introduced by
+// editions.
+func (p *Printer) qualifyTypeName(pkg, scope, fqn protoreflect.FullName) string {
+	name := p.qualifyName(pkg, scope, fqn)
+	if p.ForceFullyQualifiedNames || strings.HasPrefix(name, ".") {
+		return name
+	}
+	first, _, _ := strings.Cut(name, ".")
+	switch first {
+	case "group",
+		"optional", "required", "repeated",
+		"map",
+		"message", "enum", "oneof",
+		"reserved", "extensions", "extend",
+		"option",
+		"stream",
+		// Added in edition 2024.
+		"export", "local":
+		if fqn[0] != '.' {
+			return "." + string(fqn)
+		}
+		return string(fqn)
+	}
+	return name
+}
+
 func (p *Printer) typeString(fld protoreflect.FieldDescriptor, scope protoreflect.FullName) string {
 	if fld.IsMap() {
 		return fmt.Sprintf("map<%s, %s>", p.typeString(fld.MapKey(), scope), p.typeString(fld.MapValue(), scope))
 	}
 	switch fld.Kind() {
 	case protoreflect.EnumKind:
-		return p.qualifyName(fld.ParentFile().Package(), scope, fld.Enum().FullName())
+		return p.qualifyTypeName(fld.ParentFile().Package(), scope, fld.Enum().FullName())
 	case protoreflect.GroupKind:
 		if isGroup(fld) {
 			return string(fld.Message().Name())
 		}
 		fallthrough
 	case protoreflect.MessageKind:
-		return p.qualifyName(fld.ParentFile().Package(), scope, fld.Message().FullName())
+		return p.qualifyTypeName(fld.ParentFile().Package(), scope, fld.Message().FullName())
 	default:
 		return fld.Kind().String()
 	}
@@ -1135,7 +1168,7 @@ func (p *Printer) printExtensions(
 	p.indent(w, indent)
 	_, _ = fmt.Fprint(w, "extend ")
 	extNameSi := sourceInfo.ByPath(append(path, 0, internal.FieldExtendeeTag))
-	p.printElementString(extNameSi, w, indent, p.qualifyName(pkg, scope, exts.extendee))
+	p.printElementString(extNameSi, w, indent, p.qualifyTypeName(pkg, scope, exts.extendee))
 	_, _ = fmt.Fprintln(w, "{")
 
 	if p.printTrailingComments(exts.sourceInfo, w, indent+1) && !p.Compact {
@@ -1485,7 +1518,7 @@ func (p *Printer) printMethod(
 
 		_, _ = fmt.Fprint(w, "( ")
 		inSi := sourceInfo.ByPath(append(path, internal.MethodInputTag))
-		inName := p.qualifyName(pkg, pkg, mtd.Input().FullName())
+		inName := p.qualifyTypeName(pkg, pkg, mtd.Input().FullName())
 		if mtd.IsStreamingClient() {
 			inName = "stream " + inName
 		}
@@ -1494,7 +1527,7 @@ func (p *Printer) printMethod(
 		_, _ = fmt.Fprint(w, ") returns ( ")
 
 		outSi := sourceInfo.ByPath(append(path, internal.MethodOutputTag))
-		outName := p.qualifyName(pkg, pkg, mtd.Output().FullName())
+		outName := p.qualifyTypeName(pkg, pkg, mtd.Output().FullName())
 		if mtd.IsStreamingServer() {
 			outName = "stream " + outName
 		}
