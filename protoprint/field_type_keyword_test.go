@@ -48,6 +48,24 @@ message Foo {
 		})
 	}
 
+	t.Run("rpc_type_in_subpackage_stream", func(t *testing.T) {
+		t.Parallel()
+		files := map[string]string{
+			"pkg/stream/dep.proto": `syntax = "proto3";
+package pkg.stream;
+message X {
+  string name = 1;
+}`,
+			"pkg/root.proto": `syntax = "proto3";
+package pkg;
+import "pkg/stream/dep.proto";
+service S {
+  rpc Foo (.pkg.stream.X) returns (.pkg.stream.X);
+}`,
+		}
+		runPrintTest(t, files, "pkg/root.proto", ".pkg.stream.X")
+	})
+
 	t.Run("extendee_in_subpackage_group", func(t *testing.T) {
 		t.Parallel()
 		files := map[string]string{
