@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: [1.24.x,1.25.x]
+        go-version: [1.25.x,1.26.x,1.27.x]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -32,11 +32,11 @@ jobs:
           key: ${{ runner.os }}-protoreflect-ci-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-protoreflect-ci-
       - name: Run tests
-        if: matrix.go-version != '1.25.x' # run fast test step for older versions of Go
+        if: matrix.go-version != '1.27.x' # run fast test step for older versions of Go
         run: make deps test
       - name: Run Tests and Lint
-        if: matrix.go-version == '1.25.x' # only run linters for latest version of Go
+        if: matrix.go-version == '1.27.x' # only run linters for latest version of Go
         run: make ci
       - name: Run Tests against Latest Deps
-        if: matrix.go-version == '1.25.x' # only update deps with latest version of Go
+        if: matrix.go-version == '1.27.x' # only update deps with latest version of Go
         run: go get -u ./... && go mod tidy && make deps test

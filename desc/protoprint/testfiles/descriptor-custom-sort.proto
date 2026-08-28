@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
-// Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
+// Copyright 2008 Google LLC.  All rights reserved.
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
@@ -38,8 +15,24 @@
 
 syntax = "proto2";
 
+// Describes the 'visibility' of a symbol with respect to the proto import
+// system. Symbols can only be imported when the visibility rules do not prevent
+// it (ex: local symbols cannot be imported).  Visibility modifiers can only set
+// on `message` and `enum` as they are the only types available to be referenced
+// from other files.
+enum SymbolVisibility {
+  VISIBILITY_UNSET = 0;
+
+  VISIBILITY_LOCAL = 1;
+
+  VISIBILITY_EXPORT = 2;
+}
+
 // The full set of known editions.
 enum Edition {
+  // A placeholder edition for developing and testing unscheduled features.
+  EDITION_UNSTABLE = 9999;
+
   // A placeholder for an unknown edition value.
   EDITION_UNKNOWN = 0;
 
@@ -56,6 +49,10 @@ enum Edition {
   // support a new edition.
   EDITION_MAX = 2147483647;
 
+  // A placeholder edition for specifying default behaviors *before* a feature
+  // was first introduced.  This is effectively an "infinite past".
+  EDITION_LEGACY = 900;
+
   EDITION_99999_TEST_ONLY = 99999;
 
   EDITION_99998_TEST_ONLY = 99998;
@@ -63,6 +60,8 @@ enum Edition {
   EDITION_99997_TEST_ONLY = 99997;
 
   EDITION_2_TEST_ONLY = 2;
+
+  EDITION_2026 = 1002;
 
   EDITION_2024 = 1001;
 
@@ -72,7 +71,7 @@ enum Edition {
   EDITION_2023 = 1000;
 
   // Placeholder editions for testing feature resolution.  These should not be
-  // used or relyed on outside of tests.
+  // used or relied on outside of tests.
   EDITION_1_TEST_ONLY = 1;
 }
 
@@ -117,6 +116,8 @@ message UninterpretedOption {
 // Encapsulates information about the original source file from which a
 // FileDescriptorProto was generated.
 message SourceCodeInfo {
+  extensions 536000000;
+
   message Location {
     optional string trailing_comments = 4;
 
@@ -251,12 +252,15 @@ message SourceCodeInfo {
 }
 
 message ServiceOptions {
-  extensions 1000 to max;
+  extensions 1000 to max, 990 to 998;
 
   // The parser stores options it doesn't recognize here. See above.
   repeated UninterpretedOption uninterpreted_option = 999;
 
   // Any features defined in the specific edition.
+  // WARNING: This field should only be used by protobuf plugins or special
+  // cases like the proto compiler. Other uses are discouraged and
+  // developers should rely on the protoreflect APIs for their client language.
   optional FeatureSet features = 34;
 
   // Note:  Field numbers 1 through 32 are reserved for Google's internal RPC
@@ -273,6 +277,10 @@ message ServiceOptions {
 
 // Describes a service.
 message ServiceDescriptorProto {
+  reserved "stream";
+
+  reserved 4;
+
   optional ServiceOptions options = 3;
 
   optional string name = 1;
@@ -281,12 +289,15 @@ message ServiceDescriptorProto {
 }
 
 message OneofOptions {
-  extensions 1000 to max;
+  extensions 1000 to max, 990 to 998;
 
   // The parser stores options it doesn't recognize here. See above.
   repeated UninterpretedOption uninterpreted_option = 999;
 
   // Any features defined in the specific edition.
+  // WARNING: This field should only be used by protobuf plugins or special
+  // cases like the proto compiler. Other uses are discouraged and
+  // developers should rely on the protoreflect APIs for their client language.
   optional FeatureSet features = 1;
 }
 
@@ -298,7 +309,7 @@ message OneofDescriptorProto {
 }
 
 message MethodOptions {
-  extensions 1000 to max;
+  extensions 1000 to max, 990 to 998;
 
   // Is this method side-effect-free (or safe in HTTP parlance), or idempotent,
   // or neither? HTTP based RPC implementation may choose GET verb for safe
@@ -317,6 +328,9 @@ message MethodOptions {
   optional IdempotencyLevel idempotency_level = 34 [default = IDEMPOTENCY_UNKNOWN];
 
   // Any features defined in the specific edition.
+  // WARNING: This field should only be used by protobuf plugins or special
+  // cases like the proto compiler. Other uses are discouraged and
+  // developers should rely on the protoreflect APIs for their client language.
   optional FeatureSet features = 35;
 
   // Note:  Field numbers 1 through 32 are reserved for Google's internal RPC
@@ -353,7 +367,7 @@ message MethodDescriptorProto {
 message MessageOptions {
   reserved 9, 8, 6, 5, 4;
 
-  extensions 1000 to max;
+  extensions 1000 to max, 990 to 998;
 
   // The parser stores options it doesn't recognize here. See above.
   repeated UninterpretedOption uninterpreted_option = 999;
@@ -407,6 +421,9 @@ message MessageOptions {
   optional bool map_entry = 7;
 
   // Any features defined in the specific edition.
+  // WARNING: This field should only be used by protobuf plugins or special
+  // cases like the proto compiler. Other uses are discouraged and
+  // developers should rely on the protoreflect APIs for their client language.
   optional FeatureSet features = 12;
 
   // Enable the legacy handling of JSON field name conflicts.  This lowercases
@@ -503,9 +520,11 @@ message GeneratedCodeInfo {
 //   to automatically assign option numbers.
 
 message FileOptions {
+  reserved "php_generic_services";
+
   reserved 42, 38;
 
-  extensions 1000 to max;
+  extensions 1000 to max, 990 to 998;
 
   // Generated classes can be optimized for speed or code size.
   enum OptimizeMode {
@@ -554,12 +573,16 @@ message FileOptions {
   // generated classes from this .proto. There is no default.
   optional string objc_class_prefix = 36;
 
-  // If set true, then the Java2 code generator will generate code that
-  // throws an exception whenever an attempt is made to assign a non-UTF-8
-  // byte sequence to a string field.
-  // Message reflection will do the same.
-  // However, an extension field still accepts non-UTF-8 byte sequences.
-  // This option has no effect on when used with the lite runtime.
+  // A proto2 file can set this to true to opt in to UTF-8 checking for Java,
+  // which will throw an exception if invalid UTF-8 is parsed from the wire or
+  // assigned to a string field.
+  //
+  // TODO: clarify exactly what kinds of field types this option
+  // applies to, and update these docs accordingly.
+  //
+  // Proto3 files already perform these checks. Setting the option explicitly to
+  // false has no effect: it cannot be used to opt proto3 files out of UTF-8
+  // checks.
   optional bool java_string_check_utf8 = 27 [default = false];
 
   // Sets the Java package where classes generated from this .proto will be
@@ -581,7 +604,14 @@ message FileOptions {
   // named by java_outer_classname.  However, the wrapper class will still be
   // generated to contain the file's getDescriptor() method as well as any
   // top-level extensions defined in the file.
-  optional bool java_multiple_files = 10 [default = false];
+  optional bool java_multiple_files = 10 [
+    feature_support = {
+      edition_introduced: EDITION_PROTO2,
+      edition_removed: EDITION_2024,
+      removal_error: "This behavior is enabled by default in editions 2024 and above. To disable it, you can set `features.(pb.java).nest_in_file_class = YES` on individual messages, enums, or services."
+    },
+    default = false
+  ];
 
   optional bool java_generic_services = 17 [default = false];
 
@@ -596,6 +626,9 @@ message FileOptions {
   optional string go_package = 11;
 
   // Any features defined in the specific edition.
+  // WARNING: This field should only be used by protobuf plugins or special
+  // cases like the proto compiler. Other uses are discouraged and
+  // developers should rely on the protoreflect APIs for their client language.
   optional FeatureSet features = 50;
 
   // Is this file deprecated?
@@ -627,6 +660,8 @@ message FileOptions {
 // The protocol compiler can output a FileDescriptorSet containing the .proto
 // files it parses.
 message FileDescriptorSet {
+  extensions 536000000;
+
   repeated FileDescriptorProto file = 1;
 }
 
@@ -640,6 +675,9 @@ message FileDescriptorProto {
   // The supported values are "proto2", "proto3", and "editions".
   //
   // If `edition` is present, this value must be "editions".
+  // WARNING: This field should only be used by protobuf plugins or special
+  // cases like the proto compiler. Other uses are discouraged and
+  // developers should rely on the protoreflect APIs for their client language.
   optional string syntax = 12;
 
   // This field contains optional information about the original source code.
@@ -657,6 +695,10 @@ message FileDescriptorProto {
 
   optional FileOptions options = 8;
 
+  // Names of files imported by this file purely for the purpose of providing
+  // option extensions. These are excluded from the dependency list above.
+  repeated string option_dependency = 15;
+
   optional string name = 1; // file name, relative to root of source tree
 
   // All top-level definitions in this file.
@@ -667,6 +709,9 @@ message FileDescriptorProto {
   repeated EnumDescriptorProto enum_type = 5;
 
   // The edition of the proto file.
+  // WARNING: This field should only be used by protobuf plugins or special
+  // cases like the proto compiler. Other uses are discouraged and
+  // developers should rely on the protoreflect APIs for their client language.
   optional Edition edition = 14;
 
   // Names of files imported by this file.
@@ -676,12 +721,11 @@ message FileDescriptorProto {
 message FieldOptions {
   reserved 18, 4;
 
-  extensions 1000 to max;
+  extensions 1000 to max, 990 to 998;
 
   // This indicates the types of entities that the field may apply to when used
   // as an option. If it is unset, then the field may be freely used as an
-  // option on any kind of entity. Note: as of January 2023, support for this is
-  // in progress and does not yet have an effect (b/264593489).
+  // option on any kind of entity.
   enum OptionTargetType {
     TARGET_TYPE_UNKNOWN = 0;
 
@@ -705,8 +749,6 @@ message FieldOptions {
   }
 
   // If set to RETENTION_SOURCE, the option will be omitted from the binary.
-  // Note: as of January 2023, support for this is in progress and does not yet
-  // have an effect (b/264593489).
   enum OptionRetention {
     RETENTION_UNKNOWN = 0;
 
@@ -741,14 +783,40 @@ message FieldOptions {
     CORD = 1;
   }
 
+  // Information about the support window of a feature.
+  message FeatureSupport {
+    // The removal error text if this feature is used after the edition it was
+    // removed in.
+    optional string removal_error = 5;
+
+    // The edition this feature is no longer available in.  In editions after
+    // this one, the last default assigned will be used, and proto files will
+    // not be able to override it.
+    optional Edition edition_removed = 4;
+
+    // The edition that this feature was first available in.  In editions
+    // earlier than this one, the default assigned to EDITION_LEGACY will be
+    // used, and proto files will not be able to override it.
+    optional Edition edition_introduced = 1;
+
+    // The edition this feature becomes deprecated in.  Using this after this
+    // edition may trigger warnings.
+    optional Edition edition_deprecated = 2;
+
+    // The deprecation warning text if this feature is used after the edition it
+    // was marked deprecated in.
+    optional string deprecation_warning = 3;
+  }
+
   message EditionDefault {
     optional string value = 2; // Textproto value.
 
     optional Edition edition = 3;
   }
 
+  // DEPRECATED. DO NOT USE!
   // For Google-internal migration only. Do not use.
-  optional bool weak = 10 [default = false];
+  optional bool weak = 10 [deprecated = true, default = false];
 
   // unverified_lazy does no correctness checks on the byte stream. This should
   // only be used where lazy with verification is prohibitive for performance
@@ -809,7 +877,12 @@ message FieldOptions {
   optional JSType jstype = 6 [default = JS_NORMAL];
 
   // Any features defined in the specific edition.
+  // WARNING: This field should only be used by protobuf plugins or special
+  // cases like the proto compiler. Other uses are discouraged and
+  // developers should rely on the protoreflect APIs for their client language.
   optional FeatureSet features = 21;
+
+  optional FeatureSupport feature_support = 22;
 
   repeated EditionDefault edition_defaults = 20;
 
@@ -823,12 +896,13 @@ message FieldOptions {
   // formats, e.g. when the field contains sensitive credentials.
   optional bool debug_redact = 16 [default = false];
 
+  // NOTE: ctype is deprecated. Use `features.(pb.cpp).string_type` instead.
   // The ctype option instructs the C++ code generator to use a different
   // representation of the field than it normally would.  See the specific
   // options below.  This option is only implemented to support use of
   // [ctype=CORD] and [ctype=STRING] (the default) on non-repeated fields of
-  // type "bytes" in the open source release -- sorry, we'll try to include
-  // other types in a future version!
+  // type "bytes" in the open source release.
+  // TODO: make ctype actually deprecated.
   optional CType ctype = 1 [default = STRING];
 }
 
@@ -969,7 +1043,15 @@ message FeatureSetDefaults {
   // the defaults at the closest matching edition ordered at or before it should
   // be used.  This field must be in strict ascending order by edition.
   message FeatureSetEditionDefault {
-    optional FeatureSet features = 2;
+    reserved "features";
+
+    reserved 2, 1;
+
+    // Defaults of features that can be overridden in this edition.
+    optional FeatureSet overridable_features = 4;
+
+    // Defaults of features that can't be overridden in this edition.
+    optional FeatureSet fixed_features = 5;
 
     optional Edition edition = 3;
   }
@@ -997,7 +1079,7 @@ message FeatureSetDefaults {
 message FeatureSet {
   reserved 999;
 
-  extensions 10000, 9995 to 9999, 1002, 1001, 1000;
+  extensions 10000, 9995 to 9999, 1000 to 9994;
 
   enum Utf8Validation {
     VERIFY = 2;
@@ -1005,6 +1087,8 @@ message FeatureSet {
     UTF8_VALIDATION_UNKNOWN = 0;
 
     NONE = 3;
+
+    reserved 1;
   }
 
   enum RepeatedFieldEncoding {
@@ -1049,11 +1133,44 @@ message FeatureSet {
     CLOSED = 2;
   }
 
+  enum EnforceNamingStyle {
+    STYLE_LEGACY = 2;
+
+    STYLE2026 = 3;
+
+    STYLE2024 = 1;
+
+    ENFORCE_NAMING_STYLE_UNKNOWN = 0;
+  }
+
+  message VisibilityFeature {
+    reserved 1 to max;
+
+    enum DefaultSymbolVisibility {
+      // All symbols local by default. Nested types cannot be exported.
+      // With special case caveat for message { enum {} reserved 1 to max; }
+      // This is the recommended setting for new protos.
+      STRICT = 4;
+
+      // All symbols default to local.
+      LOCAL_ALL = 3;
+
+      // All top-level symbols default to export, nested default to local.
+      EXPORT_TOP_LEVEL = 2;
+
+      // Default pre-EDITION_2024, all UNSET visibility are export.
+      EXPORT_ALL = 1;
+
+      DEFAULT_SYMBOL_VISIBILITY_UNKNOWN = 0;
+    }
+  }
+
   optional Utf8Validation utf8_validation = 4 [
     targets = TARGET_TYPE_FIELD,
     targets = TARGET_TYPE_FILE,
     retention = RETENTION_RUNTIME,
-    edition_defaults = { value: "NONE", edition: EDITION_PROTO2 },
+    feature_support = { edition_introduced: EDITION_2023 },
+    edition_defaults = { value: "NONE", edition: EDITION_LEGACY },
     edition_defaults = { value: "VERIFY", edition: EDITION_PROTO3 }
   ];
 
@@ -1061,7 +1178,8 @@ message FeatureSet {
     targets = TARGET_TYPE_FIELD,
     targets = TARGET_TYPE_FILE,
     retention = RETENTION_RUNTIME,
-    edition_defaults = { value: "EXPANDED", edition: EDITION_PROTO2 },
+    feature_support = { edition_introduced: EDITION_2023 },
+    edition_defaults = { value: "EXPANDED", edition: EDITION_LEGACY },
     edition_defaults = { value: "PACKED", edition: EDITION_PROTO3 }
   ];
 
@@ -1069,7 +1187,8 @@ message FeatureSet {
     targets = TARGET_TYPE_FIELD,
     targets = TARGET_TYPE_FILE,
     retention = RETENTION_RUNTIME,
-    edition_defaults = { value: "LENGTH_PREFIXED", edition: EDITION_PROTO2 }
+    feature_support = { edition_introduced: EDITION_2023 },
+    edition_defaults = { value: "LENGTH_PREFIXED", edition: EDITION_LEGACY }
   ];
 
   optional JsonFormat json_format = 6 [
@@ -1077,7 +1196,8 @@ message FeatureSet {
     targets = TARGET_TYPE_ENUM,
     targets = TARGET_TYPE_FILE,
     retention = RETENTION_RUNTIME,
-    edition_defaults = { value: "LEGACY_BEST_EFFORT", edition: EDITION_PROTO2 },
+    feature_support = { edition_introduced: EDITION_2023 },
+    edition_defaults = { value: "LEGACY_BEST_EFFORT", edition: EDITION_LEGACY },
     edition_defaults = { value: "ALLOW", edition: EDITION_PROTO3 }
   ];
 
@@ -1085,7 +1205,8 @@ message FeatureSet {
     targets = TARGET_TYPE_FIELD,
     targets = TARGET_TYPE_FILE,
     retention = RETENTION_RUNTIME,
-    edition_defaults = { value: "EXPLICIT", edition: EDITION_PROTO2 },
+    feature_support = { edition_introduced: EDITION_2023 },
+    edition_defaults = { value: "EXPLICIT", edition: EDITION_LEGACY },
     edition_defaults = { value: "IMPLICIT", edition: EDITION_PROTO3 },
     edition_defaults = { value: "EXPLICIT", edition: EDITION_2023 }
   ];
@@ -1094,13 +1215,39 @@ message FeatureSet {
     targets = TARGET_TYPE_ENUM,
     targets = TARGET_TYPE_FILE,
     retention = RETENTION_RUNTIME,
-    edition_defaults = { value: "CLOSED", edition: EDITION_PROTO2 },
+    feature_support = { edition_introduced: EDITION_2023 },
+    edition_defaults = { value: "CLOSED", edition: EDITION_LEGACY },
     edition_defaults = { value: "OPEN", edition: EDITION_PROTO3 }
+  ];
+
+  optional EnforceNamingStyle enforce_naming_style = 7 [
+    targets = TARGET_TYPE_FILE,
+    targets = TARGET_TYPE_EXTENSION_RANGE,
+    targets = TARGET_TYPE_MESSAGE,
+    targets = TARGET_TYPE_FIELD,
+    targets = TARGET_TYPE_ONEOF,
+    targets = TARGET_TYPE_ENUM,
+    targets = TARGET_TYPE_ENUM_ENTRY,
+    targets = TARGET_TYPE_SERVICE,
+    targets = TARGET_TYPE_METHOD,
+    retention = RETENTION_SOURCE,
+    feature_support = { edition_introduced: EDITION_2024 },
+    edition_defaults = { value: "STYLE_LEGACY", edition: EDITION_LEGACY },
+    edition_defaults = { value: "STYLE2024", edition: EDITION_2024 },
+    edition_defaults = { value: "STYLE2026", edition: EDITION_UNSTABLE }
+  ];
+
+  optional VisibilityFeature.DefaultSymbolVisibility default_symbol_visibility = 8 [
+    targets = TARGET_TYPE_FILE,
+    retention = RETENTION_SOURCE,
+    feature_support = { edition_introduced: EDITION_2024 },
+    edition_defaults = { value: "EXPORT_ALL", edition: EDITION_LEGACY },
+    edition_defaults = { value: "EXPORT_TOP_LEVEL", edition: EDITION_2024 }
   ];
 }
 
 message ExtensionRangeOptions {
-  extensions 1000 to max;
+  extensions 1000 to max, 990 to 998;
 
   // The verification state of the extension range.
   enum VerificationState {
@@ -1153,13 +1300,19 @@ message ExtensionRangeOptions {
 }
 
 message EnumValueOptions {
-  extensions 1000 to max;
+  extensions 1000 to max, 990 to 998;
 
   // The parser stores options it doesn't recognize here. See above.
   repeated UninterpretedOption uninterpreted_option = 999;
 
   // Any features defined in the specific edition.
+  // WARNING: This field should only be used by protobuf plugins or special
+  // cases like the proto compiler. Other uses are discouraged and
+  // developers should rely on the protoreflect APIs for their client language.
   optional FeatureSet features = 2;
+
+  // Information about the support window of a feature value.
+  optional FieldOptions.FeatureSupport feature_support = 4;
 
   // Is this enum value deprecated?
   // Depending on the target platform, this can emit Deprecated annotations
@@ -1185,12 +1338,15 @@ message EnumValueDescriptorProto {
 message EnumOptions {
   reserved 5;
 
-  extensions 1000 to max;
+  extensions 1000 to max, 990 to 998;
 
   // The parser stores options it doesn't recognize here. See above.
   repeated UninterpretedOption uninterpreted_option = 999;
 
   // Any features defined in the specific edition.
+  // WARNING: This field should only be used by protobuf plugins or special
+  // cases like the proto compiler. Other uses are discouraged and
+  // developers should rely on the protoreflect APIs for their client language.
   optional FeatureSet features = 7;
 
   // Enable the legacy handling of JSON field name conflicts.  This lowercases
@@ -1226,6 +1382,9 @@ message EnumDescriptorProto {
     optional int32 end = 2; // Inclusive.
   }
 
+  // Support for `export` and `local` keywords on enums.
+  optional SymbolVisibility visibility = 6;
+
   repeated EnumValueDescriptorProto value = 2;
 
   // Range of reserved numeric values. Reserved numeric values may not be used
@@ -1260,6 +1419,9 @@ message DescriptorProto {
 
     optional int32 end = 2; // Exclusive.
   }
+
+  // Support for `export` and `local` keywords on enums.
+  optional SymbolVisibility visibility = 11;
 
   repeated ReservedRange reserved_range = 9;
 
