@@ -197,15 +197,6 @@ func checkAttributesInFields(t *testing.T, exp, actual protoreflect.ExtensionDes
 		assert.Equal(t, expFld.HasOptionalKeyword(), actFld.HasOptionalKeyword(), "%s: field has optional keyword at index %d (%s)", where, i, expFld.Name())
 		assert.Equal(t, expFld.HasPresence(), actFld.HasPresence(), "%s: field has presence at index %d (%s)", where, i, expFld.Name())
 
-		if actFld.IsExtension() && actFldProto.GetProto3Optional() {
-			// protoc sets proto3_optional to true for extensions w/ explicit optional
-			// keyword, so we do, too. BUT the Go runtime ignores it, so its descriptor
-			// implementation (as well as the logic to convert descriptor -> proto)
-			// is missing it. So we don't bother with this check in this case since we
-			// know it would fail. This is a case of the conversion of the standard Go
-			// runtime descriptor to proto being lossy :/
-			continue
-		}
 		if expFldProto.Proto3Optional == nil {
 			assert.Nil(t, actFldProto.Proto3Optional, "%s: field proto3 optional should be nil at index %d (%s)", where, i, expFld.Name())
 		} else {

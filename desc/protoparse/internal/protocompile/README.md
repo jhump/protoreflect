@@ -14,3 +14,12 @@ This version does include a parser and grammar that supports Edition 2024. Howev
 support Edition 2024 since most of the rules are not enforced and the semantics not fully implemented. The
 `github.com/jhump/protoreflect/desc/protoparse` provides the ability to enable this not-fully-implemented support
 for Edition 2024 via the `AllowExperimentalEditions` flag.
+
+### Regenerating test data
+
+This fork does not include the upstream `Makefile`, so the `make_testdata.sh` script in this directory stands in for
+its `test-descriptors` and `ext-features-descriptors` targets. It regenerates the golden descriptor sets under
+`internal/testdata` and `internal/featuresext`. Upstream pins its own version of `protoc` via a `.protoc_version`
+file; this script instead uses the same `protoc` as `internal/testprotos/make_protos.sh`, so that all golden data in
+this repo is produced by a single version of `protoc`. To move to a new version, bump the version in
+`internal/testprotos/protoc.sh` and then re-run both scripts.

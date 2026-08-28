@@ -1203,10 +1203,13 @@ func (f *fldDescriptor) HasOptionalKeyword() bool {
 		return false
 	}
 	if f.proto.GetProto3Optional() {
-		// NB: This smells weird to return false here. If the proto3_optional field
-		// is set, it's because the keyword WAS present. However, the Go runtime
-		// returns false for this case, so we mirror that behavior.
-		return !f.IsExtension()
+		// The proto3_optional field is set only when the keyword WAS present.
+		//
+		// NB: Older versions of the protobuf-go runtime ignored proto3_optional
+		// for extensions and returned false for that case, and upstream
+		// protocompile still mirrors that. As of protobuf-go v1.36.12, protodesc
+		// honors proto3_optional for extensions, so we do, too.
+		return true
 	}
 	// If it's optional, but not a proto3 optional, then the keyword is only
 	// present for proto2 files, for fields that are not part of a oneof.
