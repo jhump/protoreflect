@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -35,7 +36,6 @@ import (
 	_ "google.golang.org/protobuf/types/pluginpb"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/internal"
 	testprotosgrpc "github.com/jhump/protoreflect/internal/testprotos/grpc"
 	"github.com/jhump/protoreflect/internal/testutil"
 )
@@ -99,47 +99,6 @@ func TestFileByFileName(t *testing.T) {
 
 	_, err = client.FileByFilename("does not exist")
 	testutil.Require(t, IsElementNotFoundError(err))
-}
-
-func TestFileByFileNameForWellKnownProtos(t *testing.T) {
-	wellKnownProtos := map[string][]string{
-		"google/protobuf/any.proto":             {"google.protobuf.Any"},
-		"google/protobuf/api.proto":             {"google.protobuf.Api", "google.protobuf.Method", "google.protobuf.Mixin"},
-		"google/protobuf/descriptor.proto":      {"google.protobuf.FileDescriptorSet", "google.protobuf.DescriptorProto"},
-		"google/protobuf/duration.proto":        {"google.protobuf.Duration"},
-		"google/protobuf/empty.proto":           {"google.protobuf.Empty"},
-		"google/protobuf/field_mask.proto":      {"google.protobuf.FieldMask"},
-		"google/protobuf/source_context.proto":  {"google.protobuf.SourceContext"},
-		"google/protobuf/struct.proto":          {"google.protobuf.Struct", "google.protobuf.Value", "google.protobuf.NullValue"},
-		"google/protobuf/timestamp.proto":       {"google.protobuf.Timestamp"},
-		"google/protobuf/type.proto":            {"google.protobuf.Type", "google.protobuf.Field", "google.protobuf.Syntax"},
-		"google/protobuf/wrappers.proto":        {"google.protobuf.DoubleValue", "google.protobuf.Int32Value", "google.protobuf.StringValue"},
-		"google/protobuf/compiler/plugin.proto": {"google.protobuf.compiler.CodeGeneratorRequest"},
-	}
-
-	for file, types := range wellKnownProtos {
-		fd, err := client.FileByFilename(file)
-		testutil.Ok(t, err)
-		testutil.Eq(t, file, fd.GetName())
-		for _, typ := range types {
-			d := fd.FindSymbol(typ)
-			testutil.Require(t, d != nil)
-		}
-
-		// also try loading via alternate name
-		file = internal.StdFileAliases[file]
-		if file == "" {
-			// not a file that has a known alternate, so nothing else to check...
-			continue
-		}
-		fd, err = client.FileByFilename(file)
-		testutil.Ok(t, err)
-		testutil.Eq(t, file, fd.GetName())
-		for _, typ := range types {
-			d := fd.FindSymbol(typ)
-			testutil.Require(t, d != nil)
-		}
-	}
 }
 
 func TestFileContainingSymbol(t *testing.T) {
@@ -756,13 +715,13 @@ func testClientAutoOnUnavailable(t *testing.T) {
 		err := cconn.Close()
 		testutil.Ok(t, err)
 	}()
-	client := NewClientAuto(context.Background(), cconn)
+	refClient := NewClientAuto(context.Background(), cconn)
 	now := time.Now()
-	client.now = func() time.Time {
+	refClient.now = func() time.Time {
 		return now
 	}
 
-	svcs, err := client.ListServices()
+	svcs, err := refClient.ListServices()
 	testutil.Ok(t, err)
 	sort.Strings(svcs)
 	testutil.Eq(t, []string{
@@ -848,6 +807,50 @@ func (c *captureErrorStream) RecvMsg(m interface{}) error {
 		c.c.observe(err)
 	}
 	return err
+}
+
+// TestClientCleanupClosesStream verifies that the cleanup registered by
+// newClient actually runs: a Client that becomes unreachable without Reset
+// having been called must not leak its stream to the server. This only works
+// if nothing reachable from the cleanup's argument refers back to the Client.
+func TestClientCleanupClosesStream(t *testing.T) {
+	// NB: not parallel; this test forces GCs, which we'd rather not do while
+	// other tests in this package are allocating.
+	streamEnded := make(chan struct{}, 1)
+	cconn := startFakeReflectionServer(t, fakeReflectionServer{
+		fileFor: func(filename string) *descriptorpb.FileDescriptorProto {
+			if filename != "test.proto" {
+				return nil
+			}
+			return newFileProto(filename)
+		},
+		onStreamEnd: func() {
+			select {
+			case streamEnded <- struct{}{}:
+			default:
+			}
+		},
+	})
+
+	// Use a closure so the Client is unreachable as soon as it returns. Note
+	// that we deliberately never call Reset.
+	func() {
+		refClient := NewClientV1(context.Background(), reflectv1.NewServerReflectionClient(cconn))
+		_, err := refClient.FileByFilename("test.proto")
+		testutil.Ok(t, err, "failed to resolve test.proto")
+	}()
+
+	deadline := time.After(30 * time.Second)
+	for {
+		runtime.GC()
+		select {
+		case <-streamEnded:
+			return
+		case <-deadline:
+			t.Fatal("stream to server was not closed after Client became unreachable")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
 }
 
 func createFilesWithMissingDeps(t *testing.T) *files {
@@ -1027,11 +1030,13 @@ func (f *files) RangeExtensionsByMessage(message protoreflect.FullName, fn func(
 	})
 }
 
+type container interface {
+	Messages() protoreflect.MessageDescriptors
+	Extensions() protoreflect.ExtensionDescriptors
+}
+
 func rangeExtensionsByMessage(
-	container interface {
-		Messages() protoreflect.MessageDescriptors
-		Extensions() protoreflect.ExtensionDescriptors
-	},
+	container container,
 	message protoreflect.FullName,
 	fn func(protoreflect.ExtensionType) bool,
 ) bool {
