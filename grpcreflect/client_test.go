@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -972,6 +973,50 @@ func (c *captureErrorStream) RecvMsg(m interface{}) error {
 		c.c.observe(err)
 	}
 	return err
+}
+
+// TestClientCleanupClosesStream verifies that the cleanup registered by
+// newClient actually runs: a Client that becomes unreachable without Reset
+// having been called must not leak its stream to the server. This only works
+// if nothing reachable from the cleanup's argument refers back to the Client.
+func TestClientCleanupClosesStream(t *testing.T) {
+	// NB: not parallel; this test forces GCs, which we'd rather not do while
+	// other tests in this package are allocating.
+	streamEnded := make(chan struct{}, 1)
+	cconn := startFakeReflectionServer(t, fakeReflectionServer{
+		fileFor: func(filename string) *descriptorpb.FileDescriptorProto {
+			if filename != "test.proto" {
+				return nil
+			}
+			return newFileProto(filename)
+		},
+		onStreamEnd: func() {
+			select {
+			case streamEnded <- struct{}{}:
+			default:
+			}
+		},
+	})
+
+	// Use a closure so the Client is unreachable as soon as it returns. Note
+	// that we deliberately never call Reset.
+	func() {
+		refClient := NewClientV1(context.Background(), refv1.NewServerReflectionClient(cconn))
+		_, err := refClient.FileByFilename("test.proto")
+		require.NoError(t, err, "failed to resolve test.proto")
+	}()
+
+	deadline := time.After(30 * time.Second)
+	for {
+		runtime.GC()
+		select {
+		case <-streamEnded:
+			return
+		case <-deadline:
+			t.Fatal("stream to server was not closed after Client became unreachable")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
 }
 
 func createFilesWithMissingDeps(t *testing.T) *files {

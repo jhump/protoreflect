@@ -10,6 +10,8 @@ import (
 	"io"
 	"reflect"
 	"runtime"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,13 +29,32 @@ import (
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
-// If we try the v1 reflection API and get back "not implemented", we'll wait
-// this long before trying v1 again. This allows a long-lived client to
-// dynamically switch from v1alpha to v1 if the underlying server is updated
-// to support it. But it also prevents every stream request from always trying
-// v1 first: if we try it and see it fail, we shouldn't continually retry it
-// if we expect it will fail again.
-const durationBetweenV1Attempts = time.Hour
+const (
+	// If we try the v1 reflection API and get back "not implemented", we'll wait
+	// this long before trying v1 again. This allows a long-lived client to
+	// dynamically switch from v1alpha to v1 if the underlying server is updated
+	// to support it. But it also prevents every stream request from always trying
+	// v1 first: if we try it and see it fail, we shouldn't continually retry it
+	// if we expect it will fail again.
+	durationBetweenV1Attempts = time.Hour
+
+	// Interestingly, no Protobuf compiler (protoc, protocompile, etc) seems to
+	// have a limit on the depth of an import tree. The protobuf-go runtime's
+	// protodesc.NewFiles has no such limit either, but it also requires that
+	// the full dependency graph already be materialized in-memory as
+	// descriptorpb.FileDescriptorProtos -- so if there were a resource issue,
+	// it would have already been hit when loading all the raw descriptors into
+	// memory. This package does not have that requirement and will download
+	// descriptors on-demand as it crawls the import graph. That means that it
+	// realistically needs a limit to prevent a malicious server from
+	// synthesizing a result graph that is wildly deep, causing a fatal stack
+	// overflow error in the client. We use an incredibly generous limit to
+	// avoid returning errors for real code bases that happen to have very deep
+	// import trees. Real code bases will rarely exceed a depth in the 10s, so
+	// if we hit this, it must be a malicious server. (And this value should
+	// still be low enough to avoid a stack overflow.)
+	maxImportDepth = 1024
+)
 
 // elementNotFoundError is the error returned by reflective operations where the
 // server does not recognize a given file name, symbol name, or extension.
@@ -130,11 +151,7 @@ type Client struct {
 	fallbackResolver    protodesc.Resolver
 	fallbackExtResolver protoregistry.ExtensionTypeResolver
 
-	connMu      sync.Mutex
-	cancel      context.CancelFunc
-	stream      refv1.ServerReflection_ServerReflectionInfoClient
-	useV1Alpha  bool
-	lastTriedV1 time.Time
+	*liveStream
 
 	cacheMu      sync.RWMutex
 	protosByName map[string]*descriptorpb.FileDescriptorProto
@@ -166,13 +183,14 @@ func newClient(ctx context.Context, stubv1 refv1.ServerReflectionClient, stubv1a
 		now:          time.Now,
 		stubV1:       stubv1,
 		stubV1Alpha:  stubv1alpha,
+		liveStream:   &liveStream{},
 		protosByName: map[string]*descriptorpb.FileDescriptorProto{},
 	}
 	for _, opt := range opts {
 		opt(cr)
 	}
 	// don't leak a grpc stream
-	runtime.SetFinalizer(cr, (*Client).Reset)
+	runtime.AddCleanup(cr, (*liveStream).reset, cr.liveStream)
 	return cr
 }
 
@@ -249,6 +267,19 @@ func WithFallbackResolver(res interface {
 // FileByFilename asks the server for a file descriptor for the proto file with
 // the given name.
 func (cr *Client) FileByFilename(filename string) (protoreflect.FileDescriptor, error) {
+	return cr.fileByFilename(filename, nil)
+}
+
+func (cr *Client) fileByFilename(filename string, depPath []string) (protoreflect.FileDescriptor, error) {
+	if idx := slices.Index(depPath, filename); idx != -1 {
+		return nil, fmt.Errorf("file %s has cyclic import path: %s -> %s", filename, strings.Join(depPath[idx:], " -> "), filename)
+	}
+	if len(depPath) >= maxImportDepth {
+		// Loading filename would put us at a depth of len(depPath)+1, one past
+		// the limit, so we refuse instead of recursing any further.
+		return nil, fmt.Errorf("file %s has import tree depth > %d", depPath[0], maxImportDepth)
+	}
+
 	cr.cacheMu.RLock()
 	// hit the cache first
 	if fd, err := cr.descriptors.FindFileByPath(filename); err == nil {
@@ -259,19 +290,10 @@ func (cr *Client) FileByFilename(filename string) (protoreflect.FileDescriptor, 
 	fdp, ok := cr.protosByName[filename]
 	cr.cacheMu.RUnlock()
 	if ok {
-		return cr.descriptorFromProto(fdp)
+		return cr.descriptorFromProto(fdp, depPath)
 	}
 
-	req := &refv1.ServerReflectionRequest{
-		MessageRequest: &refv1.ServerReflectionRequest_FileByFilename{
-			FileByFilename: filename,
-		},
-	}
-	accept := func(fd protoreflect.FileDescriptor) bool {
-		return fd.Path() == filename
-	}
-
-	fd, err := cr.getAndCacheFileDescriptors(req, accept)
+	fd, err := cr.getAndCacheFileDescriptors(filename, depPath)
 	if isNotFound(err) && cr.fallbackResolver != nil {
 		if fd, err := cr.fallbackResolver.FindFileByPath(filename); err == nil {
 			return fd, nil
@@ -304,7 +326,7 @@ func (cr *Client) FileContainingSymbol(symbol protoreflect.FullName) (protorefle
 	accept := func(fd protoreflect.FileDescriptor) bool {
 		return protoresolve.FindDescriptorByNameInFile(fd, symbol) != nil
 	}
-	fd, err := cr.getAndCacheFileDescriptors(req, accept)
+	fd, err := cr.getAndCacheFileDescriptorsSearch(req, accept)
 	if isNotFound(err) && cr.fallbackResolver != nil {
 		if d, err := cr.fallbackResolver.FindDescriptorByName(symbol); err == nil {
 			return d.ParentFile(), nil
@@ -341,7 +363,7 @@ func (cr *Client) FileContainingExtension(extendedMessageName protoreflect.FullN
 	accept := func(fd protoreflect.FileDescriptor) bool {
 		return protoresolve.FindExtensionByNumberInFile(fd, extendedMessageName, extensionNumber) != nil
 	}
-	fd, err := cr.getAndCacheFileDescriptors(req, accept)
+	fd, err := cr.getAndCacheFileDescriptorsSearch(req, accept)
 	if isNotFound(err) && cr.fallbackExtResolver != nil {
 		if xt, err := cr.fallbackExtResolver.FindExtensionByNumber(extendedMessageName, extensionNumber); err == nil {
 			return xt.TypeDescriptor().ParentFile(), nil
@@ -355,7 +377,7 @@ func (cr *Client) FileContainingExtension(extendedMessageName protoreflect.FullN
 	return fd, err
 }
 
-func (cr *Client) getAndCacheFileDescriptors(req *refv1.ServerReflectionRequest, accept func(protoreflect.FileDescriptor) bool) (protoreflect.FileDescriptor, error) {
+func (cr *Client) getAndCacheFileDescriptorProtos(req *refv1.ServerReflectionRequest) ([]*descriptorpb.FileDescriptorProto, error) {
 	resp, err := cr.send(req)
 	if err != nil {
 		return nil, err
@@ -369,12 +391,10 @@ func (cr *Client) getAndCacheFileDescriptors(req *refv1.ServerReflectionRequest,
 	// Response can contain the result file descriptor, but also its transitive
 	// deps. Furthermore, protocol states that subsequent requests do not need
 	// to send transitive deps that have been sent in prior responses. So we
-	// need to cache all file descriptors and then return the first one (which
-	// should be the answer). If we're looking for a file by name, we can be
-	// smarter and make sure to grab one by name instead of just grabbing the
-	// first one.
-	var fds []*descriptorpb.FileDescriptorProto
-	for _, fdBytes := range fdResp.FileDescriptorProto {
+	// need to cache all file descriptors that were sent so we can find them if
+	// we need them later when building the file's full import graph.
+	fds := make([]*descriptorpb.FileDescriptorProto, len(fdResp.FileDescriptorProto))
+	for i, fdBytes := range fdResp.FileDescriptorProto {
 		fd := &descriptorpb.FileDescriptorProto{}
 		if err = proto.Unmarshal(fdBytes, fd); err != nil {
 			return nil, err
@@ -389,12 +409,46 @@ func (cr *Client) getAndCacheFileDescriptors(req *refv1.ServerReflectionRequest,
 		}
 		cr.cacheMu.Unlock()
 
-		fds = append(fds, fd)
+		fds[i] = fd
+	}
+	return fds, nil
+}
+
+func (cr *Client) getAndCacheFileDescriptors(filename string, depPath []string) (protoreflect.FileDescriptor, error) {
+	req := &refv1.ServerReflectionRequest{
+		MessageRequest: &refv1.ServerReflectionRequest_FileByFilename{
+			FileByFilename: filename,
+		},
+	}
+	if _, err := cr.getAndCacheFileDescriptorProtos(req); err != nil {
+		return nil, err
+	}
+
+	cr.cacheMu.RLock()
+	fd, ok := cr.protosByName[filename]
+	cr.cacheMu.RUnlock()
+
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "response does not include expected file %q", filename)
+	}
+	return cr.descriptorFromProto(fd, depPath)
+}
+
+// getAndCacheFileDescriptorsSearch is similar to getAndCacheFileDescriptors except it
+// searches all returned descriptors for one that matches the given accept predicate.
+// It is not recursive, so does not take a depPath parameter.
+func (cr *Client) getAndCacheFileDescriptorsSearch(
+	req *refv1.ServerReflectionRequest,
+	accept func(protoreflect.FileDescriptor) bool,
+) (protoreflect.FileDescriptor, error) {
+	fds, err := cr.getAndCacheFileDescriptorProtos(req)
+	if err != nil {
+		return nil, err
 	}
 
 	// find the right result from the files returned
 	for _, fd := range fds {
-		result, err := cr.descriptorFromProto(fd)
+		result, err := cr.descriptorFromProto(fd, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -406,11 +460,12 @@ func (cr *Client) getAndCacheFileDescriptors(req *refv1.ServerReflectionRequest,
 	return nil, status.Errorf(codes.NotFound, "response does not include expected file")
 }
 
-func (cr *Client) descriptorFromProto(fd *descriptorpb.FileDescriptorProto) (protoreflect.FileDescriptor, error) {
+func (cr *Client) descriptorFromProto(fd *descriptorpb.FileDescriptorProto, depPath []string) (protoreflect.FileDescriptor, error) {
 	var deferredErr error
 	var missingDeps []int
+	depPath = append(depPath, fd.GetName()) // record ourselves in the path of deps before we recurse
 	for i, depName := range fd.GetDependency() {
-		if _, err := cr.FileByFilename(depName); err != nil {
+		if _, err := cr.fileByFilename(depName, depPath); err != nil {
 			if _, ok := err.(*elementNotFoundError); !ok || !cr.allowMissing {
 				return nil, err
 			}
@@ -668,25 +723,45 @@ func (cr *Client) useV1() bool {
 // Reset ensures that any active stream with the server is closed, releasing any
 // resources.
 func (cr *Client) Reset() {
-	cr.connMu.Lock()
-	defer cr.connMu.Unlock()
-	cr.resetLocked()
+	cr.liveStream.reset()
 }
 
-func (cr *Client) resetLocked() {
-	if cr.stream != nil {
-		_ = cr.stream.CloseSend()
+// liveStream is a separate pointer value that holds the gRPC stream so that we
+// can use runtime.AddCleanup with a Client to auto-close any remaining open
+// gRPC stream.
+type liveStream struct {
+	connMu      sync.Mutex
+	cancel      context.CancelFunc
+	stream      refv1.ServerReflection_ServerReflectionInfoClient
+	useV1Alpha  bool
+	lastTriedV1 time.Time
+}
+
+// reset ensures that any active stream with the server is closed, releasing any
+// resources.
+func (ls *liveStream) reset() {
+	// This one method is factored out to liveStream instead of on *Client so
+	// it can be used from a cleanup w/out introducing a reference that keeps
+	// the *Client alive/reachable.
+	ls.connMu.Lock()
+	defer ls.connMu.Unlock()
+	ls.resetLocked()
+}
+
+func (ls *liveStream) resetLocked() {
+	if ls.stream != nil {
+		_ = ls.stream.CloseSend()
 		for {
 			// drain the stream, this covers io.EOF too
-			if _, err := cr.stream.Recv(); err != nil {
+			if _, err := ls.stream.Recv(); err != nil {
 				break
 			}
 		}
-		cr.stream = nil
+		ls.stream = nil
 	}
-	if cr.cancel != nil {
-		cr.cancel()
-		cr.cancel = nil
+	if ls.cancel != nil {
+		ls.cancel()
+		ls.cancel = nil
 	}
 }
 

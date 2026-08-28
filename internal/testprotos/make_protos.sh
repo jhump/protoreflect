@@ -4,33 +4,11 @@ set -e
 
 cd $(dirname $0)
 
-PROTOC_VERSION="28.1"
-PROTOC_OS="$(uname -s)"
-PROTOC_ARCH="$(uname -m)"
-case "${PROTOC_OS}" in
-  Darwin) PROTOC_OS="osx" ;;
-  Linux) PROTOC_OS="linux" ;;
-  *)
-    echo "Invalid value for uname -s: ${PROTOC_OS}" >&2
-    exit 1
-esac
+# Downloads protoc if it's not already cached. The version of protoc is
+# pinned in this script.
+PROTOC="$(./protoc.sh)"
 
-# This is for macs with M1 chips. Precompiled binaries for osx/amd64 are not available for download, so for that case
-# we download the x86_64 version instead. This will work as long as rosetta2 is installed.
-if [ "$PROTOC_OS" = "osx" ] && [ "$PROTOC_ARCH" = "arm64" ]; then
-  PROTOC_ARCH="x86_64"
-fi
-
-PROTOC="${PWD}/protoc/bin/protoc"
-
-if [[ "$(${PROTOC} --version 2>/dev/null)" != "libprotoc ${PROTOC_VERSION}" ]]; then
-  rm -rf ./protoc
-  mkdir -p protoc
-  curl -L "https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${PROTOC_OS}-${PROTOC_ARCH}.zip" > protoc/protoc.zip
-  cd ./protoc && unzip protoc.zip && cd ..
-fi
-
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.9
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 go install github.com/jhump/protoreflect/v2/sourceinfo/cmd/protoc-gen-gosrcinfo
 
