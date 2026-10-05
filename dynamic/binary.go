@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/jhump/protoreflect/codec"
 	internalcodec "github.com/jhump/protoreflect/internal/codec"
@@ -17,6 +18,16 @@ import (
 // deterministic (since there is no way to have that convey determinism intent).
 // **This is only used from tests.**
 var defaultDeterminism = false
+
+// checkDepth returns an error if the given nesting depth exceeds the maximum.
+// The depth of a top-level message is zero. This is used by the JSON and text
+// formats. The binary format tracks depth in codec.Buffer.
+func checkDepth(depth int) error {
+	if depth >= protowire.DefaultRecursionLimit {
+		return codec.ErrRecursionDepth
+	}
+	return nil
+}
 
 // newBuffer returns a buffer that encodes and decodes nested dynamic messages
 // directly (instead of via proto.Marshal and proto.Unmarshal), so that the

@@ -30,7 +30,7 @@ import (
 func (m *Message) MarshalText() ([]byte, error) {
 	var b indentBuffer
 	b.indentCount = -1 // no indentation
-	if err := m.marshalText(&b); err != nil {
+	if err := m.marshalText(&b, 0); err != nil {
 		return nil, err
 	}
 	return b.Bytes(), nil
@@ -45,13 +45,16 @@ func (m *Message) MarshalText() ([]byte, error) {
 func (m *Message) MarshalTextIndent() ([]byte, error) {
 	var b indentBuffer
 	b.indent = "  " // TODO: option for indent?
-	if err := m.marshalText(&b); err != nil {
+	if err := m.marshalText(&b, 0); err != nil {
 		return nil, err
 	}
 	return b.Bytes(), nil
 }
 
-func (m *Message) marshalText(b *indentBuffer) error {
+func (m *Message) marshalText(b *indentBuffer, depth int) error {
+	if err := checkDepth(depth); err != nil {
+		return err
+	}
 	// TODO: option for emitting extended Any format?
 	first := true
 	// first the known fields
@@ -75,7 +78,7 @@ func (m *Message) marshalText(b *indentBuffer) error {
 				if err != nil {
 					return err
 				}
-				err = marshalKnownFieldMapEntryText(b, fd, kfd, mk, vfd, mv)
+				err = marshalKnownFieldMapEntryText(b, fd, kfd, mk, vfd, mv, depth)
 				if err != nil {
 					return err
 				}
@@ -87,7 +90,7 @@ func (m *Message) marshalText(b *indentBuffer) error {
 				if err != nil {
 					return err
 				}
-				err = marshalKnownFieldText(b, fd, slv)
+				err = marshalKnownFieldText(b, fd, slv, depth)
 				if err != nil {
 					return err
 				}
@@ -97,7 +100,7 @@ func (m *Message) marshalText(b *indentBuffer) error {
 			if err != nil {
 				return err
 			}
-			err = marshalKnownFieldText(b, fd, v)
+			err = marshalKnownFieldText(b, fd, v, depth)
 			if err != nil {
 				return err
 			}
@@ -126,7 +129,7 @@ func (m *Message) marshalText(b *indentBuffer) error {
 					return err
 				}
 				in := codec.NewBuffer(uf.Contents)
-				err = marshalUnknownGroupText(b, in, true)
+				err = marshalUnknownGroupText(b, in, true, depth+1)
 				if err != nil {
 					return err
 				}
@@ -160,7 +163,7 @@ func (m *Message) marshalText(b *indentBuffer) error {
 	return nil
 }
 
-func marshalKnownFieldMapEntryText(b *indentBuffer, fd *desc.FieldDescriptor, kfd *desc.FieldDescriptor, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}) error {
+func marshalKnownFieldMapEntryText(b *indentBuffer, fd *desc.FieldDescriptor, kfd *desc.FieldDescriptor, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}, depth int) error {
 	var name string
 	if fd.IsExtension() {
 		name = fmt.Sprintf("[%s]", fd.GetFullyQualifiedName())
@@ -185,7 +188,7 @@ func marshalKnownFieldMapEntryText(b *indentBuffer, fd *desc.FieldDescriptor, kf
 		return err
 	}
 
-	err = marshalKnownFieldText(b, kfd, mk)
+	err = marshalKnownFieldText(b, kfd, mk, depth)
 	if err != nil {
 		return err
 	}
@@ -194,7 +197,7 @@ func marshalKnownFieldMapEntryText(b *indentBuffer, fd *desc.FieldDescriptor, kf
 		return err
 	}
 	if !isNil(mv) {
-		err = marshalKnownFieldText(b, vfd, mv)
+		err = marshalKnownFieldText(b, vfd, mv, depth)
 		if err != nil {
 			return err
 		}
@@ -207,7 +210,9 @@ func marshalKnownFieldMapEntryText(b *indentBuffer, fd *desc.FieldDescriptor, kf
 	return b.WriteByte('>')
 }
 
-func marshalKnownFieldText(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}) error {
+// marshalKnownFieldText marshals the given value for a field of a message that
+// is at the given depth.
+func marshalKnownFieldText(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, depth int) error {
 	group := fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP
 	if group {
 		var name string
@@ -300,7 +305,7 @@ func marshalKnownFieldText(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 		}
 		// must be a message
 		if dm, ok := v.(*Message); ok {
-			err = dm.marshalText(b)
+			err = dm.marshalText(b, depth+1)
 			if err != nil {
 				return err
 			}
@@ -363,7 +368,10 @@ func writeString(b *indentBuffer, s string) error {
 	return b.WriteByte('"')
 }
 
-func marshalUnknownGroupText(b *indentBuffer, in *codec.Buffer, topLevel bool) error {
+func marshalUnknownGroupText(b *indentBuffer, in *codec.Buffer, topLevel bool, depth int) error {
+	if err := checkDepth(depth); err != nil {
+		return err
+	}
 	first := true
 	for {
 		if in.EOF() {
@@ -397,7 +405,7 @@ func marshalUnknownGroupText(b *indentBuffer, in *codec.Buffer, topLevel bool) e
 			if err != nil {
 				return err
 			}
-			err = marshalUnknownGroupText(b, in, false)
+			err = marshalUnknownGroupText(b, in, false, depth+1)
 			if err != nil {
 				return err
 			}
@@ -465,10 +473,13 @@ func (m *Message) UnmarshalText(text []byte) error {
 // reset the message, instead merging the data in the given bytes into the
 // existing data in this message.
 func (m *Message) UnmarshalMergeText(text []byte) error {
-	return m.unmarshalText(newReader(text), tokenEOF)
+	return m.unmarshalText(newReader(text), tokenEOF, 0)
 }
 
-func (m *Message) unmarshalText(tr *txtReader, end tokenType) error {
+func (m *Message) unmarshalText(tr *txtReader, end tokenType, depth int) error {
+	if err := checkDepth(depth); err != nil {
+		return err
+	}
 	for {
 		tok := tr.next()
 		if tok.tokTyp == end {
@@ -493,11 +504,11 @@ func (m *Message) unmarshalText(tr *txtReader, end tokenType) error {
 				if tok.tokTyp == tokenEOF {
 					return io.ErrUnexpectedEOF
 				} else if tok.tokTyp == tokenOpenBrace {
-					if err := skipMessageText(tr, true); err != nil {
+					if err := skipMessageText(tr, true, depth+1); err != nil {
 						return err
 					}
 				} else if tok.tokTyp == tokenColon {
-					if err := skipFieldValueText(tr); err != nil {
+					if err := skipFieldValueText(tr, depth); err != nil {
 						return err
 					}
 				} else {
@@ -567,7 +578,7 @@ func (m *Message) unmarshalText(tr *txtReader, end tokenType) error {
 
 			// TODO: use mf.NewMessage and, if not a dynamic message, use proto.UnmarshalText to unmarshal it
 			g := m.mf.NewDynamicMessage(extendedAnyType)
-			if err := g.unmarshalText(tr, tok.tokTyp.EndToken()); err != nil {
+			if err := g.unmarshalText(tr, tok.tokTyp.EndToken(), depth+1); err != nil {
 				return err
 			}
 			// now we marshal the message to bytes and store in the Any
@@ -585,25 +596,16 @@ func (m *Message) unmarshalText(tr *txtReader, end tokenType) error {
 			fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE) &&
 			tok.tokTyp.EndToken() != tokenError {
 
-			// TODO: use mf.NewMessage and, if not a dynamic message, use proto.UnmarshalText to unmarshal it
-			g := m.mf.NewDynamicMessage(fd.GetMessageType())
-			if err := g.unmarshalText(tr, tok.tokTyp.EndToken()); err != nil {
+			// The colon is optional before a message value. This is handled the
+			// same as when the colon is present.
+			if err := m.unmarshalMessageText(fd, tr, tok.tokTyp.EndToken(), textSetFunction(fd), depth); err != nil {
 				return err
-			}
-			if fd.IsRepeated() {
-				if err := m.TryAddRepeatedField(fd, g); err != nil {
-					return err
-				}
-			} else {
-				if err := m.TrySetField(fd, g); err != nil {
-					return err
-				}
 			}
 		} else {
 			if tok.tokTyp != tokenColon {
 				return textError(tok, "Expecting a colon ':'; instead got %q", tok.txt)
 			}
-			if err := m.unmarshalFieldValueText(fd, tr); err != nil {
+			if err := m.unmarshalFieldValueText(fd, tr, depth); err != nil {
 				return err
 			}
 		}
@@ -655,18 +657,24 @@ func textError(tok *token, format string, args ...interface{}) error {
 
 type setFunction func(*Message, *desc.FieldDescriptor, interface{}) error
 
-func (m *Message) unmarshalFieldValueText(fd *desc.FieldDescriptor, tr *txtReader) error {
-	var set setFunction
+// textSetFunction returns the function used to store a value parsed from the
+// text format for the given field.
+func textSetFunction(fd *desc.FieldDescriptor) setFunction {
 	if fd.IsRepeated() {
-		set = (*Message).addRepeatedField
-	} else {
-		set = mergeField
+		return (*Message).addRepeatedField
 	}
+	return mergeField
+}
+
+// unmarshalFieldValueText unmarshals the value of a field of m, which is at the
+// given depth.
+func (m *Message) unmarshalFieldValueText(fd *desc.FieldDescriptor, tr *txtReader, depth int) error {
+	set := textSetFunction(fd)
 	tok := tr.peek()
 	if tok.tokTyp == tokenOpenBracket {
 		tr.next() // consume tok
 		for {
-			if err := m.unmarshalFieldElementText(fd, tr, set); err != nil {
+			if err := m.unmarshalFieldElementText(fd, tr, set, depth); err != nil {
 				return err
 			}
 			tok = tr.peek()
@@ -678,10 +686,10 @@ func (m *Message) unmarshalFieldValueText(fd *desc.FieldDescriptor, tr *txtReade
 			}
 		}
 	}
-	return m.unmarshalFieldElementText(fd, tr, set)
+	return m.unmarshalFieldElementText(fd, tr, set, depth)
 }
 
-func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtReader, set setFunction) error {
+func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtReader, set setFunction, depth int) error {
 	tok := tr.next()
 	if tok.tokTyp == tokenEOF {
 		return io.ErrUnexpectedEOF
@@ -826,25 +834,7 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 
 		endTok := tok.tokTyp.EndToken()
 		if endTok != tokenError {
-			dm := m.mf.NewDynamicMessage(fd.GetMessageType())
-			if err := dm.unmarshalText(tr, endTok); err != nil {
-				return err
-			}
-			// TODO: ideally we would use mf.NewMessage and, if not a dynamic message, use
-			// proto package to unmarshal it. But the text parser isn't particularly amenable
-			// to that, so we instead convert a dynamic message to a generated one if the
-			// known-type registry knows about the generated type...
-			var ktr *KnownTypeRegistry
-			if m.mf != nil {
-				ktr = m.mf.ktr
-			}
-			pm := ktr.CreateIfKnown(fd.GetMessageType().GetFullyQualifiedName())
-			if pm != nil {
-				if err := dm.ConvertTo(pm); err != nil {
-					return set(m, fd, pm)
-				}
-			}
-			return set(m, fd, dm)
+			return m.unmarshalMessageText(fd, tr, endTok, set, depth)
 		}
 		expected = fmt.Sprintf("message %s value", fd.GetMessageType().GetFullyQualifiedName())
 	default:
@@ -859,6 +849,31 @@ func (m *Message) unmarshalFieldElementText(fd *desc.FieldDescriptor, tr *txtRea
 		article = "a"
 	}
 	return textError(tok, "Expecting %s %s; got %q", article, expected, tok.txt)
+}
+
+// unmarshalMessageText unmarshals the value of a message field of m, which is
+// at the given depth. The token that opens the value has already been read,
+// and endTok is the token that closes it.
+func (m *Message) unmarshalMessageText(fd *desc.FieldDescriptor, tr *txtReader, endTok tokenType, set setFunction, depth int) error {
+	dm := m.mf.NewDynamicMessage(fd.GetMessageType())
+	if err := dm.unmarshalText(tr, endTok, depth+1); err != nil {
+		return err
+	}
+	// TODO: ideally we would use mf.NewMessage and, if not a dynamic message, use
+	// proto package to unmarshal it. But the text parser isn't particularly amenable
+	// to that, so we instead convert a dynamic message to a generated one if the
+	// known-type registry knows about the generated type...
+	var ktr *KnownTypeRegistry
+	if m.mf != nil {
+		ktr = m.mf.ktr
+	}
+	pm := ktr.CreateIfKnown(fd.GetMessageType().GetFullyQualifiedName())
+	if pm != nil {
+		if err := dm.ConvertTo(pm); err == nil {
+			return set(m, fd, pm)
+		}
+	}
+	return set(m, fd, dm)
 }
 
 func unmarshalFieldNameText(tr *txtReader, tok *token) (string, error) {
@@ -914,12 +929,14 @@ func skipFieldNameText(tr *txtReader) error {
 	}
 }
 
-func skipFieldValueText(tr *txtReader) error {
+// skipFieldValueText skips the value of a field of a message that is at the
+// given depth.
+func skipFieldValueText(tr *txtReader, depth int) error {
 	tok := tr.peek()
 	if tok.tokTyp == tokenOpenBracket {
 		tr.next() // consume tok
 		for {
-			if err := skipFieldElementText(tr); err != nil {
+			if err := skipFieldElementText(tr, depth); err != nil {
 				return err
 			}
 			tok = tr.peek()
@@ -932,10 +949,10 @@ func skipFieldValueText(tr *txtReader) error {
 
 		}
 	}
-	return skipFieldElementText(tr)
+	return skipFieldElementText(tr, depth)
 }
 
-func skipFieldElementText(tr *txtReader) error {
+func skipFieldElementText(tr *txtReader, depth int) error {
 	tok := tr.next()
 	switch tok.tokTyp {
 	case tokenEOF:
@@ -943,20 +960,25 @@ func skipFieldElementText(tr *txtReader) error {
 	case tokenInt, tokenFloat, tokenString, tokenIdent:
 		return nil
 	case tokenOpenAngle:
-		return skipMessageText(tr, false)
+		return skipMessageText(tr, false, depth+1)
 	default:
 		return textError(tok, "Expecting an angle bracket '<' or a value; instead got %q", tok.txt)
 	}
 }
 
-func skipMessageText(tr *txtReader, isGroup bool) error {
+func skipMessageText(tr *txtReader, isGroup bool, depth int) error {
+	if err := checkDepth(depth); err != nil {
+		return err
+	}
 	for {
 		tok := tr.peek()
 		if tok.tokTyp == tokenEOF {
 			return io.ErrUnexpectedEOF
 		} else if isGroup && tok.tokTyp == tokenCloseBrace {
+			tr.next() // consume tok
 			return nil
 		} else if !isGroup && tok.tokTyp == tokenCloseAngle {
+			tr.next() // consume tok
 			return nil
 		}
 
@@ -970,11 +992,11 @@ func skipMessageText(tr *txtReader, isGroup bool) error {
 		if tok.tokTyp == tokenEOF {
 			return io.ErrUnexpectedEOF
 		} else if tok.tokTyp == tokenOpenBrace {
-			if err := skipMessageText(tr, true); err != nil {
+			if err := skipMessageText(tr, true, depth+1); err != nil {
 				return err
 			}
 		} else if tok.tokTyp == tokenColon {
-			if err := skipFieldValueText(tr); err != nil {
+			if err := skipFieldValueText(tr, depth); err != nil {
 				return err
 			}
 		} else {

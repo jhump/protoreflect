@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/internal/testprotos"
@@ -174,4 +175,41 @@ func textTranslationParty(t *testing.T, msg proto.Message, includesNaN bool) {
 		// marshal methods work the same due to API differences in how to enable
 		// indentation/pretty-printing
 		false, true)
+}
+
+func TestTextUnmarshalKnownMessageType(t *testing.T) {
+	md := recursiveMessageDescriptor(t)
+	// Recurse.value is a google.protobuf.Value, which the message factory knows
+	// is a generated type, so it should be unmarshaled into that type (just as
+	// is done in the binary format)
+	// with or without the colon, which is optional before a message value
+	for _, text := range []string{
+		`value: {string_value: "foo"}`,
+		`value: <string_value: "foo">`,
+		`value {string_value: "foo"}`,
+		`value <string_value: "foo">`,
+	} {
+		msg := NewMessage(md)
+		testutil.Ok(t, msg.UnmarshalText([]byte(text)))
+		val, ok := msg.GetFieldByNumber(4).(*structpb.Value)
+		testutil.Require(t, ok, "%s: unexpected type: %T", text, msg.GetFieldByNumber(4))
+		testutil.Eq(t, "foo", val.GetStringValue())
+	}
+}
+
+func TestTextUnmarshalSingularMessageFieldRepeated(t *testing.T) {
+	md := recursiveMessageDescriptor(t)
+	// When a singular message field appears more than once, the values are
+	// merged, as in the binary format. This must not depend on whether the
+	// optional colon is present.
+	for _, text := range []string{
+		`child: {child: {}} child: {value: {}}`,
+		`child {child {}} child {value {}}`,
+	} {
+		msg := NewMessage(md)
+		testutil.Ok(t, msg.UnmarshalText([]byte(text)))
+		child := msg.GetFieldByNumber(1).(*Message)
+		testutil.Require(t, child.HasFieldNumber(1), "%s: first value was not merged", text)
+		testutil.Require(t, child.HasFieldNumber(4), "%s: second value was not merged", text)
+	}
 }
