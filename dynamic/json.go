@@ -100,6 +100,9 @@ func (m *Message) MarshalJSONIndent() ([]byte, error) {
 // given marshaler is augmented with knowledge of message types known to this
 // message's descriptor (and its enclosing file and set of transitive
 // dependencies).
+//
+// To instead use the protojson package, from the newer "v2" API, first convert
+// this message to a *dynamicpb.Message using ToDynamicPB.
 func (m *Message) MarshalJSONPB(opts *jsonpb.Marshaler) ([]byte, error) {
 	var b indentBuffer
 	b.indent = opts.Indent
@@ -571,6 +574,9 @@ func (m *Message) UnmarshalMergeJSON(js []byte) error {
 // the given unmarshaler is augmented with knowledge of message types known to
 // this message's descriptor (and its enclosing file and set of transitive
 // dependencies).
+//
+// To instead use the protojson package, from the newer "v2" API, unmarshal into
+// a *dynamicpb.Message and then convert it with ConvertFrom.
 func (m *Message) UnmarshalJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
 	m.Reset()
 	if err := m.UnmarshalMergeJSONPB(opts, js); err != nil {
@@ -584,6 +590,9 @@ func (m *Message) UnmarshalJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
 // options used when parsing the JSON. Unlike UnmarshalJSONPB, it does not first
 // reset the message, instead merging the data in the given bytes into the
 // existing data in this message.
+//
+// To instead use the protojson package, from the newer "v2" API, unmarshal into
+// a *dynamicpb.Message and then merge it into this message with MergeFrom.
 func (m *Message) UnmarshalMergeJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
 	r := newJsReader(js)
 	err := m.unmarshalJson(r, opts, 0)
