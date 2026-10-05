@@ -2,6 +2,7 @@ package dynamic
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -162,21 +163,27 @@ func TestJSONUnmarshalRecursionLimit(t *testing.T) {
 	nestedJSON := func(steps int, open, close string) []byte {
 		return []byte(strings.Repeat(open, steps) + "{}" + strings.Repeat(close, steps))
 	}
+	// how many levels of JSON nesting (objects and arrays) each step adds
+	jsonLevelsPerStep := map[string]int{"field": 1, "repeated": 2, "map": 2}
 	for _, tc := range nestingCases(map[string][2]string{
 		"field":    {`{"child":`, `}`},
 		"repeated": {`{"children":[`, `]}`},
 		"map":      {`{"byId":{"1":`, `}}`},
 	}) {
 		t.Run(tc.name, func(t *testing.T) {
+			// The JSON nesting must also be within encoding/json's limit, which
+			// applies in newer versions of Go. For "field" and "map", that is
+			// the same, so this tests the exact limit.
+			steps := min(tc.maxSteps, (maxJSONNesting-1)/jsonLevelsPerStep[tc.name])
 			msg := NewMessage(md)
-			testutil.Ok(t, msg.UnmarshalJSON(nestedJSON(tc.maxSteps, tc.open, tc.close)))
+			testutil.Ok(t, msg.UnmarshalJSON(nestedJSON(steps, tc.open, tc.close)))
 
 			err := NewMessage(md).UnmarshalJSON(nestedJSON(tc.maxSteps+1, tc.open, tc.close))
-			testutil.Require(t, errors.Is(err, codec.ErrRecursionDepth), "unexpected error: %v", err)
+			testutil.Require(t, isJSONDepthError(err), "unexpected error: %v", err)
 
 			// this used to crash the process
 			err = NewMessage(md).UnmarshalJSON(nestedJSON(500_000, tc.open, tc.close))
-			testutil.Require(t, errors.Is(err, codec.ErrRecursionDepth), "unexpected error: %v", err)
+			testutil.Require(t, isJSONDepthError(err), "unexpected error: %v", err)
 		})
 	}
 }
@@ -191,7 +198,24 @@ func TestJSONUnmarshalDeeplyNestedUnknownField(t *testing.T) {
 	testutil.Ok(t, NewMessage(md).UnmarshalJSONPB(opts, nestedUnknown(10)))
 	// skipping deeply nested values used to recurse and could crash the process
 	err := NewMessage(md).UnmarshalJSONPB(opts, nestedUnknown(500_000))
-	testutil.Require(t, errors.Is(err, codec.ErrRecursionDepth), "unexpected error: %v", err)
+	testutil.Require(t, isJSONDepthError(err), "unexpected error: %v", err)
+}
+
+// maxJSONNesting is the maximum depth of JSON objects and arrays allowed by
+// encoding/json. Starting with Go 1.27, this is enforced even when reading
+// tokens with json.Decoder.Token, as the dynamic package does.
+const maxJSONNesting = 10000
+
+// isJSONDepthError returns true if err indicates that JSON input was nested
+// too deeply. Starting with Go 1.27, encoding/json checks the depth of
+// JSON nesting itself, which may happen before the dynamic package checks
+// the depth of message nesting.
+func isJSONDepthError(err error) bool {
+	if errors.Is(err, codec.ErrRecursionDepth) {
+		return true
+	}
+	var syntaxErr *json.SyntaxError
+	return errors.As(err, &syntaxErr) && strings.Contains(syntaxErr.Error(), "exceeded max depth")
 }
 
 func TestJSONMarshalRecursionLimitThroughAny(t *testing.T) {
