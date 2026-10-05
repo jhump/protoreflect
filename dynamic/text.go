@@ -27,6 +27,9 @@ import (
 //
 // This method uses a compact form: no newlines, and spaces between field
 // identifiers and values are elided.
+//
+// To instead use the prototext package, from the newer "v2" API, first convert
+// this message to a *dynamicpb.Message using ToDynamicPB.
 func (m *Message) MarshalText() ([]byte, error) {
 	var b indentBuffer
 	b.indentCount = -1 // no indentation
@@ -42,6 +45,9 @@ func (m *Message) MarshalText() ([]byte, error) {
 //
 // This method uses a "pretty-printed" form, with each field on its own line and
 // spaces between field identifiers and values.
+//
+// To instead use the prototext package, from the newer "v2" API, first convert
+// this message to a *dynamicpb.Message using ToDynamicPB.
 func (m *Message) MarshalTextIndent() ([]byte, error) {
 	var b indentBuffer
 	b.indent = "  " // TODO: option for indent?
@@ -460,6 +466,9 @@ func marshalUnknownGroupText(b *indentBuffer, in *codec.Buffer, topLevel bool, d
 // the given bytes into this message. It first resets the current message. It
 // returns an error if the given bytes do not contain a valid encoding of this
 // message type in the standard text format
+//
+// To instead use the prototext package, from the newer "v2" API, unmarshal into
+// a *dynamicpb.Message and then convert it with ConvertFrom.
 func (m *Message) UnmarshalText(text []byte) error {
 	m.Reset()
 	if err := m.UnmarshalMergeText(text); err != nil {
@@ -472,6 +481,9 @@ func (m *Message) UnmarshalText(text []byte) error {
 // in the given bytes into this message. Unlike UnmarshalText, it does not first
 // reset the message, instead merging the data in the given bytes into the
 // existing data in this message.
+//
+// To instead use the prototext package, from the newer "v2" API, unmarshal into
+// a *dynamicpb.Message and then merge it into this message with MergeFrom.
 func (m *Message) UnmarshalMergeText(text []byte) error {
 	return m.unmarshalText(newReader(text), tokenEOF, 0)
 }

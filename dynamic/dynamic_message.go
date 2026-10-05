@@ -13,6 +13,7 @@ import (
 	protov2 "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
@@ -2192,6 +2193,10 @@ func (m *Message) mergeInto(pm proto.Message, deterministic bool) error {
 	if dm, ok := pm.(*Message); ok {
 		return dm.mergeFrom(m)
 	}
+	if dpb, ok := pm.(*dynamicpb.Message); ok {
+		// not a generated message, so it can't be handled via reflection below
+		return m.mergeIntoDynamicPB(dpb)
+	}
 
 	target := reflect.ValueOf(pm)
 	if target.Kind() == reflect.Ptr {
@@ -2458,6 +2463,10 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 			}
 		}
 		return nil
+	}
+	if dpb, ok := pm.(*dynamicpb.Message); ok {
+		// not a generated message, so it can't be handled via reflection below
+		return m.mergeFromDynamicPB(dpb)
 	}
 
 	pmrv := reflect.ValueOf(pm)

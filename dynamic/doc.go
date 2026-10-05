@@ -122,6 +122,19 @@
 // The ConvertTo, ConvertFrom, MergeInto, and MergeFrom methods copy message
 // contents from a dynamic message to a generated message and vice versa.
 //
+// Dynamic messages do not implement the proto.Message interface of the newer
+// "v2" API in google.golang.org/protobuf. The older github.com/golang/protobuf
+// "v1" API includes a proto.MessageV2() helper function, but not all v2
+// packages work correctly when that helper is used to adapt this package's
+// dynamic message. In particular, protojson and prototext do not work: those
+// packages see a message with no fields when marshaling and silently produce
+// incorrect output; they produce a confusing error when unmarshaling into this
+// type. Instead, use the Message.ToDynamicPB method to convert a dynamic
+// message to a *dynamicpb.Message (which is the v2 API's dynamic message
+// implementation). And use Message.ConvertFrom to convert the other direction.
+// The ConvertTo, MergeInto, and MergeFrom methods also all accept a
+// *dynamicpb.Message.
+//
 // When copying from a generated message into a dynamic message, if the
 // generated message contains fields unknown to the dynamic message (e.g. not
 // present in the descriptor used to create the dynamic message), these fields
@@ -160,8 +173,8 @@
 // Deprecated: This module was created for use with the older "v1" Protobuf API
 // in github.com/golang/protobuf. However, much of this module is no longer
 // necessary as the newer "v2" API in google.golang.org/protobuf provides similar
-// capabilities. Instead of using this github.com/jhump/protoreflect/dynamic package,
-// see [google.golang.org/protobuf/types/dynamicpb].
+// capabilities. Instead of using the github.com/jhump/protoreflect/dynamic
+// package in this module, see [google.golang.org/protobuf/types/dynamicpb].
 //
 // [google.golang.org/protobuf/types/dynamicpb]: https://pkg.go.dev/google.golang.org/protobuf/types/dynamicpb
 package dynamic
