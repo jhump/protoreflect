@@ -9,6 +9,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/jhump/protoreflect/codec"
+	internalcodec "github.com/jhump/protoreflect/internal/codec"
 )
 
 // defaultDeterminism, if true, will mean that calls to Marshal will produce
@@ -17,12 +18,45 @@ import (
 // **This is only used from tests.**
 var defaultDeterminism = false
 
+// newBuffer returns a buffer that encodes and decodes nested dynamic messages
+// directly (instead of via proto.Marshal and proto.Unmarshal), so that the
+// depth of nesting is tracked across the whole message tree.
+func newBuffer(b []byte) *codec.Buffer {
+	buf := codec.NewBuffer(b)
+	(*internalcodec.Buffer)(buf).SetMessageCodec(messageCodec{})
+	return buf
+}
+
+// messageCodec implements internalcodec.MessageCodec for dynamic messages.
+type messageCodec struct{}
+
+func (messageCodec) Marshal(buf *internalcodec.Buffer, msg proto.Message) (bool, error) {
+	dm, ok := msg.(*Message)
+	if !ok {
+		return false, nil
+	}
+	return true, dm.marshal((*codec.Buffer)(buf))
+}
+
+func (messageCodec) Unmarshal(buf *internalcodec.Buffer, msg proto.Message) (bool, error) {
+	dm, ok := msg.(*Message)
+	if !ok {
+		return false, nil
+	}
+	// same as (*Message).Unmarshal
+	dm.Reset()
+	if err := dm.unmarshal((*codec.Buffer)(buf), false); err != nil {
+		return true, err
+	}
+	return true, dm.Validate()
+}
+
 // Marshal serializes this message to bytes, returning an error if the operation
 // fails. The resulting bytes are in the standard protocol buffer binary format.
 func (m *Message) Marshal() ([]byte, error) {
-	var b codec.Buffer
+	b := newBuffer(nil)
 	b.SetDeterministic(defaultDeterminism)
-	if err := m.marshal(&b); err != nil {
+	if err := m.marshal(b); err != nil {
 		return nil, err
 	}
 	return b.Bytes(), nil
@@ -34,7 +68,7 @@ func (m *Message) Marshal() ([]byte, error) {
 // it's not guaranteed as a new backing array will automatically be allocated if
 // more bytes need to be written than the provided buffer has capacity for.
 func (m *Message) MarshalAppend(b []byte) ([]byte, error) {
-	codedBuf := codec.NewBuffer(b)
+	codedBuf := newBuffer(b)
 	codedBuf.SetDeterministic(defaultDeterminism)
 	if err := m.marshal(codedBuf); err != nil {
 		return nil, err
@@ -49,9 +83,9 @@ func (m *Message) MarshalAppend(b []byte) ([]byte, error) {
 // iteration order (which will be random). But for cases where determinism is
 // more important than performance, use this method instead.
 func (m *Message) MarshalDeterministic() ([]byte, error) {
-	var b codec.Buffer
+	b := newBuffer(nil)
 	b.SetDeterministic(true)
-	if err := m.marshal(&b); err != nil {
+	if err := m.marshal(b); err != nil {
 		return nil, err
 	}
 	return b.Bytes(), nil
@@ -64,7 +98,7 @@ func (m *Message) MarshalDeterministic() ([]byte, error) {
 // backing array will automatically be allocated if more bytes need to be written
 // than the provided buffer has capacity for.
 func (m *Message) MarshalAppendDeterministic(b []byte) ([]byte, error) {
-	codedBuf := codec.NewBuffer(b)
+	codedBuf := newBuffer(b)
 	codedBuf.SetDeterministic(true)
 	if err := m.marshal(codedBuf); err != nil {
 		return nil, err
@@ -151,7 +185,7 @@ func (m *Message) Unmarshal(b []byte) error {
 // instead merging the data in the given bytes into the existing data in this
 // message.
 func (m *Message) UnmarshalMerge(b []byte) error {
-	return m.unmarshal(codec.NewBuffer(b), false)
+	return m.unmarshal(newBuffer(b), false)
 }
 
 func (m *Message) unmarshal(buf *codec.Buffer, isGroup bool) error {

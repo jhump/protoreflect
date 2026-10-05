@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/internal/codec"
 )
 
 var varintTypes = map[descriptorpb.FieldDescriptorProto_Type]bool{}
@@ -183,6 +184,11 @@ func DecodeScalarField(fd *desc.FieldDescriptor, v uint64) (interface{}, error) 
 // still expects a single scalar value. In this case, if the actual data in bytes
 // contains multiple values, only the last value is returned.
 func DecodeLengthDelimitedField(fd *desc.FieldDescriptor, bytes []byte, mf MessageFactory) (interface{}, error) {
+	var b Buffer
+	return b.decodeLengthDelimitedField(fd, bytes, mf)
+}
+
+func (b *Buffer) decodeLengthDelimitedField(fd *desc.FieldDescriptor, bytes []byte, mf MessageFactory) (interface{}, error) {
 	switch {
 	case fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_BYTES:
 		return bytes, nil
@@ -193,7 +199,7 @@ func DecodeLengthDelimitedField(fd *desc.FieldDescriptor, bytes []byte, mf Messa
 	case fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE ||
 		fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP:
 		msg := mf.NewMessage(fd.GetMessageType())
-		err := proto.Unmarshal(bytes, msg)
+		err := (*codec.Buffer)(b).DecodeNestedMessage(bytes, msg)
 		if err != nil {
 			return nil, err
 		} else {
@@ -267,7 +273,7 @@ func (b *Buffer) decodeKnownField(fd *desc.FieldDescriptor, encoding int8, fact 
 		var raw []byte
 		raw, err = b.DecodeRawBytes(alloc)
 		if err == nil {
-			val, err = DecodeLengthDelimitedField(fd, raw, fact)
+			val, err = b.decodeLengthDelimitedField(fd, raw, fact)
 		}
 
 	case proto.WireStartGroup:
@@ -278,7 +284,7 @@ func (b *Buffer) decodeKnownField(fd *desc.FieldDescriptor, encoding int8, fact 
 		var data []byte
 		data, err = b.ReadGroup(false)
 		if err == nil {
-			err = proto.Unmarshal(data, msg)
+			err = (*codec.Buffer)(b).DecodeNestedMessage(data, msg)
 			if err == nil {
 				val = msg
 			}

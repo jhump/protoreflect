@@ -65,7 +65,7 @@ func (cb *Buffer) EncodeRawBytes(b []byte) error {
 
 // EncodeMessage writes the given message to the buffer.
 func (cb *Buffer) EncodeMessage(pm proto.Message) error {
-	bytes, err := marshalMessage(cb.buf, pm, cb.deterministic)
+	bytes, err := cb.marshalNestedMessage(cb.buf, pm)
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func (cb *Buffer) EncodeMessage(pm proto.Message) error {
 // EncodeDelimitedMessage writes the given message to the buffer with a
 // varint-encoded length prefix (the delimiter).
 func (cb *Buffer) EncodeDelimitedMessage(pm proto.Message) error {
-	bytes, err := marshalMessage(cb.tmp, pm, cb.deterministic)
+	bytes, err := cb.marshalNestedMessage(cb.tmp, pm)
 	if err != nil {
 		return err
 	}
@@ -86,6 +86,23 @@ func (cb *Buffer) EncodeDelimitedMessage(pm proto.Message) error {
 		cb.tmp = bytes[:0]
 	}
 	return cb.EncodeRawBytes(bytes)
+}
+
+// marshalNestedMessage appends the encoding of pm, which is nested inside the
+// message at this buffer's depth, to b. If this buffer has a MessageCodec, it
+// is used to encode pm, so that the depth is tracked across nested messages.
+func (cb *Buffer) marshalNestedMessage(b []byte, pm proto.Message) ([]byte, error) {
+	if cb.messageCodec == nil {
+		return marshalMessage(b, pm, cb.deterministic)
+	}
+	nested, err := cb.NestedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	if handled, err := cb.messageCodec.Marshal(nested, pm); handled {
+		return nested.buf, err
+	}
+	return marshalMessage(b, pm, cb.deterministic)
 }
 
 func marshalMessage(b []byte, pm proto.Message, deterministic bool) ([]byte, error) {

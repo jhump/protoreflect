@@ -10,6 +10,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/internal/codec"
 )
 
 // EncodeZigZag64 does zig-zag encoding to convert the given
@@ -32,9 +33,13 @@ func (cb *Buffer) EncodeFieldValue(fd *desc.FieldDescriptor, val interface{}) er
 		entryType := fd.GetMessageType()
 		keyType := entryType.FindFieldByNumber(1)
 		valType := entryType.FindFieldByNumber(2)
-		var entryBuffer Buffer
+		// a map entry is a nested message
+		nested, err := (*codec.Buffer)(cb).NestedBuffer(nil)
+		if err != nil {
+			return err
+		}
+		entryBuffer := (*Buffer)(nested)
 		if cb.IsDeterministic() {
-			entryBuffer.SetDeterministic(true)
 			keys := make([]interface{}, 0, len(mp))
 			for k := range mp {
 				keys = append(keys, k)

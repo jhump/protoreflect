@@ -3,6 +3,9 @@ package codec
 import (
 	"fmt"
 	"io"
+
+	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/encoding/protowire"
 )
 
 // Buffer is a reader and a writer that wraps a slice of bytes and also
@@ -23,6 +26,48 @@ type Buffer struct {
 	tmp []byte
 
 	deterministic bool
+
+	// depth is the nesting level of the message being encoded into or
+	// decoded from this buffer. It is zero for a top-level message.
+	depth int
+
+	// messageCodec, if non-nil, is used to encode and decode nested
+	// messages. It is propagated to the buffers used for nested messages.
+	messageCodec MessageCodec
+}
+
+// MessageCodec encodes and decodes messages directly to and from a Buffer.
+// This allows the buffer's nesting depth to be tracked through nested
+// messages instead of being reset by an intervening call to proto.Marshal
+// or proto.Unmarshal.
+type MessageCodec interface {
+	// Marshal encodes msg into buf. It returns false if msg is not a kind
+	// of message that it handles.
+	Marshal(buf *Buffer, msg proto.Message) (handled bool, err error)
+	// Unmarshal decodes the contents of buf into msg. It returns false if
+	// msg is not a kind of message that it handles.
+	Unmarshal(buf *Buffer, msg proto.Message) (handled bool, err error)
+}
+
+// SetMessageCodec sets the codec used to encode and decode nested messages.
+func (cb *Buffer) SetMessageCodec(messageCodec MessageCodec) {
+	cb.messageCodec = messageCodec
+}
+
+// NestedBuffer returns a buffer, using the given bytes, for encoding or
+// decoding a message nested inside the one at this buffer's depth. It
+// returns ErrRecursionDepth if that would exceed the maximum depth.
+func (cb *Buffer) NestedBuffer(buf []byte) (*Buffer, error) {
+	depth := cb.depth + 1
+	if depth >= protowire.DefaultRecursionLimit {
+		return nil, ErrRecursionDepth
+	}
+	return &Buffer{
+		buf:           buf,
+		deterministic: cb.deterministic,
+		depth:         depth,
+		messageCodec:  cb.messageCodec,
+	}, nil
 }
 
 // NewBuffer creates a new buffer with the given slice of bytes as the
