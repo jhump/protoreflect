@@ -107,15 +107,24 @@ func (m *Message) MarshalJSONPB(opts *jsonpb.Marshaler) ([]byte, error) {
 		b.indentCount = -1
 	}
 	b.comma = true
-	if err := m.marshalJSON(&b, opts); err != nil {
+	// If we're called from jsonpb, to marshal the contents of an Any, then
+	// the resolver tells us how deeply nested we already are.
+	var depth int
+	if r, ok := opts.AnyResolver.(*anyResolver); ok {
+		depth = r.nestedDepth
+	}
+	if err := m.marshalJSON(&b, opts, depth); err != nil {
 		return nil, err
 	}
 	return b.Bytes(), nil
 }
 
-func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
+func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler, depth int) error {
 	if m == nil {
 		_, err := b.WriteString("null")
+		return err
+	}
+	if err := checkDepth(depth); err != nil {
 		return err
 	}
 	if r, changed := wrapResolver(opts.AnyResolver, m.mf, m.md.GetFile()); changed {
@@ -124,7 +133,7 @@ func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
 		opts = &newOpts
 	}
 
-	if ok, err := marshalWellKnownType(m, b, opts); ok {
+	if ok, err := marshalWellKnownType(m, b, opts, depth); ok {
 		return err
 	}
 
@@ -163,7 +172,7 @@ func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
 		if err != nil {
 			return err
 		}
-		err = marshalKnownFieldJSON(b, fd, v, opts)
+		err = marshalKnownFieldJSON(b, fd, v, opts, depth)
 		if err != nil {
 			return err
 		}
@@ -181,7 +190,7 @@ func (m *Message) marshalJSON(b *indentBuffer, opts *jsonpb.Marshaler) error {
 	return nil
 }
 
-func marshalWellKnownType(m *Message, b *indentBuffer, opts *jsonpb.Marshaler) (bool, error) {
+func marshalWellKnownType(m *Message, b *indentBuffer, opts *jsonpb.Marshaler, depth int) (bool, error) {
 	fqn := m.md.GetFullyQualifiedName()
 	if _, ok := wellKnownTypeNames[fqn]; !ok {
 		return false, nil
@@ -198,10 +207,31 @@ func marshalWellKnownType(m *Message, b *indentBuffer, opts *jsonpb.Marshaler) (
 	if err := m.MergeInto(msg); err != nil {
 		return true, err
 	}
-	return true, opts.Marshal(b, msg)
+	return true, jsonpbMarshalerAtDepth(opts, depth).Marshal(b, msg)
 }
 
-func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts *jsonpb.Marshaler) error {
+// jsonpbMarshalerAtDepth returns options for marshaling a message at the
+// given depth with jsonpb. If that message contains an Any whose value is a
+// dynamic message, jsonpb will call back into MarshalJSONPB with these
+// options. So we record the depth in the resolver, so that MarshalJSONPB can
+// continue counting from there instead of starting over. (Counting from one
+// level deeper is a slight underestimate, since the Any is likely nested
+// inside the given message, but that's fine: we just need each round trip
+// through jsonpb to make progress towards the limit.)
+func jsonpbMarshalerAtDepth(opts *jsonpb.Marshaler, depth int) *jsonpb.Marshaler {
+	r, ok := opts.AnyResolver.(*anyResolver)
+	if !ok {
+		// marshalJSON always installs an *anyResolver, so this shouldn't happen
+		return opts
+	}
+	newResolver := *r
+	newResolver.nestedDepth = depth + 1
+	newOpts := *opts
+	newOpts.AnyResolver = &newResolver
+	return &newOpts
+}
+
+func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts *jsonpb.Marshaler, depth int) error {
 	var jsonName string
 	if opts.OrigName {
 		jsonName = fd.GetName()
@@ -266,7 +296,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 				return err
 			}
 
-			err = marshalKnownFieldMapEntryJSON(b, mk, vfd, mv, opts)
+			err = marshalKnownFieldMapEntryJSON(b, mk, vfd, mv, opts, depth)
 			if err != nil {
 				return err
 			}
@@ -295,7 +325,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 			if err != nil {
 				return err
 			}
-			err = marshalKnownFieldValueJSON(b, fd, slv, opts)
+			err = marshalKnownFieldValueJSON(b, fd, slv, opts, depth)
 			if err != nil {
 				return err
 			}
@@ -308,7 +338,7 @@ func marshalKnownFieldJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interfac
 		return b.WriteByte(']')
 
 	} else {
-		return marshalKnownFieldValueJSON(b, fd, v, opts)
+		return marshalKnownFieldValueJSON(b, fd, v, opts, depth)
 	}
 }
 
@@ -353,7 +383,9 @@ func isNil(v interface{}) bool {
 	return rv.Kind() == reflect.Ptr && rv.IsNil()
 }
 
-func marshalKnownFieldMapEntryJSON(b *indentBuffer, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}, opts *jsonpb.Marshaler) error {
+// marshalKnownFieldMapEntryJSON marshals the given map entry for a field of a
+// message that is at the given depth.
+func marshalKnownFieldMapEntryJSON(b *indentBuffer, mk interface{}, vfd *desc.FieldDescriptor, mv interface{}, opts *jsonpb.Marshaler, depth int) error {
 	rk := reflect.ValueOf(mk)
 	var strkey string
 	switch rk.Kind() {
@@ -376,10 +408,13 @@ func marshalKnownFieldMapEntryJSON(b *indentBuffer, mk interface{}, vfd *desc.Fi
 	if err != nil {
 		return err
 	}
-	return marshalKnownFieldValueJSON(b, vfd, mv, opts)
+	// a map entry is a level of nesting, as in the binary format
+	return marshalKnownFieldValueJSON(b, vfd, mv, opts, depth+1)
 }
 
-func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts *jsonpb.Marshaler) error {
+// marshalKnownFieldValueJSON marshals the given value for a field of a message
+// that is at the given depth.
+func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v interface{}, opts *jsonpb.Marshaler, depth int) error {
 	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
 	case reflect.Int64:
@@ -440,9 +475,13 @@ func marshalKnownFieldValueJSON(b *indentBuffer, fd *desc.FieldDescriptor, v int
 		}
 
 		if dm, ok := v.(*Message); ok {
-			return dm.marshalJSON(b, opts)
+			return dm.marshalJSON(b, opts, depth+1)
 		}
 
+		if err := checkDepth(depth + 1); err != nil {
+			return err
+		}
+		opts := jsonpbMarshalerAtDepth(opts, depth+1)
 		var err error
 		if b.indentCount <= 0 || len(b.indent) == 0 {
 			err = opts.Marshal(b, v.(proto.Message))
@@ -547,7 +586,7 @@ func (m *Message) UnmarshalJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
 // existing data in this message.
 func (m *Message) UnmarshalMergeJSONPB(opts *jsonpb.Unmarshaler, js []byte) error {
 	r := newJsReader(js)
-	err := m.unmarshalJson(r, opts)
+	err := m.unmarshalJson(r, opts, 0)
 	if err != nil {
 		return err
 	}
@@ -588,7 +627,10 @@ func unmarshalWellKnownType(m *Message, r *jsReader, opts *jsonpb.Unmarshaler) (
 	return true, m.MergeFrom(msg)
 }
 
-func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
+func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler, depth int) error {
+	if err := checkDepth(depth); err != nil {
+		return err
+	}
 	if r, changed := wrapResolver(opts.AnyResolver, m.mf, m.md.GetFile()); changed {
 		newOpts := *opts
 		newOpts.AnyResolver = r
@@ -621,12 +663,14 @@ func (m *Message) unmarshalJson(r *jsReader, opts *jsonpb.Unmarshaler) error {
 		fd := m.FindFieldDescriptorByJSONName(f)
 		if fd == nil {
 			if opts.AllowUnknownFields {
-				r.skip()
+				if err := r.skip(); err != nil {
+					return err
+				}
 				continue
 			}
 			return fmt.Errorf("message type %s has no known field named %s", m.md.GetFullyQualifiedName(), f)
 		}
-		v, err := unmarshalJsField(fd, r, m.mf, opts)
+		v, err := unmarshalJsField(fd, r, m.mf, opts, depth)
 		if err != nil {
 			return err
 		}
@@ -680,7 +724,9 @@ func isWellKnownListValue(fd *desc.FieldDescriptor) bool {
 			fd.GetMessageType().GetFullyQualifiedName() == "google.protobuf.Value")
 }
 
-func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory, opts *jsonpb.Unmarshaler) (interface{}, error) {
+// unmarshalJsField unmarshals the value of a field of a message that is at the
+// given depth.
+func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory, opts *jsonpb.Unmarshaler, depth int) (interface{}, error) {
 	t, err := r.peek()
 	if err != nil {
 		return nil, err
@@ -700,6 +746,9 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory,
 		valueType := entryType.FindFieldByNumber(2)
 		mp := map[interface{}]interface{}{}
 
+		// keys and values are inside a map entry, which is a level of nesting,
+		// as in the binary format
+
 		// TODO: if there are just two map keys "key" and "value" and they have the right type of values,
 		// treat this JSON object as a single map entry message. (In keeping with support of map fields as
 		// if they were normal repeated field of entry messages as well as supporting a transition from
@@ -709,11 +758,11 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory,
 			return nil, err
 		}
 		for r.hasNext() {
-			kk, err := unmarshalJsFieldElement(keyType, r, mf, opts, false)
+			kk, err := unmarshalJsFieldElement(keyType, r, mf, opts, depth+1, false)
 			if err != nil {
 				return nil, err
 			}
-			vv, err := unmarshalJsFieldElement(valueType, r, mf, opts, true)
+			vv, err := unmarshalJsFieldElement(valueType, r, mf, opts, depth+1, true)
 			if err != nil {
 				return nil, err
 			}
@@ -736,7 +785,7 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory,
 		var v interface{}
 		for r.hasNext() {
 			var err error
-			v, err = unmarshalJsFieldElement(fd, r, mf, opts, false)
+			v, err = unmarshalJsFieldElement(fd, r, mf, opts, depth, false)
 			if err != nil {
 				return nil, err
 			}
@@ -772,7 +821,7 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory,
 		// binary wire format that supports changing an optional field to repeated and vice versa.
 		// If the field is repeated, we store value as singleton slice of that one value.
 
-		v, err := unmarshalJsFieldElement(fd, r, mf, opts, false)
+		v, err := unmarshalJsFieldElement(fd, r, mf, opts, depth, false)
 		if err != nil {
 			return nil, err
 		}
@@ -787,7 +836,7 @@ func unmarshalJsField(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory,
 	}
 }
 
-func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory, opts *jsonpb.Unmarshaler, allowNilMessage bool) (interface{}, error) {
+func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageFactory, opts *jsonpb.Unmarshaler, depth int, allowNilMessage bool) (interface{}, error) {
 	t, err := r.peek()
 	if err != nil {
 		return nil, err
@@ -805,7 +854,7 @@ func unmarshalJsFieldElement(fd *desc.FieldDescriptor, r *jsReader, mf *MessageF
 
 		m := mf.NewMessage(fd.GetMessageType())
 		if dm, ok := m.(*Message); ok {
-			if err := dm.unmarshalJson(r, opts); err != nil {
+			if err := dm.unmarshalJson(r, opts, depth+1); err != nil {
 				return nil, err
 			}
 		} else {
@@ -1052,49 +1101,27 @@ func (r *jsReader) nextNumber() (json.Number, error) {
 }
 
 func (r *jsReader) skip() error {
-	t, err := r.poll()
-	if err != nil {
-		return err
-	}
-	if t == json.Delim('[') {
-		if err := r.skipArray(); err != nil {
+	// We track nested arrays and objects with a counter, instead of
+	// recursing, so that deeply nested input can't overflow the stack.
+	var depth int
+	for {
+		t, err := r.poll()
+		if err != nil {
 			return err
 		}
-	} else if t == json.Delim('{') {
-		if err := r.skipObject(); err != nil {
-			return err
+		switch t {
+		case json.Delim('['), json.Delim('{'):
+			depth++
+			if err := checkDepth(depth); err != nil {
+				return err
+			}
+		case json.Delim(']'), json.Delim('}'):
+			depth--
+		}
+		if depth == 0 {
+			return nil
 		}
 	}
-	return nil
-}
-
-func (r *jsReader) skipArray() error {
-	for r.hasNext() {
-		if err := r.skip(); err != nil {
-			return err
-		}
-	}
-	if err := r.endArray(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *jsReader) skipObject() error {
-	for r.hasNext() {
-		// skip object key
-		if err := r.skip(); err != nil {
-			return err
-		}
-		// and value
-		if err := r.skip(); err != nil {
-			return err
-		}
-	}
-	if err := r.endObject(); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (r *jsReader) expect(predicate func(json.Token) bool, ifNil interface{}, expected string) (interface{}, error) {
@@ -1146,6 +1173,10 @@ type anyResolver struct {
 	files   []*desc.FileDescriptor
 	ignored map[*desc.FileDescriptor]struct{}
 	other   jsonpb.AnyResolver
+	// nestedDepth is the depth of messages that jsonpb passes back to
+	// MarshalJSONPB, when this resolver was handed off to jsonpb. It is zero
+	// if it was not. See jsonpbMarshalerAtDepth.
+	nestedDepth int
 }
 
 func wrapResolver(r jsonpb.AnyResolver, mf *MessageFactory, f *desc.FileDescriptor) (jsonpb.AnyResolver, bool) {

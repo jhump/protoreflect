@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/encoding/protowire"
 )
 
 // ErrOverflow is returned when an integer is too large to be represented.
@@ -15,6 +16,11 @@ var ErrOverflow = errors.New("proto: integer overflow")
 // ErrBadWireType is returned when decoding a wire-type from a buffer that
 // is not valid.
 var ErrBadWireType = errors.New("proto: bad wiretype")
+
+// ErrRecursionDepth is returned when the data being encoded or decoded
+// contains messages or groups that are nested more deeply than
+// protowire.DefaultRecursionLimit.
+var ErrRecursionDepth = errors.New("proto: exceeded maximum recursion depth")
 
 func (cb *Buffer) decodeVarintSlow() (x uint64, err error) {
 	i := cb.index
@@ -233,6 +239,28 @@ func (cb *Buffer) DecodeRawBytes(alloc bool) (buf []byte, err error) {
 	return
 }
 
+// DecodeNestedMessage decodes data into msg, which is nested inside the
+// message at this buffer's depth. If this buffer has a MessageCodec, it is
+// used to decode msg, so that the depth is tracked across nested messages.
+func (cb *Buffer) DecodeNestedMessage(data []byte, msg proto.Message) error {
+	if cb.messageCodec != nil {
+		nested, err := cb.NestedBuffer(data)
+		if err != nil {
+			return err
+		}
+		if handled, err := cb.messageCodec.Unmarshal(nested, msg); handled {
+			return err
+		}
+	}
+	// Other messages are decoded by the protobuf runtime, which enforces its
+	// own recursion limit. That limit starts over, instead of only allowing
+	// the remaining depth, because passing the remaining depth would require
+	// calling the runtime in a way that changes the type of error returned
+	// for missing required fields. Even at both limits combined, the stack
+	// usage is modest.
+	return proto.Unmarshal(data, msg)
+}
+
 // ReadGroup reads the input until a "group end" tag is found
 // and returns the data up to that point. Subsequent reads from
 // the buffer will read data after the group end tag. If alloc
@@ -328,6 +356,9 @@ func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
 	defer func() {
 		cb.index = start
 	}()
+	// We track nested groups with a counter, instead of recursing via
+	// SkipField, so that deeply nested input can't overflow the stack.
+	var depth int
 	for {
 		fieldStart := cb.index
 		// read a field tag
@@ -335,12 +366,22 @@ func (cb *Buffer) findGroupEnd() (groupEnd int, dataEnd int, err error) {
 		if err != nil {
 			return 0, 0, err
 		}
-		if wireType == proto.WireEndGroup {
-			return cb.index, fieldStart, nil
-		}
-		// skip past the field's data
-		if err := cb.SkipField(wireType); err != nil {
-			return 0, 0, err
+		switch wireType {
+		case proto.WireEndGroup:
+			if depth == 0 {
+				return cb.index, fieldStart, nil
+			}
+			depth--
+		case proto.WireStartGroup:
+			depth++
+			if depth >= protowire.DefaultRecursionLimit {
+				return 0, 0, ErrRecursionDepth
+			}
+		default:
+			// skip past the field's data
+			if err := cb.SkipField(wireType); err != nil {
+				return 0, 0, err
+			}
 		}
 	}
 }

@@ -2307,7 +2307,7 @@ func (m *Message) mergeInto(pm proto.Message, deterministic bool) error {
 
 	// if we have fields that the given message doesn't know about, add to its unknown fields
 	if len(unknownTags) > 0 {
-		var b codec.Buffer
+		b := newBuffer(nil)
 		b.SetDeterministic(deterministic)
 		if deterministic {
 			// if we need to emit things deterministically, sort the

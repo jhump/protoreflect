@@ -15,6 +15,11 @@ var ErrOverflow = codec.ErrOverflow
 // is not valid.
 var ErrBadWireType = codec.ErrBadWireType
 
+// ErrRecursionDepth is returned when the data being encoded or decoded
+// contains messages or groups that are nested more deeply than
+// protowire.DefaultRecursionLimit.
+var ErrRecursionDepth = codec.ErrRecursionDepth
+
 // NB: much of the implementation is in an internal package, to avoid an import
 // cycle between this codec package and the desc package. We export it from
 // this package, but we can't use a type alias because we also need to add
