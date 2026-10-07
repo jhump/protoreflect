@@ -1,6 +1,6 @@
 # Protocol Buffer and gRPC Reflection
-[![Build Status](https://circleci.com/gh/jhump/protoreflect/tree/main.svg?style=svg)](https://circleci.com/gh/jhump/protoreflect/tree/main)
-[![Go Report Card](https://goreportcard.com/badge/github.com/jhump/protoreflect)](https://goreportcard.com/report/github.com/jhump/protoreflect)
+[![CI](https://github.com/jhump/protoreflect/actions/workflows/ci.yaml/badge.svg?branch=v1)](https://github.com/jhump/protoreflect/actions/workflows/ci.yaml?query=branch%3Av1)
+[![GoDoc](https://pkg.go.dev/badge/github.com/jhump/protoreflect.svg)](https://pkg.go.dev/github.com/jhump/protoreflect)
 
 This repo provides reflection APIs for [protocol buffers](https://developers.google.com/protocol-buffers/) (also known as "protobufs" for short)
 and [gRPC](https://grpc.io/). The core of reflection in protobufs is the
@@ -9,7 +9,6 @@ A descriptor is itself a protobuf message that describes a `.proto` source file 
 therein. So a collection of descriptors can describe an entire schema of protobuf types, including
 RPC services.
 
-[![GoDoc](https://godoc.org/github.com/jhump/protoreflect?status.svg)](https://godoc.org/github.com/jhump/protoreflect)
 
 > [!NOTE]
 > This branch is for maintenance of the v1.x line of releases. After v1.17.0, the `main` branch was replaced with the in-progress
