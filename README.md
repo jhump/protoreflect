@@ -1,5 +1,5 @@
 # Protocol Buffer and gRPC Reflection
-[![CI](https://github.com/jhump/protoreflect/workflows/ci/badge.svg)](https://github.com/jhump/protoreflect/actions/workflows/ci.yaml)
+[![CI](https://github.com/jhump/protoreflect/actions/workflows/ci.yaml/badge.svg)](https://github.com/jhump/protoreflect/actions/workflows/ci.yaml)
 [![GoDoc](https://pkg.go.dev/badge/github.com/jhump/protoreflect/v2.svg)](https://pkg.go.dev/github.com/jhump/protoreflect/v2)
 
 This repo builds on top of the reflection capabilities in the [Protobuf runtime for Go](https://pkg.go.dev/google.golang.org/protobuf/reflect/protoreflect)
