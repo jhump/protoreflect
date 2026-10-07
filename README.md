@@ -1,11 +1,9 @@
 # Protocol Buffer and gRPC Reflection
-[![Build Status](https://circleci.com/gh/jhump/protoreflect/tree/v2.svg?style=svg)](https://circleci.com/gh/jhump/protoreflect/tree/v2)
-[![Go Report Card](https://goreportcard.com/badge/github.com/jhump/protoreflect)](https://goreportcard.com/report/github.com/jhump/protoreflect)
+[![CI](https://github.com/jhump/protoreflect/workflows/ci/badge.svg)](https://github.com/jhump/protoreflect/actions/workflows/ci.yaml)
+[![GoDoc](https://pkg.go.dev/badge/github.com/jhump/protoreflect/v2.svg)](https://pkg.go.dev/github.com/jhump/protoreflect/v2)
 
 This repo builds on top of the reflection capabilities in the [Protobuf runtime for Go](https://pkg.go.dev/google.golang.org/protobuf/reflect/protoreflect)
 and also provides reflection APIs for [gRPC](https://grpc.io/) as well.
-
-[![GoDoc](https://pkg.go.dev/badge/github.com/jhump/protoreflect/v2.svg)](https://pkg.go.dev/github.com/jhump/protoreflect/v2)
 
 > [!NOTE]
 > Version 2.0.0 is still a work in progress. It is basically feature complete, but still needs more tests
