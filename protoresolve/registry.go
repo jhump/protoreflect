@@ -356,7 +356,8 @@ func (r *Registry) FindExtensionByNumber(message protoreflect.FullName, fieldNum
 
 // FindMessageByURL implements part of the Resolver interface.
 func (r *Registry) FindMessageByURL(url string) (protoreflect.MessageDescriptor, error) {
-	return r.FindMessageByName(TypeNameFromURL(url))
+	msg, err := r.FindMessageByName(TypeNameFromURL(url))
+	return msg, errorForURL(err, url)
 }
 
 // RangeExtensionsByMessage implements part of the Resolver interface.

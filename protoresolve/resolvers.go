@@ -223,7 +223,8 @@ func (r *resolverFromPool) RangeExtensionsByMessage(message protoreflect.FullNam
 }
 
 func (r *resolverFromPool) FindMessageByURL(url string) (protoreflect.MessageDescriptor, error) {
-	return r.FindMessageByName(TypeNameFromURL(url))
+	msg, err := r.FindMessageByName(TypeNameFromURL(url))
+	return msg, errorForURL(err, url)
 }
 
 func (r *resolverFromPool) AsTypeResolver() TypeResolver {

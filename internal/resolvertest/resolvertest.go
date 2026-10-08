@@ -42,9 +42,30 @@ func WithLenientErrors() Option {
 	}
 }
 
+// WithLenientTypeErrors is like WithLenientErrors, but only applies to the
+// resolver returned from the AsTypeResolver (or AsTypePool) method of the
+// resolver under test. This is for resolvers that use a type resolver
+// implemented outside of this module, like *protoregistry.Types.
+func WithLenientTypeErrors() Option {
+	return func(cfg *config) {
+		cfg.lenientTypeErrors = true
+	}
+}
+
+// WithInexactFileCounts indicates that the NumFiles and NumFilesByPackage
+// methods of the resolver under test are not expected to be accurate, so
+// they will not be checked.
+func WithInexactFileCounts() Option {
+	return func(cfg *config) {
+		cfg.inexactFileCounts = true
+	}
+}
+
 type config struct {
-	allowExtraFiles bool
-	lenientErrors   bool
+	allowExtraFiles   bool
+	lenientErrors     bool
+	lenientTypeErrors bool
+	inexactFileCounts bool
 }
 
 func newConfig(opts []Option) *config {
@@ -71,6 +92,20 @@ func Corpus() []protoreflect.FileDescriptor {
 	})
 }
 
+// CheckResolver verifies that the given resolver can resolve all files and
+// descriptors in the given corpus, and that it can enumerate all files and
+// extensions in the corpus. It also verifies the errors returned for elements
+// that are not found or that are the wrong kind.
+//
+// The resolver returned by the AsTypeResolver method is checked using
+// CheckTypePool, if it implements protoresolve.TypePool, or otherwise using
+// CheckTypeResolver. If the given resolver also has an AsTypePool method,
+// the pool it returns is also checked.
+func CheckResolver(t *testing.T, res protoresolve.Resolver, corpus []protoreflect.FileDescriptor, opts ...Option) {
+	t.Helper()
+	checkResolver(t, newConfig(opts), res, newCorpusIndex(corpus))
+}
+
 // CheckTypeResolver verifies that the given resolver can resolve all types
 // in the given corpus. It also verifies the errors returned for elements
 // that are not found or that are the wrong kind.
@@ -79,44 +114,12 @@ func Corpus() []protoreflect.FileDescriptor {
 // protoresolve.TypePool, that method is checked, too.
 func CheckTypeResolver(t *testing.T, res protoresolve.TypeResolver, corpus []protoreflect.FileDescriptor, opts ...Option) {
 	t.Helper()
-	cfg := newConfig(opts)
-	index := newCorpusIndex(corpus)
-	t.Run("FindMessage", func(t *testing.T) {
-		checkFindMessageTypes(t, cfg, res, index)
-	})
-	t.Run("FindEnumByName", func(t *testing.T) {
-		checkFindEnumTypes(t, cfg, res, index)
-	})
-	t.Run("FindExtension", func(t *testing.T) {
-		checkFindExtensionTypes(t, cfg, res, index)
-	})
-	if ranger, ok := res.(extensionTypeRanger); ok {
-		t.Run("RangeExtensionsByMessage", func(t *testing.T) {
-			checkRangeExtensionTypesByMessage(t, cfg, ranger, index)
-		})
-	}
+	checkTypeResolver(t, newConfig(opts), res, newCorpusIndex(corpus))
 }
 
 // CheckTypePool is like CheckTypeResolver, but also verifies that the methods
 // for enumerating types yield all types in the given corpus.
 func CheckTypePool(t *testing.T, pool protoresolve.TypePool, corpus []protoreflect.FileDescriptor, opts ...Option) {
 	t.Helper()
-	CheckTypeResolver(t, pool, corpus, opts...)
-	cfg := newConfig(opts)
-	index := newCorpusIndex(corpus)
-	t.Run("RangeMessages", func(t *testing.T) {
-		checkRange(t, cfg, index, pool.RangeMessages,
-			func(mt protoreflect.MessageType) protoreflect.Descriptor { return mt.Descriptor() },
-			names(index.typeMessages()))
-	})
-	t.Run("RangeEnums", func(t *testing.T) {
-		checkRange(t, cfg, index, pool.RangeEnums,
-			func(et protoreflect.EnumType) protoreflect.Descriptor { return et.Descriptor() },
-			names(index.enums))
-	})
-	t.Run("RangeExtensions", func(t *testing.T) {
-		checkRange(t, cfg, index, pool.RangeExtensions,
-			func(xt protoreflect.ExtensionType) protoreflect.Descriptor { return xt.TypeDescriptor() },
-			names(index.extensions))
-	})
+	checkTypePool(t, newConfig(opts), pool, newCorpusIndex(corpus))
 }

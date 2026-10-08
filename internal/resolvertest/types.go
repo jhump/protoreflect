@@ -14,6 +14,45 @@ type extensionTypeRanger interface {
 	RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionType) bool)
 }
 
+func checkTypeResolver(t *testing.T, cfg *config, res protoresolve.TypeResolver, index *corpusIndex) {
+	t.Run("FindMessage", func(t *testing.T) {
+		checkFindMessageTypes(t, cfg, res, index)
+	})
+	t.Run("FindEnumByName", func(t *testing.T) {
+		checkFindEnumTypes(t, cfg, res, index)
+	})
+	t.Run("FindExtension", func(t *testing.T) {
+		checkFindExtensionTypes(t, cfg, res, index)
+	})
+	if ranger, ok := res.(extensionTypeRanger); ok {
+		t.Run("RangeExtensionsByMessage", func(t *testing.T) {
+			checkRangeExtensionsByMessage(t, cfg, index, ranger.RangeExtensionsByMessage,
+				func(extType protoreflect.ExtensionType) protoreflect.ExtensionDescriptor {
+					return extType.TypeDescriptor()
+				})
+		})
+	}
+}
+
+func checkTypePool(t *testing.T, cfg *config, pool protoresolve.TypePool, index *corpusIndex) {
+	checkTypeResolver(t, cfg, pool, index)
+	t.Run("RangeMessages", func(t *testing.T) {
+		checkRange(t, cfg, index, pool.RangeMessages,
+			func(msgType protoreflect.MessageType) protoreflect.Descriptor { return msgType.Descriptor() },
+			keys(index.typeMessages()))
+	})
+	t.Run("RangeEnums", func(t *testing.T) {
+		checkRange(t, cfg, index, pool.RangeEnums,
+			func(enumType protoreflect.EnumType) protoreflect.Descriptor { return enumType.Descriptor() },
+			keys(index.enums))
+	})
+	t.Run("RangeExtensions", func(t *testing.T) {
+		checkRange(t, cfg, index, pool.RangeExtensions,
+			func(extType protoreflect.ExtensionType) protoreflect.Descriptor { return extType.TypeDescriptor() },
+			keys(index.extensions))
+	})
+}
+
 func checkFindMessageTypes(t *testing.T, cfg *config, res protoresolve.MessageTypeResolver, index *corpusIndex) {
 	for _, msg := range index.typeMessages() {
 		name := msg.FullName()
@@ -34,11 +73,11 @@ func checkFindMessageTypes(t *testing.T, cfg *config, res protoresolve.MessageTy
 	require.NotEmpty(t, index.extensions)
 	enum, ext := index.enums[0], index.extensions[0]
 	_, err := res.FindMessageByName(enum.FullName())
-	checkUnexpectedType(t, cfg, err, protoresolve.DescriptorKindMessage, protoresolve.DescriptorKindEnum, enum.FullName(), "")
+	checkUnexpectedType(t, cfg.lenientErrors, err, protoresolve.DescriptorKindMessage, protoresolve.DescriptorKindEnum, enum.FullName(), "")
 	_, err = res.FindMessageByURL(typeURL(enum.FullName()))
-	checkUnexpectedType(t, cfg, err, protoresolve.DescriptorKindMessage, protoresolve.DescriptorKindEnum, "", typeURL(enum.FullName()))
+	checkUnexpectedType(t, cfg.lenientErrors, err, protoresolve.DescriptorKindMessage, protoresolve.DescriptorKindEnum, "", typeURL(enum.FullName()))
 	_, err = res.FindMessageByName(ext.FullName())
-	checkUnexpectedType(t, cfg, err, protoresolve.DescriptorKindMessage, protoresolve.DescriptorKindExtension, ext.FullName(), "")
+	checkUnexpectedType(t, cfg.lenientErrors, err, protoresolve.DescriptorKindMessage, protoresolve.DescriptorKindExtension, ext.FullName(), "")
 
 	_, err = res.FindMessageByName(unknownName)
 	checkNotFound(t, err, string(unknownName))
@@ -60,9 +99,9 @@ func checkFindEnumTypes(t *testing.T, cfg *config, res protoresolve.EnumTypeReso
 	require.NotEmpty(t, index.messages)
 	msg, enumVal := index.messages[0], index.enums[0].Values().Get(0)
 	_, err := res.FindEnumByName(msg.FullName())
-	checkUnexpectedType(t, cfg, err, protoresolve.DescriptorKindEnum, protoresolve.DescriptorKindMessage, msg.FullName(), "")
+	checkUnexpectedType(t, cfg.lenientErrors, err, protoresolve.DescriptorKindEnum, protoresolve.DescriptorKindMessage, msg.FullName(), "")
 	_, err = res.FindEnumByName(enumVal.FullName())
-	checkUnexpectedType(t, cfg, err, protoresolve.DescriptorKindEnum, protoresolve.DescriptorKindEnumValue, enumVal.FullName(), "")
+	checkUnexpectedType(t, cfg.lenientErrors, err, protoresolve.DescriptorKindEnum, protoresolve.DescriptorKindEnumValue, enumVal.FullName(), "")
 
 	_, err = res.FindEnumByName(unknownName)
 	checkNotFound(t, err, string(unknownName))
@@ -81,68 +120,43 @@ func checkFindExtensionTypes(t *testing.T, cfg *config, res protoresolve.Extensi
 			checkExtensionMatches(t, ext, extType.TypeDescriptor())
 		}
 	}
+	checkFindExtensionErrors(t, cfg, index,
+		func(name protoreflect.FullName) error {
+			_, err := res.FindExtensionByName(name)
+			return err
+		},
+		func(message protoreflect.FullName, number protoreflect.FieldNumber) error {
+			_, err := res.FindExtensionByNumber(message, number)
+			return err
+		})
+}
 
+// checkFindExtensionErrors verifies the errors returned from queries for
+// extensions, which can be used with both descriptor and type resolvers.
+func checkFindExtensionErrors(
+	t *testing.T,
+	cfg *config,
+	index *corpusIndex,
+	findByName func(protoreflect.FullName) error,
+	findByNumber func(protoreflect.FullName, protoreflect.FieldNumber) error,
+) {
 	require.NotEmpty(t, index.messages)
 	require.NotEmpty(t, index.fields)
 	require.NotEmpty(t, index.extensions)
 	msg, field, ext := index.messages[0], index.fields[0], index.extensions[0]
-	_, err := res.FindExtensionByName(msg.FullName())
-	checkUnexpectedType(t, cfg, err, protoresolve.DescriptorKindExtension, protoresolve.DescriptorKindMessage, msg.FullName(), "")
-	_, err = res.FindExtensionByName(field.FullName())
-	checkUnexpectedType(t, cfg, err, protoresolve.DescriptorKindExtension, protoresolve.DescriptorKindField, field.FullName(), "")
+	err := findByName(msg.FullName())
+	checkUnexpectedType(t, cfg.lenientErrors, err, protoresolve.DescriptorKindExtension, protoresolve.DescriptorKindMessage, msg.FullName(), "")
+	err = findByName(field.FullName())
+	checkUnexpectedType(t, cfg.lenientErrors, err, protoresolve.DescriptorKindExtension, protoresolve.DescriptorKindField, field.FullName(), "")
 
-	_, err = res.FindExtensionByName(unknownName)
+	err = findByName(unknownName)
 	checkNotFound(t, err, string(unknownName))
 	extendee := ext.ContainingMessage().FullName()
-	_, err = res.FindExtensionByNumber(extendee, unusedFieldNumber)
+	err = findByNumber(extendee, unusedFieldNumber)
 	checkNotFound(t, err, string(extendee))
-	_, err = res.FindExtensionByNumber(unknownName, 1)
+	err = findByNumber(unknownName, 1)
 	checkNotFound(t, err, string(unknownName))
 	// A normal field's number is not an extension.
-	_, err = res.FindExtensionByNumber(field.ContainingMessage().FullName(), field.Number())
+	err = findByNumber(field.ContainingMessage().FullName(), field.Number())
 	checkNotFound(t, err, string(field.FullName()))
-}
-
-func checkRangeExtensionTypesByMessage(t *testing.T, cfg *config, ranger extensionTypeRanger, index *corpusIndex) {
-	checkExtendee := func(t *testing.T, extendee protoreflect.FullName, expected []protoreflect.FullName) {
-		rangeFn := func(fn func(protoreflect.ExtensionType) bool) {
-			ranger.RangeExtensionsByMessage(extendee, func(extType protoreflect.ExtensionType) bool {
-				assert.Equal(t, extendee, extType.TypeDescriptor().ContainingMessage().FullName())
-				return fn(extType)
-			})
-		}
-		checkRange(t, cfg, index, rangeFn,
-			func(extType protoreflect.ExtensionType) protoreflect.Descriptor { return extType.TypeDescriptor() },
-			expected)
-	}
-	for extendee, exts := range index.extensionsByMessage {
-		t.Run(string(extendee), func(t *testing.T) {
-			checkExtendee(t, extendee, names(exts))
-		})
-	}
-	for _, msg := range index.typeMessages() {
-		if _, ok := index.extensionsByMessage[msg.FullName()]; !ok {
-			t.Run("no extensions", func(t *testing.T) {
-				checkExtendee(t, msg.FullName(), nil)
-			})
-			break
-		}
-	}
-	t.Run("unknown message", func(t *testing.T) {
-		checkExtendee(t, unknownName, nil)
-	})
-}
-
-func checkDescriptorMatches(t *testing.T, expected, actual protoreflect.Descriptor) {
-	t.Helper()
-	assert.Equal(t, expected.FullName(), actual.FullName())
-	assert.Equal(t, protoresolve.KindOf(expected).String(), protoresolve.KindOf(actual).String(), "kind of %s", expected.FullName())
-	assert.Equal(t, expected.ParentFile().Path(), actual.ParentFile().Path(), "file of %s", expected.FullName())
-}
-
-func checkExtensionMatches(t *testing.T, expected, actual protoreflect.ExtensionDescriptor) {
-	t.Helper()
-	checkDescriptorMatches(t, expected, actual)
-	assert.Equal(t, expected.Number(), actual.Number(), "number of %s", expected.FullName())
-	assert.Equal(t, expected.ContainingMessage().FullName(), actual.ContainingMessage().FullName(), "extendee of %s", expected.FullName())
 }
