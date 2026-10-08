@@ -23,6 +23,11 @@ var (
 	//
 	// It is meant to serve as a drop-in alternative to protoregistry.GlobalFiles
 	// that can include source code info in the returned descriptors.
+	//
+	// If source code info is registered for a file but cannot be added to it,
+	// such as if the registered data is corrupt, the descriptor is returned
+	// without source code info. Use AddSourceInfoToFile and similar functions
+	// to get an error in that case instead.
 	Files protoresolve.DescriptorPool = files{}
 
 	// Types is a registry of types that include source code info, if the
@@ -30,6 +35,9 @@ var (
 	//
 	// It is meant to serve as a drop-in alternative to protoregistry.GlobalTypes
 	// that can include source code info in the returned types.
+	//
+	// As with Files, if source code info cannot be added to a type, the type is
+	// returned without source code info.
 	Types protoresolve.TypePool = types{}
 
 	mu                   sync.RWMutex
@@ -43,7 +51,8 @@ var (
 // and gzipped form of a google.protobuf.SourceCodeInfo message.
 //
 // This is automatically used from generated code if using the protoc-gen-gosrcinfo
-// plugin.
+// plugin. It must be called during initialization, before any queries for the
+// file's descriptors. Data registered later may be ignored.
 func Register(file string, data []byte) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -165,8 +174,10 @@ func getFileLocked(fd protoreflect.FileDescriptor) (protoreflect.FileDescriptor,
 	}
 
 	// We have to build its dependencies, too, so that the descriptor's
-	// references *all* have source code info.
-	var deps []protoreflect.FileDescriptor
+	// references *all* have source code info. The updated dependencies
+	// are registered in updatedDescriptors, which is used below to
+	// rebuild this file.
+	var depsUpdated bool
 	imps := fd.Imports()
 	for i, length := 0, imps.Len(); i < length; i++ {
 		origDep := imps.Get(i).FileDescriptor
@@ -174,15 +185,8 @@ func getFileLocked(fd protoreflect.FileDescriptor) (protoreflect.FileDescriptor,
 		if err != nil {
 			return nil, fmt.Errorf("updating import %q: %w", origDep.Path(), err)
 		}
-		if updatedDep != origDep && deps == nil {
-			// lazily init slice of deps and copy over deps before this one
-			deps = make([]protoreflect.FileDescriptor, i, length)
-			for j := 0; j < i; j++ {
-				deps[j] = imps.Get(i).FileDescriptor
-			}
-		}
-		if deps != nil {
-			deps = append(deps, updatedDep)
+		if updatedDep != origDep {
+			depsUpdated = true
 		}
 	}
 
@@ -190,8 +194,9 @@ func getFileLocked(fd protoreflect.FileDescriptor) (protoreflect.FileDescriptor,
 	if err != nil {
 		return nil, err
 	}
-	if len(srcInfo.GetLocation()) == 0 && len(deps) == 0 {
+	if len(srcInfo.GetLocation()) == 0 && !depsUpdated {
 		// nothing to do; don't bother changing
+		fileDescriptors[fd] = fd
 		return fd, nil
 	}
 
@@ -218,7 +223,7 @@ func (files) FindFileByPath(path string) (protoreflect.FileDescriptor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return getFile(fd)
+	return fileWithSourceInfo(fd), nil
 }
 
 func (files) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
@@ -226,29 +231,7 @@ func (files) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Desc
 	if err != nil {
 		return nil, err
 	}
-	if !canUpgrade(d) {
-		return d, nil
-	}
-	switch d := d.(type) {
-	case protoreflect.FileDescriptor:
-		return getFile(d)
-	case protoreflect.MessageDescriptor:
-		return updateDescriptor(d)
-	case protoreflect.FieldDescriptor:
-		return updateField(d)
-	case protoreflect.OneofDescriptor:
-		return updateDescriptor(d)
-	case protoreflect.EnumDescriptor:
-		return updateDescriptor(d)
-	case protoreflect.EnumValueDescriptor:
-		return updateDescriptor(d)
-	case protoreflect.ServiceDescriptor:
-		return updateDescriptor(d)
-	case protoreflect.MethodDescriptor:
-		return updateDescriptor(d)
-	default:
-		return nil, fmt.Errorf("unrecognized descriptor type: %T", d)
-	}
+	return descriptorWithSourceInfo(d), nil
 }
 
 func (files) NumFiles() int {
@@ -256,13 +239,7 @@ func (files) NumFiles() int {
 }
 
 func (files) RangeFiles(fn func(protoreflect.FileDescriptor) bool) {
-	protoregistry.GlobalFiles.RangeFiles(func(file protoreflect.FileDescriptor) bool {
-		updated, err := getFile(file)
-		if err != nil {
-			return fn(file)
-		}
-		return fn(updated)
-	})
+	rangeWithSourceInfo(protoregistry.GlobalFiles.RangeFiles, fileWithSourceInfo, fn)
 }
 
 func (files) NumFilesByPackage(name protoreflect.FullName) int {
@@ -270,13 +247,9 @@ func (files) NumFilesByPackage(name protoreflect.FullName) int {
 }
 
 func (files) RangeFilesByPackage(name protoreflect.FullName, fn func(protoreflect.FileDescriptor) bool) {
-	protoregistry.GlobalFiles.RangeFilesByPackage(name, func(file protoreflect.FileDescriptor) bool {
-		updated, err := getFile(file)
-		if err != nil {
-			return fn(file)
-		}
-		return fn(updated)
-	})
+	rangeWithSourceInfo(func(fn func(protoreflect.FileDescriptor) bool) {
+		protoregistry.GlobalFiles.RangeFilesByPackage(name, fn)
+	}, fileWithSourceInfo, fn)
 }
 
 type types struct{}
@@ -286,11 +259,7 @@ func (types) FindMessageByName(message protoreflect.FullName) (protoreflect.Mess
 	if err != nil {
 		return nil, err
 	}
-	msg, err := updateDescriptor(mt.Descriptor())
-	if err != nil {
-		return mt, nil
-	}
-	return messageType{MessageType: mt, msgDesc: msg}, nil
+	return messageTypeWithSourceInfo(mt), nil
 }
 
 func (types) FindMessageByURL(url string) (protoreflect.MessageType, error) {
@@ -298,11 +267,7 @@ func (types) FindMessageByURL(url string) (protoreflect.MessageType, error) {
 	if err != nil {
 		return nil, err
 	}
-	msg, err := updateDescriptor(mt.Descriptor())
-	if err != nil {
-		return mt, nil
-	}
-	return messageType{MessageType: mt, msgDesc: msg}, nil
+	return messageTypeWithSourceInfo(mt), nil
 }
 
 func (types) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
@@ -310,11 +275,7 @@ func (types) FindExtensionByName(field protoreflect.FullName) (protoreflect.Exte
 	if err != nil {
 		return nil, err
 	}
-	ext, err := updateDescriptor(xt.TypeDescriptor().Descriptor())
-	if err != nil {
-		return xt, nil
-	}
-	return extensionType{ExtensionType: xt, extDesc: ext}, nil
+	return extensionTypeWithSourceInfo(xt), nil
 }
 
 func (types) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
@@ -322,11 +283,7 @@ func (types) FindExtensionByNumber(message protoreflect.FullName, field protoref
 	if err != nil {
 		return nil, err
 	}
-	ext, err := updateDescriptor(xt.TypeDescriptor().Descriptor())
-	if err != nil {
-		return xt, nil
-	}
-	return extensionType{ExtensionType: xt, extDesc: ext}, nil
+	return extensionTypeWithSourceInfo(xt), nil
 }
 
 func (types) FindEnumByName(enum protoreflect.FullName) (protoreflect.EnumType, error) {
@@ -334,51 +291,118 @@ func (types) FindEnumByName(enum protoreflect.FullName) (protoreflect.EnumType, 
 	if err != nil {
 		return nil, err
 	}
-	en, err := updateDescriptor(et.Descriptor())
-	if err != nil {
-		return et, nil
-	}
-	return enumType{EnumType: et, enumDesc: en}, nil
+	return enumTypeWithSourceInfo(et), nil
 }
 
 func (types) RangeMessages(fn func(protoreflect.MessageType) bool) {
-	protoregistry.GlobalTypes.RangeMessages(func(mt protoreflect.MessageType) bool {
-		msg, err := updateDescriptor(mt.Descriptor())
-		if err != nil {
-			return fn(mt)
-		}
-		return fn(messageType{MessageType: mt, msgDesc: msg})
-	})
+	rangeWithSourceInfo(protoregistry.GlobalTypes.RangeMessages, messageTypeWithSourceInfo, fn)
 }
 
 func (types) RangeEnums(fn func(protoreflect.EnumType) bool) {
-	protoregistry.GlobalTypes.RangeEnums(func(et protoreflect.EnumType) bool {
-		en, err := updateDescriptor(et.Descriptor())
-		if err != nil {
-			return fn(et)
-		}
-		return fn(enumType{EnumType: et, enumDesc: en})
-	})
+	rangeWithSourceInfo(protoregistry.GlobalTypes.RangeEnums, enumTypeWithSourceInfo, fn)
 }
 
 func (types) RangeExtensions(fn func(protoreflect.ExtensionType) bool) {
-	protoregistry.GlobalTypes.RangeExtensions(func(xt protoreflect.ExtensionType) bool {
-		ext, err := updateDescriptor(xt.TypeDescriptor().Descriptor())
-		if err != nil {
-			return fn(xt)
-		}
-		return fn(extensionType{ExtensionType: xt, extDesc: ext})
-	})
+	rangeWithSourceInfo(protoregistry.GlobalTypes.RangeExtensions, extensionTypeWithSourceInfo, fn)
 }
 
 func (types) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionType) bool) {
-	protoregistry.GlobalTypes.RangeExtensionsByMessage(message, func(xt protoreflect.ExtensionType) bool {
-		ext, err := updateDescriptor(xt.TypeDescriptor().Descriptor())
-		if err != nil {
-			return fn(xt)
-		}
-		return fn(extensionType{ExtensionType: xt, extDesc: ext})
+	rangeWithSourceInfo(func(fn func(protoreflect.ExtensionType) bool) {
+		protoregistry.GlobalTypes.RangeExtensionsByMessage(message, fn)
+	}, extensionTypeWithSourceInfo, fn)
+}
+
+// rangeWithSourceInfo calls fn for each element yielded by rangeFn, after
+// adding source info to it with withSourceInfo.
+//
+// The elements are collected before any source info is added, because the
+// global registries hold a lock while calling the range function's callback,
+// and adding source info also needs to acquire that lock.
+func rangeWithSourceInfo[T any](rangeFn func(func(T) bool), withSourceInfo func(T) T, fn func(T) bool) {
+	var elems []T
+	rangeFn(func(elem T) bool {
+		elems = append(elems, elem)
+		return true
 	})
+	for _, elem := range elems {
+		if !fn(withSourceInfo(elem)) {
+			return
+		}
+	}
+}
+
+// fileWithSourceInfo returns the given file with source info added. If it can't
+// be added, the given file is returned.
+func fileWithSourceInfo(fd protoreflect.FileDescriptor) protoreflect.FileDescriptor {
+	updated, err := getFile(fd)
+	if err != nil {
+		return fd
+	}
+	return updated
+}
+
+// descriptorWithSourceInfo returns the given descriptor with source info added.
+// If it can't be added, the given descriptor is returned.
+func descriptorWithSourceInfo(d protoreflect.Descriptor) protoreflect.Descriptor {
+	if !canUpgrade(d) {
+		return d
+	}
+	var updated protoreflect.Descriptor
+	var err error
+	switch d := d.(type) {
+	case protoreflect.FileDescriptor:
+		updated, err = getFile(d)
+	case protoreflect.MessageDescriptor:
+		updated, err = updateDescriptor(d)
+	case protoreflect.FieldDescriptor:
+		updated, err = updateField(d)
+	case protoreflect.OneofDescriptor:
+		updated, err = updateDescriptor(d)
+	case protoreflect.EnumDescriptor:
+		updated, err = updateDescriptor(d)
+	case protoreflect.EnumValueDescriptor:
+		updated, err = updateDescriptor(d)
+	case protoreflect.ServiceDescriptor:
+		updated, err = updateDescriptor(d)
+	case protoreflect.MethodDescriptor:
+		updated, err = updateDescriptor(d)
+	default:
+		return d
+	}
+	if err != nil {
+		return d
+	}
+	return updated
+}
+
+// messageTypeWithSourceInfo returns the given type with source info added to
+// its descriptor. If it can't be added, the given type is returned.
+func messageTypeWithSourceInfo(mt protoreflect.MessageType) protoreflect.MessageType {
+	msg, err := updateDescriptor(mt.Descriptor())
+	if err != nil {
+		return mt
+	}
+	return messageType{MessageType: mt, msgDesc: msg}
+}
+
+// enumTypeWithSourceInfo returns the given type with source info added to its
+// descriptor. If it can't be added, the given type is returned.
+func enumTypeWithSourceInfo(et protoreflect.EnumType) protoreflect.EnumType {
+	en, err := updateDescriptor(et.Descriptor())
+	if err != nil {
+		return et
+	}
+	return enumType{EnumType: et, enumDesc: en}
+}
+
+// extensionTypeWithSourceInfo returns the given type with source info added to
+// its descriptor. If it can't be added, the given type is returned.
+func extensionTypeWithSourceInfo(xt protoreflect.ExtensionType) protoreflect.ExtensionType {
+	ext, err := updateDescriptor(xt.TypeDescriptor().Descriptor())
+	if err != nil {
+		return xt
+	}
+	return extensionType{ExtensionType: xt, extDesc: ext}
 }
 
 type filesWithFallback struct {
