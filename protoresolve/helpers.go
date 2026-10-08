@@ -50,6 +50,25 @@ func findExtension(container TypeContainer, message protoreflect.FullName, field
 	return nil
 }
 
+// rangeExtensions calls fn for every extension in the given container,
+// including extensions nested in messages. It stops and returns false as soon
+// as fn returns false.
+func rangeExtensions(container TypeContainer, fn func(protoreflect.ExtensionDescriptor) bool) bool {
+	exts := container.Extensions()
+	for i, length := 0, exts.Len(); i < length; i++ {
+		if !fn(exts.Get(i)) {
+			return false
+		}
+	}
+	msgs := container.Messages()
+	for i, length := 0, msgs.Len(); i < length; i++ {
+		if !rangeExtensions(msgs.Get(i), fn) {
+			return false
+		}
+	}
+	return true
+}
+
 // RangeExtensionsByMessage enumerates all extensions in the given descriptor pool that
 // extend the given message. It stops early if the given function returns false.
 func RangeExtensionsByMessage(res DescriptorPool, message protoreflect.FullName, fn func(descriptor protoreflect.ExtensionDescriptor) bool) {

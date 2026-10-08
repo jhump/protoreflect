@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
@@ -98,4 +100,34 @@ func newCombinedInputs(t *testing.T, corpus []protoreflect.FileDescriptor) combi
 		inputs.nonPools = append(inputs.nonPools, protoresolve.ResolverFromPool(reg))
 	}
 	return inputs
+}
+
+// fileProto returns a descriptor proto for a file with the given path and
+// package, which imports the given dependencies. Callers add elements to it.
+func fileProto(path string, pkg protoreflect.FullName, deps ...string) *descriptorpb.FileDescriptorProto {
+	return &descriptorpb.FileDescriptorProto{
+		Name:       proto.String(path),
+		Package:    proto.String(string(pkg)),
+		Dependency: deps,
+	}
+}
+
+// int32Extension returns a descriptor proto for an optional int32 extension
+// of the given message.
+func int32Extension(name string, number int32, extendee protoreflect.FullName) *descriptorpb.FieldDescriptorProto {
+	return &descriptorpb.FieldDescriptorProto{
+		Name:     proto.String(name),
+		Number:   proto.Int32(number),
+		Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+		Type:     descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
+		Extendee: proto.String("." + string(extendee)),
+	}
+}
+
+// conflictingExtensionFileProto returns a file that defines an extension
+// whose number conflicts with one in desc_test1.proto.
+func conflictingExtensionFileProto() *descriptorpb.FileDescriptorProto {
+	file := fileProto("conflict.proto", "conflict", "desc_test1.proto")
+	file.Extension = []*descriptorpb.FieldDescriptorProto{int32Extension("xtm", 100, "testprotos.AnotherTestMessage")}
+	return file
 }
