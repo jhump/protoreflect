@@ -336,7 +336,8 @@ func (dc *DescriptorConverter) DescriptorAsEnum(ed protoreflect.EnumDescriptor) 
 }
 
 func (dc *DescriptorConverter) options(options proto.Message) []*typepb.Option {
-	if rv := reflect.ValueOf(options); rv.Kind() == reflect.Ptr && rv.IsNil() {
+	if options == nil || !options.ProtoReflect().IsValid() {
+		// Nil interface or typed-nil message.
 		return nil
 	}
 	var opts []*typepb.Option

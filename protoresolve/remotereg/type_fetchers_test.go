@@ -215,9 +215,9 @@ func TestCachingTypeFetcher_Panic(t *testing.T) {
 	require.Equal(t, "some.Type", typ.Name)
 }
 
-func TestHttpTypeFetcher(t *testing.T) {
+func TestHTTPTypeFetcher(t *testing.T) {
 	trt := &testRoundTripper{counts: map[string]int{}}
-	fetcher := HttpTypeFetcher(trt, 65536, 10)
+	fetcher := HTTPTypeFetcher(trt, 65536, 10)
 
 	for i := 0; i < 10; i++ {
 		typ, err := fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Message")
@@ -232,14 +232,29 @@ func TestHttpTypeFetcher(t *testing.T) {
 		require.Equal(t, "fee.fi.fo.Enum", en.Name)
 	}
 
-	// HttpTypeFetcher caches results
+	// HTTPTypeFetcher caches results
 	require.Equal(t, 1, trt.counts["https://blah.blah.blah/fee.fi.fo.Message"])
 	require.Equal(t, 1, trt.counts["https://blah.blah.blah/fee.fi.fo.Enum"])
 }
 
-func TestHttpTypeFetcher_ParallelDownloads(t *testing.T) {
+func TestHTTPTypeFetcher_NonPositiveParallelLimit(t *testing.T) {
+	for _, parLimit := range []int{0, -1} {
+		t.Run(fmt.Sprintf("parLimit=%d", parLimit), func(t *testing.T) {
+			trt := &testRoundTripper{counts: map[string]int{}}
+			fetcher := HTTPTypeFetcher(trt, 65536, parLimit)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			typ, err := fetcher.FetchMessageType(ctx, "blah.blah.blah/fee.fi.fo.Message")
+			require.NoError(t, err)
+			require.Equal(t, "fee.fi.fo.Message", typ.Name)
+		})
+	}
+}
+
+func TestHTTPTypeFetcher_ParallelDownloads(t *testing.T) {
 	trt := &testRoundTripper{counts: map[string]int{}, delay: 100 * time.Millisecond}
-	fetcher := HttpTypeFetcher(trt, 65536, 10)
+	fetcher := HTTPTypeFetcher(trt, 65536, 10)
 	// We spin up 100 fetches in parallel, but only 10 can go at a time and each
 	// one takes 100millis. So it should take about 1 second.
 	start := time.Now()
@@ -264,10 +279,10 @@ func TestHttpTypeFetcher_ParallelDownloads(t *testing.T) {
 	require.GreaterOrEqual(t, elapsed, time.Second)
 }
 
-func TestHttpTypeFetcher_SizeLimits(t *testing.T) {
+func TestHTTPTypeFetcher_SizeLimits(t *testing.T) {
 	trt := &testRoundTripper{counts: map[string]int{}}
 	// small size that will always get tripped
-	fetcher := HttpTypeFetcher(trt, 32, 10)
+	fetcher := HTTPTypeFetcher(trt, 32, 10)
 
 	// name with "Size" causes content-length to be reported in header
 	_, err := fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.FumSize")

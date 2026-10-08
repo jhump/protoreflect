@@ -22,9 +22,9 @@ const defaultBaseURL = "type.googleapis.com"
 // A Registry can be configured with a TypeFetcher, which can be used
 // to dynamically retrieve message definitions.
 //
-// It differs from a Registry in that it only exposes a subset of the Resolver
-// interface, focused on messages and enums, which are types which may be
-// resolved by downloading schemas from a remote source.
+// It differs from a protoresolve.Registry in that it only exposes a subset of
+// the Resolver interface, focused on messages and enums, which are types which
+// may be resolved by downloading schemas from a remote source.
 //
 // This registry is intended to help resolve message type URLs in
 // google.protobuf.Any messages.
@@ -163,9 +163,7 @@ func (r *Registry) RegisterPackageBaseURL(pkgName protoreflect.FullName, baseURL
 	if !previouslyRegistered {
 		previous = r.baseURLFromRegistrationsLocked(pkgName)
 	}
-	if r.pkgBaseURLs == nil {
-		r.pkgBaseURLs = map[protoreflect.FullName]string{}
-	}
+	r.initMapsLocked()
 	r.pkgBaseURLs[pkgName] = baseURL
 	r.mu.Unlock()
 	if previous == "" {
@@ -201,40 +199,44 @@ func (r *Registry) RegisterEnum(ed protoreflect.EnumDescriptor) error {
 
 // RegisterMessageWithURL registers the given message type with the given URL.
 func (r *Registry) RegisterMessageWithURL(md protoreflect.MessageDescriptor, url string) error {
-	url = ensureScheme(url)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if err := r.checkTypeLocked(md, "message", url); err != nil {
-		return err
-	}
-	if r.typeURLs == nil {
-		r.typeURLs = map[protoreflect.FullName]string{}
-	}
-	if r.typeCache == nil {
-		r.typeCache = map[string]protoreflect.Descriptor{}
-	}
-	r.typeURLs[md.FullName()] = url
-	r.typeCache[url] = md
-	return nil
+	return r.registerWithURL(md, "message", url)
 }
 
 // RegisterEnumWithURL registers the given enum type with the given URL.
 func (r *Registry) RegisterEnumWithURL(ed protoreflect.EnumDescriptor, url string) error {
+	return r.registerWithURL(ed, "enum", url)
+}
+
+// registerWithURL registers the given message or enum descriptor with the
+// given URL. The descKind is used in error messages.
+func (r *Registry) registerWithURL(desc protoreflect.Descriptor, descKind, url string) error {
 	url = ensureScheme(url)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if err := r.checkTypeLocked(ed, "enum", url); err != nil {
+	if err := r.checkTypeLocked(desc, descKind, url); err != nil {
 		return err
 	}
+	r.initMapsLocked()
+	r.typeURLs[desc.FullName()] = url
+	r.typeCache[url] = desc
+	return nil
+}
+
+// initMapsLocked lazily allocates the registry's maps. The caller must hold
+// r.mu for writing.
+func (r *Registry) initMapsLocked() {
 	if r.typeURLs == nil {
 		r.typeURLs = map[protoreflect.FullName]string{}
 	}
 	if r.typeCache == nil {
 		r.typeCache = map[string]protoreflect.Descriptor{}
 	}
-	r.typeURLs[ed.FullName()] = url
-	r.typeCache[url] = ed
-	return nil
+	if r.descProtos == nil {
+		r.descProtos = map[protoreflect.Descriptor]proto.Message{}
+	}
+	if r.pkgBaseURLs == nil {
+		r.pkgBaseURLs = map[protoreflect.FullName]string{}
+	}
 }
 
 func (r *Registry) checkTypeLocked(desc protoreflect.Descriptor, descKind string, url string) error {
@@ -292,12 +294,7 @@ func (r *Registry) checkTypesInContainerLocked(container protoresolve.TypeContai
 }
 
 func (r *Registry) registerTypesInContainerLocked(container protoresolve.TypeContainer, baseURL string) {
-	if r.typeURLs == nil {
-		r.typeURLs = map[protoreflect.FullName]string{}
-	}
-	if r.typeCache == nil {
-		r.typeCache = map[string]protoreflect.Descriptor{}
-	}
+	r.initMapsLocked()
 	msgs := container.Messages()
 	for i, length := 0, msgs.Len(); i < length; i++ {
 		md := msgs.Get(i)
@@ -519,15 +516,7 @@ func (r *Registry) recordConvertedTypes(cc *convertContext) (map[string]protoref
 	protoOracle := protoresolve.NewProtoOracle(files)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.typeURLs == nil {
-		r.typeURLs = map[protoreflect.FullName]string{}
-	}
-	if r.typeCache == nil {
-		r.typeCache = map[string]protoreflect.Descriptor{}
-	}
-	if r.descProtos == nil {
-		r.descProtos = map[protoreflect.Descriptor]proto.Message{}
-	}
+	r.initMapsLocked()
 	recorded := make(map[string]protoreflect.Descriptor, len(cc.typeLocations))
 	for typeURL := range cc.typeLocations {
 		if existing := r.typeCache[typeURL]; existing != nil {
@@ -550,7 +539,7 @@ func (r *Registry) recordConvertedTypes(cc *convertContext) (map[string]protoref
 }
 
 // AsTypeResolver returns a view of this registry that returns types instead
-// of descriptors. The returned resolver implements TypeResolver
+// of descriptors. The returned resolver implements TypeResolver.
 func (r *Registry) AsTypeResolver() *RemoteTypeResolver {
 	return (*RemoteTypeResolver)(r)
 }

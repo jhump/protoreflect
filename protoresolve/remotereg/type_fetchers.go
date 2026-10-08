@@ -203,20 +203,26 @@ func (c *cachingFetcher) load(ctx context.Context, key string, entry *cachingFet
 	return msg, err
 }
 
-// HttpTypeFetcher returns a TypeFetcher that uses the given HTTP transport to query and
+// HTTPTypeFetcher returns a TypeFetcher that uses the given HTTP transport to query and
 // download type definitions. The given szLimit is the maximum response size accepted. If
 // used from multiple goroutines (like when a type's dependency graph is resolved in
 // parallel), this resolver limits the number of parallel queries/downloads to the given
-// parLimit.
-func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFetcher {
-	sem := semaphore.NewWeighted(int64(parLimit))
+// parLimit. If parLimit is zero or negative, the number of parallel queries/downloads is
+// not limited.
+func HTTPTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFetcher {
+	var sem *semaphore.Weighted
+	if parLimit > 0 {
+		sem = semaphore.NewWeighted(int64(parLimit))
+	}
 	return CachingTypeFetcher(TypeFetcherFunc(func(ctx context.Context, typeUrl string, enum bool) (proto.Message, error) {
-		if err := sem.Acquire(ctx, 1); err != nil {
-			return nil, err
+		if sem != nil {
+			if err := sem.Acquire(ctx, 1); err != nil {
+				return nil, err
+			}
+			defer sem.Release(1)
 		}
-		defer sem.Release(1)
 
-		req, err := http.NewRequestWithContext(ctx, "GET", ensureScheme(typeUrl), http.NoBody)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, ensureScheme(typeUrl), http.NoBody)
 		if err != nil {
 			return nil, err
 		}
@@ -272,6 +278,5 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 }
 
 var bufferPool = sync.Pool{New: func() interface{} {
-	buf := make([]byte, 8192)
-	return bytes.NewBuffer(buf)
+	return bytes.NewBuffer(make([]byte, 0, 8192))
 }}
