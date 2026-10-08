@@ -123,6 +123,13 @@ func (e *elementNotFoundError) Error() string {
 	return b.String()
 }
 
+// Is returns true if target is protoresolve.ErrNotFound. This allows callers,
+// like combined resolvers from protoresolve.Combine, to recognize when an
+// element is not found by using errors.Is.
+func (e *elementNotFoundError) Is(target error) bool {
+	return target == protoresolve.ErrNotFound
+}
+
 // IsElementNotFoundError determines if the given error indicates that a file
 // name, symbol name, or extension field was could not be found by the server.
 func IsElementNotFoundError(err error) bool {
@@ -548,20 +555,21 @@ func (cr *Client) AllExtensionNumbersForType(extendedMessageName protoreflect.Fu
 		},
 	}
 	resp, err := cr.send(req)
-	if err != nil {
-		if isNotFound(err) {
-			return nil, nil
-		}
+	var nums []protoreflect.FieldNumber
+	switch {
+	case isNotFound(err):
+		// The server doesn't know the type, but the fallback might.
+	case err != nil:
 		return nil, err
-	}
-
-	extResp := resp.GetAllExtensionNumbersResponse()
-	if extResp == nil {
-		return nil, &ProtocolError{reflect.TypeOf(extResp).Elem()}
-	}
-	nums := make([]protoreflect.FieldNumber, len(extResp.ExtensionNumber))
-	for i := range extResp.ExtensionNumber {
-		nums[i] = protoreflect.FieldNumber(extResp.ExtensionNumber[i])
+	default:
+		extResp := resp.GetAllExtensionNumbersResponse()
+		if extResp == nil {
+			return nil, &ProtocolError{reflect.TypeOf(extResp).Elem()}
+		}
+		nums = make([]protoreflect.FieldNumber, len(extResp.ExtensionNumber))
+		for i := range extResp.ExtensionNumber {
+			nums[i] = protoreflect.FieldNumber(extResp.ExtensionNumber[i])
+		}
 	}
 	if extRanger, ok := cr.fallbackExtResolver.(interface {
 		RangeExtensionsByMessage(protoreflect.FullName, func(protoreflect.ExtensionType) bool)
@@ -610,7 +618,7 @@ func (cr *Client) ListServices() ([]protoreflect.FullName, error) {
 }
 
 func (cr *Client) send(req *refv1.ServerReflectionRequest) (*refv1.ServerReflectionResponse, error) {
-	// we allow one immediate retry, in case we have a stale stream
+	// doSend retries a few times, in case we have a stale stream
 	// (e.g. closed by server)
 	resp, err := cr.doSend(req)
 	if err != nil {
@@ -620,7 +628,13 @@ func (cr *Client) send(req *refv1.ServerReflectionRequest) (*refv1.ServerReflect
 	// convert error response messages into errors
 	errResp := resp.GetErrorResponse()
 	if errResp != nil {
-		return nil, status.Errorf(codes.Code(errResp.ErrorCode), "%s", errResp.ErrorMessage)
+		code := codes.Code(errResp.ErrorCode)
+		if code == codes.OK {
+			// An error response must result in an error, but a status
+			// with an OK code is not an error.
+			code = codes.Unknown
+		}
+		return nil, status.Errorf(code, "%s", errResp.ErrorMessage)
 	}
 
 	return resp, nil
@@ -686,8 +700,9 @@ func (cr *Client) initStreamLocked() error {
 	if cr.stream != nil {
 		return nil
 	}
-	var newCtx context.Context
-	newCtx, cr.cancel = context.WithCancel(cr.ctx)
+	// The context is only retained, for use by resetLocked, if a stream is
+	// created. Otherwise, it is cancelled here.
+	newCtx, cancel := context.WithCancel(cr.ctx)
 	if cr.useV1Alpha && cr.now().Sub(cr.lastTriedV1) > durationBetweenV1Attempts {
 		// we're due for periodic retry of v1
 		cr.useV1Alpha = false
@@ -697,9 +712,11 @@ func (cr *Client) initStreamLocked() error {
 		streamv1, err := cr.stubV1.ServerReflectionInfo(newCtx)
 		if err == nil {
 			cr.stream = streamv1
+			cr.cancel = cancel
 			return nil
 		}
 		if status.Code(err) != codes.Unimplemented {
+			cancel()
 			return err
 		}
 		// oh well, fall through below to try v1alpha and update state
@@ -707,13 +724,14 @@ func (cr *Client) initStreamLocked() error {
 		cr.useV1Alpha = true
 		cr.lastTriedV1 = cr.now()
 	}
-	var err error
 	streamv1alpha, err := cr.stubV1Alpha.ServerReflectionInfo(newCtx)
-	if err == nil {
-		cr.stream = adaptStreamFromV1Alpha{streamv1alpha}
-		return nil
+	if err != nil {
+		cancel()
+		return err
 	}
-	return err
+	cr.stream = adaptStreamFromV1Alpha{streamv1alpha}
+	cr.cancel = cancel
+	return nil
 }
 
 func (cr *Client) useV1() bool {
@@ -751,15 +769,11 @@ func (ls *liveStream) reset() {
 func (ls *liveStream) resetLocked() {
 	if ls.stream != nil {
 		_ = ls.stream.CloseSend()
-		for {
-			// drain the stream, this covers io.EOF too
-			if _, err := ls.stream.Recv(); err != nil {
-				break
-			}
-		}
 		ls.stream = nil
 	}
 	if ls.cancel != nil {
+		// Cancelling the stream's context releases its resources. We don't
+		// wait for the server to end the stream, which it might never do.
 		ls.cancel()
 		ls.cancel = nil
 	}
@@ -835,56 +849,72 @@ func (c *clientResolver) RangeFilesByPackage(name protoreflect.FullName, fn func
 	}
 }
 
-func (c *clientResolver) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
+// findDescriptor returns the descriptor with the given name, downloading the
+// file that contains it if necessary. The descriptor is found in the file that
+// the client returns, instead of in the client's cache, since the file may
+// have come from the client's fallback resolver.
+func (c *clientResolver) findDescriptor(name protoreflect.FullName) (protoreflect.Descriptor, error) {
 	cr := (*Client)(c)
-	_, err := cr.FileContainingSymbol(name)
+	file, err := cr.FileContainingSymbol(name)
 	if err != nil {
 		return nil, err
 	}
-	cr.cacheMu.RLock()
-	d, err := cr.descriptors.FindDescriptorByName(name)
-	cr.cacheMu.RUnlock()
-	return d, err
+	d := protoresolve.FindDescriptorByNameInFile(file, name)
+	if d == nil {
+		return nil, symbolNotFound(name, nil)
+	}
+	return d, nil
+}
+
+func (c *clientResolver) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
+	return c.findDescriptor(name)
 }
 
 func (c *clientResolver) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageDescriptor, error) {
-	cr := (*Client)(c)
-	_, err := cr.FileContainingSymbol(name)
-	if err != nil {
-		return nil, err
-	}
-	cr.cacheMu.RLock()
-	d, err := cr.descriptors.FindMessageByName(name)
-	cr.cacheMu.RUnlock()
-	return d, err
-}
-
-func (c *clientResolver) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
-	cr := (*Client)(c)
-	_, err := cr.FileContainingSymbol(name)
-	if err != nil {
-		return nil, err
-	}
-	cr.cacheMu.RLock()
-	d, err := cr.descriptors.FindExtensionByName(name)
-	cr.cacheMu.RUnlock()
-	return d, err
+	return c.findMessage(name, "")
 }
 
 func (c *clientResolver) FindMessageByURL(url string) (protoreflect.MessageDescriptor, error) {
-	return c.FindMessageByName(protoresolve.TypeNameFromURL(url))
+	return c.findMessage(protoresolve.TypeNameFromURL(url), url)
+}
+
+// findMessage returns the message with the given name. The url is the query
+// that produced the name, if any, for reporting errors.
+func (c *clientResolver) findMessage(name protoreflect.FullName, url string) (protoreflect.MessageDescriptor, error) {
+	d, err := c.findDescriptor(name)
+	if err != nil {
+		return nil, err
+	}
+	msg, ok := d.(protoreflect.MessageDescriptor)
+	if !ok {
+		return nil, protoresolve.NewUnexpectedTypeError(protoresolve.DescriptorKindMessage, d, url)
+	}
+	return msg, nil
+}
+
+func (c *clientResolver) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
+	d, err := c.findDescriptor(name)
+	if err != nil {
+		return nil, err
+	}
+	ext, ok := d.(protoreflect.ExtensionDescriptor)
+	if !ok || !ext.IsExtension() {
+		return nil, protoresolve.NewUnexpectedTypeError(protoresolve.DescriptorKindExtension, d, "")
+	}
+	return ext, nil
 }
 
 func (c *clientResolver) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error) {
 	cr := (*Client)(c)
-	_, err := cr.FileContainingExtension(message, field)
+	file, err := cr.FileContainingExtension(message, field)
 	if err != nil {
 		return nil, err
 	}
-	cr.cacheMu.RLock()
-	d, err := cr.descriptors.FindExtensionByNumber(message, field)
-	cr.cacheMu.RUnlock()
-	return d, err
+	ext := protoresolve.FindExtensionByNumberInFile(file, message, field)
+	if ext == nil {
+		return nil, extensionNotFound(message, field, nil)
+	}
+	return ext, nil
 }
 
 func (c *clientResolver) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionDescriptor) bool) {
