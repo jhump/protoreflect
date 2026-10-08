@@ -306,39 +306,57 @@ func (flb *FieldBuilder) findChild(name protoreflect.Name) Builder {
 	return nil
 }
 
-func (flb *FieldBuilder) removeChild(b Builder) {
-	if mb, ok := b.(*MessageBuilder); ok && mb == flb.msgType {
-		flb.msgType = nil
-		if p, ok := flb.parent.(*MessageBuilder); ok {
-			delete(p.symbols, mb.Name())
-		}
+// enclosingMessage returns the message whose namespace includes this field's
+// group or map entry type: the field's parent or, if the field is in a oneof,
+// the oneof's parent. It returns nil if there is no such message.
+func (flb *FieldBuilder) enclosingMessage() *MessageBuilder {
+	switch p := flb.parent.(type) {
+	case *MessageBuilder:
+		return p
+	case *OneofBuilder:
+		return p.parent()
+	default:
+		return nil
 	}
 }
 
-func (flb *FieldBuilder) renamedChild(b Builder, _ protoreflect.Name) error {
-	if flb.msgType != nil {
-		var oldFieldName protoreflect.Name
-		if flb.fieldType.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
-			// For groups, we need to rename the field according to the group message's new name
-			if !unicode.IsUpper(rune(b.Name()[0])) {
-				return fmt.Errorf("group name %s must start with capital letter", b.Name())
-			}
-			// change field name to be lower-case form of group name
-			oldFieldName = flb.name
-			fieldName := protoreflect.Name(strings.ToLower(string(b.Name())))
-			if err := flb.trySetNameInternal(fieldName); err != nil {
-				return err
-			}
+func (flb *FieldBuilder) removeChild(b Builder) {
+	if mb, ok := b.(*MessageBuilder); ok && mb == flb.msgType {
+		flb.msgType = nil
+		if p := flb.enclosingMessage(); p != nil {
+			delete(p.symbols, mb.Name())
 		}
-		if p, ok := flb.parent.(*MessageBuilder); ok {
-			if err := p.addSymbol(b); err != nil {
-				if flb.fieldType.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
-					// revert the above field rename
-					flb.setNameInternal(oldFieldName)
-				}
-				return err
-			}
+		mb.setParent(nil)
+	}
+}
+
+func (flb *FieldBuilder) renamedChild(b Builder, oldName protoreflect.Name) error {
+	if flb.msgType == nil || b != Builder(flb.msgType) {
+		return nil
+	}
+	isGroup := flb.fieldType.fieldType == descriptorpb.FieldDescriptorProto_TYPE_GROUP
+	var oldFieldName protoreflect.Name
+	if isGroup {
+		// For groups, we need to rename the field according to the group message's new name
+		if !unicode.IsUpper(rune(b.Name()[0])) {
+			return fmt.Errorf("group name %s must start with capital letter", b.Name())
 		}
+		// change field name to be lower-case form of group name
+		oldFieldName = flb.name
+		fieldName := protoreflect.Name(strings.ToLower(string(b.Name())))
+		if err := flb.trySetNameInternal(fieldName); err != nil {
+			return err
+		}
+	}
+	if p := flb.enclosingMessage(); p != nil {
+		if err := p.addSymbol(b); err != nil {
+			if isGroup {
+				// revert the above field rename
+				flb.setNameInternal(oldFieldName)
+			}
+			return err
+		}
+		delete(p.symbols, oldName)
 	}
 	return nil
 }
@@ -758,13 +776,10 @@ func (oob *OneofBuilder) removeChild(b Builder) {
 		return
 	}
 
-	if oob.parent() != nil {
+	if mb := oob.parent(); mb != nil {
 		// remove from message's name and tag maps
-		flb := b.(*FieldBuilder)
-		delete(oob.parent().fieldTags, flb.Number())
-		delete(oob.parent().symbols, flb.Name())
-		if flb.msgType != nil {
-			delete(oob.parent().symbols, flb.msgType.Name())
+		if flb, ok := b.(*FieldBuilder); ok {
+			mb.unregisterField(flb)
 		}
 	}
 
@@ -859,13 +874,16 @@ func (oob *OneofBuilder) TryAddChoice(flb *FieldBuilder) error {
 		return err
 	}
 	mb := oob.parent()
-	if mb != nil {
+	if mb == nil {
+		Unlink(flb)
+	} else {
 		// If we are moving field from a message to a oneof that belongs to the
-		// same message, we have to use different order of operations to prevent
-		// failure (otherwise, it looks like it's being added twice).
+		// same message (or from another oneof of that message), we have to use
+		// different order of operations to prevent failure (otherwise, it looks
+		// like it's being added twice).
 		// (We do similar if moving the other direction, from the oneof into
 		// the message to which oneof belongs.)
-		needToUnlinkFirst := mb.isPresentButNotChild(flb)
+		needToUnlinkFirst := mb.symbols[flb.Name()] == Builder(flb)
 		if needToUnlinkFirst {
 			Unlink(flb)
 			if err := mb.registerField(flb); err != nil {

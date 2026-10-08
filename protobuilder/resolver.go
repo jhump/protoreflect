@@ -1,8 +1,10 @@
 package protobuilder
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"google.golang.org/protobuf/encoding/protowire"
@@ -245,24 +247,22 @@ func (r *dependencyResolver) resolveSyntheticFile(b Builder, seen []Builder) (pr
 	case *ServiceBuilder:
 		f.services = append(f.services, curr)
 	case *FieldBuilder:
-		if curr.IsExtension() {
-			f.extensions = append(f.extensions, curr)
-		} else {
-			panic("field must be added to message before calling Build()")
+		if !curr.IsExtension() {
+			return nil, errors.New("field must be added to message before calling Build()")
 		}
+		f.extensions = append(f.extensions, curr)
 	case *OneofBuilder:
 		if _, ok := b.(*OneofBuilder); ok {
-			panic("one-of must be added to message before calling Build()")
-		} else {
-			// b was a child of one-of which means it must have been a field
-			panic("field must be added to message before calling Build()")
+			return nil, errors.New("one-of must be added to message before calling Build()")
 		}
+		// b was a child of one-of which means it must have been a field
+		return nil, errors.New("field must be added to message before calling Build()")
 	case *MethodBuilder:
-		panic("method must be added to service before calling Build()")
+		return nil, errors.New("method must be added to service before calling Build()")
 	case *EnumValueBuilder:
-		panic("enum value must be added to enum before calling Build()")
+		return nil, errors.New("enum value must be added to enum before calling Build()")
 	default:
-		panic(fmt.Sprintf("Unrecognized kind of builder: %T", b))
+		return nil, fmt.Errorf("unrecognized kind of builder: %T", b)
 	}
 	curr.setParent(f)
 
@@ -271,7 +271,8 @@ func (r *dependencyResolver) resolveSyntheticFile(b Builder, seen []Builder) (pr
 		curr.setParent(nil)
 	}()
 
-	return r.resolveFile(f, b, seen)
+	// The synthetic file is now the root of b's hierarchy.
+	return r.resolveFile(f, f, seen)
 }
 
 func (r *dependencyResolver) resolveTypesInMessage(root Builder, seen []Builder, deps *dependencies, mb *MessageBuilder) error {
@@ -316,6 +317,9 @@ func (r *dependencyResolver) resolveTypesInExtension(root Builder, seen []Builde
 
 func (r *dependencyResolver) resolveTypesInService(root Builder, seen []Builder, deps *dependencies, sb *ServiceBuilder) error {
 	for _, mtb := range sb.methods {
+		if mtb.ReqType == nil || mtb.RespType == nil {
+			return fmt.Errorf("method %s must have both request and response types", FullName(mtb))
+		}
 		if err := r.resolveRpcType(root, seen, mtb.ReqType, deps); err != nil {
 			return err
 		}
@@ -423,7 +427,7 @@ func (r *dependencyResolver) resolveTypesInMessageOptions(root Builder, fileExts
 			return err
 		}
 	}
-	for _, nmb := range mb.nestedMessages {
+	for _, nmb := range slices.Concat(mb.nestedMessages, mb.fieldMessageTypes()) {
 		if err := r.resolveTypesInMessageOptions(root, fileExts, deps, nmb); err != nil {
 			return err
 		}
@@ -575,7 +579,7 @@ func findExtensionInMessage(mb *MessageBuilder, messageName protoreflect.FullNam
 			return true
 		}
 	}
-	for _, mb := range mb.nestedMessages {
+	for _, mb := range slices.Concat(mb.nestedMessages, mb.fieldMessageTypes()) {
 		if findExtensionInMessage(mb, messageName, extTag) {
 			return true
 		}
