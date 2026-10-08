@@ -244,6 +244,9 @@ func JsonName(name protoreflect.Name) string {
 
 // InitCap returns the given field name, but with the first letter capitalized.
 func InitCap(name string) string {
+	if name == "" {
+		return ""
+	}
 	r, sz := utf8.DecodeRuneInString(name)
 	return string(unicode.ToUpper(r)) + name[sz:]
 }
