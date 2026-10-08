@@ -81,16 +81,9 @@ type typesFromResolver struct {
 }
 
 func (t *typesFromResolver) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
-	d, err := t.resolver.FindDescriptorByName(field)
+	ext, err := findDescriptorOfKind[protoreflect.ExtensionDescriptor](t.resolver, field, DescriptorKindExtension)
 	if err != nil {
 		return nil, err
-	}
-	ext, ok := d.(protoreflect.ExtensionDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
-	}
-	if !ext.IsExtension() {
-		return nil, NewUnexpectedTypeError(DescriptorKindExtension, ext, "")
 	}
 	return ExtensionType(ext), nil
 }
@@ -104,13 +97,9 @@ func (t *typesFromResolver) FindExtensionByNumber(message protoreflect.FullName,
 }
 
 func (t *typesFromResolver) FindMessageByName(message protoreflect.FullName) (protoreflect.MessageType, error) {
-	d, err := t.resolver.FindDescriptorByName(message)
+	msg, err := findDescriptorOfKind[protoreflect.MessageDescriptor](t.resolver, message, DescriptorKindMessage)
 	if err != nil {
 		return nil, err
-	}
-	msg, ok := d.(protoreflect.MessageDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindMessage, d, "")
 	}
 	return dynamicpb.NewMessageType(msg), nil
 }
@@ -121,13 +110,9 @@ func (t *typesFromResolver) FindMessageByURL(url string) (protoreflect.MessageTy
 }
 
 func (t *typesFromResolver) FindEnumByName(enum protoreflect.FullName) (protoreflect.EnumType, error) {
-	d, err := t.resolver.FindDescriptorByName(enum)
+	en, err := findDescriptorOfKind[protoreflect.EnumDescriptor](t.resolver, enum, DescriptorKindEnum)
 	if err != nil {
 		return nil, err
-	}
-	en, ok := d.(protoreflect.EnumDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindEnum, d, "")
 	}
 	return dynamicpb.NewEnumType(en), nil
 }
@@ -148,16 +133,9 @@ type typesFromDescriptorPool struct {
 }
 
 func (t *typesFromDescriptorPool) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
-	d, err := t.pool.FindDescriptorByName(field)
+	ext, err := findDescriptorOfKind[protoreflect.ExtensionDescriptor](t.pool, field, DescriptorKindExtension)
 	if err != nil {
 		return nil, err
-	}
-	ext, ok := d.(protoreflect.ExtensionDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
-	}
-	if !ext.IsExtension() {
-		return nil, NewUnexpectedTypeError(DescriptorKindExtension, ext, "")
 	}
 	return ExtensionType(ext), nil
 }
@@ -180,13 +158,9 @@ func (t *typesFromDescriptorPool) FindExtensionByNumber(message protoreflect.Ful
 }
 
 func (t *typesFromDescriptorPool) FindMessageByName(message protoreflect.FullName) (protoreflect.MessageType, error) {
-	d, err := t.pool.FindDescriptorByName(message)
+	msg, err := findDescriptorOfKind[protoreflect.MessageDescriptor](t.pool, message, DescriptorKindMessage)
 	if err != nil {
 		return nil, err
-	}
-	msg, ok := d.(protoreflect.MessageDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindMessage, d, "")
 	}
 	return dynamicpb.NewMessageType(msg), nil
 }
@@ -197,82 +171,34 @@ func (t *typesFromDescriptorPool) FindMessageByURL(url string) (protoreflect.Mes
 }
 
 func (t *typesFromDescriptorPool) FindEnumByName(enum protoreflect.FullName) (protoreflect.EnumType, error) {
-	d, err := t.pool.FindDescriptorByName(enum)
+	en, err := findDescriptorOfKind[protoreflect.EnumDescriptor](t.pool, enum, DescriptorKindEnum)
 	if err != nil {
 		return nil, err
-	}
-	en, ok := d.(protoreflect.EnumDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindEnum, d, "")
 	}
 	return dynamicpb.NewEnumType(en), nil
 }
 
 func (t *typesFromDescriptorPool) RangeMessages(fn func(protoreflect.MessageType) bool) {
-	var rangeInContext func(container TypeContainer, fn func(protoreflect.MessageType) bool) bool
-	rangeInContext = func(container TypeContainer, fn func(protoreflect.MessageType) bool) bool {
-		msgs := container.Messages()
-		for i, length := 0, msgs.Len(); i < length; i++ {
-			msg := msgs.Get(i)
-			if !fn(dynamicpb.NewMessageType(msg)) {
-				return false
-			}
-			if !rangeInContext(msg, fn) {
-				return false
-			}
-		}
-		return true
-	}
 	t.pool.RangeFiles(func(file protoreflect.FileDescriptor) bool {
-		return rangeInContext(file, fn)
+		return rangeMessages(file, func(msg protoreflect.MessageDescriptor) bool {
+			return fn(dynamicpb.NewMessageType(msg))
+		})
 	})
 }
 
 func (t *typesFromDescriptorPool) RangeEnums(fn func(protoreflect.EnumType) bool) {
-	var rangeInContext func(container TypeContainer, fn func(protoreflect.EnumType) bool) bool
-	rangeInContext = func(container TypeContainer, fn func(protoreflect.EnumType) bool) bool {
-		enums := container.Enums()
-		for i, length := 0, enums.Len(); i < length; i++ {
-			enum := enums.Get(i)
-			if !fn(dynamicpb.NewEnumType(enum)) {
-				return false
-			}
-		}
-		msgs := container.Messages()
-		for i, length := 0, msgs.Len(); i < length; i++ {
-			msg := msgs.Get(i)
-			if !rangeInContext(msg, fn) {
-				return false
-			}
-		}
-		return true
-	}
 	t.pool.RangeFiles(func(file protoreflect.FileDescriptor) bool {
-		return rangeInContext(file, fn)
+		return rangeEnums(file, func(en protoreflect.EnumDescriptor) bool {
+			return fn(dynamicpb.NewEnumType(en))
+		})
 	})
 }
 
 func (t *typesFromDescriptorPool) RangeExtensions(fn func(protoreflect.ExtensionType) bool) {
-	var rangeInContext func(container TypeContainer, fn func(protoreflect.ExtensionType) bool) bool
-	rangeInContext = func(container TypeContainer, fn func(protoreflect.ExtensionType) bool) bool {
-		exts := container.Extensions()
-		for i, length := 0, exts.Len(); i < length; i++ {
-			ext := exts.Get(i)
-			if !fn(ExtensionType(ext)) {
-				return false
-			}
-		}
-		msgs := container.Messages()
-		for i, length := 0, msgs.Len(); i < length; i++ {
-			msg := msgs.Get(i)
-			if !rangeInContext(msg, fn) {
-				return false
-			}
-		}
-		return true
-	}
 	t.pool.RangeFiles(func(file protoreflect.FileDescriptor) bool {
-		return rangeInContext(file, fn)
+		return rangeExtensions(file, func(ext protoreflect.ExtensionDescriptor) bool {
+			return fn(ExtensionType(ext))
+		})
 	})
 }
 

@@ -12,7 +12,7 @@ import (
 
 // FindExtensionByNumber searches the given descriptor pool for the requested extension.
 // This performs an inefficient search through all files and extensions in the pool.
-// It returns nil if the extension is not found in the file.
+// It returns nil if the extension is not found in the pool.
 func FindExtensionByNumber(res DescriptorPool, message protoreflect.FullName, field protoreflect.FieldNumber) protoreflect.ExtensionDescriptor {
 	var ext protoreflect.ExtensionDescriptor
 	res.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
@@ -29,25 +29,62 @@ func FindExtensionByNumberInFile(file protoreflect.FileDescriptor, message proto
 }
 
 func findExtension(container TypeContainer, message protoreflect.FullName, field protoreflect.FieldNumber) protoreflect.FieldDescriptor {
-	// search extensions in this scope
-	exts := container.Extensions()
-	for i, length := 0, exts.Len(); i < length; i++ {
-		ext := exts.Get(i)
+	var found protoreflect.ExtensionDescriptor
+	rangeExtensions(container, func(ext protoreflect.ExtensionDescriptor) bool {
 		if ext.Number() == field && ext.ContainingMessage().FullName() == message {
-			return ext
+			found = ext
+			return false
 		}
-	}
+		return true
+	})
+	return found
+}
 
-	// if not found, search nested scopes
+// findDescriptorOfKind finds the descriptor with the given name and returns
+// it as a D. It returns an *ErrUnexpectedType if the descriptor is not of the
+// given kind.
+func findDescriptorOfKind[D protoreflect.Descriptor](res DescriptorResolver, name protoreflect.FullName, kind DescriptorKind) (D, error) {
+	var zero D
+	d, err := res.FindDescriptorByName(name)
+	if err != nil {
+		return zero, err
+	}
+	result, ok := d.(D)
+	if !ok || KindOf(d) != kind {
+		return zero, NewUnexpectedTypeError(kind, d, "")
+	}
+	return result, nil
+}
+
+// rangeMessages calls fn for every message in the given container, including
+// nested messages. It stops and returns false as soon as fn returns false.
+func rangeMessages(container TypeContainer, fn func(protoreflect.MessageDescriptor) bool) bool {
 	msgs := container.Messages()
 	for i, length := 0, msgs.Len(); i < length; i++ {
 		msg := msgs.Get(i)
-		ext := findExtension(msg, message, field)
-		if ext != nil {
-			return ext
+		if !fn(msg) || !rangeMessages(msg, fn) {
+			return false
 		}
 	}
-	return nil
+	return true
+}
+
+// rangeEnums calls fn for every enum in the given container, including enums
+// nested in messages. It stops and returns false as soon as fn returns false.
+func rangeEnums(container TypeContainer, fn func(protoreflect.EnumDescriptor) bool) bool {
+	enums := container.Enums()
+	for i, length := 0, enums.Len(); i < length; i++ {
+		if !fn(enums.Get(i)) {
+			return false
+		}
+	}
+	msgs := container.Messages()
+	for i, length := 0, msgs.Len(); i < length; i++ {
+		if !rangeEnums(msgs.Get(i), fn) {
+			return false
+		}
+	}
+	return true
 }
 
 // rangeExtensions calls fn for every extension in the given container,
@@ -72,28 +109,13 @@ func rangeExtensions(container TypeContainer, fn func(protoreflect.ExtensionDesc
 // RangeExtensionsByMessage enumerates all extensions in the given descriptor pool that
 // extend the given message. It stops early if the given function returns false.
 func RangeExtensionsByMessage(res DescriptorPool, message protoreflect.FullName, fn func(descriptor protoreflect.ExtensionDescriptor) bool) {
-	var rangeInContext func(container TypeContainer, fn func(protoreflect.ExtensionDescriptor) bool) bool
-	rangeInContext = func(container TypeContainer, fn func(protoreflect.ExtensionDescriptor) bool) bool {
-		exts := container.Extensions()
-		for i, length := 0, exts.Len(); i < length; i++ {
-			ext := exts.Get(i)
-			if ext.ContainingMessage().FullName() == message {
-				if !fn(ext) {
-					return false
-				}
-			}
-		}
-		msgs := container.Messages()
-		for i, length := 0, msgs.Len(); i < length; i++ {
-			msg := msgs.Get(i)
-			if !rangeInContext(msg, fn) {
-				return false
-			}
-		}
-		return true
-	}
 	res.RangeFiles(func(file protoreflect.FileDescriptor) bool {
-		return rangeInContext(file, fn)
+		return rangeExtensions(file, func(ext protoreflect.ExtensionDescriptor) bool {
+			if ext.ContainingMessage().FullName() != message {
+				return true
+			}
+			return fn(ext)
+		})
 	})
 }
 

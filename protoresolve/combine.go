@@ -70,14 +70,9 @@ func CombinePools(res ...interface {
 type combined []Resolver
 
 func (c combined) FindFileByPath(path string) (protoreflect.FileDescriptor, error) {
-	for _, res := range c {
-		file, err := res.FindFileByPath(path)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return file, err
-	}
-	return nil, protoregistry.NotFound
+	return findFirst(c, func(res Resolver) (protoreflect.FileDescriptor, error) {
+		return res.FindFileByPath(path)
+	})
 }
 
 func (c combined) NumFiles() int {
@@ -105,47 +100,27 @@ func (c combined) RangeFilesByPackage(name protoreflect.FullName, f func(protore
 }
 
 func (c combined) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
-	for _, res := range c {
-		d, err := res.FindDescriptorByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return d, err
-	}
-	return nil, protoregistry.NotFound
+	return findFirst(c, func(res Resolver) (protoreflect.Descriptor, error) {
+		return res.FindDescriptorByName(name)
+	})
 }
 
 func (c combined) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageDescriptor, error) {
-	for _, res := range c {
-		msg, err := res.FindMessageByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return msg, err
-	}
-	return nil, protoregistry.NotFound
+	return findFirst(c, func(res Resolver) (protoreflect.MessageDescriptor, error) {
+		return res.FindMessageByName(name)
+	})
 }
 
 func (c combined) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
-	for _, res := range c {
-		ext, err := res.FindExtensionByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return ext, err
-	}
-	return nil, protoregistry.NotFound
+	return findFirst(c, func(res Resolver) (protoreflect.ExtensionDescriptor, error) {
+		return res.FindExtensionByName(name)
+	})
 }
 
 func (c combined) FindExtensionByNumber(message protoreflect.FullName, number protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error) {
-	for _, res := range c {
-		ext, err := res.FindExtensionByNumber(message, number)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return ext, err
-	}
-	return nil, protoregistry.NotFound
+	return findFirst(c, func(res Resolver) (protoreflect.ExtensionDescriptor, error) {
+		return res.FindExtensionByNumber(message, number)
+	})
 }
 
 func (c combined) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionDescriptor) bool) {
@@ -155,14 +130,9 @@ func (c combined) RangeExtensionsByMessage(message protoreflect.FullName, fn fun
 }
 
 func (c combined) FindMessageByURL(url string) (protoreflect.MessageDescriptor, error) {
-	for _, res := range c {
-		msg, err := res.FindMessageByURL(url)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return msg, err
-	}
-	return nil, protoregistry.NotFound
+	return findFirst(c, func(res Resolver) (protoreflect.MessageDescriptor, error) {
+		return res.FindMessageByURL(url)
+	})
 }
 
 func (c combined) AsTypeResolver() TypeResolver {
@@ -172,58 +142,33 @@ func (c combined) AsTypeResolver() TypeResolver {
 type combinedPool []TypePool
 
 func (c combinedPool) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionType, error) {
-	for _, res := range c {
-		ext, err := res.FindExtensionByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return ext, err
-	}
-	return nil, protoregistry.NotFound
+	return findFirst(c, func(res TypePool) (protoreflect.ExtensionType, error) {
+		return res.FindExtensionByName(name)
+	})
 }
 
 func (c combinedPool) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
-	for _, res := range c {
-		ext, err := res.FindExtensionByNumber(message, field)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return ext, err
-	}
-	return nil, protoregistry.NotFound
+	return findFirst(c, func(res TypePool) (protoreflect.ExtensionType, error) {
+		return res.FindExtensionByNumber(message, field)
+	})
 }
 
 func (c combinedPool) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageType, error) {
-	for _, res := range c {
-		msg, err := res.FindMessageByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return msg, err
-	}
-	return nil, protoregistry.NotFound
+	return findFirst(c, func(res TypePool) (protoreflect.MessageType, error) {
+		return res.FindMessageByName(name)
+	})
 }
 
 func (c combinedPool) FindMessageByURL(url string) (protoreflect.MessageType, error) {
-	for _, res := range c {
-		msg, err := res.FindMessageByURL(url)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return msg, err
-	}
-	return nil, protoregistry.NotFound
+	return findFirst(c, func(res TypePool) (protoreflect.MessageType, error) {
+		return res.FindMessageByURL(url)
+	})
 }
 
 func (c combinedPool) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumType, error) {
-	for _, res := range c {
-		en, err := res.FindEnumByName(name)
-		if errors.Is(err, protoregistry.NotFound) {
-			continue
-		}
-		return en, err
-	}
-	return nil, protoregistry.NotFound
+	return findFirst(c, func(res TypePool) (protoreflect.EnumType, error) {
+		return res.FindEnumByName(name)
+	})
 }
 
 func (c combinedPool) RangeMessages(fn func(protoreflect.MessageType) bool) {
@@ -291,4 +236,18 @@ func rangeDistinct[R, T any, K comparable](
 			return
 		}
 	}
+}
+
+// findFirst calls find with each of the given resolvers, in order, and returns
+// the first result that is not a not-found error.
+func findFirst[R, T any](resolvers []R, find func(R) (T, error)) (T, error) {
+	for _, res := range resolvers {
+		result, err := find(res)
+		if errors.Is(err, protoregistry.NotFound) {
+			continue
+		}
+		return result, err
+	}
+	var zero T
+	return zero, protoregistry.NotFound
 }

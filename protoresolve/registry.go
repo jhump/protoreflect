@@ -303,31 +303,12 @@ func (r *Registry) FindDescriptorByName(name protoreflect.FullName) (protoreflec
 
 // FindMessageByName implements part of the Resolver interface.
 func (r *Registry) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageDescriptor, error) {
-	d, err := r.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	msg, ok := d.(protoreflect.MessageDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindMessage, d, "")
-	}
-	return msg, nil
+	return findDescriptorOfKind[protoreflect.MessageDescriptor](r, name, DescriptorKindMessage)
 }
 
 // FindExtensionByName implements part of the Resolver interface.
 func (r *Registry) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
-	d, err := r.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	fld, ok := d.(protoreflect.FieldDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
-	}
-	if !fld.IsExtension() {
-		return nil, NewUnexpectedTypeError(DescriptorKindExtension, fld, "")
-	}
-	return fld, nil
+	return findDescriptorOfKind[protoreflect.ExtensionDescriptor](r, name, DescriptorKindExtension)
 }
 
 // FindExtensionByNumber implements part of the Resolver interface.
@@ -382,6 +363,9 @@ func (r *Registry) AsTypePool() TypePool {
 	return TypesFromDescriptorPool(r)
 }
 
+// extResolverForFile resolves extensions for re-parsing the custom options of
+// a file as it is registered. It finds extensions in the registry, which has
+// the file's dependencies, or in the file itself.
 type extResolverForFile struct {
 	f protoreflect.FileDescriptor
 	r ExtensionResolver
@@ -392,9 +376,12 @@ func (e *extResolverForFile) FindExtensionByName(field protoreflect.FullName) (p
 	if err == nil {
 		return ExtensionType(ext), nil
 	}
+	if !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
 	desc := FindDescriptorByNameInFile(e.f, field)
 	if desc == nil {
-		return nil, ErrNotFound
+		return nil, NewNotFoundError(field)
 	}
 	ext, ok := desc.(protoreflect.FieldDescriptor)
 	if !ok || !ext.IsExtension() {
@@ -408,9 +395,12 @@ func (e *extResolverForFile) FindExtensionByNumber(message protoreflect.FullName
 	if err == nil {
 		return ExtensionType(ext), nil
 	}
+	if !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
 	ext = FindExtensionByNumberInFile(e.f, message, field)
 	if ext == nil {
-		return nil, ErrNotFound
+		return nil, fmt.Errorf("extension number %d for message %q: %w", field, message, ErrNotFound)
 	}
 	return ExtensionType(ext), nil
 }
