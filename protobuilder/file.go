@@ -178,11 +178,11 @@ func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
 
 func updateLocalRefsInMessage(mb *MessageBuilder, localMessages map[protoreflect.MessageDescriptor]*MessageBuilder, localEnums map[protoreflect.EnumDescriptor]*EnumBuilder) {
 	for _, b := range mb.fieldsAndOneofs {
-		if flb, ok := b.(*FieldBuilder); ok {
-			updateLocalRefsInField(flb, localMessages, localEnums)
-		} else {
-			oob := b.(*OneofBuilder)
-			for _, flb := range oob.choices {
+		switch b := b.(type) {
+		case *FieldBuilder:
+			updateLocalRefsInField(b, localMessages, localEnums)
+		case *OneofBuilder:
+			for _, flb := range b.choices {
 				updateLocalRefsInField(flb, localMessages, localEnums)
 			}
 		}
@@ -231,7 +231,6 @@ func updateLocalRefsInRpcType(rpcType *RpcType, localMessages map[protoreflect.M
 // Name implements the Builder interface. However, files do not have
 // names, they have paths. So this method always returns the empty
 // string. Use Path instead.
-// instead.
 func (fb *FileBuilder) Name() protoreflect.Name {
 	return ""
 }
@@ -357,13 +356,13 @@ func (fb *FileBuilder) removeChild(b Builder) {
 
 	switch b.(type) {
 	case *MessageBuilder:
-		fb.messages = deleteBuilder(b.Name(), fb.messages).([]*MessageBuilder)
+		fb.messages = deleteBuilder(fb.messages, b)
 	case *FieldBuilder:
-		fb.extensions = deleteBuilder(b.Name(), fb.extensions).([]*FieldBuilder)
+		fb.extensions = deleteBuilder(fb.extensions, b)
 	case *EnumBuilder:
-		fb.enums = deleteBuilder(b.Name(), fb.enums).([]*EnumBuilder)
+		fb.enums = deleteBuilder(fb.enums, b)
 	case *ServiceBuilder:
-		fb.services = deleteBuilder(b.Name(), fb.services).([]*ServiceBuilder)
+		fb.services = deleteBuilder(fb.services, b)
 	}
 	delete(fb.symbols, b.Name())
 	b.setParent(nil)

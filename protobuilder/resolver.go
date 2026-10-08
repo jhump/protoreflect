@@ -277,13 +277,13 @@ func (r *dependencyResolver) resolveSyntheticFile(b Builder, seen []Builder) (pr
 
 func (r *dependencyResolver) resolveTypesInMessage(root Builder, seen []Builder, deps *dependencies, mb *MessageBuilder) error {
 	for _, b := range mb.fieldsAndOneofs {
-		if flb, ok := b.(*FieldBuilder); ok {
-			if err := r.resolveTypesInField(root, seen, deps, flb); err != nil {
+		switch b := b.(type) {
+		case *FieldBuilder:
+			if err := r.resolveTypesInField(root, seen, deps, b); err != nil {
 				return err
 			}
-		} else {
-			oob := b.(*OneofBuilder)
-			for _, flb := range oob.choices {
+		case *OneofBuilder:
+			for _, flb := range b.choices {
 				if err := r.resolveTypesInField(root, seen, deps, flb); err != nil {
 					return err
 				}
@@ -401,18 +401,18 @@ func (r *dependencyResolver) resolveTypesInFileOptions(root Builder, deps *depen
 
 func (r *dependencyResolver) resolveTypesInMessageOptions(root Builder, fileExts protoresolve.ExtensionTypeResolver, deps *dependencies, mb *MessageBuilder) error {
 	for _, b := range mb.fieldsAndOneofs {
-		if flb, ok := b.(*FieldBuilder); ok {
-			if err := r.resolveTypesInOptions(root, fileExts, deps, flb.Options); err != nil {
+		switch b := b.(type) {
+		case *FieldBuilder:
+			if err := r.resolveTypesInOptions(root, fileExts, deps, b.Options); err != nil {
 				return err
 			}
-		} else {
-			oob := b.(*OneofBuilder)
-			for _, flb := range oob.choices {
+		case *OneofBuilder:
+			for _, flb := range b.choices {
 				if err := r.resolveTypesInOptions(root, fileExts, deps, flb.Options); err != nil {
 					return err
 				}
 			}
-			if err := r.resolveTypesInOptions(root, fileExts, deps, oob.Options); err != nil {
+			if err := r.resolveTypesInOptions(root, fileExts, deps, b.Options); err != nil {
 				return err
 			}
 		}

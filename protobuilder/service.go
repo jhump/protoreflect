@@ -25,7 +25,8 @@ type ServiceBuilder struct {
 
 var _ Builder = (*ServiceBuilder)(nil)
 
-// NewService creates a new ServiceBuilder for a service with the given name.
+// NewService creates a new ServiceBuilder for a service with the given name. If
+// the given name is not a valid identifier, this function will panic.
 func NewService(name protoreflect.Name) *ServiceBuilder {
 	return &ServiceBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -124,7 +125,7 @@ func (sb *ServiceBuilder) removeChild(b Builder) {
 	if p, ok := b.Parent().(*ServiceBuilder); !ok || p != sb {
 		return
 	}
-	sb.methods = deleteBuilder(b.Name(), sb.methods).([]*MethodBuilder)
+	sb.methods = deleteBuilder(sb.methods, b)
 	delete(sb.symbols, b.Name())
 	b.setParent(nil)
 }
@@ -134,7 +135,11 @@ func (sb *ServiceBuilder) renamedChild(b Builder, oldName protoreflect.Name) err
 		return nil
 	}
 
-	if err := sb.addSymbol(b.(*MethodBuilder)); err != nil {
+	mtb, ok := b.(*MethodBuilder)
+	if !ok {
+		return nil
+	}
+	if err := sb.addSymbol(mtb); err != nil {
 		return err
 	}
 	delete(sb.symbols, oldName)
@@ -173,8 +178,8 @@ func (sb *ServiceBuilder) TryRemoveMethod(name protoreflect.Name) bool {
 	return false
 }
 
-// AddMethod adds the given method to this servuce. If an error prevents the
-// method  from being added, this method panics. This returns the service
+// AddMethod adds the given method to this service. If an error prevents the
+// method from being added, this method panics. This returns the service
 // builder, for method chaining.
 func (sb *ServiceBuilder) AddMethod(mtb *MethodBuilder) *ServiceBuilder {
 	if err := sb.TryAddMethod(mtb); err != nil {
@@ -183,8 +188,8 @@ func (sb *ServiceBuilder) AddMethod(mtb *MethodBuilder) *ServiceBuilder {
 	return sb
 }
 
-// TryAddMethod adds the given field to this service, returning any error that
-// prevents the field from being added (such as a name collision with another
+// TryAddMethod adds the given method to this service, returning any error that
+// prevents the method from being added (such as a name collision with another
 // method already added to the service).
 func (sb *ServiceBuilder) TryAddMethod(mtb *MethodBuilder) error {
 	if err := sb.addSymbol(mtb); err != nil {
@@ -259,7 +264,8 @@ type MethodBuilder struct {
 var _ Builder = (*MethodBuilder)(nil)
 
 // NewMethod creates a new MethodBuilder for a method with the given name and
-// request and response types.
+// request and response types. If the given name is not a valid identifier, this
+// function will panic.
 func NewMethod(name protoreflect.Name, req, resp *RpcType) *MethodBuilder {
 	return &MethodBuilder{
 		baseBuilder: baseBuilderWithName(name),

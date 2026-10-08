@@ -35,9 +35,10 @@ type EnumBuilder struct {
 var _ Builder = (*EnumBuilder)(nil)
 
 // NewEnum creates a new EnumBuilder for an enum with the given name. Since the
-// new message has no parent element, it also has no package name (e.g. it is in
+// new enum has no parent element, it also has no package name (e.g. it is in
 // the unnamed package, until it is assigned to a file builder that defines a
-// package name).
+// package name). If the given name is not a valid identifier, this function
+// will panic.
 func NewEnum(name protoreflect.Name) *EnumBuilder {
 	return &EnumBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -148,7 +149,7 @@ func (eb *EnumBuilder) removeChild(b Builder) {
 	if p, ok := b.Parent().(*EnumBuilder); !ok || p != eb {
 		return
 	}
-	eb.values = deleteBuilder(b.Name(), eb.values).([]*EnumValueBuilder)
+	eb.values = deleteBuilder(eb.values, b)
 	delete(eb.symbols, b.Name())
 	b.setParent(nil)
 }
@@ -158,7 +159,11 @@ func (eb *EnumBuilder) renamedChild(b Builder, oldName protoreflect.Name) error 
 		return nil
 	}
 
-	if err := eb.addSymbol(b.(*EnumValueBuilder)); err != nil {
+	evb, ok := b.(*EnumValueBuilder)
+	if !ok {
+		return nil
+	}
+	if err := eb.addSymbol(evb); err != nil {
 		return err
 	}
 	delete(eb.symbols, oldName)
@@ -227,9 +232,9 @@ func (eb *EnumBuilder) TryAddValue(evb *EnumValueBuilder) error {
 	return nil
 }
 
-// AddReservedRange adds the given reserved range to this message. The range is
+// AddReservedRange adds the given reserved range to this enum. The range is
 // inclusive of both the start and end, just like defining a range in proto IDL
-// source. This returns the message, for method chaining.
+// source. This returns the enum builder, for method chaining.
 func (eb *EnumBuilder) AddReservedRange(start, end protoreflect.EnumNumber) *EnumBuilder {
 	eb.ReservedRanges = append(eb.ReservedRanges, EnumRange{start, end})
 	return eb
@@ -360,7 +365,8 @@ var _ Builder = (*EnumValueBuilder)(nil)
 // NewEnumValue creates a new EnumValueBuilder for an enum value with the given
 // name. The return value's numeric value will not be set, which means it will
 // be auto-assigned when the descriptor is built, unless explicitly set with a
-// call to SetNumber.
+// call to SetNumber. If the given name is not a valid identifier, this function
+// will panic.
 func NewEnumValue(name protoreflect.Name) *EnumValueBuilder {
 	return &EnumValueBuilder{baseBuilder: baseBuilderWithName(name)}
 }

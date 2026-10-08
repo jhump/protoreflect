@@ -61,7 +61,8 @@ var _ Builder = (*FieldBuilder)(nil)
 
 // NewField creates a new FieldBuilder for a non-extension field with the given
 // name and type. To create a map or group field, see NewMapField or
-// NewGroupField respectively.
+// NewGroupField respectively. If the given name is not a valid identifier, this
+// function will panic.
 //
 // The new field will be optional. See SetCardinality, SetRepeated, and SetRequired
 // for changing this aspect of the field. The new field's tag will be zero,
@@ -79,7 +80,8 @@ func NewField(name protoreflect.Name, typ *FieldType) *FieldBuilder {
 // given name and whose type is a map of the given key and value types. Map keys
 // can be any of the scalar integer types, booleans, or strings. If any other
 // type is specified, this function will panic. Map values cannot be groups: if
-// a group type is specified, this function will panic.
+// a group type is specified, this function will panic. This function will also
+// panic if the given name is not a valid identifier.
 //
 // When this field is added to a message, the associated map entry message type
 // will also be added.
@@ -124,6 +126,8 @@ func NewMapField(name protoreflect.Name, keyTyp, valTyp *FieldType) *FieldBuilde
 // converted to all lower-case. If a message is given with a name that starts
 // with a lower-case letter, this function will panic.
 //
+// If the given message currently has a parent, it is removed from that parent.
+//
 // When this field is added to a message, the associated group message type will
 // also be added.
 //
@@ -149,7 +153,9 @@ func NewGroupField(mb *MessageBuilder) *FieldBuilder {
 }
 
 // NewExtension creates a new FieldBuilder for an extension field with the given
-// name, tag, type, and extendee. The extendee given is a message builder.
+// name, tag, type, and extendee. The extendee given is a message builder. If the
+// given name is not a valid identifier, the tag is not valid, or the extendee is
+// nil, this function will panic.
 //
 // The new field will be optional. See SetCardinality and SetRepeated for changing
 // this aspect of the field.
@@ -164,7 +170,8 @@ func NewExtension(name protoreflect.Name, tag protoreflect.FieldNumber, typ *Fie
 
 // NewExtensionImported creates a new FieldBuilder for an extension field with
 // the given name, tag, type, and extendee. The extendee given is a message
-// descriptor.
+// descriptor. If the given name is not a valid identifier, the tag is not
+// valid, or the extendee is nil, this function will panic.
 //
 // The new field will be optional. See SetCardinality and SetRepeated for changing
 // this aspect of the field.
@@ -516,8 +523,9 @@ func (flb *FieldBuilder) SetType(ft *FieldType) *FieldBuilder {
 	return flb
 }
 
-// SetDefaultValue changes the field's type and returns the field builder, for
-// method chaining.
+// SetDefaultValue changes the field's default value and returns the field
+// builder, for method chaining. The value is expressed in the same textual form
+// used for default values in a descriptor proto.
 func (flb *FieldBuilder) SetDefaultValue(defValue string) *FieldBuilder {
 	flb.Default = defValue
 	return flb
@@ -668,7 +676,8 @@ type OneofBuilder struct {
 
 var _ Builder = (*OneofBuilder)(nil)
 
-// NewOneof creates a new OneofBuilder for a oneof with the given name.
+// NewOneof creates a new OneofBuilder for a oneof with the given name. If the
+// given name is not a valid identifier, this function will panic.
 func NewOneof(name protoreflect.Name) *OneofBuilder {
 	return &OneofBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -759,10 +768,8 @@ func (oob *OneofBuilder) Children() []Builder {
 }
 
 func (oob *OneofBuilder) parent() *MessageBuilder {
-	if oob.baseBuilder.parent == nil {
-		return nil
-	}
-	return oob.baseBuilder.parent.(*MessageBuilder)
+	mb, _ := oob.baseBuilder.parent.(*MessageBuilder)
+	return mb
 }
 
 func (oob *OneofBuilder) findChild(_ protoreflect.Name) Builder {
@@ -783,7 +790,7 @@ func (oob *OneofBuilder) removeChild(b Builder) {
 		}
 	}
 
-	oob.choices = deleteBuilder(b.Name(), oob.choices).([]*FieldBuilder)
+	oob.choices = deleteBuilder(oob.choices, b)
 	delete(oob.symbols, b.Name())
 	b.setParent(nil)
 }
@@ -793,7 +800,11 @@ func (oob *OneofBuilder) renamedChild(b Builder, oldName protoreflect.Name) erro
 		return nil
 	}
 
-	if err := oob.addSymbol(b.(*FieldBuilder)); err != nil {
+	flb, ok := b.(*FieldBuilder)
+	if !ok {
+		return nil
+	}
+	if err := oob.addSymbol(flb); err != nil {
 		return err
 	}
 

@@ -3,7 +3,7 @@ package protobuilder
 import (
 	"bytes"
 	"fmt"
-	"reflect"
+	"slices"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -393,19 +393,11 @@ func getRoot(b Builder) Builder {
 	}
 }
 
-// deleteBuilder will delete a descriptor builder with the given name from the
-// given slice. The slice's elements can be any builder type. The parameter has
-// type interface{} so it can accept []*MessageBuilder or []*FieldBuilder, for
-// example. It returns a value of the same type with the named builder omitted.
-func deleteBuilder(name protoreflect.Name, descs interface{}) interface{} {
-	rv := reflect.ValueOf(descs)
-	for i := 0; i < rv.Len(); i++ {
-		c := rv.Index(i).Interface().(Builder)
-		if c.Name() == name {
-			head := rv.Slice(0, i)
-			tail := rv.Slice(i+1, rv.Len())
-			return reflect.AppendSlice(head, tail).Interface()
-		}
-	}
-	return descs
+// deleteBuilder removes the given builder (compared by identity, not by name)
+// from the given slice and returns the resulting slice. It modifies the slice
+// in place, so callers should only use the returned value.
+func deleteBuilder[T Builder](builders []T, b Builder) []T {
+	return slices.DeleteFunc(builders, func(elem T) bool {
+		return Builder(elem) == b
+	})
 }
