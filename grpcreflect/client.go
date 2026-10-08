@@ -138,13 +138,14 @@ func IsElementNotFoundError(err error) bool {
 }
 
 // ProtocolError is an error returned when the server sends a response of the
-// wrong type.
+// wrong type. Callers can use [errors.As] with a *ProtocolError target to
+// detect it.
 type ProtocolError struct {
 	missingType reflect.Type
 }
 
-func (p ProtocolError) Error() string {
-	return fmt.Sprintf("Protocol error: response was missing %v", p.missingType)
+func (p *ProtocolError) Error() string {
+	return fmt.Sprintf("protocol error: response was missing %v", p.missingType)
 }
 
 // Client is a client connection to a server for performing reflection calls
@@ -205,7 +206,7 @@ func newClient(ctx context.Context, stubv1 refv1.ServerReflectionClient, stubv1a
 // of reflection (based on what the server supports) with the given root context
 // and using the given client connection.
 //
-// It will first the v1 version of the reflection service. If it gets back an
+// It will first try the v1 version of the reflection service. If it gets back an
 // "Unimplemented" error, it will fall back to using the v1alpha version. It
 // will remember which version the server supports for any subsequent operations
 // that need to re-invoke the streaming RPC. But, if it's a very long-lived
@@ -306,10 +307,11 @@ func (cr *Client) fileByFilename(filename string, depPath []string) (protoreflec
 			return fd, nil
 		}
 	}
+	var notFoundErr *elementNotFoundError
 	if isNotFound(err) {
 		err = fileNotFound(filename, nil)
-	} else if e, ok := err.(*elementNotFoundError); ok {
-		err = fileNotFound(filename, e)
+	} else if errors.As(err, &notFoundErr) {
+		err = fileNotFound(filename, notFoundErr)
 	}
 	return fd, err
 }
@@ -339,10 +341,11 @@ func (cr *Client) FileContainingSymbol(symbol protoreflect.FullName) (protorefle
 			return d.ParentFile(), nil
 		}
 	}
+	var notFoundErr *elementNotFoundError
 	if isNotFound(err) {
 		err = symbolNotFound(symbol, nil)
-	} else if e, ok := err.(*elementNotFoundError); ok {
-		err = symbolNotFound(symbol, e)
+	} else if errors.As(err, &notFoundErr) {
+		err = symbolNotFound(symbol, notFoundErr)
 	}
 	return fd, err
 }
@@ -376,10 +379,11 @@ func (cr *Client) FileContainingExtension(extendedMessageName protoreflect.FullN
 			return xt.TypeDescriptor().ParentFile(), nil
 		}
 	}
+	var notFoundErr *elementNotFoundError
 	if isNotFound(err) {
 		err = extensionNotFound(extendedMessageName, extensionNumber, nil)
-	} else if e, ok := err.(*elementNotFoundError); ok {
-		err = extensionNotFound(extendedMessageName, extensionNumber, e)
+	} else if errors.As(err, &notFoundErr) {
+		err = extensionNotFound(extendedMessageName, extensionNumber, notFoundErr)
 	}
 	return fd, err
 }
@@ -473,7 +477,7 @@ func (cr *Client) descriptorFromProto(fd *descriptorpb.FileDescriptorProto, depP
 	depPath = append(depPath, fd.GetName()) // record ourselves in the path of deps before we recurse
 	for i, depName := range fd.GetDependency() {
 		if _, err := cr.fileByFilename(depName, depPath); err != nil {
-			if _, ok := err.(*elementNotFoundError); !ok || !cr.allowMissing {
+			if !IsElementNotFoundError(err) || !cr.allowMissing {
 				return nil, err
 			}
 			// We'll ignore for now to see if the file is really necessary.
@@ -649,9 +653,11 @@ func isNotFound(err error) bool {
 }
 
 func (cr *Client) doSend(req *refv1.ServerReflectionRequest) (*refv1.ServerReflectionResponse, error) {
-	// TODO: Streams are thread-safe, so we shouldn't need to lock. But without locking, we'll need more machinery
-	// (goroutines and channels) to ensure that responses are correctly correlated with their requests and thus
-	// delivered in correct oder.
+	// gRPC streams do not allow concurrent calls to Send or concurrent calls to
+	// Recv. We also rely on each response following its request, so we hold the
+	// lock across the whole send and receive. Without it, we would need more
+	// machinery (goroutines and channels) to correlate responses with their
+	// requests.
 	cr.connMu.Lock()
 	defer cr.connMu.Unlock()
 	return cr.doSendLocked(0, nil, req)
