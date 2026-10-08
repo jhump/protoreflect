@@ -6,10 +6,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 
+	"github.com/jhump/protoreflect/v2/internal/resolvertest"
 	"github.com/jhump/protoreflect/v2/internal/testprotos"
+	"github.com/jhump/protoreflect/v2/internal/testprotos/nopkg"
+	"github.com/jhump/protoreflect/v2/internal/testprotos/pkg"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
@@ -233,4 +240,183 @@ func TestRangeExtensionsByMessage(t *testing.T) {
 		return true
 	})
 	assert.Equal(t, 0, len(exts))
+}
+
+func TestTypeNameFromURL(t *testing.T) {
+	t.Parallel()
+	testCases := map[string]protoreflect.FullName{
+		"type.googleapis.com/foo.Bar": "foo.Bar",
+		"example.com/a/b/c/foo.Bar":   "foo.Bar",
+		"foo.Bar":                     "foo.Bar",
+		"example.com/":                "",
+		"":                            "",
+	}
+	for url, name := range testCases {
+		assert.Equal(t, name, protoresolve.TypeNameFromURL(url), "URL %q", url)
+	}
+}
+
+func TestExtensionType(t *testing.T) {
+	t.Parallel()
+	// Descriptors that know their type return that type.
+	assert.Same(t, testprotos.E_Xtm, protoresolve.ExtensionType(testprotos.E_Xtm.TypeDescriptor()))
+	// Otherwise, a dynamic type is returned.
+	ext := testprotos.File_desc_test1_proto.Extensions().ByName("xtm")
+	require.NotNil(t, ext)
+	extType := protoresolve.ExtensionType(ext)
+	assert.IsType(t, dynamicpb.NewExtensionType(ext), extType)
+	assert.Equal(t, ext, extType.TypeDescriptor().Descriptor())
+}
+
+func TestTypeKindString(t *testing.T) {
+	t.Parallel()
+	testCases := map[protoresolve.TypeKind]string{
+		0:                                   "<none>",
+		protoresolve.TypeKindMessage:        "message",
+		protoresolve.TypeKindEnum:           "enum",
+		protoresolve.TypeKindExtension:      "extension",
+		protoresolve.TypeKindsAll:           "message,enum,extension",
+		protoresolve.TypeKindsSerialization: "message,extension",
+		protoresolve.TypeKind(8):            "unknown kind (8)",
+		protoresolve.TypeKindEnum | 8:       "enum,unknown kind (8)",
+	}
+	for kind, str := range testCases {
+		assert.Equal(t, str, kind.String())
+	}
+}
+
+func TestRegisterTypesInFile(t *testing.T) {
+	t.Parallel()
+	file := testprotos.File_desc_test1_proto
+	const (
+		msgName        = "testprotos.TestMessage.NestedMessage"
+		enumName       = "testprotos.SomeEnum"
+		nestedEnumName = "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.YetAnotherNestedMessage.DeeplyNestedEnum"
+		extName        = "testprotos.xtm"
+		nestedExtName  = "testprotos.TestMessage.NestedMessage.AnotherNestedMessage.flags"
+	)
+	testCases := []struct {
+		kinds                       protoresolve.TypeKind
+		messages, enums, extensions bool
+	}{
+		{kinds: protoresolve.TypeKindMessage, messages: true},
+		{kinds: protoresolve.TypeKindEnum, enums: true},
+		{kinds: protoresolve.TypeKindExtension, extensions: true},
+		{kinds: protoresolve.TypeKindsSerialization, messages: true, extensions: true},
+		{kinds: protoresolve.TypeKindsAll, messages: true, enums: true, extensions: true},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.kinds.String(), func(t *testing.T) {
+			t.Parallel()
+			var types protoregistry.Types
+			require.NoError(t, protoresolve.RegisterTypesInFile(file, &types, testCase.kinds))
+			// Registering again is a no-op.
+			require.NoError(t, protoresolve.RegisterTypesInFile(file, &types, testCase.kinds))
+			_, err := types.FindMessageByName(msgName)
+			assert.Equal(t, testCase.messages, err == nil, "message %s: %v", msgName, err)
+			for _, name := range []protoreflect.FullName{enumName, nestedEnumName} {
+				_, err = types.FindEnumByName(name)
+				assert.Equal(t, testCase.enums, err == nil, "enum %s: %v", name, err)
+			}
+			for _, name := range []protoreflect.FullName{extName, nestedExtName} {
+				_, err = types.FindExtensionByName(name)
+				assert.Equal(t, testCase.extensions, err == nil, "extension %s: %v", name, err)
+			}
+		})
+	}
+
+	t.Run("not recursive", func(t *testing.T) {
+		t.Parallel()
+		var types protoregistry.Types
+		require.NoError(t, protoresolve.RegisterTypesInFile(testprotos.File_desc_test2_proto, &types, protoresolve.TypeKindsAll))
+		_, err := types.FindMessageByName(msgName)
+		assert.ErrorIs(t, err, protoresolve.ErrNotFound, "types from imports should not be registered")
+	})
+}
+
+func TestRegisterTypesInFileRecursive(t *testing.T) {
+	t.Parallel()
+	// desc_test2.proto and all of its transitive imports.
+	expected := []protoreflect.FileDescriptor{
+		testprotos.File_desc_test1_proto,
+		pkg.File_pkg_desc_test_pkg_proto,
+		nopkg.File_nopkg_desc_test_nopkg_new_proto,
+		nopkg.File_nopkg_desc_test_nopkg_proto,
+		testprotos.File_desc_test2_proto,
+	}
+	opts := []resolvertest.Option{resolvertest.WithLenientErrors()}
+
+	var types protoregistry.Types
+	require.NoError(t, protoresolve.RegisterTypesInFileRecursive(testprotos.File_desc_test2_proto, &types, protoresolve.TypeKindsAll))
+	resolvertest.CheckTypePool(t, &types, expected, opts...)
+
+	types = protoregistry.Types{}
+	files := newFiles(t, []protoreflect.FileDescriptor{testprotos.File_desc_test1_proto, testprotos.File_desc_test2_proto})
+	require.NoError(t, protoresolve.RegisterTypesInFilesRecursive(files, &types, protoresolve.TypeKindsAll))
+	resolvertest.CheckTypePool(t, &types, expected, opts...)
+}
+
+func TestRegisterTypesInFileConflicts(t *testing.T) {
+	t.Parallel()
+	file := testprotos.File_desc_test1_proto
+	deps := newFiles(t, []protoreflect.FileDescriptor{file})
+	newFile := func(t *testing.T, fileProto *descriptorpb.FileDescriptorProto) protoreflect.FileDescriptor {
+		t.Helper()
+		other, err := protodesc.NewFile(fileProto, deps)
+		require.NoError(t, err)
+		return other
+	}
+	// Files with elements whose names conflict with those in file.
+	otherMessage := fileProto("other.proto", "testprotos")
+	otherMessage.MessageType = []*descriptorpb.DescriptorProto{{Name: proto.String("TestMessage")}}
+	otherEnum := fileProto("other.proto", "testprotos")
+	otherEnum.EnumType = []*descriptorpb.EnumDescriptorProto{{
+		Name:  proto.String("SomeEnum"),
+		Value: []*descriptorpb.EnumValueDescriptorProto{{Name: proto.String("OTHER"), Number: proto.Int32(0)}},
+	}}
+	otherExtension := fileProto("other.proto", "testprotos", file.Path())
+	otherExtension.Extension = []*descriptorpb.FieldDescriptorProto{int32Extension("xtm", 150, "testprotos.AnotherTestMessage")}
+	testCases := []struct {
+		name      string
+		other     *descriptorpb.FileDescriptorProto
+		kinds     protoresolve.TypeKind
+		errSubstr string
+	}{
+		{
+			name:      "message",
+			other:     otherMessage,
+			kinds:     protoresolve.TypeKindMessage,
+			errSubstr: `type testprotos.TestMessage is defined in both "other.proto" and "desc_test1.proto"`,
+		},
+		{
+			name:      "enum",
+			other:     otherEnum,
+			kinds:     protoresolve.TypeKindEnum,
+			errSubstr: `type testprotos.SomeEnum is defined in both "other.proto" and "desc_test1.proto"`,
+		},
+		{
+			name:      "extension name",
+			other:     otherExtension,
+			kinds:     protoresolve.TypeKindExtension,
+			errSubstr: `type testprotos.xtm is defined in both "other.proto" and "desc_test1.proto"`,
+		},
+		{
+			name:      "extension number",
+			other:     conflictingExtensionFileProto(),
+			kinds:     protoresolve.TypeKindExtension,
+			errSubstr: `extension number 100 for testprotos.AnotherTestMessage is defined in both "conflict.proto" and "desc_test1.proto"`,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			other := newFile(t, testCase.other)
+			var types protoregistry.Types
+			require.NoError(t, protoresolve.RegisterTypesInFile(other, &types, testCase.kinds))
+			err := protoresolve.RegisterTypesInFile(file, &types, testCase.kinds)
+			assert.ErrorContains(t, err, testCase.errSubstr)
+			err = protoresolve.RegisterTypesInFilesRecursive(deps, &types, testCase.kinds)
+			assert.ErrorContains(t, err, testCase.errSubstr)
+		})
+	}
 }

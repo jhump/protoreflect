@@ -268,18 +268,13 @@ func (k TypeKind) String() string {
 		}
 
 		var buf bytes.Buffer
-		l := bits.UintSize
 		for i != 0 {
 			if buf.Len() > 0 {
 				buf.WriteByte(',')
 			}
-			z := bits.LeadingZeros(i)
-			if z == l {
-				break
-			}
-			shr := l - z - 1
-			elem := TypeKind(1 << shr)
-			buf.WriteString(elem.String())
+			bit := uint(1) << bits.TrailingZeros(i)
+			buf.WriteString(TypeKind(bit).String())
+			i &^= bit
 		}
 		return buf.String()
 	}
