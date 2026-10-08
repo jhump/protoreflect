@@ -54,6 +54,22 @@ func TestWrongMessageType(t *testing.T) {
 	assert.Equal(t, io.EOF, err)
 }
 
+func TestNilMessage(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	const errSubstr = "got nil"
+	_, err := stub.InvokeRpc(ctx, unaryMd, nil)
+	assert.ErrorContains(t, err, errSubstr)
+	_, err = stub.InvokeRpcServerStream(ctx, serverStreamingMd, nil)
+	assert.ErrorContains(t, err, errSubstr)
+
+	clientStream, err := stub.InvokeRpcClientStream(ctx, clientStreamingMd)
+	require.NoError(t, err)
+	assert.ErrorContains(t, clientStream.SendMsg(nil), errSubstr)
+	_, err = clientStream.CloseAndReceive()
+	require.NoError(t, err)
+}
+
 func TestChannelErrors(t *testing.T) {
 	t.Parallel()
 	errChannel := errors.New("channel failure")
