@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/bufbuild/protocompile/walk"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
@@ -69,4 +70,28 @@ func (o oracleForFile) ProtoFromFileDescriptor(file protoreflect.FileDescriptor)
 		return o.fdProto, nil
 	}
 	return nil, fmt.Errorf("unexpected file: %s", file.Path())
+}
+
+func TestWalkStopsEarly(t *testing.T) {
+	t.Parallel()
+	root := &descriptorpb.FileDescriptorProto{
+		MessageType: []*descriptorpb.DescriptorProto{
+			{Name: proto.String("A"), Field: []*descriptorpb.FieldDescriptorProto{{Name: proto.String("a")}}},
+			{Name: proto.String("B")},
+		},
+	}
+	var count int
+	protomessage.Walk(root.ProtoReflect(), func([]any, protoreflect.Message) bool {
+		count++
+		return false
+	})
+	assert.Equal(t, 1, count, "should stop after root")
+
+	count = 0
+	protomessage.Walk(root.ProtoReflect(), func(path []any, _ protoreflect.Message) bool {
+		count++
+		// Stop at the first message after the root.
+		return len(path) == 0
+	})
+	assert.Equal(t, 2, count, "should stop after first nested message")
 }
