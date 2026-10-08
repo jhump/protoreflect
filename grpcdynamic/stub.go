@@ -80,6 +80,10 @@ func (s *Stub) InvokeRpc(ctx context.Context, method protoreflect.MethodDescript
 }
 
 // InvokeRpcServerStream sends a unary RPC and returns the response stream. Use this for server-streaming methods.
+//
+// To release the stream's resources, callers must either call RecvMsg until it
+// returns an error (which is io.EOF when the stream completes normally) or
+// cancel ctx.
 func (s *Stub) InvokeRpcServerStream(ctx context.Context, method protoreflect.MethodDescriptor, request proto.Message, opts ...grpc.CallOption) (*ServerStream, error) {
 	if method.IsStreamingClient() || !method.IsStreamingServer() {
 		return nil, fmt.Errorf("InvokeRpcServerStream is for server-streaming methods; %q is %s", method.FullName(), methodType(method))
@@ -108,12 +112,7 @@ func (s *Stub) InvokeRpcServerStream(ctx context.Context, method protoreflect.Me
 		cancel()
 		return nil, err
 	}
-	go func() {
-		// when the new stream is finished, also cleanup the parent context
-		<-cs.Context().Done()
-		cancel()
-	}()
-	return &ServerStream{cs, method.Output(), s.resolver}, nil
+	return &ServerStream{cs, method.Output(), s.resolver, cancel}, nil
 }
 
 // InvokeRpcClientStream creates a new stream that is used to send request messages and, at the end,
@@ -133,11 +132,6 @@ func (s *Stub) InvokeRpcClientStream(ctx context.Context, method protoreflect.Me
 		cancel()
 		return nil, err
 	}
-	go func() {
-		// when the new stream is finished, also cleanup the parent context
-		<-cs.Context().Done()
-		cancel()
-	}()
 	return &ClientStream{cs, method, s.resolver, cancel}, nil
 }
 
@@ -186,6 +180,9 @@ type ServerStream struct {
 	stream   grpc.ClientStream
 	respType protoreflect.MessageDescriptor
 	resolver protoresolve.SerializationResolver
+	// Cancels the stream's context, to release its resources once the
+	// stream is finished.
+	cancel context.CancelFunc
 }
 
 // Header returns any header metadata sent by the server (blocks if necessary until headers are
@@ -211,6 +208,8 @@ func (s *ServerStream) Context() context.Context {
 func (s *ServerStream) RecvMsg() (proto.Message, error) {
 	resp := newMessage(s.respType, s.resolver)
 	if err := s.stream.RecvMsg(resp); err != nil {
+		// The stream is finished.
+		s.cancel()
 		return nil, err
 	}
 	if s.resolver != nil {
@@ -225,7 +224,9 @@ type ClientStream struct {
 	stream   grpc.ClientStream
 	method   protoreflect.MethodDescriptor
 	resolver protoresolve.SerializationResolver
-	cancel   context.CancelFunc
+	// Cancels the stream's context, to release its resources once the
+	// stream is finished.
+	cancel context.CancelFunc
 }
 
 // Header returns any header metadata sent by the server (blocks if necessary until headers are
@@ -255,6 +256,8 @@ func (s *ClientStream) SendMsg(m proto.Message) error {
 
 // CloseAndReceive closes the outgoing request stream and then blocks for the server's response.
 func (s *ClientStream) CloseAndReceive() (proto.Message, error) {
+	// The stream is finished when this returns.
+	defer s.cancel()
 	if err := s.stream.CloseSend(); err != nil {
 		return nil, err
 	}
@@ -269,7 +272,6 @@ func (s *ClientStream) CloseAndReceive() (proto.Message, error) {
 	// make sure we get EOF for a second message
 	if err := s.stream.RecvMsg(resp.ProtoReflect().New().Interface()); err != io.EOF {
 		if err == nil {
-			s.cancel()
 			return nil, fmt.Errorf("client-streaming method %q returned more than one response message", s.method.FullName())
 		}
 		return nil, err
