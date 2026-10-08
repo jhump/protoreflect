@@ -131,6 +131,90 @@ func TestCachingTypeFetcher_Concurrency(t *testing.T) {
 	require.Greater(t, atomic.LoadInt32(&queryCount), int32(len(counts)))
 }
 
+func TestCachingTypeFetcher_CancelledLoad(t *testing.T) {
+	t.Parallel()
+	// The caller that starts a load cancels it, but a concurrent caller with a
+	// live context still gets the type.
+	const url = "foo.bar/some.Type"
+	started := make(chan struct{})
+	var calls atomic.Int32
+	fetcher := CachingTypeFetcher(TypeFetcherFunc(func(ctx context.Context, url string, enum bool) (proto.Message, error) {
+		if calls.Add(1) == 1 {
+			close(started)
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+		return testFetcher(ctx, url, enum)
+	}))
+
+	firstCtx, cancelFirst := context.WithCancel(context.Background())
+	firstErr := make(chan error, 1)
+	go func() {
+		_, err := fetcher.FetchMessageType(firstCtx, url)
+		firstErr <- err
+	}()
+	<-started
+	type result struct {
+		typ *typepb.Type
+		err error
+	}
+	second := make(chan result, 1)
+	go func() {
+		typ, err := fetcher.FetchMessageType(context.Background(), url)
+		second <- result{typ, err}
+	}()
+	// Give the second caller time to start waiting for the first load.
+	time.Sleep(100 * time.Millisecond)
+	cancelFirst()
+
+	require.ErrorIs(t, <-firstErr, context.Canceled)
+	secondResult := <-second
+	require.NoError(t, secondResult.err)
+	require.Equal(t, "some.Type", secondResult.typ.Name)
+}
+
+func TestCachingTypeFetcher_WaiterContext(t *testing.T) {
+	t.Parallel()
+	// A caller waiting for a concurrent load can stop waiting.
+	const url = "foo.bar/some.Type"
+	started := make(chan struct{})
+	release := make(chan struct{})
+	fetcher := CachingTypeFetcher(TypeFetcherFunc(func(ctx context.Context, url string, enum bool) (proto.Message, error) {
+		close(started)
+		<-release
+		return testFetcher(ctx, url, enum)
+	}))
+	defer close(release)
+	go func() {
+		_, _ = fetcher.FetchMessageType(context.Background(), url)
+	}()
+	<-started
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, err := fetcher.FetchMessageType(ctx, url)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestCachingTypeFetcher_Panic(t *testing.T) {
+	t.Parallel()
+	const url = "foo.bar/some.Type"
+	var calls atomic.Int32
+	fetcher := CachingTypeFetcher(TypeFetcherFunc(func(ctx context.Context, url string, enum bool) (proto.Message, error) {
+		if calls.Add(1) == 1 {
+			panic("fetcher failure")
+		}
+		return testFetcher(ctx, url, enum)
+	}))
+	require.Panics(t, func() {
+		_, _ = fetcher.FetchMessageType(context.Background(), url)
+	})
+	// The failed load is not cached.
+	typ, err := fetcher.FetchMessageType(context.Background(), url)
+	require.NoError(t, err)
+	require.Equal(t, "some.Type", typ.Name)
+}
+
 func TestHttpTypeFetcher(t *testing.T) {
 	trt := &testRoundTripper{counts: map[string]int{}}
 	fetcher := HttpTypeFetcher(trt, 65536, 10)
