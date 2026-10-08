@@ -1,6 +1,8 @@
 package sort
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -196,12 +198,9 @@ func TestSortFiles_MissingImport(t *testing.T) {
 }
 
 func TestSortFiles_CircularDependency(t *testing.T) {
-	// Note: The current implementation doesn't explicitly detect circular dependencies
-	// but this test documents the behavior. In practice, circular dependencies
-	// would be caught by the protobuf compiler itself.
-
 	name1 := "file1.proto"
 	name2 := "file2.proto"
+	name3 := "file3.proto"
 
 	files := []*descriptorpb.FileDescriptorProto{
 		{
@@ -210,15 +209,22 @@ func TestSortFiles_CircularDependency(t *testing.T) {
 		},
 		{
 			Name:       &name2,
+			Dependency: []string{"file3.proto"},
+		},
+		{
+			Name:       &name3,
 			Dependency: []string{"file1.proto"},
 		},
 	}
+	original := slices.Clone(files)
 
-	// This will likely cause infinite recursion or stack overflow
-	// depending on the implementation
 	err := SortFiles(files)
-	// For now, we just document that this is not handled
-	_ = err
+	if err == nil || !strings.Contains(err.Error(), "import cycle") {
+		t.Errorf("Expected import cycle error, got %v", err)
+	}
+	if !slices.Equal(original, files) {
+		t.Errorf("Files should be unchanged after an error")
+	}
 }
 
 func TestSortFiles_SelfDependency(t *testing.T) {
@@ -231,14 +237,58 @@ func TestSortFiles_SelfDependency(t *testing.T) {
 		},
 	}
 
-	// Self-dependency should be handled gracefully
+	// A file that imports itself is a cycle.
 	err := SortFiles(files)
-	// The current implementation will add it once and skip on recursion
-	if err != nil {
-		t.Errorf("Unexpected error for self-dependency: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "import cycle") {
+		t.Errorf("Expected import cycle error, got %v", err)
 	}
-	if len(files) != 1 {
-		t.Errorf("Expected 1 file after sort, got %d", len(files))
+}
+
+func TestSortFiles_UnchangedOnError(t *testing.T) {
+	// Several files can be sorted before the missing import is found.
+	names := []string{"a.proto", "b.proto", "c.proto", "d.proto", "e.proto", "f.proto", "g.proto", "h.proto"}
+	for range 10 {
+		files := make([]*descriptorpb.FileDescriptorProto, len(names))
+		for i := range names {
+			files[i] = &descriptorpb.FileDescriptorProto{Name: &names[i]}
+		}
+		// b.proto imports h.proto, which imports a missing file.
+		files[1].Dependency = []string{"h.proto"}
+		files[7].Dependency = []string{"missing.proto"}
+		original := slices.Clone(files)
+
+		if err := SortFiles(files); err == nil {
+			t.Fatal("Expected error for missing import")
+		}
+		if !slices.Equal(original, files) {
+			t.Fatal("Files should be unchanged after an error")
+		}
+	}
+}
+
+func TestSortFiles_Deterministic(t *testing.T) {
+	names := []string{"a.proto", "b.proto", "c.proto", "d.proto", "e.proto", "f.proto"}
+	newFiles := func() []*descriptorpb.FileDescriptorProto {
+		files := make([]*descriptorpb.FileDescriptorProto, len(names))
+		for i := range names {
+			files[i] = &descriptorpb.FileDescriptorProto{Name: &names[i]}
+		}
+		// f.proto imports a.proto; the rest have no imports.
+		files[5].Dependency = []string{"a.proto"}
+		return files
+	}
+
+	// Independent files keep their order.
+	for range 20 {
+		files := newFiles()
+		if err := SortFiles(files); err != nil {
+			t.Fatalf("SortFiles failed: %v", err)
+		}
+		for i, file := range files {
+			if file.GetName() != names[i] {
+				t.Fatalf("Expected %s at index %d, got %s", names[i], i, file.GetName())
+			}
+		}
 	}
 }
 
