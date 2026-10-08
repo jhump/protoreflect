@@ -329,7 +329,7 @@ func (p *Printer) printNormalizedProto(dsc protoreflect.Descriptor, out io.Write
 	var reg protoregistry.Types
 	register.RegisterTypesVisibleToFile(fd, &reg, true)
 
-	path := findElement(dsc)
+	path := sourceloc.PathFor(dsc)
 	switch d := dsc.(type) {
 	case protoreflect.FileDescriptor:
 		p.printFile(d, &reg, w, sourceInfo)
@@ -375,63 +375,6 @@ func (p *Printer) printNormalizedProto(dsc protoreflect.Descriptor, out io.Write
 	return w.err
 }
 
-func findElement(dsc protoreflect.Descriptor) protoreflect.SourcePath {
-	// we start with dsc (leaf) and work our way up to root,
-	// which means we are building the path backwards
-	var path protoreflect.SourcePath
-	for dsc.Parent() != nil {
-		parent := dsc.Parent()
-		path = append(path, int32(dsc.Index()))
-		switch d := dsc.(type) {
-		case protoreflect.MessageDescriptor:
-			if _, ok := parent.(protoreflect.MessageDescriptor); ok {
-				path = append(path, internal.MessageNestedMessagesTag)
-			} else {
-				path = append(path, internal.FileMessagesTag)
-			}
-
-		case protoreflect.FieldDescriptor:
-			if d.IsExtension() {
-				if _, ok := parent.(protoreflect.MessageDescriptor); ok {
-					path = append(path, internal.MessageExtensionsTag)
-				} else {
-					path = append(path, internal.FileExtensionsTag)
-				}
-			} else {
-				path = append(path, internal.MessageFieldsTag)
-			}
-
-		case protoreflect.OneofDescriptor:
-			path = append(path, internal.MessageOneofsTag)
-
-		case protoreflect.EnumDescriptor:
-			if _, ok := parent.(protoreflect.MessageDescriptor); ok {
-				path = append(path, internal.MessageEnumsTag)
-			} else {
-				path = append(path, internal.FileEnumsTag)
-			}
-
-		case protoreflect.EnumValueDescriptor:
-			path = append(path, internal.EnumValuesTag)
-
-		case protoreflect.ServiceDescriptor:
-			path = append(path, internal.FileServicesTag)
-
-		case protoreflect.MethodDescriptor:
-			path = append(path, internal.ServiceMethodsTag)
-
-		default:
-			panic(fmt.Sprintf("unexpected descriptor type: %T", dsc))
-		}
-		dsc = parent
-	}
-	// finally, we reverse the backwards path
-	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
-		path[i], path[j] = path[j], path[i]
-	}
-	return path
-}
-
 func (p *Printer) newLine(w io.Writer) {
 	if !p.Compact {
 		_, _ = fmt.Fprintln(w)
@@ -444,10 +387,7 @@ func (p *Printer) printFile(
 	w *writer,
 	sourceInfo protoreflect.SourceLocations,
 ) {
-	opts, err := p.extractOptions(fd, reg, fd.Options())
-	if err != nil {
-		return
-	}
+	opts := p.extractOptions(fd, reg, fd.Options())
 
 	path := make(protoreflect.SourcePath, 1)
 
@@ -787,13 +727,7 @@ func (p *Printer) printMessageBody(
 	path protoreflect.SourcePath,
 	indent int,
 ) {
-	opts, err := p.extractOptions(md, reg, md.Options())
-	if err != nil {
-		if w.err == nil {
-			w.err = err
-		}
-		return
-	}
+	opts := p.extractOptions(md, reg, md.Options())
 
 	skip := map[interface{}]bool{}
 	maxTag := internal.GetMaxTag(isMessageSet(md))
@@ -1027,13 +961,7 @@ func (p *Printer) printField(
 		numSi := sourceInfo.ByPath(append(path, internal.FieldNumberTag))
 		p.printElementString(numSi, w, indent, fmt.Sprintf("%d", fld.Number()))
 
-		opts, err := p.extractOptions(fld, reg, fld.Options())
-		if err != nil {
-			if w.err == nil {
-				w.err = err
-			}
-			return
-		}
+		opts := p.extractOptions(fld, reg, fld.Options())
 
 		// we use negative values for "extras" keys so they can't collide
 		// with legit option tags
@@ -1110,13 +1038,7 @@ func (p *Printer) printOneOf(
 		indent++
 		trailer(indent, true)
 
-		opts, err := p.extractOptions(ood, reg, ood.Options())
-		if err != nil {
-			if w.err == nil {
-				w.err = err
-			}
-			return
-		}
+		opts := p.extractOptions(ood, reg, ood.Options())
 
 		elements := elementAddrs{dsc: ood, opts: opts}
 		elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.OneofOptionsTag, -1, opts)...)
@@ -1342,13 +1264,7 @@ func (p *Printer) printEnum(
 		indent++
 		trailer(indent, true)
 
-		opts, err := p.extractOptions(ed, reg, ed.Options())
-		if err != nil {
-			if w.err == nil {
-				w.err = err
-			}
-			return
-		}
+		opts := p.extractOptions(ed, reg, ed.Options())
 
 		skip := map[interface{}]bool{}
 
@@ -1472,13 +1388,7 @@ func (p *Printer) printService(
 		indent++
 		trailer(indent, true)
 
-		opts, err := p.extractOptions(sd, reg, sd.Options())
-		if err != nil {
-			if w.err == nil {
-				w.err = err
-			}
-			return
-		}
+		opts := p.extractOptions(sd, reg, sd.Options())
 
 		elements := elementAddrs{dsc: sd, opts: opts}
 		elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.ServiceOptionsTag, -1, opts)...)
@@ -1544,13 +1454,7 @@ func (p *Printer) printMethod(
 		p.printElementString(outSi, w, indent, outName)
 		_, _ = fmt.Fprint(w, ") ")
 
-		opts, err := p.extractOptions(mtd, reg, mtd.Options())
-		if err != nil {
-			if w.err == nil {
-				w.err = err
-			}
-			return
-		}
+		opts := p.extractOptions(mtd, reg, mtd.Options())
 
 		if len(opts) > 0 {
 			_, _ = fmt.Fprintln(w, "{")
@@ -1614,13 +1518,7 @@ func (p *Printer) extractAndPrintOptionsShort(
 	if !ok {
 		d = dsc.(extensionRangeMarker).owner
 	}
-	opts, err := p.extractOptions(d, reg, optsMsg)
-	if err != nil {
-		if w.err == nil {
-			w.err = err
-		}
-		return
-	}
+	opts := p.extractOptions(d, reg, optsMsg)
 	p.printOptionsShort(dsc, opts, optsTag, reg, w, sourceInfo, path, indent)
 }
 
@@ -1905,8 +1803,8 @@ func extendOptionLocations(fd protoreflect.FileDescriptor) protoreflect.SourceLo
 	for i, length := 0, srcLocs.Len(); i < length; i++ {
 		loc := srcLocs.Get(i)
 		allowed := edges[edgeKindFile]
-		for i := 0; i+1 < len(loc.Path); i += 2 {
-			nextKind, ok := allowed[loc.Path[i]]
+		for pathIndex := 0; pathIndex+1 < len(loc.Path); pathIndex += 2 {
+			nextKind, ok := allowed[loc.Path[pathIndex]]
 			if !ok {
 				break
 			}
@@ -1918,7 +1816,7 @@ func extendOptionLocations(fd protoreflect.FileDescriptor) protoreflect.SourceLo
 				// optional index for repeated option fields (zero for
 				// non-repeated option fields). This is used for querying source
 				// info when printing options.
-				newPath := make(protoreflect.SourcePath, i+3)
+				newPath := make(protoreflect.SourcePath, pathIndex+3)
 				copy(newPath, loc.Path)
 				srcLocs.putIfAbsent(newPath, loc)
 				// we do another path of path-so-far plus two, but with
@@ -1954,7 +1852,7 @@ func extendOptionLocations(fd protoreflect.FileDescriptor) protoreflect.SourceLo
 	return &srcLocs
 }
 
-func (p *Printer) extractOptions(dsc protoreflect.Descriptor, reg *protoregistry.Types, opts proto.Message) (map[protoreflect.FieldNumber][]option, error) {
+func (p *Printer) extractOptions(dsc protoreflect.Descriptor, reg *protoregistry.Types, opts proto.Message) map[protoreflect.FieldNumber][]option {
 	// The options belong to the descriptor, so we must not modify them.
 	opts = proto.CloneOf(opts)
 	protomessage.ReparseUnrecognized(opts, reg)
@@ -1996,7 +1894,7 @@ func (p *Printer) extractOptions(dsc protoreflect.Descriptor, reg *protoregistry
 		}
 		return true
 	})
-	return options, nil
+	return options
 }
 
 func valueToOptions(fld protoreflect.FieldDescriptor, name string, val interface{}) []option {

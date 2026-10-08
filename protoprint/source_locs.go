@@ -9,7 +9,7 @@ import (
 
 type sourceLocations struct {
 	protoreflect.SourceLocations
-	extrasByPath map[string]*protoreflect.SourceLocation
+	extrasByPath map[string]int // index into extras
 	extras       []protoreflect.SourceLocation
 }
 
@@ -26,24 +26,22 @@ func (s *sourceLocations) Get(i int) protoreflect.SourceLocation {
 
 func (s *sourceLocations) ByPath(path protoreflect.SourcePath) protoreflect.SourceLocation {
 	loc := s.SourceLocations.ByPath(path)
-	if loc.Path != nil {
+	if !sourceloc.IsZero(loc) {
 		return loc
 	}
-	k := internal.PathKey(path)
-	pLoc := s.extrasByPath[k]
-	if pLoc == nil {
+	extraIndex, ok := s.extrasByPath[internal.PathKey(path)]
+	if !ok {
 		return protoreflect.SourceLocation{}
 	}
-	return *pLoc
+	return s.extras[extraIndex]
 }
 
 func (s *sourceLocations) putIfAbsent(path protoreflect.SourcePath, loc protoreflect.SourceLocation) {
 	if existing := s.ByPath(path); sourceloc.IsZero(existing) {
-		k := internal.PathKey(path)
-		s.extras = append(s.extras, loc)
 		if s.extrasByPath == nil {
-			s.extrasByPath = map[string]*protoreflect.SourceLocation{}
+			s.extrasByPath = map[string]int{}
 		}
-		s.extrasByPath[k] = &s.extras[len(s.extras)-1]
+		s.extrasByPath[internal.PathKey(path)] = len(s.extras)
+		s.extras = append(s.extras, loc)
 	}
 }

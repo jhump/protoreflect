@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/jhump/protoreflect/v2/internal"
 	"github.com/jhump/protoreflect/v2/internal/fielddefault"
 )
 
@@ -78,7 +79,7 @@ func (p *Printer) printMessageLiteralToBuffer(
 			p.printArrayLiteralToBufferMaybeCompact(buf, fld, val.List(), res, pkg, scope, threshold, indent)
 		case fld.IsMap():
 			p.printMapLiteralToBufferMaybeCompact(buf, fld, val.Map(), res, pkg, scope, threshold, indent)
-		case fld.Kind() == protoreflect.MessageKind || fld.Kind() == protoreflect.GroupKind:
+		case internal.IsMessageKind(fld.Kind()):
 			p.printMessageLiteralToBufferMaybeCompact(buf, val.Message(), res, pkg, scope, threshold, indent)
 		default:
 			p.printValueLiteralToBuffer(buf, fld, val.Interface())
@@ -261,7 +262,7 @@ func (p *Printer) printArrayLiteralToBuffer(
 			buf.WriteRune(',')
 		}
 		p.maybeNewline(buf, indent)
-		if fld.Kind() == protoreflect.MessageKind || fld.Kind() == protoreflect.GroupKind {
+		if internal.IsMessageKind(fld.Kind()) {
 			p.printMessageLiteralToBufferMaybeCompact(buf, val.Get(i).Message(), res, pkg, scope, threshold, indent)
 		} else {
 			p.printValueLiteralToBuffer(buf, fld, val.Get(i).Interface())
