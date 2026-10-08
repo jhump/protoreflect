@@ -11,6 +11,8 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/jhump/protoreflect/v2/internal/fielddefault"
 )
 
 func (p *Printer) printMessageLiteralCompact(msg protoreflect.Message, res *protoregistry.Types, pkg, scope protoreflect.FullName) string {
@@ -184,8 +186,10 @@ func (p *Printer) printValueLiteralToBuffer(buf *bytes.Buffer, fld protoreflect.
 		buf.WriteString(quotedBytes(string(val)))
 	case int32, uint32, int64, uint64:
 		_, _ = fmt.Fprintf(buf, "%d", val)
-	case float32, float64:
-		_, _ = fmt.Fprintf(buf, "%f", val)
+	case float32:
+		buf.WriteString(fielddefault.FormatFloat(float64(val), 32))
+	case float64:
+		buf.WriteString(fielddefault.FormatFloat(val, 64))
 	default:
 		_, _ = fmt.Fprintf(buf, "%v", val)
 	}

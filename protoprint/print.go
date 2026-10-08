@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/internal/fielddefault"
 	"github.com/jhump/protoreflect/v2/internal/register"
 	"github.com/jhump/protoreflect/v2/protodescs"
 	"github.com/jhump/protoreflect/v2/protomessage"
@@ -216,7 +217,7 @@ func (p *Printer) PrintProtoFiles(fds []protoreflect.FileDescriptor, open func(n
 	for _, fd := range fds {
 		w, err := open(fd.Path())
 		if err != nil {
-			return fmt.Errorf("failed to open %s: %v", fd.Path(), err)
+			return fmt.Errorf("failed to open %s: %w", fd.Path(), err)
 		}
 		err = func() error {
 			defer func() {
@@ -225,7 +226,7 @@ func (p *Printer) PrintProtoFiles(fds []protoreflect.FileDescriptor, open func(n
 			return p.PrintProtoFile(fd, w)
 		}()
 		if err != nil {
-			return fmt.Errorf("failed to write %s: %v", fd.Path(), err)
+			return fmt.Errorf("failed to write %s: %w", fd.Path(), err)
 		}
 	}
 	return nil
@@ -295,23 +296,32 @@ func (p *Printer) PrintProtoToString(dsc protoreflect.Descriptor) (string, error
 }
 
 func (p *Printer) printProto(dsc protoreflect.Descriptor, out io.Writer) error {
-	w := newWriter(out)
+	// Normalize the indent in a copy, so we don't modify the caller's Printer,
+	// which may be in use concurrently.
+	normalized := *p
+	normalized.Indent = normalizeIndent(p.Indent)
+	return normalized.printNormalizedProto(dsc, out)
+}
 
-	if p.Indent == "" {
-		// default indent to two spaces
-		p.Indent = "  "
-	} else {
-		// indent must be all spaces or tabs, so convert other chars to spaces
-		ind := make([]rune, 0, len(p.Indent))
-		for _, r := range p.Indent {
-			if r == '\t' {
-				ind = append(ind, r)
-			} else {
-				ind = append(ind, ' ')
-			}
-		}
-		p.Indent = string(ind)
+// normalizeIndent returns the given indent, with any characters other than tabs
+// converted to spaces. If the given indent is empty, it returns two spaces.
+func normalizeIndent(indent string) string {
+	if indent == "" {
+		return "  "
 	}
+	ind := make([]rune, 0, len(indent))
+	for _, r := range indent {
+		if r == '\t' {
+			ind = append(ind, r)
+		} else {
+			ind = append(ind, ' ')
+		}
+	}
+	return string(ind)
+}
+
+func (p *Printer) printNormalizedProto(dsc protoreflect.Descriptor, out io.Writer) error {
+	w := newWriter(out)
 
 	fd := dsc.ParentFile()
 	sourceInfo := extendOptionLocations(fd)
@@ -1791,8 +1801,10 @@ func (p *Printer) printOption(reg *protoregistry.Types, name string, optVal inte
 	switch optVal := optVal.(type) {
 	case int32, uint32, int64, uint64:
 		_, _ = fmt.Fprintf(w, "%d", optVal)
-	case float32, float64:
-		_, _ = fmt.Fprintf(w, "%f", optVal)
+	case float32:
+		_, _ = fmt.Fprint(w, fielddefault.FormatFloat(float64(optVal), 32))
+	case float64:
+		_, _ = fmt.Fprint(w, fielddefault.FormatFloat(optVal, 64))
 	case string:
 		_, _ = fmt.Fprintf(w, "%s", quotedString(optVal))
 	case []byte:
@@ -1943,6 +1955,8 @@ func extendOptionLocations(fd protoreflect.FileDescriptor) protoreflect.SourceLo
 }
 
 func (p *Printer) extractOptions(dsc protoreflect.Descriptor, reg *protoregistry.Types, opts proto.Message) (map[protoreflect.FieldNumber][]option, error) {
+	// The options belong to the descriptor, so we must not modify them.
+	opts = proto.CloneOf(opts)
 	protomessage.ReparseUnrecognized(opts, reg)
 
 	pkg := dsc.ParentFile().Package()
@@ -2744,7 +2758,7 @@ func (p *Printer) printComment(comments string, w *writer, indent int, forceNext
 	if len(lines) == 1 && multiLine {
 		p.indent(w, indent)
 		line := lines[0]
-		if line[0] == ' ' && line[len(line)-1] != ' ' {
+		if line != "" && line[0] == ' ' && line[len(line)-1] != ' ' {
 			// add trailing space for symmetry
 			line += " "
 		}

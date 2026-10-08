@@ -27,9 +27,9 @@ service RpcService {
   rpc UnaryRpc ( Request ) returns ( google.protobuf.Empty ) {
     // trailer for method
 
-    option (testprotos.mtfubard) = 123.456000;
+    option (testprotos.mtfubard) = 123.456;
 
-    option (testprotos.mtfubar) = 12.340000;
+    option (testprotos.mtfubar) = 12.34;
 
     // this RPC is deprecated!
     option deprecated = true;

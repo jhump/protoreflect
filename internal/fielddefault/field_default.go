@@ -29,21 +29,10 @@ func DefaultValue(fld protoreflect.FieldDescriptor) string {
 		return encodeDefaultBytes(defVal.Bytes())
 	case protoreflect.EnumKind:
 		return string(fld.DefaultEnumValue().Name())
-	case protoreflect.FloatKind, protoreflect.DoubleKind:
-		flt := defVal.Float()
-		switch {
-		case math.IsInf(flt, 1):
-			return "inf"
-		case math.IsInf(flt, -1):
-			return "-inf"
-		case math.IsNaN(flt):
-			return "nan"
-		}
-		bitSize := 64
-		if fld.Kind() == protoreflect.FloatKind {
-			bitSize = 32
-		}
-		return strconv.FormatFloat(flt, 'g', -1, bitSize)
+	case protoreflect.FloatKind:
+		return FormatFloat(defVal.Float(), 32)
+	case protoreflect.DoubleKind:
+		return FormatFloat(defVal.Float(), 64)
 	case protoreflect.BoolKind:
 		return strconv.FormatBool(defVal.Bool())
 	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind,
@@ -56,6 +45,21 @@ func DefaultValue(fld protoreflect.FieldDescriptor) string {
 		// Shouldn't happen; above cases should be exhaustive...
 		return fmt.Sprintf("%v", defVal.Interface())
 	}
+}
+
+// FormatFloat returns the string representation of the given floating point
+// value, as used in default values and in option values in proto source. The
+// bitSize is 32 for float values and 64 for double values.
+func FormatFloat(flt float64, bitSize int) string {
+	switch {
+	case math.IsInf(flt, 1):
+		return "inf"
+	case math.IsInf(flt, -1):
+		return "-inf"
+	case math.IsNaN(flt):
+		return "nan"
+	}
+	return strconv.FormatFloat(flt, 'g', -1, bitSize)
 }
 
 func encodeDefaultBytes(data []byte) string {
