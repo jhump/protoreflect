@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal/testprotos"
 	"github.com/jhump/protoreflect/v2/protoresolve"
@@ -90,6 +91,21 @@ func Corpus() []protoreflect.FileDescriptor {
 		testprotos.File_desc_test_proto3_proto,
 		testprotos.File_desc_test_editions_proto,
 	})
+}
+
+// ProtoFileOracleFunc adapts a function to the protoresolve.ProtoFileOracle
+// interface.
+type ProtoFileOracleFunc func(protoreflect.FileDescriptor) (*descriptorpb.FileDescriptorProto, error)
+
+// ProtoFromFileDescriptor implements protoresolve.ProtoFileOracle.
+func (f ProtoFileOracleFunc) ProtoFromFileDescriptor(file protoreflect.FileDescriptor) (*descriptorpb.FileDescriptorProto, error) {
+	return f(file)
+}
+
+// Descriptors returns all descriptors in the given files, other than the
+// file descriptors themselves.
+func Descriptors(files []protoreflect.FileDescriptor) []protoreflect.Descriptor {
+	return newCorpusIndex(files).all
 }
 
 // CheckResolver verifies that the given resolver can resolve all files and
