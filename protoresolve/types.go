@@ -1,8 +1,6 @@
 package protoresolve
 
 import (
-	"fmt"
-
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
@@ -92,7 +90,7 @@ func (t *typesFromResolver) FindExtensionByName(field protoreflect.FullName) (pr
 		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
 	}
 	if !ext.IsExtension() {
-		return nil, fmt.Errorf("%s is a normal field, not an extension", field)
+		return nil, NewUnexpectedTypeError(DescriptorKindExtension, ext, "")
 	}
 	return ExtensionType(ext), nil
 }
@@ -118,7 +116,8 @@ func (t *typesFromResolver) FindMessageByName(message protoreflect.FullName) (pr
 }
 
 func (t *typesFromResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
-	return t.FindMessageByName(TypeNameFromURL(url))
+	msg, err := t.FindMessageByName(TypeNameFromURL(url))
+	return msg, errorForURL(err, url)
 }
 
 func (t *typesFromResolver) FindEnumByName(enum protoreflect.FullName) (protoreflect.EnumType, error) {
@@ -158,7 +157,7 @@ func (t *typesFromDescriptorPool) FindExtensionByName(field protoreflect.FullNam
 		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
 	}
 	if !ext.IsExtension() {
-		return nil, fmt.Errorf("%s is a normal field, not an extension", field)
+		return nil, NewUnexpectedTypeError(DescriptorKindExtension, ext, "")
 	}
 	return ExtensionType(ext), nil
 }
@@ -193,7 +192,8 @@ func (t *typesFromDescriptorPool) FindMessageByName(message protoreflect.FullNam
 }
 
 func (t *typesFromDescriptorPool) FindMessageByURL(url string) (protoreflect.MessageType, error) {
-	return t.FindMessageByName(TypeNameFromURL(url))
+	msg, err := t.FindMessageByName(TypeNameFromURL(url))
+	return msg, errorForURL(err, url)
 }
 
 func (t *typesFromDescriptorPool) FindEnumByName(enum protoreflect.FullName) (protoreflect.EnumType, error) {

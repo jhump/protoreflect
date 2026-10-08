@@ -57,8 +57,24 @@ func NewUnexpectedTypeError(expecting DescriptorKind, got protoreflect.Descripto
 		URL:        url,
 		Name:       name,
 		Expecting:  expecting,
+		Actual:     KindOf(got),
 		Descriptor: got,
 	}
+}
+
+// errorForURL updates the given error, if it is an *ErrUnexpectedType from a
+// query by name, to instead indicate the given URL as the query. A wrapped
+// *ErrUnexpectedType is left as is: callers use this with errors that come
+// directly from NewUnexpectedTypeError.
+func errorForURL(err error, url string) error {
+	unexpectedTypeErr, ok := err.(*ErrUnexpectedType)
+	if !ok || unexpectedTypeErr.URL != "" {
+		return err
+	}
+	errForURL := *unexpectedTypeErr
+	errForURL.URL = url
+	errForURL.Name = ""
+	return &errForURL
 }
 
 // Error implements the error interface.

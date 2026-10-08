@@ -88,16 +88,7 @@ func (c combined) NumFiles() int {
 }
 
 func (c combined) RangeFiles(f func(protoreflect.FileDescriptor) bool) {
-	observed := map[string]struct{}{}
-	for _, res := range c {
-		res.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
-			if _, ok := observed[fd.Path()]; ok {
-				return true
-			}
-			observed[fd.Path()] = struct{}{}
-			return f(fd)
-		})
-	}
+	rangeDistinct(c, Resolver.RangeFiles, protoreflect.FileDescriptor.Path, f)
 }
 
 func (c combined) NumFilesByPackage(name protoreflect.FullName) int {
@@ -108,16 +99,9 @@ func (c combined) NumFilesByPackage(name protoreflect.FullName) int {
 }
 
 func (c combined) RangeFilesByPackage(name protoreflect.FullName, f func(protoreflect.FileDescriptor) bool) {
-	observed := map[string]struct{}{}
-	for _, res := range c {
-		res.RangeFilesByPackage(name, func(fd protoreflect.FileDescriptor) bool {
-			if _, ok := observed[fd.Path()]; ok {
-				return true
-			}
-			observed[fd.Path()] = struct{}{}
-			return f(fd)
-		})
-	}
+	rangeDistinct(c, func(res Resolver, fn func(protoreflect.FileDescriptor) bool) {
+		res.RangeFilesByPackage(name, fn)
+	}, protoreflect.FileDescriptor.Path, f)
 }
 
 func (c combined) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
@@ -165,20 +149,9 @@ func (c combined) FindExtensionByNumber(message protoreflect.FullName, number pr
 }
 
 func (c combined) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionDescriptor) bool) {
-	seen := map[protoreflect.FieldNumber]struct{}{}
-	for _, res := range c {
-		var keepGoing bool
-		res.RangeExtensionsByMessage(message, func(ext protoreflect.ExtensionDescriptor) bool {
-			if _, ok := seen[ext.Number()]; ok {
-				return true
-			}
-			keepGoing = fn(ext)
-			return keepGoing
-		})
-		if !keepGoing {
-			return
-		}
-	}
+	rangeDistinct(c, func(res Resolver, fn func(protoreflect.ExtensionDescriptor) bool) {
+		res.RangeExtensionsByMessage(message, fn)
+	}, protoreflect.ExtensionDescriptor.Number, fn)
 }
 
 func (c combined) FindMessageByURL(url string) (protoreflect.MessageDescriptor, error) {
@@ -254,71 +227,29 @@ func (c combinedPool) FindEnumByName(name protoreflect.FullName) (protoreflect.E
 }
 
 func (c combinedPool) RangeMessages(fn func(protoreflect.MessageType) bool) {
-	seen := map[protoreflect.FullName]struct{}{}
-	for _, res := range c {
-		var keepGoing bool
-		res.RangeMessages(func(msg protoreflect.MessageType) bool {
-			if _, ok := seen[msg.Descriptor().FullName()]; ok {
-				return true
-			}
-			keepGoing = fn(msg)
-			return keepGoing
-		})
-		if !keepGoing {
-			return
-		}
-	}
+	rangeDistinct(c, TypePool.RangeMessages, func(msg protoreflect.MessageType) protoreflect.FullName {
+		return msg.Descriptor().FullName()
+	}, fn)
 }
 
 func (c combinedPool) RangeEnums(fn func(protoreflect.EnumType) bool) {
-	seen := map[protoreflect.FullName]struct{}{}
-	for _, res := range c {
-		var keepGoing bool
-		res.RangeEnums(func(en protoreflect.EnumType) bool {
-			if _, ok := seen[en.Descriptor().FullName()]; ok {
-				return true
-			}
-			keepGoing = fn(en)
-			return keepGoing
-		})
-		if !keepGoing {
-			return
-		}
-	}
+	rangeDistinct(c, TypePool.RangeEnums, func(en protoreflect.EnumType) protoreflect.FullName {
+		return en.Descriptor().FullName()
+	}, fn)
 }
 
 func (c combinedPool) RangeExtensions(fn func(protoreflect.ExtensionType) bool) {
-	seen := map[protoreflect.FullName]struct{}{}
-	for _, res := range c {
-		var keepGoing bool
-		res.RangeExtensions(func(ext protoreflect.ExtensionType) bool {
-			if _, ok := seen[ext.TypeDescriptor().FullName()]; ok {
-				return true
-			}
-			keepGoing = fn(ext)
-			return keepGoing
-		})
-		if !keepGoing {
-			return
-		}
-	}
+	rangeDistinct(c, TypePool.RangeExtensions, func(ext protoreflect.ExtensionType) protoreflect.FullName {
+		return ext.TypeDescriptor().FullName()
+	}, fn)
 }
 
 func (c combinedPool) RangeExtensionsByMessage(message protoreflect.FullName, fn func(protoreflect.ExtensionType) bool) {
-	seen := map[protoreflect.FieldNumber]struct{}{}
-	for _, res := range c {
-		var keepGoing bool
-		res.RangeExtensionsByMessage(message, func(ext protoreflect.ExtensionType) bool {
-			if _, ok := seen[ext.TypeDescriptor().Number()]; ok {
-				return true
-			}
-			keepGoing = fn(ext)
-			return keepGoing
-		})
-		if !keepGoing {
-			return
-		}
-	}
+	rangeDistinct(c, func(res TypePool, fn func(protoreflect.ExtensionType) bool) {
+		res.RangeExtensionsByMessage(message, fn)
+	}, func(ext protoreflect.ExtensionType) protoreflect.FieldNumber {
+		return ext.TypeDescriptor().Number()
+	}, fn)
 }
 
 type combinedWithPool struct {
@@ -332,4 +263,32 @@ func (c *combinedWithPool) AsTypeResolver() TypeResolver {
 
 func (c *combinedWithPool) AsTypePool() TypePool {
 	return c.pool
+}
+
+// rangeDistinct enumerates elements from all the given resolvers, in order,
+// using rangeFn to enumerate the elements of each one. Each element is passed
+// to fn, except for elements with the same key as one already passed, which
+// are skipped. It stops as soon as fn returns false.
+func rangeDistinct[R, T any, K comparable](
+	resolvers []R,
+	rangeFn func(R, func(T) bool),
+	key func(T) K,
+	fn func(T) bool,
+) {
+	seen := map[K]struct{}{}
+	for _, res := range resolvers {
+		keepGoing := true
+		rangeFn(res, func(elem T) bool {
+			elemKey := key(elem)
+			if _, ok := seen[elemKey]; ok {
+				return true
+			}
+			seen[elemKey] = struct{}{}
+			keepGoing = fn(elem)
+			return keepGoing
+		})
+		if !keepGoing {
+			return
+		}
+	}
 }
