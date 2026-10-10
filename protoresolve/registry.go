@@ -366,6 +366,11 @@ func (r *Registry) AsTypePool() TypePool {
 // extResolverForFile resolves extensions for re-parsing the custom options of
 // a file as it is registered. It finds extensions in the registry, which has
 // the file's dependencies, or in the file itself.
+//
+// It is used as the resolver for unmarshalling, so it must return exactly
+// ErrNotFound (not an error that wraps it) for unknown extensions, as the doc
+// comment for protoregistry.NotFound requires. Otherwise, unmarshalling fails
+// instead of leaving them as unknown fields.
 type extResolverForFile struct {
 	f protoreflect.FileDescriptor
 	r ExtensionResolver
@@ -381,7 +386,7 @@ func (e *extResolverForFile) FindExtensionByName(field protoreflect.FullName) (p
 	}
 	desc := FindDescriptorByNameInFile(e.f, field)
 	if desc == nil {
-		return nil, NewNotFoundError(field)
+		return nil, ErrNotFound
 	}
 	ext, ok := desc.(protoreflect.FieldDescriptor)
 	if !ok || !ext.IsExtension() {
@@ -400,7 +405,7 @@ func (e *extResolverForFile) FindExtensionByNumber(message protoreflect.FullName
 	}
 	ext = FindExtensionByNumberInFile(e.f, message, field)
 	if ext == nil {
-		return nil, fmt.Errorf("extension number %d for message %q: %w", field, message, ErrNotFound)
+		return nil, ErrNotFound
 	}
 	return ExtensionType(ext), nil
 }

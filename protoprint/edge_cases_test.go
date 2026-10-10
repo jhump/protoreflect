@@ -49,15 +49,15 @@ func TestPrintDoesNotModifyOptions(t *testing.T) {
 func TestPrintCommentOfBlankLines(t *testing.T) {
 	t.Parallel()
 	file, err := protodesc.NewFile(&descriptorpb.FileDescriptorProto{
-		Name:        proto.String("test.proto"),
-		Syntax:      proto.String("proto3"),
-		MessageType: []*descriptorpb.DescriptorProto{{Name: proto.String("Msg")}},
+		Name:        new("test.proto"),
+		Syntax:      new("proto3"),
+		MessageType: []*descriptorpb.DescriptorProto{{Name: new("Msg")}},
 		SourceCodeInfo: &descriptorpb.SourceCodeInfo{
 			Location: []*descriptorpb.SourceCodeInfo_Location{{
 				Path: []int32{4, 0},
 				Span: []int32{3, 0, 4, 1},
 				// Two comment lines with no text: "//\n//\n"
-				LeadingComments: proto.String("\n\n"),
+				LeadingComments: new("\n\n"),
 			}},
 		},
 	}, nil)
@@ -74,16 +74,16 @@ func TestPrintNonFiniteFloatOptions(t *testing.T) {
 	proto.SetExtension(opts, testprotos.E_Mtfubar, []float32{float32(math.Inf(1)), float32(math.Inf(-1)), 1e-7})
 	proto.SetExtension(opts, testprotos.E_Mtfubard, math.NaN())
 	file, err := protodesc.NewFile(&descriptorpb.FileDescriptorProto{
-		Name:       proto.String("test.proto"),
-		Package:    proto.String("test"),
-		Syntax:     proto.String("proto3"),
+		Name:       new("test.proto"),
+		Package:    new("test"),
+		Syntax:     new("proto3"),
 		Dependency: []string{testprotos.File_desc_test_options_proto.Path(), "google/protobuf/empty.proto"},
 		Service: []*descriptorpb.ServiceDescriptorProto{{
-			Name: proto.String("Svc"),
+			Name: new("Svc"),
 			Method: []*descriptorpb.MethodDescriptorProto{{
-				Name:       proto.String("Method"),
-				InputType:  proto.String(".google.protobuf.Empty"),
-				OutputType: proto.String(".google.protobuf.Empty"),
+				Name:       new("Method"),
+				InputType:  new(".google.protobuf.Empty"),
+				OutputType: new(".google.protobuf.Empty"),
 				Options:    opts,
 			}},
 		}},
@@ -93,7 +93,7 @@ func TestPrintNonFiniteFloatOptions(t *testing.T) {
 	output, err := (&Printer{}).PrintProtoToString(file)
 	require.NoError(t, err)
 	var optionLines []string
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if strings.Contains(line, "mtfubar") {
 			optionLines = append(optionLines, strings.TrimSpace(line))
 		}

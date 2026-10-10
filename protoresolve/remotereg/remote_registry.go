@@ -502,7 +502,8 @@ func (r *Registry) resolveURLFromConvertContext(cc *convertContext, url string) 
 }
 
 // recordConvertedTypes builds descriptors for the types fetched by the given
-// context and records them in the registry. It returns the descriptors for all
+// context and records them in the registry, along with any types the context
+// found in the fallback resolver instead. It returns the descriptors for all
 // the types' URLs.
 //
 // A type whose URL is already in the registry, such as one registered explicitly
@@ -523,10 +524,14 @@ func (r *Registry) recordConvertedTypes(cc *convertContext) (map[string]protoref
 			recorded[typeURL] = existing
 			continue
 		}
-		d, err := files.FindDescriptorByName(protoresolve.TypeNameFromURL(typeURL))
-		if err != nil {
-			// should not be possible
-			return nil, err
+		d := cc.fallbackTypes[typeURL]
+		if d == nil {
+			// Every type was either fetched, and so converted into files, or
+			// found in the fallback resolver.
+			d, err = files.FindDescriptorByName(protoresolve.TypeNameFromURL(typeURL))
+			if err != nil {
+				return nil, fmt.Errorf("converted files do not include type for URL %s: %w", typeURL, err)
+			}
 		}
 		r.typeURLs[d.FullName()] = typeURL
 		r.typeCache[typeURL] = d
@@ -759,8 +764,8 @@ func (r *remoteSubResolver) FindMessageByURL(url string) (protoreflect.MessageTy
 }
 
 func ensureScheme(url string) string {
-	pos := strings.Index(url, "://")
-	if pos < 0 {
+	found := strings.Contains(url, "://")
+	if !found {
 		return "https://" + url
 	}
 	return url

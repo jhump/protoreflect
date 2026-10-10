@@ -91,7 +91,7 @@ func TestClientStreamingRpc(t *testing.T) {
 	cs, err := stub.InvokeRpcClientStream(context.Background(), clientStreamingMd)
 	require.NoError(t, err, "Failed to invoke client-streaming RPC")
 	req := &grpctestprotos.StreamingInputCallRequest{Payload: payload}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		err = cs.SendMsg(req)
 		require.NoError(t, err, "Failed to send request message")
 	}
@@ -112,7 +112,7 @@ func TestServerStreamingRpc(t *testing.T) {
 		},
 	})
 	require.NoError(t, err, "Failed to invoke server-streaming RPC")
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		resp, err := ss.RecvMsg()
 		require.NoError(t, err, "Failed to receive response message")
 		refMsg := resp.ProtoReflect()
@@ -128,7 +128,7 @@ func TestBidiStreamingRpc(t *testing.T) {
 	bds, err := stub.InvokeRpcBidiStream(context.Background(), bidiStreamingMd)
 	require.NoError(t, err)
 	req := &grpctestprotos.StreamingOutputCallRequest{Payload: payload}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		err = bds.SendMsg(req)
 		require.NoError(t, err, "Failed to send request message")
 		resp, err := bds.RecvMsg()

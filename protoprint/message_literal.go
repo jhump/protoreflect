@@ -130,19 +130,19 @@ func (p *Printer) maybePrintAnyMessageToBuffer(
 	if md.FullName() != anyTypeName {
 		return false
 	}
-	typeUrlFld := md.Fields().ByNumber(anyTypeUrlTag)
-	if typeUrlFld == nil || typeUrlFld.Kind() != protoreflect.StringKind || typeUrlFld.Cardinality() == protoreflect.Repeated {
+	typeURLField := md.Fields().ByNumber(anyTypeUrlTag)
+	if typeURLField == nil || typeURLField.Kind() != protoreflect.StringKind || typeURLField.Cardinality() == protoreflect.Repeated {
 		return false
 	}
 	valueFld := md.Fields().ByNumber(anyValueTag)
 	if valueFld == nil || valueFld.Kind() != protoreflect.BytesKind || valueFld.Cardinality() == protoreflect.Repeated {
 		return false
 	}
-	typeUrl := msg.Get(typeUrlFld).String()
-	if typeUrl == "" {
+	typeURL := msg.Get(typeURLField).String()
+	if typeURL == "" {
 		return false
 	}
-	mt, err := res.FindMessageByURL(typeUrl)
+	mt, err := res.FindMessageByURL(typeURL)
 	if err != nil {
 		return false
 	}
@@ -159,7 +159,7 @@ func (p *Printer) maybePrintAnyMessageToBuffer(
 	p.maybeNewline(buf, indent)
 
 	buf.WriteRune('[')
-	buf.WriteString(typeUrl)
+	buf.WriteString(typeURL)
 	buf.WriteString("]: ")
 	p.printMessageLiteralToBufferMaybeCompact(buf, valueMsg, res, pkg, scope, threshold, indent)
 
@@ -172,7 +172,7 @@ func (p *Printer) maybePrintAnyMessageToBuffer(
 	return true
 }
 
-func (p *Printer) printValueLiteralToBuffer(buf *bytes.Buffer, fld protoreflect.FieldDescriptor, value interface{}) {
+func (p *Printer) printValueLiteralToBuffer(buf *bytes.Buffer, fld protoreflect.FieldDescriptor, value any) {
 	switch val := value.(type) {
 	case protoreflect.EnumNumber:
 		ev := fld.Enum().Values().ByNumber(val)

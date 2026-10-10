@@ -2,6 +2,8 @@ package grpcreflect
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,7 +14,9 @@ import (
 	refv1 "google.golang.org/grpc/reflection/grpc_reflection_v1"
 	"google.golang.org/grpc/status"
 
+	"github.com/jhump/protoreflect/v2/internal/resolvertest"
 	prototesting "github.com/jhump/protoreflect/v2/internal/testing"
+	"github.com/jhump/protoreflect/v2/internal/testprotos"
 )
 
 func TestResetDoesNotWaitForServer(t *testing.T) {
@@ -83,4 +87,95 @@ func (s stubReflectionServer) ServerReflectionInfo(stream refv1.ServerReflection
 			return err
 		}
 	}
+}
+
+func TestConcurrentRequestsForSameElement(t *testing.T) {
+	t.Parallel()
+	const numGoroutines = 20
+	file := testprotos.File_desc_test_complex_proto
+	testCases := []struct {
+		name   string
+		lookup func(*Client) error
+		// Identifies the request for the element.
+		isRequest func(*refv1.ServerReflectionRequest) bool
+	}{
+		{
+			name: "file",
+			lookup: func(client *Client) error {
+				_, err := client.FileByFilename(file.Path())
+				return err
+			},
+			isRequest: func(req *refv1.ServerReflectionRequest) bool {
+				return req.GetFileByFilename() == file.Path()
+			},
+		},
+		{
+			name: "symbol",
+			lookup: func(client *Client) error {
+				_, err := client.FileContainingSymbol(file.Messages().Get(0).FullName())
+				return err
+			},
+			isRequest: func(req *refv1.ServerReflectionRequest) bool {
+				return req.GetFileContainingSymbol() == string(file.Messages().Get(0).FullName())
+			},
+		},
+		{
+			name: "extension",
+			lookup: func(client *Client) error {
+				ext := file.Extensions().Get(0)
+				_, err := client.FileContainingExtension(ext.ContainingMessage().FullName(), ext.Number())
+				return err
+			},
+			isRequest: func(req *refv1.ServerReflectionRequest) bool {
+				ext := file.Extensions().Get(0)
+				extReq := req.GetFileContainingExtension()
+				return extReq.GetContainingType() == string(ext.ContainingMessage().FullName()) &&
+					extReq.GetExtensionNumber() == int32(ext.Number())
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			var numRequests atomic.Int32
+			// Counts requests for the element, and slows down responses, so
+			// that concurrent lookups overlap.
+			interceptor := func(srv any, stream grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+				return handler(srv, &countingServerStream{ServerStream: stream, isRequest: testCase.isRequest, numRequests: &numRequests})
+			}
+			clientConn := startReflectionServer(t, resolvertest.Corpus(), grpc.StreamInterceptor(interceptor))
+			client := NewClientV1(context.Background(), refv1.NewServerReflectionClient(clientConn))
+			t.Cleanup(client.Reset)
+
+			var waitGroup sync.WaitGroup
+			for range numGoroutines {
+				waitGroup.Go(func() {
+					assert.NoError(t, testCase.lookup(client))
+				})
+			}
+			waitGroup.Wait()
+			assert.Equal(t, int32(1), numRequests.Load(), "concurrent lookups should share one request")
+		})
+	}
+}
+
+type countingServerStream struct {
+	grpc.ServerStream
+	isRequest   func(*refv1.ServerReflectionRequest) bool
+	numRequests *atomic.Int32
+}
+
+func (s *countingServerStream) RecvMsg(msg any) error {
+	if err := s.ServerStream.RecvMsg(msg); err != nil {
+		return err
+	}
+	if req, ok := msg.(*refv1.ServerReflectionRequest); ok && s.isRequest(req) {
+		s.numRequests.Add(1)
+	}
+	return nil
+}
+
+func (s *countingServerStream) SendMsg(msg any) error {
+	time.Sleep(10 * time.Millisecond)
+	return s.ServerStream.SendMsg(msg)
 }

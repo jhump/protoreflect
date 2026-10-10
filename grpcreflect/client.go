@@ -164,6 +164,9 @@ type Client struct {
 	cacheMu      sync.RWMutex
 	protosByName map[string]*descriptorpb.FileDescriptorProto
 	descriptors  protoresolve.Registry
+	// The names of the files in the response to each request that has been
+	// answered, keyed by a description of the request.
+	responseFiles map[string][]string
 }
 
 // ClientOption is an option that can be used to configure the behavior of
@@ -307,10 +310,9 @@ func (cr *Client) fileByFilename(filename string, depPath []string) (protoreflec
 			return fd, nil
 		}
 	}
-	var notFoundErr *elementNotFoundError
 	if isNotFound(err) {
 		err = fileNotFound(filename, nil)
-	} else if errors.As(err, &notFoundErr) {
+	} else if notFoundErr, ok := errors.AsType[*elementNotFoundError](err); ok {
 		err = fileNotFound(filename, notFoundErr)
 	}
 	return fd, err
@@ -335,16 +337,15 @@ func (cr *Client) FileContainingSymbol(symbol protoreflect.FullName) (protorefle
 	accept := func(fd protoreflect.FileDescriptor) bool {
 		return protoresolve.FindDescriptorByNameInFile(fd, symbol) != nil
 	}
-	fd, err := cr.getAndCacheFileDescriptorsSearch(req, accept)
+	fd, err := cr.getAndCacheFileDescriptorsSearch(req, "symbol:"+string(symbol), accept)
 	if isNotFound(err) && cr.fallbackResolver != nil {
 		if d, err := cr.fallbackResolver.FindDescriptorByName(symbol); err == nil {
 			return d.ParentFile(), nil
 		}
 	}
-	var notFoundErr *elementNotFoundError
 	if isNotFound(err) {
 		err = symbolNotFound(symbol, nil)
-	} else if errors.As(err, &notFoundErr) {
+	} else if notFoundErr, ok := errors.AsType[*elementNotFoundError](err); ok {
 		err = symbolNotFound(symbol, notFoundErr)
 	}
 	return fd, err
@@ -373,23 +374,38 @@ func (cr *Client) FileContainingExtension(extendedMessageName protoreflect.FullN
 	accept := func(fd protoreflect.FileDescriptor) bool {
 		return protoresolve.FindExtensionByNumberInFile(fd, extendedMessageName, extensionNumber) != nil
 	}
-	fd, err := cr.getAndCacheFileDescriptorsSearch(req, accept)
+	key := fmt.Sprintf("extension:%s:%d", extendedMessageName, extensionNumber)
+	fd, err := cr.getAndCacheFileDescriptorsSearch(req, key, accept)
 	if isNotFound(err) && cr.fallbackExtResolver != nil {
 		if xt, err := cr.fallbackExtResolver.FindExtensionByNumber(extendedMessageName, extensionNumber); err == nil {
 			return xt.TypeDescriptor().ParentFile(), nil
 		}
 	}
-	var notFoundErr *elementNotFoundError
 	if isNotFound(err) {
 		err = extensionNotFound(extendedMessageName, extensionNumber, nil)
-	} else if errors.As(err, &notFoundErr) {
+	} else if notFoundErr, ok := errors.AsType[*elementNotFoundError](err); ok {
 		err = extensionNotFound(extendedMessageName, extensionNumber, notFoundErr)
 	}
 	return fd, err
 }
 
-func (cr *Client) getAndCacheFileDescriptorProtos(req *refv1.ServerReflectionRequest) ([]*descriptorpb.FileDescriptorProto, error) {
-	resp, err := cr.send(req)
+// getAndCacheFileDescriptorProtos sends the given request for files and caches
+// the files in the response. The given key identifies the request.
+//
+// Requests are sent one at a time, so concurrent requests for the same element
+// wait for each other. To avoid sending such a request again, the names of the
+// files in each response are recorded under the request's key, and a request
+// whose key has been recorded uses the cached files instead.
+func (cr *Client) getAndCacheFileDescriptorProtos(req *refv1.ServerReflectionRequest, key string) ([]*descriptorpb.FileDescriptorProto, error) {
+	// The stream lock is held until the response is cached, so a concurrent
+	// request for the same element sees it once it acquires the lock.
+	cr.connMu.Lock()
+	defer cr.connMu.Unlock()
+	if fds := cr.cachedResponse(key); fds != nil {
+		return fds, nil
+	}
+
+	resp, err := cr.sendLocked(req)
 	if err != nil {
 		return nil, err
 	}
@@ -405,24 +421,47 @@ func (cr *Client) getAndCacheFileDescriptorProtos(req *refv1.ServerReflectionReq
 	// need to cache all file descriptors that were sent so we can find them if
 	// we need them later when building the file's full import graph.
 	fds := make([]*descriptorpb.FileDescriptorProto, len(fdResp.FileDescriptorProto))
+	names := make([]string, len(fdResp.FileDescriptorProto))
 	for i, fdBytes := range fdResp.FileDescriptorProto {
 		fd := &descriptorpb.FileDescriptorProto{}
 		if err = proto.Unmarshal(fdBytes, fd); err != nil {
 			return nil, err
 		}
+		fds[i] = fd
+		names[i] = fd.GetName()
+	}
 
-		cr.cacheMu.Lock()
+	cr.cacheMu.Lock()
+	defer cr.cacheMu.Unlock()
+	for i, fd := range fds {
 		// store in cache of raw descriptor protos, but don't overwrite existing protos
 		if existingFd, ok := cr.protosByName[fd.GetName()]; ok {
-			fd = existingFd
+			fds[i] = existingFd
 		} else {
 			cr.protosByName[fd.GetName()] = fd
 		}
-		cr.cacheMu.Unlock()
-
-		fds[i] = fd
 	}
+	if cr.responseFiles == nil {
+		cr.responseFiles = map[string][]string{}
+	}
+	cr.responseFiles[key] = names
 	return fds, nil
+}
+
+// cachedResponse returns the cached files from the response to an earlier
+// request with the given key, or nil if there was no such request.
+func (cr *Client) cachedResponse(key string) []*descriptorpb.FileDescriptorProto {
+	cr.cacheMu.RLock()
+	defer cr.cacheMu.RUnlock()
+	names, ok := cr.responseFiles[key]
+	if !ok {
+		return nil
+	}
+	fds := make([]*descriptorpb.FileDescriptorProto, len(names))
+	for i, name := range names {
+		fds[i] = cr.protosByName[name]
+	}
+	return fds
 }
 
 func (cr *Client) getAndCacheFileDescriptors(filename string, depPath []string) (protoreflect.FileDescriptor, error) {
@@ -431,7 +470,7 @@ func (cr *Client) getAndCacheFileDescriptors(filename string, depPath []string) 
 			FileByFilename: filename,
 		},
 	}
-	if _, err := cr.getAndCacheFileDescriptorProtos(req); err != nil {
+	if _, err := cr.getAndCacheFileDescriptorProtos(req, "file:"+filename); err != nil {
 		return nil, err
 	}
 
@@ -450,9 +489,10 @@ func (cr *Client) getAndCacheFileDescriptors(filename string, depPath []string) 
 // It is not recursive, so does not take a depPath parameter.
 func (cr *Client) getAndCacheFileDescriptorsSearch(
 	req *refv1.ServerReflectionRequest,
+	key string,
 	accept func(protoreflect.FileDescriptor) bool,
 ) (protoreflect.FileDescriptor, error) {
-	fds, err := cr.getAndCacheFileDescriptorProtos(req)
+	fds, err := cr.getAndCacheFileDescriptorProtos(req, key)
 	if err != nil {
 		return nil, err
 	}
@@ -622,9 +662,23 @@ func (cr *Client) ListServices() ([]protoreflect.FullName, error) {
 }
 
 func (cr *Client) send(req *refv1.ServerReflectionRequest) (*refv1.ServerReflectionResponse, error) {
-	// doSend retries a few times, in case we have a stale stream
+	cr.connMu.Lock()
+	defer cr.connMu.Unlock()
+	return cr.sendLocked(req)
+}
+
+// sendLocked sends the given request and returns the response. The caller
+// must hold cr.connMu.
+//
+// gRPC streams do not allow concurrent calls to Send or concurrent calls to
+// Recv. We also rely on each response following its request, so the lock is
+// held across the whole send and receive. Without it, we would need more
+// machinery (goroutines and channels) to correlate responses with their
+// requests.
+func (cr *Client) sendLocked(req *refv1.ServerReflectionRequest) (*refv1.ServerReflectionResponse, error) {
+	// doSendLocked retries a few times, in case we have a stale stream
 	// (e.g. closed by server)
-	resp, err := cr.doSend(req)
+	resp, err := cr.doSendLocked(0, nil, req)
 	if err != nil {
 		return nil, err
 	}
@@ -650,17 +704,6 @@ func isNotFound(err error) bool {
 	}
 	s, ok := status.FromError(err)
 	return ok && s.Code() == codes.NotFound
-}
-
-func (cr *Client) doSend(req *refv1.ServerReflectionRequest) (*refv1.ServerReflectionResponse, error) {
-	// gRPC streams do not allow concurrent calls to Send or concurrent calls to
-	// Recv. We also rely on each response following its request, so we hold the
-	// lock across the whole send and receive. Without it, we would need more
-	// machinery (goroutines and channels) to correlate responses with their
-	// requests.
-	cr.connMu.Lock()
-	defer cr.connMu.Unlock()
-	return cr.doSendLocked(0, nil, req)
 }
 
 func (cr *Client) doSendLocked(attemptCount int, prevErr error, req *refv1.ServerReflectionRequest) (*refv1.ServerReflectionResponse, error) {
@@ -798,9 +841,24 @@ func (cr *Client) AsResolver() protoresolve.Resolver {
 
 type clientResolver Client
 
+// resolverError converts an error from the client into an error for the
+// protoresolve.Resolver interface: not-found errors must be exactly
+// protoresolve.ErrNotFound (which is protoregistry.NotFound), as its doc comment
+// requires, since the protobuf runtime compares errors to it with ==.
+func resolverError(err error) error {
+	if errors.Is(err, protoresolve.ErrNotFound) {
+		return protoresolve.ErrNotFound
+	}
+	return err
+}
+
 func (c *clientResolver) FindFileByPath(path string) (protoreflect.FileDescriptor, error) {
 	cr := (*Client)(c)
-	return cr.FileByFilename(path)
+	file, err := cr.FileByFilename(path)
+	if err != nil {
+		return nil, resolverError(err)
+	}
+	return file, nil
 }
 
 func (c *clientResolver) NumFiles() int {
@@ -863,11 +921,11 @@ func (c *clientResolver) findDescriptor(name protoreflect.FullName) (protoreflec
 	cr := (*Client)(c)
 	file, err := cr.FileContainingSymbol(name)
 	if err != nil {
-		return nil, err
+		return nil, resolverError(err)
 	}
 	d := protoresolve.FindDescriptorByNameInFile(file, name)
 	if d == nil {
-		return nil, symbolNotFound(name, nil)
+		return nil, protoresolve.ErrNotFound
 	}
 	return d, nil
 }
@@ -914,11 +972,11 @@ func (c *clientResolver) FindExtensionByNumber(message protoreflect.FullName, fi
 	cr := (*Client)(c)
 	file, err := cr.FileContainingExtension(message, field)
 	if err != nil {
-		return nil, err
+		return nil, resolverError(err)
 	}
 	ext := protoresolve.FindExtensionByNumberInFile(file, message, field)
 	if ext == nil {
-		return nil, extensionNotFound(message, field, nil)
+		return nil, protoresolve.ErrNotFound
 	}
 	return ext, nil
 }

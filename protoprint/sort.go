@@ -58,7 +58,7 @@ type Element interface {
 	IsCustomOption() bool
 }
 
-func asElement(v interface{}) Element {
+func asElement(v any) Element {
 	switch v := v.(type) {
 	case pkg:
 		return pkgElement(v)

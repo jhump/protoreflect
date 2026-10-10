@@ -5,7 +5,6 @@ import (
 	"strings"
 	"unicode"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
@@ -112,7 +111,7 @@ func NewMapField(name protoreflect.Name, keyTyp, valTyp *FieldType) *FieldBuilde
 	valFlb.number = 2
 	entryMsg.AddField(keyFlb)
 	entryMsg.AddField(valFlb)
-	entryMsg.Options = &descriptorpb.MessageOptions{MapEntry: proto.Bool(true)}
+	entryMsg.Options = &descriptorpb.MessageOptions{MapEntry: new(true)}
 
 	flb := NewField(name, FieldTypeMessage(entryMsg)).SetCardinality(protoreflect.Repeated)
 	flb.msgType = entryMsg
@@ -575,16 +574,16 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 		if flb.ParentFile().Syntax != protoreflect.Proto2 && flb.Cardinality == protoreflect.Required {
 			return nil, fmt.Errorf("field %s: only proto2 allows required fields", FullName(flb))
 		}
-		lbl = (descriptorpb.FieldDescriptorProto_Label)(flb.Cardinality).Enum()
+		lbl = new(descriptorpb.FieldDescriptorProto_Label(flb.Cardinality))
 	}
 	var typeName *string
 	tn := flb.fieldType.TypeName()
 	if tn != "" {
-		typeName = proto.String("." + string(tn))
+		typeName = new("." + string(tn))
 	}
 	var extendee *string
 	if flb.IsExtension() {
-		extendee = proto.String("." + string(flb.ExtendeeTypeName()))
+		extendee = new("." + string(flb.ExtendeeTypeName()))
 	}
 	jsName := flb.JsonName
 	if jsName == "" {
@@ -592,11 +591,11 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 	}
 	var def *string
 	if flb.Default != "" {
-		def = proto.String(flb.Default)
+		def = new(flb.Default)
 	}
 	var proto3Optional *bool
 	if flb.Proto3Optional {
-		proto3Optional = proto.Bool(true)
+		proto3Optional = new(true)
 	}
 
 	maxTag := internal.GetMaxTag(isMessageSet)
@@ -605,13 +604,13 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 	}
 
 	fd := &descriptorpb.FieldDescriptorProto{
-		Name:           proto.String(string(flb.name)),
-		Number:         proto.Int32(int32(flb.number)),
+		Name:           new(string(flb.name)),
+		Number:         new(int32(flb.number)),
 		Options:        flb.Options,
 		Label:          lbl,
-		Type:           flb.fieldType.fieldType.Enum(),
+		Type:           new(flb.fieldType.fieldType),
 		TypeName:       typeName,
-		JsonName:       proto.String(jsName),
+		JsonName:       new(jsName),
 		DefaultValue:   def,
 		Extendee:       extendee,
 		Proto3Optional: proto3Optional,
@@ -933,7 +932,7 @@ func (oob *OneofBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 	}
 
 	return &descriptorpb.OneofDescriptorProto{
-		Name:    proto.String(string(oob.name)),
+		Name:    new(string(oob.name)),
 		Options: oob.Options,
 	}, nil
 }

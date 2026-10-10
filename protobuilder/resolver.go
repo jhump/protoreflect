@@ -65,15 +65,13 @@ func (r *dependencyResolver) resolveElement(b Builder, seen []Builder) (protoref
 		return fd, nil
 	}
 
-	for _, s := range seen {
-		if s == b {
-			names := make([]string, len(seen)+1)
-			for i, s := range seen {
-				names[i] = string(s.Name())
-			}
-			names[len(seen)] = string(b.Name())
-			return nil, fmt.Errorf("descriptors have cyclic dependency: %s", strings.Join(names, " ->  "))
+	if slices.Contains(seen, b) {
+		names := make([]string, len(seen)+1)
+		for i, s := range seen {
+			names[i] = string(s.Name())
 		}
+		names[len(seen)] = string(b.Name())
+		return nil, fmt.Errorf("descriptors have cyclic dependency: %s", strings.Join(names, " ->  "))
 	}
 	seen = append(seen, b)
 
@@ -157,7 +155,7 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 	}
 	unique := makeUnique(fp.GetName(), fileNames)
 	if unique != fp.GetName() {
-		fp.Name = proto.String(unique)
+		fp.Name = new(unique)
 	}
 
 	for _, dep := range depSlice {
@@ -460,13 +458,13 @@ func (r *dependencyResolver) resolveTypesInOptions(root Builder, fileExts protor
 	if opts == nil {
 		return nil
 	}
-	if rv := reflect.ValueOf(opts); rv.Kind() == reflect.Ptr && rv.IsNil() {
+	if rv := reflect.ValueOf(opts); rv.Kind() == reflect.Pointer && rv.IsNil() {
 		return nil
 	}
 
 	ref := opts.ProtoReflect()
 	tags := map[protoreflect.FieldNumber]protoreflect.ExtensionType{}
-	proto.RangeExtensions(opts, func(xt protoreflect.ExtensionType, _ interface{}) bool {
+	proto.RangeExtensions(opts, func(xt protoreflect.ExtensionType, _ any) bool {
 		num := xt.TypeDescriptor().Number()
 		tags[num] = xt
 		return true

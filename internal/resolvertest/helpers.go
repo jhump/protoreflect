@@ -71,9 +71,14 @@ func checkUnexpectedType(
 	}
 }
 
+// checkNotFound verifies that err is exactly protoresolve.ErrNotFound, which is
+// protoregistry.NotFound. An error that merely wraps it is not enough: the
+// protobuf runtime, which uses resolvers when unmarshalling and in protodesc,
+// requires resolvers to return that exact value (see the doc comment for
+// protoregistry.NotFound) and compares errors to it with ==.
 func checkNotFound(t *testing.T, err error, query string) {
 	t.Helper()
-	assert.ErrorIs(t, err, protoresolve.ErrNotFound, "query for %q", query)
+	assert.Same(t, protoresolve.ErrNotFound, err, "query for %q should return exactly ErrNotFound", query)
 }
 
 func checkDescriptorMatches(t *testing.T, expected, actual protoreflect.Descriptor) {

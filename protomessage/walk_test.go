@@ -76,8 +76,8 @@ func TestWalkStopsEarly(t *testing.T) {
 	t.Parallel()
 	root := &descriptorpb.FileDescriptorProto{
 		MessageType: []*descriptorpb.DescriptorProto{
-			{Name: proto.String("A"), Field: []*descriptorpb.FieldDescriptorProto{{Name: proto.String("a")}}},
-			{Name: proto.String("B")},
+			{Name: new("A"), Field: []*descriptorpb.FieldDescriptorProto{{Name: new("a")}}},
+			{Name: new("B")},
 		},
 	}
 	var count int

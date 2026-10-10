@@ -20,7 +20,7 @@ func TestGetEdition(t *testing.T) {
 	// Hides the file's Edition method, so the edition must come from elsewhere.
 	hiddenEdition := struct{ protoreflect.FileDescriptor }{editionsFile}
 	oracle := resolvertest.ProtoFileOracleFunc(func(protoreflect.FileDescriptor) (*descriptorpb.FileDescriptorProto, error) {
-		return &descriptorpb.FileDescriptorProto{Edition: descriptorpb.Edition_EDITION_2024.Enum()}, nil
+		return &descriptorpb.FileDescriptorProto{Edition: new(descriptorpb.Edition_EDITION_2024)}, nil
 	})
 	failingOracle := resolvertest.ProtoFileOracleFunc(func(protoreflect.FileDescriptor) (*descriptorpb.FileDescriptorProto, error) {
 		return nil, errors.New("oracle failure")

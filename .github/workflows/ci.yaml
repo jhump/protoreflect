@@ -17,9 +17,9 @@ jobs:
     strategy:
       matrix:
         go-version:
-          - version: 1.26.x
+          - version: 1.27.x
             name: latest
-          - version: 1.25.x
+          - version: 1.26.x
             name: previous
     steps:
       - name: Checkout Code

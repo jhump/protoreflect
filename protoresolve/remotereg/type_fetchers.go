@@ -214,7 +214,7 @@ func HTTPTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 	if parLimit > 0 {
 		sem = semaphore.NewWeighted(int64(parLimit))
 	}
-	return CachingTypeFetcher(TypeFetcherFunc(func(ctx context.Context, typeUrl string, enum bool) (proto.Message, error) {
+	return CachingTypeFetcher(TypeFetcherFunc(func(ctx context.Context, typeURL string, enum bool) (proto.Message, error) {
 		if sem != nil {
 			if err := sem.Acquire(ctx, 1); err != nil {
 				return nil, err
@@ -222,7 +222,7 @@ func HTTPTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 			defer sem.Release(1)
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, ensureScheme(typeUrl), http.NoBody)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, ensureScheme(typeURL), http.NoBody)
 		if err != nil {
 			return nil, err
 		}
@@ -277,6 +277,6 @@ func HTTPTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 	}))
 }
 
-var bufferPool = sync.Pool{New: func() interface{} {
+var bufferPool = sync.Pool{New: func() any {
 	return bytes.NewBuffer(make([]byte, 0, 8192))
 }}

@@ -11,7 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
 	grpctestprotos "github.com/jhump/protoreflect/v2/internal/testprotos/grpc"
@@ -96,6 +98,16 @@ func TestChannelErrors(t *testing.T) {
 		fakeStub := NewStub(&fakeChannel{stream: &fakeStream{sendErr: errChannel}})
 		_, err := fakeStub.InvokeRpcServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
 		assert.ErrorIs(t, err, errChannel)
+	})
+	t.Run("server stream ended before send", func(t *testing.T) {
+		t.Parallel()
+		// When the server ends the call before the request is sent, the
+		// error with the call's status comes from receiving.
+		statusErr := status.Error(codes.PermissionDenied, "not allowed")
+		fakeStub := NewStub(&fakeChannel{stream: &fakeStream{sendErr: io.EOF, recvErr: statusErr}})
+		_, err := fakeStub.InvokeRpcServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
+		assert.Equal(t, codes.PermissionDenied, status.Code(err))
+		assert.ErrorContains(t, err, "not allowed")
 	})
 	t.Run("server stream close send", func(t *testing.T) {
 		t.Parallel()

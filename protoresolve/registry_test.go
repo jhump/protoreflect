@@ -2,11 +2,13 @@ package protoresolve_test
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -154,6 +156,47 @@ func TestRegistryRegisterFileProtoCustomOptions(t *testing.T) {
 	_, err = reg.RegisterFileProto(&duplicateProto)
 	require.ErrorContains(t, err, "already registered")
 	assert.True(t, hasUnknownFields(duplicateProto.ProtoReflect()), "proto should not be modified")
+}
+
+func TestRegistryRegisterFileProtoUnknownOptions(t *testing.T) {
+	t.Parallel()
+	// Round-trip the proto through the binary format without knowledge of
+	// the file's custom options, so they are all unrecognized fields.
+	data, err := proto.Marshal(protodesc.ToFileDescriptorProto(testprotos.File_desc_test_complex_proto))
+	require.NoError(t, err)
+	var fileProto descriptorpb.FileDescriptorProto
+	require.NoError(t, proto.UnmarshalOptions{Resolver: &protoregistry.Types{}}.Unmarshal(data, &fileProto))
+	// Add an option that no file defines next to the custom options of a
+	// nested message.
+	var msgProto *descriptorpb.DescriptorProto
+	for _, name := range []string{"Test", "Nested", "_NestedNested"} {
+		candidates := fileProto.MessageType
+		if msgProto != nil {
+			candidates = msgProto.NestedType
+		}
+		idx := slices.IndexFunc(candidates, func(candidate *descriptorpb.DescriptorProto) bool {
+			return candidate.GetName() == name
+		})
+		require.NotEqual(t, -1, idx, "message %s", name)
+		msgProto = candidates[idx]
+	}
+	opts := msgProto.GetOptions().ProtoReflect()
+	opts.SetUnknown(protowire.AppendVarint(protowire.AppendTag(opts.GetUnknown(), 59999, protowire.VarintType), 1))
+
+	reg := newRegistry(t, []protoreflect.FileDescriptor{descriptorpb.File_google_protobuf_descriptor_proto})
+	file, err := reg.RegisterFileProto(&fileProto)
+	require.NoError(t, err)
+
+	// The custom options are still recognized, despite the unknown one.
+	msg := protoresolve.FindDescriptorByNameInFile(file, "foo.bar.Test.Nested._NestedNested")
+	require.NotNil(t, msg)
+	var recognized []protoreflect.FullName
+	msg.Options().ProtoReflect().Range(func(field protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
+		recognized = append(recognized, field.FullName())
+		return true
+	})
+	assert.ElementsMatch(t, []protoreflect.FullName{"foo.bar.Test.Nested.fooblez", "foo.bar.rept"}, recognized)
+	assert.NotEmpty(t, msg.Options().ProtoReflect().GetUnknown(), "unknown option should remain unknown")
 }
 
 func TestRegistryConcurrency(t *testing.T) {

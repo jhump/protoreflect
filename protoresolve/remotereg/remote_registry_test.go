@@ -71,7 +71,7 @@ func TestRemoteRegistry_Basic(t *testing.T) {
 	pm, err := anypb.UnmarshalNew(a, proto.UnmarshalOptions{Resolver: rr.AsTypeResolver()})
 	require.NoError(t, err)
 	protosEqual(t, protodesc.ToDescriptorProto(md), pm)
-	require.Equal(t, reflect.TypeOf((*dynamicpb.Message)(nil)), reflect.TypeOf(pm))
+	require.Equal(t, reflect.TypeFor[*dynamicpb.Message](), reflect.TypeOf(pm))
 
 	fd, err := protoregistry.GlobalFiles.FindFileByPath("desc_test1.proto")
 	require.NoError(t, err)
@@ -151,7 +151,7 @@ func TestRemoteRegistry_FindMessage_TypeFetcher(t *testing.T) {
 	require.Equal(t, protoreflect.Proto3, md.ParentFile().Syntax())
 
 	mo := &descriptorpb.MessageOptions{
-		Deprecated: proto.Bool(true),
+		Deprecated: new(true),
 	}
 	proto.SetExtension(mo, testprotos.E_Mfubar, true)
 	protosEqual(t, mo, md.Options())
@@ -165,7 +165,7 @@ func TestRemoteRegistry_FindMessage_TypeFetcher(t *testing.T) {
 	require.Equal(t, protoreflect.MessageKind, flds.Get(0).Kind())
 
 	fo := &descriptorpb.FieldOptions{
-		Deprecated: proto.Bool(true),
+		Deprecated: new(true),
 	}
 	proto.SetExtension(fo, testprotos.E_Ffubar, []string{"foo", "bar", "baz"})
 	proto.SetExtension(fo, testprotos.E_Ffubarb, []byte{1, 2, 3, 4, 5, 6, 7, 8})
@@ -348,8 +348,8 @@ func TestRemoteRegistry_FindEnum_TypeFetcher(t *testing.T) {
 	require.Equal(t, protoreflect.Proto3, ed.ParentFile().Syntax())
 
 	eo := &descriptorpb.EnumOptions{
-		Deprecated: proto.Bool(true),
-		AllowAlias: proto.Bool(true),
+		Deprecated: new(true),
+		AllowAlias: new(true),
 	}
 	proto.SetExtension(eo, testprotos.E_Efubar, int32(-42))
 	require.NoError(t, err)
@@ -369,7 +369,7 @@ func TestRemoteRegistry_FindEnum_TypeFetcher(t *testing.T) {
 	require.Equal(t, protoreflect.EnumNumber(0), vals.Get(0).Number())
 
 	evo := &descriptorpb.EnumValueOptions{
-		Deprecated: proto.Bool(true),
+		Deprecated: new(true),
 	}
 	proto.SetExtension(evo, testprotos.E_Evfubar, int64(-420420420420))
 	require.NoError(t, err)
@@ -641,9 +641,9 @@ func TestDescriptorConverter_ToServiceDescriptor(t *testing.T) {
 	require.Equal(t, protoreflect.Proto3, sd.ParentFile().Syntax())
 
 	so := &descriptorpb.ServiceOptions{
-		Deprecated: proto.Bool(true),
+		Deprecated: new(true),
 	}
-	proto.SetExtension(so, testprotos.E_Sfubar, &testprotos.ReallySimpleMessage{Id: proto.Uint64(100), Name: proto.String("deuce")})
+	proto.SetExtension(so, testprotos.E_Sfubar, &testprotos.ReallySimpleMessage{Id: new(uint64(100)), Name: new("deuce")})
 	proto.SetExtension(so, testprotos.E_Sfubare, testprotos.ReallySimpleEnum_VALUE)
 	protosEqual(t, so, sd.Options())
 
@@ -654,7 +654,7 @@ func TestDescriptorConverter_ToServiceDescriptor(t *testing.T) {
 	require.Equal(t, "some.OtherType", string(methods.Get(0).Output().FullName()))
 
 	mto := &descriptorpb.MethodOptions{
-		Deprecated: proto.Bool(true),
+		Deprecated: new(true),
 	}
 	proto.SetExtension(mto, testprotos.E_Mtfubar, []float32{3.14159, 2.71828})
 	proto.SetExtension(mto, testprotos.E_Mtfubard, 10203040.506070809)
@@ -723,7 +723,7 @@ func getApi(t *testing.T) *apipb.Api {
 	err = anypb.MarshalFrom(&enu, &wrapperspb.Int32Value{Value: int32(testprotos.ReallySimpleEnum_VALUE)}, proto.MarshalOptions{})
 	require.NoError(t, err)
 	var msg anypb.Any
-	err = anypb.MarshalFrom(&msg, &testprotos.ReallySimpleMessage{Id: proto.Uint64(100), Name: proto.String("deuce")}, proto.MarshalOptions{})
+	err = anypb.MarshalFrom(&msg, &testprotos.ReallySimpleMessage{Id: new(uint64(100)), Name: new("deuce")}, proto.MarshalOptions{})
 	require.NoError(t, err)
 	return &apipb.Api{
 		Name: "some.Service",
@@ -796,48 +796,48 @@ func getApi(t *testing.T) *apipb.Api {
 
 func TestDescriptorConverter_DescriptorAsApi(t *testing.T) {
 	svcOpts := &descriptorpb.ServiceOptions{
-		Deprecated: proto.Bool(true),
+		Deprecated: new(true),
 	}
-	proto.SetExtension(svcOpts, testprotos.E_Sfubar, &testprotos.ReallySimpleMessage{Id: proto.Uint64(1234), Name: proto.String("abc")})
+	proto.SetExtension(svcOpts, testprotos.E_Sfubar, &testprotos.ReallySimpleMessage{Id: new(uint64(1234)), Name: new("abc")})
 	proto.SetExtension(svcOpts, testprotos.E_Sfubare, testprotos.ReallySimpleEnum_VALUE)
 	mtdOpts := &descriptorpb.MethodOptions{
-		Deprecated: proto.Bool(true),
+		Deprecated: new(true),
 	}
 	proto.SetExtension(mtdOpts, testprotos.E_Mtfubar, []float32{0, 102.3040506, float32(math.Inf(-1)), 2030.40506})
 	proto.SetExtension(mtdOpts, testprotos.E_Mtfubard, -98765.4321)
 	fdp := &descriptorpb.FileDescriptorProto{
-		Name:    proto.String("test.proto"),
-		Syntax:  proto.String("proto3"),
-		Package: proto.String("foo"),
+		Name:    new("test.proto"),
+		Syntax:  new("proto3"),
+		Package: new("foo"),
 		Dependency: []string{
 			"google/protobuf/empty.proto",
 			"desc_test_options.proto",
 		},
 		Service: []*descriptorpb.ServiceDescriptorProto{
 			{
-				Name:    proto.String("FooService"),
+				Name:    new("FooService"),
 				Options: svcOpts,
 				Method: []*descriptorpb.MethodDescriptorProto{
 					{
-						Name:            proto.String("Do"),
+						Name:            new("Do"),
 						Options:         mtdOpts,
-						InputType:       proto.String(".foo.Request"),
-						ClientStreaming: proto.Bool(true),
-						OutputType:      proto.String(".google.protobuf.Empty"),
+						InputType:       new(".foo.Request"),
+						ClientStreaming: new(true),
+						OutputType:      new(".google.protobuf.Empty"),
 					},
 				},
 			},
 		},
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
-				Name: proto.String("Request"),
+				Name: new("Request"),
 				Field: []*descriptorpb.FieldDescriptorProto{
 					{
-						Name:     proto.String("id"),
-						Number:   proto.Int32(1),
-						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
-						JsonName: proto.String("id"),
+						Name:     new("id"),
+						Number:   new(int32(1)),
+						Label:    new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+						Type:     new(descriptorpb.FieldDescriptorProto_TYPE_STRING),
+						JsonName: new("id"),
 					},
 				},
 			},
@@ -857,7 +857,7 @@ func TestDescriptorConverter_DescriptorAsApi(t *testing.T) {
 		},
 		Options: []*typepb.Option{
 			{Name: "deprecated", Value: asAny(t, &wrapperspb.BoolValue{Value: true})},
-			{Name: "testprotos.sfubar", Value: asAny(t, &testprotos.ReallySimpleMessage{Id: proto.Uint64(1234), Name: proto.String("abc")})},
+			{Name: "testprotos.sfubar", Value: asAny(t, &testprotos.ReallySimpleMessage{Id: new(uint64(1234)), Name: new("abc")})},
 			{Name: "testprotos.sfubare", Value: asAny(t, &wrapperspb.Int32Value{Value: int32(testprotos.ReallySimpleEnum_VALUE)})},
 		},
 		Methods: []*apipb.Method{
@@ -896,55 +896,55 @@ func TestDescriptorConverter_ToMessageDescriptor(t *testing.T) {
 	mdProto := protodesc.ToDescriptorProto(md)
 
 	msgOpts := &descriptorpb.MessageOptions{
-		Deprecated: proto.Bool(true),
+		Deprecated: new(true),
 	}
 	proto.SetExtension(msgOpts, testprotos.E_Mfubar, true)
 	fldOpts := &descriptorpb.FieldOptions{
-		Deprecated: proto.Bool(true),
+		Deprecated: new(true),
 	}
 	proto.SetExtension(fldOpts, testprotos.E_Ffubar, []string{"foo", "bar", "baz"})
 	proto.SetExtension(fldOpts, testprotos.E_Ffubarb, []byte{1, 2, 3, 4, 5, 6, 7, 8})
 	expected := &descriptorpb.DescriptorProto{
-		Name:    proto.String("Type"),
+		Name:    new("Type"),
 		Options: msgOpts,
 		OneofDecl: []*descriptorpb.OneofDescriptorProto{
 			{
-				Name: proto.String("un"),
+				Name: new("un"),
 			},
 		},
 		Field: []*descriptorpb.FieldDescriptorProto{
 			{
-				Name:     proto.String("a"),
-				Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-				Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
-				TypeName: proto.String(".some.OtherType"),
-				Number:   proto.Int32(1),
+				Name:     new("a"),
+				Label:    new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+				Type:     new(descriptorpb.FieldDescriptorProto_TYPE_MESSAGE),
+				TypeName: new(".some.OtherType"),
+				Number:   new(int32(1)),
 				Options:  fldOpts,
-				JsonName: proto.String("a"),
+				JsonName: new("a"),
 			},
 			{
-				Name:     proto.String("b"),
-				Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
-				Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
-				Number:   proto.Int32(2),
-				JsonName: proto.String("b"),
+				Name:     new("b"),
+				Label:    new(descriptorpb.FieldDescriptorProto_LABEL_REPEATED),
+				Type:     new(descriptorpb.FieldDescriptorProto_TYPE_STRING),
+				Number:   new(int32(2)),
+				JsonName: new("b"),
 			},
 			{
-				Name:       proto.String("c"),
-				Label:      descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-				Type:       descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum(),
-				TypeName:   proto.String(".some.Enum"),
-				Number:     proto.Int32(3),
-				OneofIndex: proto.Int32(0),
-				JsonName:   proto.String("c"),
+				Name:       new("c"),
+				Label:      new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+				Type:       new(descriptorpb.FieldDescriptorProto_TYPE_ENUM),
+				TypeName:   new(".some.Enum"),
+				Number:     new(int32(3)),
+				OneofIndex: new(int32(0)),
+				JsonName:   new("c"),
 			},
 			{
-				Name:       proto.String("d"),
-				Label:      descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-				Type:       descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
-				Number:     proto.Int32(4),
-				OneofIndex: proto.Int32(0),
-				JsonName:   proto.String("d"),
+				Name:       new("d"),
+				Label:      new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+				Type:       new(descriptorpb.FieldDescriptorProto_TYPE_INT32),
+				Number:     new(int32(4)),
+				OneofIndex: new(int32(0)),
+				JsonName:   new("d"),
 			},
 		},
 	}
@@ -954,57 +954,57 @@ func TestDescriptorConverter_ToMessageDescriptor(t *testing.T) {
 
 func TestDescriptorConverter_DescriptorAsType(t *testing.T) {
 	fdp := &descriptorpb.FileDescriptorProto{
-		Name:    proto.String("test.proto"),
-		Syntax:  proto.String("proto2"),
-		Package: proto.String("foo"),
+		Name:    new("test.proto"),
+		Syntax:  new("proto2"),
+		Package: new("foo"),
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
-				Name: proto.String("Bar"),
+				Name: new("Bar"),
 				OneofDecl: []*descriptorpb.OneofDescriptorProto{
 					{
-						Name: proto.String("oo"),
+						Name: new("oo"),
 					},
 				},
 				Field: []*descriptorpb.FieldDescriptorProto{
 					{
-						Name:     proto.String("abc"),
-						Number:   proto.Int32(1),
-						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
-						Options:  &descriptorpb.FieldOptions{Deprecated: proto.Bool(true)},
-						JsonName: proto.String("abc"),
+						Name:     new("abc"),
+						Number:   new(int32(1)),
+						Label:    new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+						Type:     new(descriptorpb.FieldDescriptorProto_TYPE_STRING),
+						Options:  &descriptorpb.FieldOptions{Deprecated: new(true)},
+						JsonName: new("abc"),
 					},
 					{
-						Name:     proto.String("def"),
-						Number:   proto.Int32(2),
-						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
-						Type:     descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
-						Options:  &descriptorpb.FieldOptions{Packed: proto.Bool(true)},
-						JsonName: proto.String("def"),
+						Name:     new("def"),
+						Number:   new(int32(2)),
+						Label:    new(descriptorpb.FieldDescriptorProto_LABEL_REPEATED),
+						Type:     new(descriptorpb.FieldDescriptorProto_TYPE_INT32),
+						Options:  &descriptorpb.FieldOptions{Packed: new(true)},
+						JsonName: new("def"),
 					},
 					{
-						Name:         proto.String("ghi"),
-						Number:       proto.Int32(3),
-						Label:        descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						Type:         descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
-						DefaultValue: proto.String("foobar"),
-						JsonName:     proto.String("ghi"),
+						Name:         new("ghi"),
+						Number:       new(int32(3)),
+						Label:        new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+						Type:         new(descriptorpb.FieldDescriptorProto_TYPE_STRING),
+						DefaultValue: new("foobar"),
+						JsonName:     new("ghi"),
 					},
 					{
-						Name:       proto.String("nid"),
-						Number:     proto.Int32(4),
-						Label:      descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						Type:       descriptorpb.FieldDescriptorProto_TYPE_UINT64.Enum(),
-						JsonName:   proto.String("nid"),
-						OneofIndex: proto.Int32(0),
+						Name:       new("nid"),
+						Number:     new(int32(4)),
+						Label:      new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+						Type:       new(descriptorpb.FieldDescriptorProto_TYPE_UINT64),
+						JsonName:   new("nid"),
+						OneofIndex: new(int32(0)),
 					},
 					{
-						Name:       proto.String("sid"),
-						Number:     proto.Int32(5),
-						Label:      descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						Type:       descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
-						JsonName:   proto.String("_SID_"),
-						OneofIndex: proto.Int32(0),
+						Name:       new("sid"),
+						Number:     new(int32(5)),
+						Label:      new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+						Type:       new(descriptorpb.FieldDescriptorProto_TYPE_STRING),
+						JsonName:   new("_SID_"),
+						OneofIndex: new(int32(0)),
 					},
 				},
 			},
@@ -1085,8 +1085,8 @@ func TestDescriptorConverter_ToEnumDescriptor(t *testing.T) {
 	edProto := protodesc.ToEnumDescriptorProto(ed)
 
 	enumOpts := &descriptorpb.EnumOptions{
-		Deprecated: proto.Bool(true),
-		AllowAlias: proto.Bool(true),
+		Deprecated: new(true),
+		AllowAlias: new(true),
 	}
 	proto.SetExtension(enumOpts, testprotos.E_Efubar, int32(-42))
 	proto.SetExtension(enumOpts, testprotos.E_Efubars, int32(-42))
@@ -1094,7 +1094,7 @@ func TestDescriptorConverter_ToEnumDescriptor(t *testing.T) {
 	proto.SetExtension(enumOpts, testprotos.E_Efubaru, uint32(42))
 	proto.SetExtension(enumOpts, testprotos.E_Efubaruf, uint32(42))
 	enumValOpts := &descriptorpb.EnumValueOptions{
-		Deprecated: proto.Bool(true),
+		Deprecated: new(true),
 	}
 	proto.SetExtension(enumValOpts, testprotos.E_Evfubar, int64(-420420420420))
 	proto.SetExtension(enumValOpts, testprotos.E_Evfubars, int64(-420420420420))
@@ -1102,21 +1102,21 @@ func TestDescriptorConverter_ToEnumDescriptor(t *testing.T) {
 	proto.SetExtension(enumValOpts, testprotos.E_Evfubaru, uint64(420420420420))
 	proto.SetExtension(enumValOpts, testprotos.E_Evfubaruf, uint64(420420420420))
 	expected := &descriptorpb.EnumDescriptorProto{
-		Name:    proto.String("Enum"),
+		Name:    new("Enum"),
 		Options: enumOpts,
 		Value: []*descriptorpb.EnumValueDescriptorProto{
 			{
-				Name:    proto.String("ABC"),
-				Number:  proto.Int32(0),
+				Name:    new("ABC"),
+				Number:  new(int32(0)),
 				Options: enumValOpts,
 			},
 			{
-				Name:   proto.String("XYZ"),
-				Number: proto.Int32(1),
+				Name:   new("XYZ"),
+				Number: new(int32(1)),
 			},
 			{
-				Name:   proto.String("WXY"),
-				Number: proto.Int32(1),
+				Name:   new("WXY"),
+				Number: new(int32(1)),
 			},
 		},
 	}
@@ -1126,34 +1126,34 @@ func TestDescriptorConverter_ToEnumDescriptor(t *testing.T) {
 
 func TestDescriptorConverter_DescriptorAsEnum(t *testing.T) {
 	fdp := &descriptorpb.FileDescriptorProto{
-		Name:    proto.String("test.proto"),
-		Syntax:  proto.String("proto2"),
-		Package: proto.String("foo"),
+		Name:    new("test.proto"),
+		Syntax:  new("proto2"),
+		Package: new("foo"),
 		EnumType: []*descriptorpb.EnumDescriptorProto{
 			{
-				Name:    proto.String("Bar"),
-				Options: &descriptorpb.EnumOptions{AllowAlias: proto.Bool(true)},
+				Name:    new("Bar"),
+				Options: &descriptorpb.EnumOptions{AllowAlias: new(true)},
 				Value: []*descriptorpb.EnumValueDescriptorProto{
 					{
-						Name:   proto.String("ZERO"),
-						Number: proto.Int32(0),
+						Name:   new("ZERO"),
+						Number: new(int32(0)),
 					},
 					{
-						Name:    proto.String("__UNSET__"),
-						Number:  proto.Int32(0),
-						Options: &descriptorpb.EnumValueOptions{Deprecated: proto.Bool(true)},
+						Name:    new("__UNSET__"),
+						Number:  new(int32(0)),
+						Options: &descriptorpb.EnumValueOptions{Deprecated: new(true)},
 					},
 					{
-						Name:   proto.String("ONE"),
-						Number: proto.Int32(1),
+						Name:   new("ONE"),
+						Number: new(int32(1)),
 					},
 					{
-						Name:   proto.String("TWO"),
-						Number: proto.Int32(2),
+						Name:   new("TWO"),
+						Number: new(int32(2)),
 					},
 					{
-						Name:   proto.String("THREE"),
-						Number: proto.Int32(3),
+						Name:   new("THREE"),
+						Number: new(int32(3)),
 					},
 				},
 			},

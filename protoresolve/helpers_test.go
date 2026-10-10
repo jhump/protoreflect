@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -368,11 +367,11 @@ func TestRegisterTypesInFileConflicts(t *testing.T) {
 	}
 	// Files with elements whose names conflict with those in file.
 	otherMessage := fileProto("other.proto", "testprotos")
-	otherMessage.MessageType = []*descriptorpb.DescriptorProto{{Name: proto.String("TestMessage")}}
+	otherMessage.MessageType = []*descriptorpb.DescriptorProto{{Name: new("TestMessage")}}
 	otherEnum := fileProto("other.proto", "testprotos")
 	otherEnum.EnumType = []*descriptorpb.EnumDescriptorProto{{
-		Name:  proto.String("SomeEnum"),
-		Value: []*descriptorpb.EnumValueDescriptorProto{{Name: proto.String("OTHER"), Number: proto.Int32(0)}},
+		Name:  new("SomeEnum"),
+		Value: []*descriptorpb.EnumValueDescriptorProto{{Name: new("OTHER"), Number: new(int32(0))}},
 	}}
 	otherExtension := fileProto("other.proto", "testprotos", file.Path())
 	otherExtension.Extension = []*descriptorpb.FieldDescriptorProto{int32Extension("xtm", 150, "testprotos.AnotherTestMessage")}

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -106,8 +105,8 @@ func newCombinedInputs(t *testing.T, corpus []protoreflect.FileDescriptor) combi
 // package, which imports the given dependencies. Callers add elements to it.
 func fileProto(path string, pkg protoreflect.FullName, deps ...string) *descriptorpb.FileDescriptorProto {
 	return &descriptorpb.FileDescriptorProto{
-		Name:       proto.String(path),
-		Package:    proto.String(string(pkg)),
+		Name:       new(path),
+		Package:    new(string(pkg)),
 		Dependency: deps,
 	}
 }
@@ -116,11 +115,11 @@ func fileProto(path string, pkg protoreflect.FullName, deps ...string) *descript
 // of the given message.
 func int32Extension(name string, number int32, extendee protoreflect.FullName) *descriptorpb.FieldDescriptorProto {
 	return &descriptorpb.FieldDescriptorProto{
-		Name:     proto.String(name),
-		Number:   proto.Int32(number),
-		Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-		Type:     descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
-		Extendee: proto.String("." + string(extendee)),
+		Name:     new(name),
+		Number:   new(number),
+		Label:    new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+		Type:     new(descriptorpb.FieldDescriptorProto_TYPE_INT32),
+		Extendee: new("." + string(extendee)),
 	}
 }
 
