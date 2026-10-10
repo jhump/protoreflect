@@ -15,6 +15,7 @@ type testService struct {
 }
 
 func TestLoadServiceDescriptors(t *testing.T) {
+	t.Parallel()
 	s := grpc.NewServer()
 	testprotosgrpc.RegisterDummyServiceServer(s, testService{})
 	sds, err := LoadServiceDescriptors(s)
@@ -26,6 +27,7 @@ func TestLoadServiceDescriptors(t *testing.T) {
 }
 
 func TestLoadServiceDescriptor(t *testing.T) {
+	t.Parallel()
 	sd, err := LoadServiceDescriptor(&testprotosgrpc.DummyService_ServiceDesc)
 	require.NoError(t, err)
 	checkServiceDescriptor(t, sd)

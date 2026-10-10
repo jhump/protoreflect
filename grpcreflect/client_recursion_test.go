@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,11 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	refv1 "google.golang.org/grpc/reflection/grpc_reflection_v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
+
+	prototesting "github.com/jhump/protoreflect/v2/internal/testing"
 )
 
 // TestFileByFilenameCyclicImports verifies that a server which serves files
@@ -185,25 +185,13 @@ func (s fakeReflectionServer) ServerReflectionInfo(stream refv1.ServerReflection
 	}
 }
 
-// startFakeReflectionServer starts svc on a local port and returns a client
-// connection to it. Both are shut down when the test finishes.
+// startFakeReflectionServer starts svc and returns a client connection to it.
+// Both are shut down when the test finishes.
 func startFakeReflectionServer(t *testing.T, svc fakeReflectionServer) *grpc.ClientConn {
 	t.Helper()
 	svr := grpc.NewServer()
 	refv1.RegisterServerReflectionServer(svr, svc)
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err, "failed to listen")
-	go func() {
-		_ = svr.Serve(listener)
-	}()
-	t.Cleanup(svr.Stop)
-
-	cconn, err := grpc.NewClient(listener.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err, "failed to create grpc client")
-	t.Cleanup(func() {
-		_ = cconn.Close()
-	})
-	return cconn
+	return prototesting.StartServer(t, svr)
 }
 
 // newFileProto returns a minimal file descriptor with the given name and

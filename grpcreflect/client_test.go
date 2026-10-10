@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"runtime"
 	"slices"
 	"sort"
@@ -21,7 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 	refv1 "google.golang.org/grpc/reflection/grpc_reflection_v1"
 	refv1alpha "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
@@ -44,59 +42,40 @@ import (
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
-var clientv1, clientv1alpha *Client
-
-func TestMain(m *testing.M) {
-	code := 1
-	defer func() {
-		p := recover()
-		if p != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "PANIC: %v\n", p)
-		}
-		os.Exit(code)
-	}()
-
-	svr := grpc.NewServer()
-	testprotosgrpc.RegisterDummyServiceServer(svr, testService{})
-	// support both v1 and v1alpha
-	reflection.Register(svr)
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		panic(fmt.Sprintf("Failed to open server socket: %s", err.Error()))
+// testVersions runs fn with clients for both the v1 and v1alpha versions of
+// the reflection service. Each uses a new server with the dummy service.
+func testVersions(t *testing.T, fn func(*testing.T, *Client)) {
+	t.Helper()
+	newClients := map[string]func(grpc.ClientConnInterface) *Client{
+		"v1": func(clientConn grpc.ClientConnInterface) *Client {
+			return NewClientV1(context.Background(), refv1.NewServerReflectionClient(clientConn))
+		},
+		"v1alpha": func(clientConn grpc.ClientConnInterface) *Client {
+			return NewClientV1Alpha(context.Background(), refv1alpha.NewServerReflectionClient(clientConn))
+		},
 	}
-	go func() {
-		_ = svr.Serve(l)
-	}()
-	defer svr.Stop()
-
-	// create grpc client
-	addr := l.Addr().String()
-	cconn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))
+	for name, newClient := range newClients {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			client := newClient(startDummyServer(t))
+			t.Cleanup(client.Reset)
+			fn(t, client)
+		})
 	}
-	defer func() {
-		_ = cconn.Close()
-	}()
-
-	stubv1alpha := refv1alpha.NewServerReflectionClient(cconn)
-	clientv1alpha = NewClientV1Alpha(context.Background(), stubv1alpha)
-	stubv1 := refv1.NewServerReflectionClient(cconn)
-	clientv1 = NewClientV1(context.Background(), stubv1)
-
-	code = m.Run()
 }
 
-func testVersions(t *testing.T, fn func(*testing.T, *Client)) {
-	t.Run("v1", func(t *testing.T) {
-		fn(t, clientv1)
-	})
-	t.Run("v1alpha", func(t *testing.T) {
-		fn(t, clientv1alpha)
-	})
+// startDummyServer starts a server with the dummy service and both versions of
+// the reflection service, and returns a connection to it.
+func startDummyServer(t *testing.T) *grpc.ClientConn {
+	t.Helper()
+	svr := grpc.NewServer()
+	testprotosgrpc.RegisterDummyServiceServer(svr, testService{})
+	reflection.Register(svr)
+	return prototesting.StartServer(t, svr)
 }
 
 func TestFileByFileName(t *testing.T) {
+	t.Parallel()
 	testVersions(t, func(t *testing.T, client *Client) {
 		fd, err := client.FileByFilename("desc_test1.proto")
 		require.NoError(t, err)
@@ -120,6 +99,7 @@ func TestFileByFileName(t *testing.T) {
 }
 
 func TestFileByFileNameForWellKnownProtos(t *testing.T) {
+	t.Parallel()
 	testVersions(t, func(t *testing.T, client *Client) {
 		wellKnownProtos := map[string][]protoreflect.FullName{
 			"google/protobuf/any.proto":             {"google.protobuf.Any"},
@@ -149,6 +129,7 @@ func TestFileByFileNameForWellKnownProtos(t *testing.T) {
 }
 
 func TestFileContainingSymbol(t *testing.T) {
+	t.Parallel()
 	testVersions(t, func(t *testing.T, client *Client) {
 		fd, err := client.FileContainingSymbol("TopLevel")
 		require.NoError(t, err)
@@ -176,6 +157,7 @@ func TestFileContainingSymbol(t *testing.T) {
 }
 
 func TestFileContainingExtension(t *testing.T) {
+	t.Parallel()
 	testVersions(t, func(t *testing.T, client *Client) {
 		fd, err := client.FileContainingExtension("TopLevel", 100)
 		require.NoError(t, err)
@@ -200,6 +182,7 @@ func TestFileContainingExtension(t *testing.T) {
 }
 
 func TestAllExtensionNumbersForType(t *testing.T) {
+	t.Parallel()
 	testVersions(t, func(t *testing.T, client *Client) {
 		nums, err := client.AllExtensionNumbersForType("TopLevel")
 		require.NoError(t, err)
@@ -227,6 +210,7 @@ func TestAllExtensionNumbersForType(t *testing.T) {
 }
 
 func TestListServices(t *testing.T) {
+	t.Parallel()
 	testVersions(t, func(t *testing.T, client *Client) {
 		s, err := client.ListServices()
 		require.NoError(t, err)
@@ -241,6 +225,7 @@ func TestListServices(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
+	t.Parallel()
 	testVersions(t, func(t *testing.T, client *Client) {
 		_, err := client.ListServices()
 		require.NoError(t, err)
@@ -268,6 +253,7 @@ func TestReset(t *testing.T) {
 }
 
 func TestRecover(t *testing.T) {
+	t.Parallel()
 	testVersions(t, func(t *testing.T, client *Client) {
 		_, err := client.ListServices()
 		require.NoError(t, err)
@@ -285,6 +271,7 @@ func TestRecover(t *testing.T) {
 }
 
 func TestMultipleFiles(t *testing.T) {
+	t.Parallel()
 	svr := grpc.NewServer()
 	refv1alpha.RegisterServerReflectionServer(svr, testReflectionServer{})
 
@@ -306,6 +293,7 @@ func TestMultipleFiles(t *testing.T) {
 }
 
 func TestAllowMissingFileDescriptors(t *testing.T) {
+	t.Parallel()
 	svr := grpc.NewServer()
 	files := createFilesWithMissingDeps(t)
 	reflectionSvc := reflection.NewServer(reflection.ServerOptions{
@@ -346,6 +334,7 @@ func TestAllowMissingFileDescriptors(t *testing.T) {
 }
 
 func TestAllowFallbackResolver(t *testing.T) {
+	t.Parallel()
 	svr := grpc.NewServer()
 	reflection.RegisterV1(svr)
 
@@ -420,6 +409,7 @@ func TestAllowFallbackResolver(t *testing.T) {
 }
 
 func TestAllowFallbackResolver_ForDependency(t *testing.T) {
+	t.Parallel()
 	// Create resolver with some extra files.
 	fdp := &descriptorpb.FileDescriptorProto{
 		Name:       new("foo/bar/this.proto"),
@@ -513,6 +503,7 @@ func TestAllowFallbackResolver_ForDependency(t *testing.T) {
 }
 
 func TestFileWithoutDeps(t *testing.T) {
+	t.Parallel()
 	fd := &descriptorpb.FileDescriptorProto{
 		Dependency: []string{
 			"foo/bar.proto",
@@ -631,6 +622,7 @@ func msgResponseForFiles(files ...string) *refv1alpha.ServerReflectionResponse_F
 }
 
 func TestAutoVersion(t *testing.T) {
+	t.Parallel()
 	t.Run("v1", func(t *testing.T) {
 		testClientAuto(t,
 			func(s *grpc.Server) {
@@ -758,12 +750,7 @@ func (c *captureStreamNames) handleUnknown(_ any, _ grpc.ServerStream) error {
 }
 
 func testClientAutoOnUnavailable(t *testing.T) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		panic(fmt.Sprintf("Failed to open server socket: %s", err.Error()))
-	}
-	captureConn := &captureListener{Listener: l}
-
+	var captureConn *captureListener
 	var capture captureStreamNames
 	svr := grpc.NewServer(
 		grpc.StreamInterceptor(capture.intercept),
@@ -777,25 +764,14 @@ func testClientAutoOnUnavailable(t *testing.T) {
 	refv1alpha.RegisterServerReflectionServer(svr, impl)
 	testprotosgrpc.RegisterDummyServiceServer(svr, testService{})
 
-	go func() {
-		err := svr.Serve(captureConn)
-		require.NoError(t, err)
-	}()
-	defer svr.Stop()
-
 	var captureErrs captureErrors
-	cconn, err := grpc.NewClient(
-		l.Addr().String(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithStreamInterceptor(captureErrs.intercept),
+	cconn := prototesting.StartServer(t, svr,
+		prototesting.WithListenerWrapper(func(listener net.Listener) net.Listener {
+			captureConn = &captureListener{Listener: listener}
+			return captureConn
+		}),
+		prototesting.WithDialOptions(grpc.WithStreamInterceptor(captureErrs.intercept)),
 	)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))
-	}
-	defer func() {
-		err := cconn.Close()
-		require.NoError(t, err)
-	}()
 	client := NewClientAuto(context.Background(), cconn)
 	now := time.Now()
 	client.now = func() time.Time {
@@ -895,6 +871,7 @@ func (c *captureErrorStream) RecvMsg(m any) error {
 // having been called must not leak its stream to the server. This only works
 // if nothing reachable from the cleanup's argument refers back to the Client.
 func TestClientCleanupClosesStream(t *testing.T) {
+	t.Parallel()
 	// NB: not parallel; this test forces GCs, which we'd rather not do while
 	// other tests in this package are allocating.
 	streamEnded := make(chan struct{}, 1)
