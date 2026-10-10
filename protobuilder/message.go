@@ -969,6 +969,14 @@ func (mb *MessageBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(mb, BuilderOptions{})
 }
 
+// Clone implements the Builder interface. See Builder.Clone for details.
+func (mb *MessageBuilder) Clone() Builder {
+	c := newCloner()
+	clone := c.message(mb)
+	c.updateReferences()
+	return clone
+}
+
 // processProto3OptionalFields adds synthetic oneofs to the given message descriptor
 // for each proto3 optional field. It also updates the fields to have the correct
 // oneof index reference.

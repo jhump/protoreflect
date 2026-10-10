@@ -63,14 +63,25 @@
 // can be moved from one message to another. When this is done, the field is
 // unlinked from its previous location (so the message to which it previously
 // belonged will no longer have any reference to such a field) and linked with
-// its new parent. To instead *duplicate* a descriptor builder, its struct value
-// can simply be copied. This allows for copying a descriptor from one parent to
-// another, like so:
+// its new parent.
 //
-//	msg := builder.FromMessage(someMsgDesc)
+// So adding an element to a parent *moves* it there: an element can only have
+// one parent at a time. To instead put the same element in two places, add a
+// copy of it to one of them. The Clone function makes a deep copy of a builder,
+// including all of its descendants. (All builders also have a Clone method.)
+// This allows for copying a descriptor from one parent to another, like so:
+//
+//	msg, err := protobuilder.FromMessage(someMsgDesc)
+//	if err != nil {
+//	    return err
+//	}
 //	field1 := msg.GetField("foo")
-//	field2 := *field1 // field2 is now a copy
-//	otherMsg.AddField(&field2)
+//	field2 := protobuilder.Clone(field1) // field2 is now a copy
+//	otherMsg.AddField(field2)
+//
+// Don't copy a builder by copying its struct value. The resulting copy shares
+// state with the original, such as its parent and its children, and modifying
+// it can corrupt the original.
 //
 // All descriptors have a link up the hierarchy to the file in which they were
 // declared. However, it is *not* necessary to construct this full hierarchy

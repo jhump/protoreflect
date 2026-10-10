@@ -68,6 +68,17 @@ type Builder interface {
 	// custom options, use BuilderOptions.Build instead.
 	BuildDescriptor() (protoreflect.Descriptor, error)
 
+	// Clone returns a deep copy of this element. The copy has no parent, even
+	// if this element does, so it is ready to be added to another parent.
+	//
+	// The deep copy only creates copies of this element and all of its
+	// descendants. References to other elements outside theis hierarchy, such
+	// as a field's type referring to some other message, are unchanged.
+	//
+	// Also see the package-level Clone function, for a strongly-typed form of
+	// this method.
+	Clone() Builder
+
 	// findChild returns the child builder with the given name or nil if this
 	// builder has no such child.
 	findChild(protoreflect.Name) Builder
