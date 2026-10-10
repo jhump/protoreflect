@@ -22,9 +22,9 @@ const defaultBaseURL = "type.googleapis.com"
 // A Registry can be configured with a TypeFetcher, which can be used
 // to dynamically retrieve message definitions.
 //
-// It differs from a Registry in that it only exposes a subset of the Resolver
-// interface, focused on messages and enums, which are types which may be
-// resolved by downloading schemas from a remote source.
+// It differs from a protoresolve.Registry in that it only exposes a subset of
+// the Resolver interface, focused on messages and enums, which are types which
+// may be resolved by downloading schemas from a remote source.
 //
 // This registry is intended to help resolve message type URLs in
 // google.protobuf.Any messages.
@@ -42,6 +42,12 @@ type Registry struct {
 	// A function that provides the base URL for a given package. When types
 	// are registered without a URL or looked up by name, this base URL is
 	// used to construct a full type URL.
+	//
+	// If it returns the empty string for a package, it is called again with
+	// the package's parent, and so on. When a type is looked up by name, its
+	// package is not known, so the function is first called with the name of
+	// the type's parent, which may be an enclosing message instead of a
+	// package.
 	//
 	// If not specified or nil, or if it returns the empty string, the
 	// DefaultBaseURL will be applied.
@@ -68,16 +74,11 @@ type Registry struct {
 	typeCache   map[string]protoreflect.Descriptor
 	typeURLs    map[protoreflect.FullName]string
 	descProtos  map[protoreflect.Descriptor]proto.Message
-	pkgBaseURLs map[protoreflect.FullName]pkgBaseURL
+	pkgBaseURLs map[protoreflect.FullName]string
 	// Used to synthesize file names when source context information is insufficient
 	// when converting google.protobuf.Type, google.protobuf.Enum, and google.protobuf.Api
 	// to descriptors.
 	fileCounter atomic.Int32
-}
-
-type pkgBaseURL struct {
-	baseURL            string
-	applyToSubPackages bool
 }
 
 var _ protoresolve.MessageResolver = (*Registry)(nil)
@@ -116,11 +117,14 @@ func (r *Registry) urlFromRegistrations(typeName, pkgName protoreflect.FullName)
 	return ""
 }
 
+// baseURLFromRegistrationsLocked returns the base URL registered for the given
+// package or, if there is none, for its nearest ancestor that has one. It
+// returns the empty string if neither the package nor any of its ancestors
+// has a registered base URL.
 func (r *Registry) baseURLFromRegistrationsLocked(pkgName protoreflect.FullName) string {
-	var ancestor bool
 	for pkgName != "" {
-		if urlEntry, ok := r.pkgBaseURLs[pkgName]; ok && (!ancestor || urlEntry.applyToSubPackages) {
-			return urlEntry.baseURL
+		if baseURL, ok := r.pkgBaseURLs[pkgName]; ok {
+			return baseURL
 		}
 		pkgName = pkgName.Parent()
 	}
@@ -146,38 +150,39 @@ func (r *Registry) baseURLWithoutRegistrations(pkgName protoreflect.FullName) st
 }
 
 // RegisterPackageBaseURL registers the given base URL to be used with elements
-// in the given package. If includeSubPackages is true, this base URL will also
-// be applied to all sub-packages (unless overridden via separate call to
-// RegisterPackageBaseURL for a particular sub-package).
-func (r *Registry) RegisterPackageBaseURL(pkgName protoreflect.FullName, baseURL string, includeSubPackages bool) (string, bool) {
+// in the given package and in all of its sub-packages (unless overridden via a
+// separate call to RegisterPackageBaseURL for a particular sub-package).
+//
+// It returns the base URL that applied to the package before this call, and
+// whether that base URL was registered by an earlier call to
+// RegisterPackageBaseURL for the same package.
+func (r *Registry) RegisterPackageBaseURL(pkgName protoreflect.FullName, baseURL string) (string, bool) {
 	baseURL = ensureScheme(baseURL)
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	previousEntry, previouslyRegistered := r.pkgBaseURLs[pkgName]
+	previous, previouslyRegistered := r.pkgBaseURLs[pkgName]
 	if !previouslyRegistered {
-		previousEntry.baseURL = r.baseURL(pkgName)
+		previous = r.baseURLFromRegistrationsLocked(pkgName)
 	}
-	if r.pkgBaseURLs == nil {
-		r.pkgBaseURLs = map[protoreflect.FullName]pkgBaseURL{}
+	r.initMapsLocked()
+	r.pkgBaseURLs[pkgName] = baseURL
+	r.mu.Unlock()
+	if previous == "" {
+		// This may call PackageBaseURLMapper, so we don't hold the lock.
+		previous = r.baseURLWithoutRegistrations(pkgName)
 	}
-	r.pkgBaseURLs[pkgName] = pkgBaseURL{
-		baseURL:            baseURL,
-		applyToSubPackages: includeSubPackages,
-	}
-	return previousEntry.baseURL, previouslyRegistered
+	return previous, previouslyRegistered
 }
 
+// baseURL returns the base URL for the given package. The caller must not
+// hold r.mu.
 func (r *Registry) baseURL(pkgName protoreflect.FullName) string {
-	if baseURL := r.baseURLFromRegistrations(pkgName); baseURL != "" {
+	r.mu.RLock()
+	baseURL := r.baseURLFromRegistrationsLocked(pkgName)
+	r.mu.RUnlock()
+	if baseURL != "" {
 		return baseURL
 	}
 	return r.baseURLWithoutRegistrations(pkgName)
-}
-
-func (r *Registry) baseURLFromRegistrations(pkgName protoreflect.FullName) string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.baseURLFromRegistrationsLocked(pkgName)
 }
 
 // RegisterMessage registers the given message type. The URL that corresponds to the given
@@ -194,40 +199,44 @@ func (r *Registry) RegisterEnum(ed protoreflect.EnumDescriptor) error {
 
 // RegisterMessageWithURL registers the given message type with the given URL.
 func (r *Registry) RegisterMessageWithURL(md protoreflect.MessageDescriptor, url string) error {
-	url = ensureScheme(url)
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if err := r.checkTypeLocked(md, "message", url); err != nil {
-		return err
-	}
-	if r.typeURLs == nil {
-		r.typeURLs = map[protoreflect.FullName]string{}
-	}
-	if r.typeCache == nil {
-		r.typeCache = map[string]protoreflect.Descriptor{}
-	}
-	r.typeURLs[md.FullName()] = url
-	r.typeCache[url] = md
-	return nil
+	return r.registerWithURL(md, "message", url)
 }
 
 // RegisterEnumWithURL registers the given enum type with the given URL.
 func (r *Registry) RegisterEnumWithURL(ed protoreflect.EnumDescriptor, url string) error {
+	return r.registerWithURL(ed, "enum", url)
+}
+
+// registerWithURL registers the given message or enum descriptor with the
+// given URL. The descKind is used in error messages.
+func (r *Registry) registerWithURL(desc protoreflect.Descriptor, descKind, url string) error {
 	url = ensureScheme(url)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if err := r.checkTypeLocked(ed, "enum", url); err != nil {
+	if err := r.checkTypeLocked(desc, descKind, url); err != nil {
 		return err
 	}
+	r.initMapsLocked()
+	r.typeURLs[desc.FullName()] = url
+	r.typeCache[url] = desc
+	return nil
+}
+
+// initMapsLocked lazily allocates the registry's maps. The caller must hold
+// r.mu for writing.
+func (r *Registry) initMapsLocked() {
 	if r.typeURLs == nil {
 		r.typeURLs = map[protoreflect.FullName]string{}
 	}
 	if r.typeCache == nil {
 		r.typeCache = map[string]protoreflect.Descriptor{}
 	}
-	r.typeURLs[ed.FullName()] = url
-	r.typeCache[url] = ed
-	return nil
+	if r.descProtos == nil {
+		r.descProtos = map[protoreflect.Descriptor]proto.Message{}
+	}
+	if r.pkgBaseURLs == nil {
+		r.pkgBaseURLs = map[protoreflect.FullName]string{}
+	}
 }
 
 func (r *Registry) checkTypeLocked(desc protoreflect.Descriptor, descKind string, url string) error {
@@ -285,12 +294,7 @@ func (r *Registry) checkTypesInContainerLocked(container protoresolve.TypeContai
 }
 
 func (r *Registry) registerTypesInContainerLocked(container protoresolve.TypeContainer, baseURL string) {
-	if r.typeURLs == nil {
-		r.typeURLs = map[protoreflect.FullName]string{}
-	}
-	if r.typeCache == nil {
-		r.typeCache = map[string]protoreflect.Descriptor{}
-	}
+	r.initMapsLocked()
 	msgs := container.Messages()
 	for i, length := 0, msgs.Len(); i < length; i++ {
 		md := msgs.Get(i)
@@ -468,82 +472,74 @@ func (r *Registry) findMessageTypesByURL(ctx context.Context, urls []string) (ma
 		}
 	}
 
-	files, err := cc.toFileDescriptors()
-	protoOracle := protoresolve.NewProtoOracle(files)
+	recorded, err := r.recordConvertedTypes(cc)
 	if err != nil {
 		return nil, err
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if len(cc.typeLocations) > 0 {
-		if r.typeURLs == nil {
-			r.typeURLs = map[protoreflect.FullName]string{}
+	for u := range ret {
+		d := recorded[u]
+		if d == nil {
+			continue
 		}
-		if r.typeCache == nil {
-			r.typeCache = map[string]protoreflect.Descriptor{}
+		md, ok := d.(protoreflect.MessageDescriptor)
+		if !ok {
+			return nil, fmt.Errorf("type for URL %v is the wrong type: wanted message, got %s", u, protoresolve.KindOf(d))
 		}
-		for typeUrl := range cc.typeLocations {
-			d, err := files.FindDescriptorByName(protoresolve.TypeNameFromURL(typeUrl))
-			if err != nil {
-				// should not be possible
-				return nil, err
-			}
-			r.typeURLs[d.FullName()] = typeUrl
-			r.typeCache[typeUrl] = d
-			if dProto, err := protoOracle.ProtoFromDescriptor(d); err == nil {
-				r.descProtos[d] = dProto
-			}
-			if _, ok := ret[typeUrl]; ok {
-				ret[typeUrl] = d.(protoreflect.MessageDescriptor)
-			}
-		}
+		ret[u] = md
 	}
 	return ret, nil
 }
 
 func (r *Registry) resolveURLFromConvertContext(cc *convertContext, url string) (protoreflect.Descriptor, error) {
-	files, err := cc.toFileDescriptors()
-	protoOracle := protoresolve.NewProtoOracle(files)
+	recorded, err := r.recordConvertedTypes(cc)
 	if err != nil {
 		return nil, err
 	}
+	if d := recorded[url]; d != nil {
+		return d, nil
+	}
+	return nil, protoregistry.NotFound
+}
+
+// recordConvertedTypes builds descriptors for the types fetched by the given
+// context and records them in the registry. It returns the descriptors for all
+// the types' URLs.
+//
+// A type whose URL is already in the registry, such as one registered explicitly
+// or fetched concurrently, is not replaced: the existing descriptor is returned
+// for its URL instead.
+func (r *Registry) recordConvertedTypes(cc *convertContext) (map[string]protoreflect.Descriptor, error) {
+	files, err := cc.toFileDescriptors()
+	if err != nil {
+		return nil, err
+	}
+	protoOracle := protoresolve.NewProtoOracle(files)
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var ret protoreflect.Descriptor
-	if len(cc.typeLocations) > 0 {
-		if r.typeURLs == nil {
-			r.typeURLs = map[protoreflect.FullName]string{}
+	r.initMapsLocked()
+	recorded := make(map[string]protoreflect.Descriptor, len(cc.typeLocations))
+	for typeURL := range cc.typeLocations {
+		if existing := r.typeCache[typeURL]; existing != nil {
+			recorded[typeURL] = existing
+			continue
 		}
-		if r.typeCache == nil {
-			r.typeCache = map[string]protoreflect.Descriptor{}
+		d, err := files.FindDescriptorByName(protoresolve.TypeNameFromURL(typeURL))
+		if err != nil {
+			// should not be possible
+			return nil, err
 		}
-		if r.descProtos == nil {
-			r.descProtos = map[protoreflect.Descriptor]proto.Message{}
+		r.typeURLs[d.FullName()] = typeURL
+		r.typeCache[typeURL] = d
+		if dProto, err := protoOracle.ProtoFromDescriptor(d); err == nil {
+			r.descProtos[d] = dProto
 		}
-		for typeUrl := range cc.typeLocations {
-			d, err := files.FindDescriptorByName(protoresolve.TypeNameFromURL(typeUrl))
-			if err != nil {
-				// should not be possible
-				return nil, err
-			}
-			r.typeURLs[d.FullName()] = typeUrl
-			r.typeCache[typeUrl] = d
-			if dProto, err := protoOracle.ProtoFromDescriptor(d); err == nil {
-				r.descProtos[d] = dProto
-			}
-			if url == typeUrl {
-				ret = d
-			}
-		}
+		recorded[typeURL] = d
 	}
-	if ret == nil {
-		return nil, protoregistry.NotFound
-	}
-	return ret, nil
+	return recorded, nil
 }
 
 // AsTypeResolver returns a view of this registry that returns types instead
-// of descriptors. The returned resolver implements TypeResolver
+// of descriptors. The returned resolver implements TypeResolver.
 func (r *Registry) AsTypeResolver() *RemoteTypeResolver {
 	return (*RemoteTypeResolver)(r)
 }

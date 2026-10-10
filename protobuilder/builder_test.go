@@ -950,8 +950,6 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	enum3 := NewEnum("foosball")
 	err = fb.TryAddEnum(enum3)
 	checkFailedAdd(t, err, fb, enum3, "already contains element")
-
-	// TODO: test moving and removing, too
 }
 
 func checkChildren(t *testing.T, parent Builder, children ...Builder) {
@@ -973,14 +971,6 @@ func checkFailedAdd(t *testing.T, err error, parent Builder, child Builder, erro
 	for _, ch := range parent.Children() {
 		require.True(t, ch != child, "Child %s (%T) should not appear in list of children for %s (%T) but does", child.Name(), child, FullName(parent), parent)
 	}
-}
-
-func TestRenamingBuilders(t *testing.T) {
-	// TODO
-}
-
-func TestRenumberingFields(t *testing.T) {
-	// TODO
 }
 
 var (

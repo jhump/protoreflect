@@ -80,8 +80,8 @@ service RpcService {
   rpc StreamingRpc ( stream .foo.bar.Request ) returns ( .foo.bar.Request );
   rpc UnaryRpc ( .foo.bar.Request ) returns ( .google.protobuf.Empty ) {
     option deprecated = true;
-    option (.testprotos.mtfubar) = 12.340000;
-    option (.testprotos.mtfubard) = 123.456000;
+    option (.testprotos.mtfubar) = 12.34;
+    option (.testprotos.mtfubard) = 123.456;
   }
 }
 extend .foo.bar.Request {
@@ -300,8 +300,8 @@ service RpcService {
   rpc StreamingRpc ( stream .foo.bar.Request ) returns ( .foo.bar.Request );
   rpc UnaryRpc ( .foo.bar.Request ) returns ( .google.protobuf.Empty ) {
     option deprecated = true;
-    option (.testprotos.mtfubar) = 12.340000;
-    option (.testprotos.mtfubard) = 123.456000;
+    option (.testprotos.mtfubar) = 12.34;
+    option (.testprotos.mtfubard) = 123.456;
   }
 }
 -------- foo.bar.RpcService.StreamingRpc (*linker.mtdDescriptor) --------
@@ -310,6 +310,6 @@ rpc StreamingRpc ( stream .foo.bar.Request ) returns ( .foo.bar.Request );
 -------- foo.bar.RpcService.UnaryRpc (*linker.mtdDescriptor) --------
 rpc UnaryRpc ( .foo.bar.Request ) returns ( .google.protobuf.Empty ) {
   option deprecated = true;
-  option (.testprotos.mtfubar) = 12.340000;
-  option (.testprotos.mtfubard) = 123.456000;
+  option (.testprotos.mtfubar) = 12.34;
+  option (.testprotos.mtfubard) = 123.456;
 }

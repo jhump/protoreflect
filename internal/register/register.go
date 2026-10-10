@@ -25,7 +25,7 @@ func RegisterTypesInImportedFile(file protoreflect.FileDescriptor, reg *protoreg
 	registerTypes(file, reg, includeMessages)
 	imports := file.Imports()
 	for i, length := 0, imports.Len(); i < length; i++ {
-		dep := file.Imports().Get(i)
+		dep := imports.Get(i)
 		if dep.IsPublic {
 			RegisterTypesInImportedFile(dep.FileDescriptor, reg, includeMessages)
 		}

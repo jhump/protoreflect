@@ -11,6 +11,9 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/internal/fielddefault"
 )
 
 func (p *Printer) printMessageLiteralCompact(msg protoreflect.Message, res *protoregistry.Types, pkg, scope protoreflect.FullName) string {
@@ -76,7 +79,7 @@ func (p *Printer) printMessageLiteralToBuffer(
 			p.printArrayLiteralToBufferMaybeCompact(buf, fld, val.List(), res, pkg, scope, threshold, indent)
 		case fld.IsMap():
 			p.printMapLiteralToBufferMaybeCompact(buf, fld, val.Map(), res, pkg, scope, threshold, indent)
-		case fld.Kind() == protoreflect.MessageKind || fld.Kind() == protoreflect.GroupKind:
+		case internal.IsMessageKind(fld.Kind()):
 			p.printMessageLiteralToBufferMaybeCompact(buf, val.Message(), res, pkg, scope, threshold, indent)
 		default:
 			p.printValueLiteralToBuffer(buf, fld, val.Interface())
@@ -184,8 +187,10 @@ func (p *Printer) printValueLiteralToBuffer(buf *bytes.Buffer, fld protoreflect.
 		buf.WriteString(quotedBytes(string(val)))
 	case int32, uint32, int64, uint64:
 		_, _ = fmt.Fprintf(buf, "%d", val)
-	case float32, float64:
-		_, _ = fmt.Fprintf(buf, "%f", val)
+	case float32:
+		buf.WriteString(fielddefault.FormatFloat(float64(val), 32))
+	case float64:
+		buf.WriteString(fielddefault.FormatFloat(val, 64))
 	default:
 		_, _ = fmt.Fprintf(buf, "%v", val)
 	}
@@ -257,7 +262,7 @@ func (p *Printer) printArrayLiteralToBuffer(
 			buf.WriteRune(',')
 		}
 		p.maybeNewline(buf, indent)
-		if fld.Kind() == protoreflect.MessageKind || fld.Kind() == protoreflect.GroupKind {
+		if internal.IsMessageKind(fld.Kind()) {
 			p.printMessageLiteralToBufferMaybeCompact(buf, val.Get(i).Message(), res, pkg, scope, threshold, indent)
 		} else {
 			p.printValueLiteralToBuffer(buf, fld, val.Get(i).Interface())

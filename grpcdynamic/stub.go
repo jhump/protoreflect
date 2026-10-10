@@ -80,6 +80,10 @@ func (s *Stub) InvokeRpc(ctx context.Context, method protoreflect.MethodDescript
 }
 
 // InvokeRpcServerStream sends a unary RPC and returns the response stream. Use this for server-streaming methods.
+//
+// To release the stream's resources, callers must either call RecvMsg until it
+// returns an error (which is io.EOF when the stream completes normally) or
+// cancel ctx.
 func (s *Stub) InvokeRpcServerStream(ctx context.Context, method protoreflect.MethodDescriptor, request proto.Message, opts ...grpc.CallOption) (*ServerStream, error) {
 	if method.IsStreamingClient() || !method.IsStreamingServer() {
 		return nil, fmt.Errorf("InvokeRpcServerStream is for server-streaming methods; %q is %s", method.FullName(), methodType(method))
@@ -88,12 +92,7 @@ func (s *Stub) InvokeRpcServerStream(ctx context.Context, method protoreflect.Me
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	sd := grpc.StreamDesc{
-		StreamName:    string(method.Name()),
-		ServerStreams: method.IsStreamingServer(),
-		ClientStreams: method.IsStreamingClient(),
-	}
-	cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...)
+	cs, err := s.channel.NewStream(ctx, streamDesc(method), requestMethod(method), opts...)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -108,12 +107,7 @@ func (s *Stub) InvokeRpcServerStream(ctx context.Context, method protoreflect.Me
 		cancel()
 		return nil, err
 	}
-	go func() {
-		// when the new stream is finished, also cleanup the parent context
-		<-cs.Context().Done()
-		cancel()
-	}()
-	return &ServerStream{cs, method.Output(), s.resolver}, nil
+	return &ServerStream{baseStream{cs}, method.Output(), s.resolver, cancel}, nil
 }
 
 // InvokeRpcClientStream creates a new stream that is used to send request messages and, at the end,
@@ -123,22 +117,12 @@ func (s *Stub) InvokeRpcClientStream(ctx context.Context, method protoreflect.Me
 		return nil, fmt.Errorf("InvokeRpcClientStream is for client-streaming methods; %q is %s", method.FullName(), methodType(method))
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	sd := grpc.StreamDesc{
-		StreamName:    string(method.Name()),
-		ServerStreams: method.IsStreamingServer(),
-		ClientStreams: method.IsStreamingClient(),
-	}
-	cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...)
+	cs, err := s.channel.NewStream(ctx, streamDesc(method), requestMethod(method), opts...)
 	if err != nil {
 		cancel()
 		return nil, err
 	}
-	go func() {
-		// when the new stream is finished, also cleanup the parent context
-		<-cs.Context().Done()
-		cancel()
-	}()
-	return &ClientStream{cs, method, s.resolver, cancel}, nil
+	return &ClientStream{baseStream{cs}, method, s.resolver, cancel}, nil
 }
 
 // InvokeRpcBidiStream creates a new stream that is used to both send request messages and receive response
@@ -147,16 +131,19 @@ func (s *Stub) InvokeRpcBidiStream(ctx context.Context, method protoreflect.Meth
 	if !method.IsStreamingClient() || !method.IsStreamingServer() {
 		return nil, fmt.Errorf("InvokeRpcBidiStream is for bidi-streaming methods; %q is %s", method.FullName(), methodType(method))
 	}
-	sd := grpc.StreamDesc{
-		StreamName:    string(method.Name()),
-		ServerStreams: method.IsStreamingServer(),
-		ClientStreams: method.IsStreamingClient(),
-	}
-	cs, err := s.channel.NewStream(ctx, &sd, requestMethod(method), opts...)
+	cs, err := s.channel.NewStream(ctx, streamDesc(method), requestMethod(method), opts...)
 	if err != nil {
 		return nil, err
 	}
-	return &BidiStream{cs, method.Input(), method.Output(), s.resolver}, nil
+	return &BidiStream{baseStream{cs}, method.Input(), method.Output(), s.resolver}, nil
+}
+
+func streamDesc(md protoreflect.MethodDescriptor) *grpc.StreamDesc {
+	return &grpc.StreamDesc{
+		StreamName:    string(md.Name()),
+		ServerStreams: md.IsStreamingServer(),
+		ClientStreams: md.IsStreamingClient(),
+	}
 }
 
 func methodType(md protoreflect.MethodDescriptor) string {
@@ -173,6 +160,9 @@ func methodType(md protoreflect.MethodDescriptor) string {
 }
 
 func checkMessageType(md protoreflect.MessageDescriptor, msg proto.Message) error {
+	if msg == nil {
+		return fmt.Errorf("expecting message of type %s; got nil", md.FullName())
+	}
 	typeName := msg.ProtoReflect().Descriptor().FullName()
 	if typeName != md.FullName() {
 		return fmt.Errorf("expecting message of type %s; got %s", md.FullName(), typeName)
@@ -180,69 +170,77 @@ func checkMessageType(md protoreflect.MessageDescriptor, msg proto.Message) erro
 	return nil
 }
 
-// ServerStream represents a response stream from a server. Messages in the stream can be queried
-// as can header and trailer metadata sent by the server.
-type ServerStream struct {
-	stream   grpc.ClientStream
-	respType protoreflect.MessageDescriptor
-	resolver protoresolve.SerializationResolver
+// baseStream provides the behavior shared by all of the dynamic stream types.
+type baseStream struct {
+	stream grpc.ClientStream
 }
 
 // Header returns any header metadata sent by the server (blocks if necessary until headers are
 // received).
-func (s *ServerStream) Header() (metadata.MD, error) {
+func (s baseStream) Header() (metadata.MD, error) {
 	return s.stream.Header()
 }
 
 // Trailer returns the trailer metadata sent by the server. It must only be called after
-// RecvMsg returns a non-nil error (which may be EOF for normal completion of stream).
-func (s *ServerStream) Trailer() metadata.MD {
+// the stream has finished: after RecvMsg returns a non-nil error (which may be EOF for
+// normal completion of stream) or, for client-streaming calls, after CloseAndReceive
+// returns.
+func (s baseStream) Trailer() metadata.MD {
 	return s.stream.Trailer()
 }
 
 // Context returns the context associated with this streaming operation.
-func (s *ServerStream) Context() context.Context {
+func (s baseStream) Context() context.Context {
 	return s.stream.Context()
+}
+
+// recvMessage receives the next message from the stream, as a message of the
+// given type. If a resolver is given, it is used to re-parse unrecognized fields,
+// which may be extensions.
+func (s baseStream) recvMessage(md protoreflect.MessageDescriptor, resolver protoresolve.SerializationResolver) (proto.Message, error) {
+	msg := newMessage(md, resolver)
+	if err := s.stream.RecvMsg(msg); err != nil {
+		return nil, err
+	}
+	if resolver != nil {
+		protomessage.ReparseUnrecognized(msg, resolver)
+	}
+	return msg, nil
+}
+
+// ServerStream represents a response stream from a server. Messages in the stream can be queried
+// as can header and trailer metadata sent by the server.
+type ServerStream struct {
+	baseStream
+	respType protoreflect.MessageDescriptor
+	resolver protoresolve.SerializationResolver
+	// Cancels the stream's context, to release its resources once the
+	// stream is finished.
+	cancel context.CancelFunc
 }
 
 // RecvMsg returns the next message in the response stream or an error. If the stream
 // has completed normally, the error is io.EOF. Otherwise, the error indicates the
 // nature of the abnormal termination of the stream.
 func (s *ServerStream) RecvMsg() (proto.Message, error) {
-	resp := newMessage(s.respType, s.resolver)
-	if err := s.stream.RecvMsg(resp); err != nil {
+	resp, err := s.recvMessage(s.respType, s.resolver)
+	if err != nil {
+		// The stream is finished.
+		s.cancel()
 		return nil, err
-	}
-	if s.resolver != nil {
-		protomessage.ReparseUnrecognized(resp, s.resolver)
 	}
 	return resp, nil
 }
 
-// ClientStream represents a response stream from a client. Messages in the stream can be sent
+// ClientStream represents the client side of a client-streaming call. Messages can be sent
 // and, when done, the unary server message and header and trailer metadata can be queried.
 type ClientStream struct {
-	stream   grpc.ClientStream
+	baseStream
 	method   protoreflect.MethodDescriptor
 	resolver protoresolve.SerializationResolver
-	cancel   context.CancelFunc
-}
-
-// Header returns any header metadata sent by the server (blocks if necessary until headers are
-// received).
-func (s *ClientStream) Header() (metadata.MD, error) {
-	return s.stream.Header()
-}
-
-// Trailer returns the trailer metadata sent by the server. It must only be called after
-// RecvMsg returns a non-nil error (which may be EOF for normal completion of stream).
-func (s *ClientStream) Trailer() metadata.MD {
-	return s.stream.Trailer()
-}
-
-// Context returns the context associated with this streaming operation.
-func (s *ClientStream) Context() context.Context {
-	return s.stream.Context()
+	// Cancels the stream's context, to release its resources once the
+	// stream is finished.
+	cancel context.CancelFunc
 }
 
 // SendMsg sends a request message to the server.
@@ -255,21 +253,19 @@ func (s *ClientStream) SendMsg(m proto.Message) error {
 
 // CloseAndReceive closes the outgoing request stream and then blocks for the server's response.
 func (s *ClientStream) CloseAndReceive() (proto.Message, error) {
+	// The stream is finished when this returns.
+	defer s.cancel()
 	if err := s.stream.CloseSend(); err != nil {
 		return nil, err
 	}
-	resp := newMessage(s.method.Output(), s.resolver)
-	if err := s.stream.RecvMsg(resp); err != nil {
+	resp, err := s.recvMessage(s.method.Output(), s.resolver)
+	if err != nil {
 		return nil, err
-	}
-	if s.resolver != nil {
-		protomessage.ReparseUnrecognized(resp, s.resolver)
 	}
 
 	// make sure we get EOF for a second message
 	if err := s.stream.RecvMsg(resp.ProtoReflect().New().Interface()); err != io.EOF {
 		if err == nil {
-			s.cancel()
 			return nil, fmt.Errorf("client-streaming method %q returned more than one response message", s.method.FullName())
 		}
 		return nil, err
@@ -281,27 +277,10 @@ func (s *ClientStream) CloseAndReceive() (proto.Message, error) {
 // messages from a server. The header and trailer metadata sent by the server can also be
 // queried.
 type BidiStream struct {
-	stream   grpc.ClientStream
+	baseStream
 	reqType  protoreflect.MessageDescriptor
 	respType protoreflect.MessageDescriptor
 	resolver protoresolve.SerializationResolver
-}
-
-// Header returns any header metadata sent by the server (blocks if necessary until headers are
-// received).
-func (s *BidiStream) Header() (metadata.MD, error) {
-	return s.stream.Header()
-}
-
-// Trailer returns the trailer metadata sent by the server. It must only be called after
-// RecvMsg returns a non-nil error (which may be EOF for normal completion of stream).
-func (s *BidiStream) Trailer() metadata.MD {
-	return s.stream.Trailer()
-}
-
-// Context returns the context associated with this streaming operation.
-func (s *BidiStream) Context() context.Context {
-	return s.stream.Context()
 }
 
 // SendMsg sends a request message to the server.
@@ -322,14 +301,7 @@ func (s *BidiStream) CloseSend() error {
 // has completed normally, the error is io.EOF. Otherwise, the error indicates the
 // nature of the abnormal termination of the stream.
 func (s *BidiStream) RecvMsg() (proto.Message, error) {
-	resp := newMessage(s.respType, s.resolver)
-	if err := s.stream.RecvMsg(resp); err != nil {
-		return nil, err
-	}
-	if s.resolver != nil {
-		protomessage.ReparseUnrecognized(resp, s.resolver)
-	}
-	return resp, nil
+	return s.recvMessage(s.respType, s.resolver)
 }
 
 func newMessage(md protoreflect.MessageDescriptor, resolver protoresolve.SerializationResolver) proto.Message {

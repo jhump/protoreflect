@@ -26,7 +26,7 @@ func genSourceInfo(plugin *protogen.Plugin) error {
 	for _, f := range plugin.Files {
 		if f.Generate {
 			if err := generateSourceInfo(f, plugin); err != nil {
-				return fmt.Errorf("%s: %v", f.Desc.Path(), err)
+				return fmt.Errorf("%s: %w", f.Desc.Path(), err)
 			}
 		}
 	}

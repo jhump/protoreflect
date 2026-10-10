@@ -44,7 +44,9 @@ func ReparseUnrecognized(msg protoreflect.Message, resolver resolver) bool {
 	unk := msg.GetUnknown()
 	if len(unk) > 0 {
 		other := msg.New().Interface()
-		if err := (proto.UnmarshalOptions{Resolver: resolver}).Unmarshal(unk, other); err == nil {
+		if err := (proto.UnmarshalOptions{Resolver: resolver}).Unmarshal(unk, other); err == nil && hasKnownFields(other.ProtoReflect()) {
+			// Some fields were recognized. Any that still weren't remain
+			// in other's unknown fields, which are merged back.
 			msg.SetUnknown(nil)
 			proto.Merge(msg.Interface(), other)
 			changed = true
@@ -59,4 +61,13 @@ func ReparseUnrecognized(msg protoreflect.Message, resolver resolver) bool {
 type resolver interface {
 	FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error)
 	FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error)
+}
+
+func hasKnownFields(msg protoreflect.Message) bool {
+	var found bool
+	msg.Range(func(protoreflect.FieldDescriptor, protoreflect.Value) bool {
+		found = true
+		return false
+	})
+	return found
 }

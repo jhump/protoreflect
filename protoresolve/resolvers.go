@@ -184,30 +184,11 @@ type resolverFromPool struct {
 }
 
 func (r *resolverFromPool) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageDescriptor, error) {
-	d, err := r.DescriptorPool.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	msg, ok := d.(protoreflect.MessageDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindMessage, d, "")
-	}
-	return msg, nil
+	return findDescriptorOfKind[protoreflect.MessageDescriptor](r.DescriptorPool, name, DescriptorKindMessage)
 }
 
 func (r *resolverFromPool) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
-	d, err := r.DescriptorPool.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	field, ok := d.(protoreflect.FieldDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
-	}
-	if !field.IsExtension() {
-		return nil, NewUnexpectedTypeError(DescriptorKindExtension, field, "")
-	}
-	return field, nil
+	return findDescriptorOfKind[protoreflect.ExtensionDescriptor](r.DescriptorPool, name, DescriptorKindExtension)
 }
 
 func (r *resolverFromPool) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionDescriptor, error) {
@@ -223,7 +204,8 @@ func (r *resolverFromPool) RangeExtensionsByMessage(message protoreflect.FullNam
 }
 
 func (r *resolverFromPool) FindMessageByURL(url string) (protoreflect.MessageDescriptor, error) {
-	return r.FindMessageByName(TypeNameFromURL(url))
+	msg, err := r.FindMessageByName(TypeNameFromURL(url))
+	return msg, errorForURL(err, url)
 }
 
 func (r *resolverFromPool) AsTypeResolver() TypeResolver {

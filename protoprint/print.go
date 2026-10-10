@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
+	"github.com/jhump/protoreflect/v2/internal/fielddefault"
 	"github.com/jhump/protoreflect/v2/internal/register"
 	"github.com/jhump/protoreflect/v2/protodescs"
 	"github.com/jhump/protoreflect/v2/protomessage"
@@ -216,7 +217,7 @@ func (p *Printer) PrintProtoFiles(fds []protoreflect.FileDescriptor, open func(n
 	for _, fd := range fds {
 		w, err := open(fd.Path())
 		if err != nil {
-			return fmt.Errorf("failed to open %s: %v", fd.Path(), err)
+			return fmt.Errorf("failed to open %s: %w", fd.Path(), err)
 		}
 		err = func() error {
 			defer func() {
@@ -225,7 +226,7 @@ func (p *Printer) PrintProtoFiles(fds []protoreflect.FileDescriptor, open func(n
 			return p.PrintProtoFile(fd, w)
 		}()
 		if err != nil {
-			return fmt.Errorf("failed to write %s: %v", fd.Path(), err)
+			return fmt.Errorf("failed to write %s: %w", fd.Path(), err)
 		}
 	}
 	return nil
@@ -295,23 +296,32 @@ func (p *Printer) PrintProtoToString(dsc protoreflect.Descriptor) (string, error
 }
 
 func (p *Printer) printProto(dsc protoreflect.Descriptor, out io.Writer) error {
-	w := newWriter(out)
+	// Normalize the indent in a copy, so we don't modify the caller's Printer,
+	// which may be in use concurrently.
+	normalized := *p
+	normalized.Indent = normalizeIndent(p.Indent)
+	return normalized.printNormalizedProto(dsc, out)
+}
 
-	if p.Indent == "" {
-		// default indent to two spaces
-		p.Indent = "  "
-	} else {
-		// indent must be all spaces or tabs, so convert other chars to spaces
-		ind := make([]rune, 0, len(p.Indent))
-		for _, r := range p.Indent {
-			if r == '\t' {
-				ind = append(ind, r)
-			} else {
-				ind = append(ind, ' ')
-			}
-		}
-		p.Indent = string(ind)
+// normalizeIndent returns the given indent, with any characters other than tabs
+// converted to spaces. If the given indent is empty, it returns two spaces.
+func normalizeIndent(indent string) string {
+	if indent == "" {
+		return "  "
 	}
+	ind := make([]rune, 0, len(indent))
+	for _, r := range indent {
+		if r == '\t' {
+			ind = append(ind, r)
+		} else {
+			ind = append(ind, ' ')
+		}
+	}
+	return string(ind)
+}
+
+func (p *Printer) printNormalizedProto(dsc protoreflect.Descriptor, out io.Writer) error {
+	w := newWriter(out)
 
 	fd := dsc.ParentFile()
 	sourceInfo := extendOptionLocations(fd)
@@ -319,7 +329,7 @@ func (p *Printer) printProto(dsc protoreflect.Descriptor, out io.Writer) error {
 	var reg protoregistry.Types
 	register.RegisterTypesVisibleToFile(fd, &reg, true)
 
-	path := findElement(dsc)
+	path := sourceloc.PathFor(dsc)
 	switch d := dsc.(type) {
 	case protoreflect.FileDescriptor:
 		p.printFile(d, &reg, w, sourceInfo)
@@ -365,63 +375,6 @@ func (p *Printer) printProto(dsc protoreflect.Descriptor, out io.Writer) error {
 	return w.err
 }
 
-func findElement(dsc protoreflect.Descriptor) protoreflect.SourcePath {
-	// we start with dsc (leaf) and work our way up to root,
-	// which means we are building the path backwards
-	var path protoreflect.SourcePath
-	for dsc.Parent() != nil {
-		parent := dsc.Parent()
-		path = append(path, int32(dsc.Index()))
-		switch d := dsc.(type) {
-		case protoreflect.MessageDescriptor:
-			if _, ok := parent.(protoreflect.MessageDescriptor); ok {
-				path = append(path, internal.MessageNestedMessagesTag)
-			} else {
-				path = append(path, internal.FileMessagesTag)
-			}
-
-		case protoreflect.FieldDescriptor:
-			if d.IsExtension() {
-				if _, ok := parent.(protoreflect.MessageDescriptor); ok {
-					path = append(path, internal.MessageExtensionsTag)
-				} else {
-					path = append(path, internal.FileExtensionsTag)
-				}
-			} else {
-				path = append(path, internal.MessageFieldsTag)
-			}
-
-		case protoreflect.OneofDescriptor:
-			path = append(path, internal.MessageOneofsTag)
-
-		case protoreflect.EnumDescriptor:
-			if _, ok := parent.(protoreflect.MessageDescriptor); ok {
-				path = append(path, internal.MessageEnumsTag)
-			} else {
-				path = append(path, internal.FileEnumsTag)
-			}
-
-		case protoreflect.EnumValueDescriptor:
-			path = append(path, internal.EnumValuesTag)
-
-		case protoreflect.ServiceDescriptor:
-			path = append(path, internal.FileServicesTag)
-
-		case protoreflect.MethodDescriptor:
-			path = append(path, internal.ServiceMethodsTag)
-
-		default:
-			panic(fmt.Sprintf("unexpected descriptor type: %T", dsc))
-		}
-		dsc = parent
-	}
-	// finally, we reverse the backwards path
-	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
-		path[i], path[j] = path[j], path[i]
-	}
-	return path
-}
-
 func (p *Printer) newLine(w io.Writer) {
 	if !p.Compact {
 		_, _ = fmt.Fprintln(w)
@@ -434,10 +387,7 @@ func (p *Printer) printFile(
 	w *writer,
 	sourceInfo protoreflect.SourceLocations,
 ) {
-	opts, err := p.extractOptions(fd, reg, fd.Options())
-	if err != nil {
-		return
-	}
+	opts := p.extractOptions(fd, reg, fd.Options())
 
 	path := make(protoreflect.SourcePath, 1)
 
@@ -777,13 +727,7 @@ func (p *Printer) printMessageBody(
 	path protoreflect.SourcePath,
 	indent int,
 ) {
-	opts, err := p.extractOptions(md, reg, md.Options())
-	if err != nil {
-		if w.err == nil {
-			w.err = err
-		}
-		return
-	}
+	opts := p.extractOptions(md, reg, md.Options())
 
 	skip := map[interface{}]bool{}
 	maxTag := internal.GetMaxTag(isMessageSet(md))
@@ -1017,13 +961,7 @@ func (p *Printer) printField(
 		numSi := sourceInfo.ByPath(append(path, internal.FieldNumberTag))
 		p.printElementString(numSi, w, indent, fmt.Sprintf("%d", fld.Number()))
 
-		opts, err := p.extractOptions(fld, reg, fld.Options())
-		if err != nil {
-			if w.err == nil {
-				w.err = err
-			}
-			return
-		}
+		opts := p.extractOptions(fld, reg, fld.Options())
 
 		// we use negative values for "extras" keys so they can't collide
 		// with legit option tags
@@ -1100,13 +1038,7 @@ func (p *Printer) printOneOf(
 		indent++
 		trailer(indent, true)
 
-		opts, err := p.extractOptions(ood, reg, ood.Options())
-		if err != nil {
-			if w.err == nil {
-				w.err = err
-			}
-			return
-		}
+		opts := p.extractOptions(ood, reg, ood.Options())
 
 		elements := elementAddrs{dsc: ood, opts: opts}
 		elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.OneofOptionsTag, -1, opts)...)
@@ -1332,13 +1264,7 @@ func (p *Printer) printEnum(
 		indent++
 		trailer(indent, true)
 
-		opts, err := p.extractOptions(ed, reg, ed.Options())
-		if err != nil {
-			if w.err == nil {
-				w.err = err
-			}
-			return
-		}
+		opts := p.extractOptions(ed, reg, ed.Options())
 
 		skip := map[interface{}]bool{}
 
@@ -1462,13 +1388,7 @@ func (p *Printer) printService(
 		indent++
 		trailer(indent, true)
 
-		opts, err := p.extractOptions(sd, reg, sd.Options())
-		if err != nil {
-			if w.err == nil {
-				w.err = err
-			}
-			return
-		}
+		opts := p.extractOptions(sd, reg, sd.Options())
 
 		elements := elementAddrs{dsc: sd, opts: opts}
 		elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.ServiceOptionsTag, -1, opts)...)
@@ -1534,13 +1454,7 @@ func (p *Printer) printMethod(
 		p.printElementString(outSi, w, indent, outName)
 		_, _ = fmt.Fprint(w, ") ")
 
-		opts, err := p.extractOptions(mtd, reg, mtd.Options())
-		if err != nil {
-			if w.err == nil {
-				w.err = err
-			}
-			return
-		}
+		opts := p.extractOptions(mtd, reg, mtd.Options())
 
 		if len(opts) > 0 {
 			_, _ = fmt.Fprintln(w, "{")
@@ -1604,13 +1518,7 @@ func (p *Printer) extractAndPrintOptionsShort(
 	if !ok {
 		d = dsc.(extensionRangeMarker).owner
 	}
-	opts, err := p.extractOptions(d, reg, optsMsg)
-	if err != nil {
-		if w.err == nil {
-			w.err = err
-		}
-		return
-	}
+	opts := p.extractOptions(d, reg, optsMsg)
 	p.printOptionsShort(dsc, opts, optsTag, reg, w, sourceInfo, path, indent)
 }
 
@@ -1791,8 +1699,10 @@ func (p *Printer) printOption(reg *protoregistry.Types, name string, optVal inte
 	switch optVal := optVal.(type) {
 	case int32, uint32, int64, uint64:
 		_, _ = fmt.Fprintf(w, "%d", optVal)
-	case float32, float64:
-		_, _ = fmt.Fprintf(w, "%f", optVal)
+	case float32:
+		_, _ = fmt.Fprint(w, fielddefault.FormatFloat(float64(optVal), 32))
+	case float64:
+		_, _ = fmt.Fprint(w, fielddefault.FormatFloat(optVal, 64))
 	case string:
 		_, _ = fmt.Fprintf(w, "%s", quotedString(optVal))
 	case []byte:
@@ -1893,8 +1803,8 @@ func extendOptionLocations(fd protoreflect.FileDescriptor) protoreflect.SourceLo
 	for i, length := 0, srcLocs.Len(); i < length; i++ {
 		loc := srcLocs.Get(i)
 		allowed := edges[edgeKindFile]
-		for i := 0; i+1 < len(loc.Path); i += 2 {
-			nextKind, ok := allowed[loc.Path[i]]
+		for pathIndex := 0; pathIndex+1 < len(loc.Path); pathIndex += 2 {
+			nextKind, ok := allowed[loc.Path[pathIndex]]
 			if !ok {
 				break
 			}
@@ -1906,7 +1816,7 @@ func extendOptionLocations(fd protoreflect.FileDescriptor) protoreflect.SourceLo
 				// optional index for repeated option fields (zero for
 				// non-repeated option fields). This is used for querying source
 				// info when printing options.
-				newPath := make(protoreflect.SourcePath, i+3)
+				newPath := make(protoreflect.SourcePath, pathIndex+3)
 				copy(newPath, loc.Path)
 				srcLocs.putIfAbsent(newPath, loc)
 				// we do another path of path-so-far plus two, but with
@@ -1942,7 +1852,9 @@ func extendOptionLocations(fd protoreflect.FileDescriptor) protoreflect.SourceLo
 	return &srcLocs
 }
 
-func (p *Printer) extractOptions(dsc protoreflect.Descriptor, reg *protoregistry.Types, opts proto.Message) (map[protoreflect.FieldNumber][]option, error) {
+func (p *Printer) extractOptions(dsc protoreflect.Descriptor, reg *protoregistry.Types, opts proto.Message) map[protoreflect.FieldNumber][]option {
+	// The options belong to the descriptor, so we must not modify them.
+	opts = proto.CloneOf(opts)
 	protomessage.ReparseUnrecognized(opts, reg)
 
 	pkg := dsc.ParentFile().Package()
@@ -1982,7 +1894,7 @@ func (p *Printer) extractOptions(dsc protoreflect.Descriptor, reg *protoregistry
 		}
 		return true
 	})
-	return options, nil
+	return options
 }
 
 func valueToOptions(fld protoreflect.FieldDescriptor, name string, val interface{}) []option {
@@ -2744,7 +2656,7 @@ func (p *Printer) printComment(comments string, w *writer, indent int, forceNext
 	if len(lines) == 1 && multiLine {
 		p.indent(w, indent)
 		line := lines[0]
-		if line[0] == ' ' && line[len(line)-1] != ' ' {
+		if line != "" && line[0] == ' ' && line[len(line)-1] != ' ' {
 			// add trailing space for symmetry
 			line += " "
 		}

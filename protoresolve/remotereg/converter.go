@@ -336,7 +336,8 @@ func (dc *DescriptorConverter) DescriptorAsEnum(ed protoreflect.EnumDescriptor) 
 }
 
 func (dc *DescriptorConverter) options(options proto.Message) []*typepb.Option {
-	if rv := reflect.ValueOf(options); rv.Kind() == reflect.Ptr && rv.IsNil() {
+	if options == nil || !options.ProtoReflect().IsValid() {
+		// Nil interface or typed-nil message.
 		return nil
 	}
 	var opts []*typepb.Option
@@ -561,7 +562,9 @@ func (dc *DescriptorConverter) addDescriptors(ref string, files map[string]*file
 		files[fileName] = fe
 	}
 
+	dc.mu.RLock()
 	descProto := dc.descProtos[d]
+	dc.mu.RUnlock()
 	if descProto == nil {
 		switch d := d.(type) {
 		case protoreflect.MessageDescriptor:
@@ -685,9 +688,9 @@ func (cc *convertContext) recordTypeAndDependencies(ctx context.Context, url str
 			kind := f.Kind
 			grp.Go(func() error {
 				// first check the registry for descriptors
-				cc.reg.mu.Lock()
+				cc.reg.mu.RLock()
 				d := cc.reg.typeCache[typeURL]
-				cc.reg.mu.Unlock()
+				cc.reg.mu.RUnlock()
 
 				if d != nil {
 					// found it!
@@ -764,7 +767,7 @@ func (cc *convertContext) recordDescriptor(url, ref string, d protoreflect.Descr
 
 	dc := (*DescriptorConverter)(cc.reg)
 	dc.addDescriptors(ref, cc.files, d, nil, func(dsc protoreflect.Descriptor) bool {
-		u := ensureScheme(cc.reg.urlForType(dsc.FullName(), dsc.Parent().FullName()))
+		u := ensureScheme(cc.reg.urlForType(dsc.FullName(), dsc.ParentFile().Package()))
 		if _, ok := cc.typeLocations[u]; ok {
 			// already seen this one
 			return false

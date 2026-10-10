@@ -131,9 +131,93 @@ func TestCachingTypeFetcher_Concurrency(t *testing.T) {
 	require.Greater(t, atomic.LoadInt32(&queryCount), int32(len(counts)))
 }
 
-func TestHttpTypeFetcher(t *testing.T) {
+func TestCachingTypeFetcher_CancelledLoad(t *testing.T) {
+	t.Parallel()
+	// The caller that starts a load cancels it, but a concurrent caller with a
+	// live context still gets the type.
+	const url = "foo.bar/some.Type"
+	started := make(chan struct{})
+	var calls atomic.Int32
+	fetcher := CachingTypeFetcher(TypeFetcherFunc(func(ctx context.Context, url string, enum bool) (proto.Message, error) {
+		if calls.Add(1) == 1 {
+			close(started)
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}
+		return testFetcher(ctx, url, enum)
+	}))
+
+	firstCtx, cancelFirst := context.WithCancel(context.Background())
+	firstErr := make(chan error, 1)
+	go func() {
+		_, err := fetcher.FetchMessageType(firstCtx, url)
+		firstErr <- err
+	}()
+	<-started
+	type result struct {
+		typ *typepb.Type
+		err error
+	}
+	second := make(chan result, 1)
+	go func() {
+		typ, err := fetcher.FetchMessageType(context.Background(), url)
+		second <- result{typ, err}
+	}()
+	// Give the second caller time to start waiting for the first load.
+	time.Sleep(100 * time.Millisecond)
+	cancelFirst()
+
+	require.ErrorIs(t, <-firstErr, context.Canceled)
+	secondResult := <-second
+	require.NoError(t, secondResult.err)
+	require.Equal(t, "some.Type", secondResult.typ.Name)
+}
+
+func TestCachingTypeFetcher_WaiterContext(t *testing.T) {
+	t.Parallel()
+	// A caller waiting for a concurrent load can stop waiting.
+	const url = "foo.bar/some.Type"
+	started := make(chan struct{})
+	release := make(chan struct{})
+	fetcher := CachingTypeFetcher(TypeFetcherFunc(func(ctx context.Context, url string, enum bool) (proto.Message, error) {
+		close(started)
+		<-release
+		return testFetcher(ctx, url, enum)
+	}))
+	defer close(release)
+	go func() {
+		_, _ = fetcher.FetchMessageType(context.Background(), url)
+	}()
+	<-started
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, err := fetcher.FetchMessageType(ctx, url)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestCachingTypeFetcher_Panic(t *testing.T) {
+	t.Parallel()
+	const url = "foo.bar/some.Type"
+	var calls atomic.Int32
+	fetcher := CachingTypeFetcher(TypeFetcherFunc(func(ctx context.Context, url string, enum bool) (proto.Message, error) {
+		if calls.Add(1) == 1 {
+			panic("fetcher failure")
+		}
+		return testFetcher(ctx, url, enum)
+	}))
+	require.Panics(t, func() {
+		_, _ = fetcher.FetchMessageType(context.Background(), url)
+	})
+	// The failed load is not cached.
+	typ, err := fetcher.FetchMessageType(context.Background(), url)
+	require.NoError(t, err)
+	require.Equal(t, "some.Type", typ.Name)
+}
+
+func TestHTTPTypeFetcher(t *testing.T) {
 	trt := &testRoundTripper{counts: map[string]int{}}
-	fetcher := HttpTypeFetcher(trt, 65536, 10)
+	fetcher := HTTPTypeFetcher(trt, 65536, 10)
 
 	for i := 0; i < 10; i++ {
 		typ, err := fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Message")
@@ -148,14 +232,29 @@ func TestHttpTypeFetcher(t *testing.T) {
 		require.Equal(t, "fee.fi.fo.Enum", en.Name)
 	}
 
-	// HttpTypeFetcher caches results
+	// HTTPTypeFetcher caches results
 	require.Equal(t, 1, trt.counts["https://blah.blah.blah/fee.fi.fo.Message"])
 	require.Equal(t, 1, trt.counts["https://blah.blah.blah/fee.fi.fo.Enum"])
 }
 
-func TestHttpTypeFetcher_ParallelDownloads(t *testing.T) {
+func TestHTTPTypeFetcher_NonPositiveParallelLimit(t *testing.T) {
+	for _, parLimit := range []int{0, -1} {
+		t.Run(fmt.Sprintf("parLimit=%d", parLimit), func(t *testing.T) {
+			trt := &testRoundTripper{counts: map[string]int{}}
+			fetcher := HTTPTypeFetcher(trt, 65536, parLimit)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			typ, err := fetcher.FetchMessageType(ctx, "blah.blah.blah/fee.fi.fo.Message")
+			require.NoError(t, err)
+			require.Equal(t, "fee.fi.fo.Message", typ.Name)
+		})
+	}
+}
+
+func TestHTTPTypeFetcher_ParallelDownloads(t *testing.T) {
 	trt := &testRoundTripper{counts: map[string]int{}, delay: 100 * time.Millisecond}
-	fetcher := HttpTypeFetcher(trt, 65536, 10)
+	fetcher := HTTPTypeFetcher(trt, 65536, 10)
 	// We spin up 100 fetches in parallel, but only 10 can go at a time and each
 	// one takes 100millis. So it should take about 1 second.
 	start := time.Now()
@@ -180,10 +279,10 @@ func TestHttpTypeFetcher_ParallelDownloads(t *testing.T) {
 	require.GreaterOrEqual(t, elapsed, time.Second)
 }
 
-func TestHttpTypeFetcher_SizeLimits(t *testing.T) {
+func TestHTTPTypeFetcher_SizeLimits(t *testing.T) {
 	trt := &testRoundTripper{counts: map[string]int{}}
 	// small size that will always get tripped
-	fetcher := HttpTypeFetcher(trt, 32, 10)
+	fetcher := HTTPTypeFetcher(trt, 32, 10)
 
 	// name with "Size" causes content-length to be reported in header
 	_, err := fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.FumSize")

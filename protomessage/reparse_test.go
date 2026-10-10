@@ -3,11 +3,14 @@ package protomessage
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/v2/internal"
 	"github.com/jhump/protoreflect/v2/internal/testprotos"
@@ -81,4 +84,26 @@ func hasUnrecognized(msg protoreflect.Message) bool {
 		return true
 	})
 	return foundUnrecognized
+}
+
+func TestReparseReportsChanges(t *testing.T) {
+	t.Parallel()
+	// Unknown bytes for a known extension and for an unknown field.
+	known := &descriptorpb.MessageOptions{}
+	proto.SetExtension(known, testprotos.E_Mfubar, true)
+	data, err := proto.Marshal(known)
+	require.NoError(t, err)
+	data = protowire.AppendTag(data, 50000, protowire.VarintType)
+	data = protowire.AppendVarint(data, 1)
+
+	// Nothing recognized, so nothing changes.
+	var opts descriptorpb.MessageOptions
+	require.NoError(t, proto.UnmarshalOptions{Resolver: &protoregistry.Types{}}.Unmarshal(data, &opts))
+	assert.False(t, ReparseUnrecognized(&opts, &protoregistry.Types{}))
+	assert.Equal(t, []byte(data), []byte(opts.ProtoReflect().GetUnknown()))
+
+	// The known extension is recognized; the unknown field remains unknown.
+	assert.True(t, ReparseUnrecognized(&opts, protoregistry.GlobalTypes))
+	assert.Equal(t, true, proto.GetExtension(&opts, testprotos.E_Mfubar))
+	assert.NotEmpty(t, opts.ProtoReflect().GetUnknown())
 }

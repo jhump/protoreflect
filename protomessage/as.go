@@ -29,17 +29,26 @@ func As[M PointerMessage[T], T any](msg proto.Message) (M, error) {
 	if msg.ProtoReflect().Descriptor().FullName() != dest.ProtoReflect().Descriptor().FullName() {
 		return nil, fmt.Errorf("cannot return type %q: given message is %q", dest.ProtoReflect().Descriptor().FullName(), msg.ProtoReflect().Descriptor().FullName())
 	}
+	// Collect the extensions present anywhere in the message, so they can be
+	// recognized when unmarshalling.
 	var exts *protoregistry.Types
 	var err error
-	msg.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
-		if fd.IsExtension() {
+	Walk(msg.ProtoReflect(), func(_ []any, val protoreflect.Message) bool {
+		val.Range(func(fd protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
+			if !fd.IsExtension() {
+				return true
+			}
 			if exts == nil {
 				exts = &protoregistry.Types{}
 			}
+			if _, findErr := exts.FindExtensionByName(fd.FullName()); findErr == nil {
+				// already registered
+				return true
+			}
 			err = exts.RegisterExtension(protoresolve.ExtensionType(fd))
 			return err == nil
-		}
-		return true
+		})
+		return err == nil
 	})
 	if err != nil {
 		return nil, err

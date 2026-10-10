@@ -3,6 +3,7 @@ package remotereg
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -94,14 +95,15 @@ func CachingTypeFetcher(fetcher TypeFetcher) TypeFetcher {
 
 type cachingFetcher struct {
 	fetcher TypeFetcher
-	mu      sync.RWMutex
+	mu      sync.Mutex
 	entries map[string]*cachingFetcherEntry
 }
 
 type cachingFetcherEntry struct {
-	msg proto.Message
-	err error
-	wg  sync.WaitGroup
+	// Closed when msg and err are set.
+	done chan struct{}
+	msg  proto.Message
+	err  error
 }
 
 func (c *cachingFetcher) FetchMessageType(ctx context.Context, url string) (*typepb.Type, error) {
@@ -121,7 +123,7 @@ func (c *cachingFetcher) FetchEnumType(ctx context.Context, url string) (*typepb
 }
 
 func (c *cachingFetcher) fetchType(ctx context.Context, url string, enum bool) (proto.Message, error) {
-	m, err := c.getOrLoad(url, func() (proto.Message, error) {
+	m, err := c.getOrLoad(ctx, url, func(ctx context.Context) (proto.Message, error) {
 		if enum {
 			return c.fetcher.FetchEnumType(ctx, url)
 		}
@@ -149,57 +151,78 @@ func (c *cachingFetcher) fetchType(ctx context.Context, url string, enum bool) (
 	return nil, newUnexpectedTypeError(wanted, m, url)
 }
 
-func (c *cachingFetcher) getOrLoad(key string, loader func() (proto.Message, error)) (m proto.Message, err error) {
-	// see if it's cached
-	c.mu.RLock()
-	cached, ok := c.entries[key]
-	c.mu.RUnlock()
-	if ok {
-		cached.wg.Wait()
-		return cached.msg, cached.err
-	}
-
-	// must delegate and cache the result
-	c.mu.Lock()
-	// double-check, in case it was added concurrently while we were upgrading lock
-	cached, ok = c.entries[key]
-	if ok {
+// getOrLoad returns the cached result for the given key, waiting for it if
+// it is being loaded concurrently. If there is no result, it calls loader and
+// caches its result, unless the result is an error.
+func (c *cachingFetcher) getOrLoad(ctx context.Context, key string, loader func(context.Context) (proto.Message, error)) (proto.Message, error) {
+	for {
+		c.mu.Lock()
+		entry, ok := c.entries[key]
+		if !ok {
+			entry = &cachingFetcherEntry{done: make(chan struct{})}
+			c.entries[key] = entry
+			c.mu.Unlock()
+			return c.load(ctx, key, entry, loader)
+		}
 		c.mu.Unlock()
-		cached.wg.Wait()
-		return cached.msg, cached.err
+
+		select {
+		case <-entry.done:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		if ctx.Err() == nil && (errors.Is(entry.err, context.Canceled) || errors.Is(entry.err, context.DeadlineExceeded)) {
+			// The load was ended by the context of the caller that started
+			// it, not by ours. So try again.
+			continue
+		}
+		return entry.msg, entry.err
 	}
-	e := &cachingFetcherEntry{}
-	e.wg.Add(1)
-	c.entries[key] = e
-	c.mu.Unlock()
+}
+
+// load calls loader and records its result in the given entry.
+func (c *cachingFetcher) load(ctx context.Context, key string, entry *cachingFetcherEntry, loader func(context.Context) (proto.Message, error)) (msg proto.Message, err error) {
+	completed := false
 	defer func() {
+		if !completed {
+			// The loader panicked. Concurrent callers get an error, and the
+			// panic continues.
+			err = fmt.Errorf("fetching %s: type fetcher panicked", key)
+		}
+		entry.msg, entry.err = msg, err
 		if err != nil {
-			// don't leave broken entry in the cache
+			// don't leave a failed entry in the cache
 			c.mu.Lock()
 			delete(c.entries, key)
 			c.mu.Unlock()
 		}
-		e.msg, e.err = m, err
-		e.wg.Done()
+		close(entry.done)
 	}()
-
-	return loader()
+	msg, err = loader(ctx)
+	completed = true
+	return msg, err
 }
 
-// HttpTypeFetcher returns a TypeFetcher that uses the given HTTP transport to query and
+// HTTPTypeFetcher returns a TypeFetcher that uses the given HTTP transport to query and
 // download type definitions. The given szLimit is the maximum response size accepted. If
 // used from multiple goroutines (like when a type's dependency graph is resolved in
 // parallel), this resolver limits the number of parallel queries/downloads to the given
-// parLimit.
-func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFetcher {
-	sem := semaphore.NewWeighted(int64(parLimit))
+// parLimit. If parLimit is zero or negative, the number of parallel queries/downloads is
+// not limited.
+func HTTPTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFetcher {
+	var sem *semaphore.Weighted
+	if parLimit > 0 {
+		sem = semaphore.NewWeighted(int64(parLimit))
+	}
 	return CachingTypeFetcher(TypeFetcherFunc(func(ctx context.Context, typeUrl string, enum bool) (proto.Message, error) {
-		if err := sem.Acquire(ctx, 1); err != nil {
-			return nil, err
+		if sem != nil {
+			if err := sem.Acquire(ctx, 1); err != nil {
+				return nil, err
+			}
+			defer sem.Release(1)
 		}
-		defer sem.Release(1)
 
-		req, err := http.NewRequestWithContext(ctx, "GET", ensureScheme(typeUrl), http.NoBody)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, ensureScheme(typeUrl), http.NoBody)
 		if err != nil {
 			return nil, err
 		}
@@ -255,6 +278,5 @@ func HttpTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 }
 
 var bufferPool = sync.Pool{New: func() interface{} {
-	buf := make([]byte, 8192)
-	return bytes.NewBuffer(buf)
+	return bytes.NewBuffer(make([]byte, 0, 8192))
 }}

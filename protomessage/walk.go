@@ -18,6 +18,9 @@ import (
 // into a list field), or protoreflect.MapKey (indicating which entry
 // in a map field).
 //
+// The callback must not retain the path slice, since it is re-used for
+// subsequent calls. It must make a copy if it needs to retain it.
+//
 // If the callback returns false, the traversal is terminated and the
 // callback will not be invoked again.
 func Walk(root protoreflect.Message, action func(path []any, val protoreflect.Message) bool) {
@@ -25,7 +28,10 @@ func Walk(root protoreflect.Message, action func(path []any, val protoreflect.Me
 }
 
 func walk(root protoreflect.Message, path []any, action func(path []any, val protoreflect.Message) bool) bool {
-	ok := action(path, root)
+	if !action(path, root) {
+		return false
+	}
+	ok := true
 	root.Range(func(field protoreflect.FieldDescriptor, val protoreflect.Value) bool {
 		path = append(path, field.Number())
 		switch {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -35,49 +36,26 @@ var _ Resolver = (*Registry)(nil)
 var _ DescriptorRegistry = (*Registry)(nil)
 var _ ProtoFileRegistry = (*Registry)(nil)
 
-// FromFiles returns a new registry that wraps the given files. After creating
-// this registry, callers should not directly use files -- most especially, they
-// should not register any additional descriptors with files and should instead
-// use the RegisterFile method of the returned registry.
+// FromFiles returns a new registry that contains all the files in the given
+// registry. The files are copied, so later changes to either registry do not
+// affect the other.
 //
-// This may return an error if the given files includes conflicting extension
+// This returns an error if the given files include conflicting extension
 // definitions (i.e. more than one extension for the same extended message and
-// tag number).
+// tag number), which protoregistry.Files permits.
 //
-// If protoregistry.GlobalFiles is supplied, a deep copy is made first. To avoid
-// such a copy, use GlobalDescriptors instead.
+// To use protoregistry.GlobalFiles as a Resolver without copying it, use
+// GlobalDescriptors instead.
 func FromFiles(files *protoregistry.Files) (*Registry, error) {
-	if files == protoregistry.GlobalFiles {
-		// Don't wrap files if it's the global registry; make an effective copy
-		reg := &Registry{}
-		var err error
-		files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
-			err = reg.RegisterFile(fd)
-			return err == nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		return reg, nil
-	}
-
-	reg := &Registry{
-		files: *files,
-	}
-	// NB: It's okay to call methods below without first acquiring
-	// lock because reg is not visible to any other goroutines yet.
+	reg := &Registry{}
 	var err error
 	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
-		err = reg.checkExtensionsLocked(fd)
+		err = reg.RegisterFile(fd)
 		return err == nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
-		reg.registerExtensionsLocked(fd)
-		return true
-	})
 	return reg, nil
 }
 
@@ -89,7 +67,7 @@ func FromFileDescriptorSet(files *descriptorpb.FileDescriptorSet) (*Registry, er
 	}
 	for _, file := range files.File {
 		if _, err := reg.RegisterFileProto(file); err != nil {
-			return nil, fmt.Errorf("failed to register %q: %w", file, err)
+			return nil, fmt.Errorf("register %q: %w", file.GetName(), err)
 		}
 	}
 	return &reg, nil
@@ -111,18 +89,30 @@ func (r *Registry) RegisterFileProto(fd *descriptorpb.FileDescriptorProto) (prot
 	if err != nil {
 		return nil, err
 	}
-	if reparse.ReparseUnrecognized(fd.ProtoReflect(), &extResolverForFile{file, r}) {
+	// Custom options defined in the file itself can't be recognized until the
+	// file is built. So we re-parse them now. We use a copy, so the given proto
+	// is only modified if registration succeeds.
+	reparsed := proto.CloneOf(fd)
+	if reparse.ReparseUnrecognized(reparsed.ProtoReflect(), &extResolverForFile{file, r}) {
 		// We were able to recognize some custom options, so re-create the
 		// file with these newly recognized fields.
-		file, err = protodesc.NewFile(fd, r)
+		file, err = protodesc.NewFile(reparsed, r)
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		reparsed = nil
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if err := r.registerFileLocked(file, fd); err != nil {
 		return nil, err
+	}
+	if reparsed != nil {
+		// Safe to modify: other goroutines can only access fd via r.protos,
+		// which requires the lock we hold.
+		proto.Reset(fd)
+		proto.Merge(fd, reparsed)
 	}
 	return file, nil
 }
@@ -135,53 +125,16 @@ func (r *Registry) RegisterFile(file protoreflect.FileDescriptor) error {
 }
 
 func (r *Registry) registerFileLocked(file protoreflect.FileDescriptor, fd *descriptorpb.FileDescriptorProto) error {
+	if _, err := r.files.FindFileByPath(file.Path()); err == nil {
+		return fmt.Errorf("file %q already registered", file.Path())
+	}
 	if err := r.checkExtensionsLocked(file); err != nil {
-		_, findFileErr := r.files.FindFileByPath(file.Path())
-		if findFileErr == nil {
-			return fmt.Errorf("file %q already registered", file.Path())
-		}
 		return err
 	}
 	if err := r.files.RegisterFile(file); err != nil {
 		return err
 	}
-	r.registerExtensionsLocked(file)
-	if fd != nil {
-		if r.protos == nil {
-			r.protos = map[protoreflect.FileDescriptor]*descriptorpb.FileDescriptorProto{}
-		}
-		r.protos[file] = fd
-	}
-	return nil
-}
-
-func (r *Registry) checkExtensionsLocked(container TypeContainer) error {
-	exts := container.Extensions()
-	for i, length := 0, exts.Len(); i < length; i++ {
-		ext := exts.Get(i)
-		existing := r.exts[ext.ContainingMessage().FullName()][ext.Number()]
-		if existing != nil {
-			if existing.FullName() == ext.FullName() {
-				return fmt.Errorf("extension named %q already registered", ext.FullName())
-			}
-			return fmt.Errorf("extension number %d for message %q already registered (existing: %q; trying to register: %q)",
-				ext.Number(), ext.ContainingMessage().FullName(), existing.FullName(), ext.FullName())
-		}
-	}
-
-	msgs := container.Messages()
-	for i, length := 0, msgs.Len(); i < length; i++ {
-		if err := r.checkExtensionsLocked(msgs.Get(i)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *Registry) registerExtensionsLocked(container TypeContainer) {
-	exts := container.Extensions()
-	for i, length := 0, exts.Len(); i < length; i++ {
-		ext := exts.Get(i)
+	rangeExtensions(file, func(ext protoreflect.ExtensionDescriptor) bool {
 		if r.exts == nil {
 			r.exts = map[protoreflect.FullName]map[protoreflect.FieldNumber]protoreflect.FieldDescriptor{}
 		}
@@ -191,12 +144,46 @@ func (r *Registry) registerExtensionsLocked(container TypeContainer) {
 			r.exts[ext.ContainingMessage().FullName()] = extsForMsg
 		}
 		extsForMsg[ext.Number()] = ext
+		return true
+	})
+	if fd != nil {
+		if r.protos == nil {
+			r.protos = map[protoreflect.FileDescriptor]*descriptorpb.FileDescriptorProto{}
+		}
+		r.protos[file] = fd
 	}
+	return nil
+}
 
-	msgs := container.Messages()
-	for i, length := 0, msgs.Len(); i < length; i++ {
-		r.registerExtensionsLocked(msgs.Get(i))
+// checkExtensionsLocked returns an error if any extension in the given file
+// has the same extended message and number as an extension that is already
+// registered or as another extension in the same file.
+func (r *Registry) checkExtensionsLocked(file protoreflect.FileDescriptor) error {
+	type extensionKey struct {
+		message protoreflect.FullName
+		number  protoreflect.FieldNumber
 	}
+	inFile := map[extensionKey]protoreflect.ExtensionDescriptor{}
+	var err error
+	rangeExtensions(file, func(ext protoreflect.ExtensionDescriptor) bool {
+		key := extensionKey{message: ext.ContainingMessage().FullName(), number: ext.Number()}
+		existing := r.exts[key.message][key.number]
+		if existing == nil {
+			existing = inFile[key]
+		}
+		if existing == nil {
+			inFile[key] = ext
+			return true
+		}
+		if existing.FullName() == ext.FullName() {
+			err = fmt.Errorf("extension named %q already registered", ext.FullName())
+		} else {
+			err = fmt.Errorf("extension number %d for message %q already registered (existing: %q; trying to register: %q)",
+				key.number, key.message, existing.FullName(), ext.FullName())
+		}
+		return false
+	})
+	return err
 }
 
 // ProtoFromFileDescriptor recovers the file descriptor proto that
@@ -316,31 +303,12 @@ func (r *Registry) FindDescriptorByName(name protoreflect.FullName) (protoreflec
 
 // FindMessageByName implements part of the Resolver interface.
 func (r *Registry) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageDescriptor, error) {
-	d, err := r.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	msg, ok := d.(protoreflect.MessageDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindMessage, d, "")
-	}
-	return msg, nil
+	return findDescriptorOfKind[protoreflect.MessageDescriptor](r, name, DescriptorKindMessage)
 }
 
 // FindExtensionByName implements part of the Resolver interface.
 func (r *Registry) FindExtensionByName(name protoreflect.FullName) (protoreflect.ExtensionDescriptor, error) {
-	d, err := r.FindDescriptorByName(name)
-	if err != nil {
-		return nil, err
-	}
-	fld, ok := d.(protoreflect.FieldDescriptor)
-	if !ok {
-		return nil, NewUnexpectedTypeError(DescriptorKindExtension, d, "")
-	}
-	if !fld.IsExtension() {
-		return nil, NewUnexpectedTypeError(DescriptorKindExtension, fld, "")
-	}
-	return fld, nil
+	return findDescriptorOfKind[protoreflect.ExtensionDescriptor](r, name, DescriptorKindExtension)
 }
 
 // FindExtensionByNumber implements part of the Resolver interface.
@@ -356,7 +324,8 @@ func (r *Registry) FindExtensionByNumber(message protoreflect.FullName, fieldNum
 
 // FindMessageByURL implements part of the Resolver interface.
 func (r *Registry) FindMessageByURL(url string) (protoreflect.MessageDescriptor, error) {
-	return r.FindMessageByName(TypeNameFromURL(url))
+	msg, err := r.FindMessageByName(TypeNameFromURL(url))
+	return msg, errorForURL(err, url)
 }
 
 // RangeExtensionsByMessage implements part of the Resolver interface.
@@ -394,6 +363,9 @@ func (r *Registry) AsTypePool() TypePool {
 	return TypesFromDescriptorPool(r)
 }
 
+// extResolverForFile resolves extensions for re-parsing the custom options of
+// a file as it is registered. It finds extensions in the registry, which has
+// the file's dependencies, or in the file itself.
 type extResolverForFile struct {
 	f protoreflect.FileDescriptor
 	r ExtensionResolver
@@ -404,9 +376,12 @@ func (e *extResolverForFile) FindExtensionByName(field protoreflect.FullName) (p
 	if err == nil {
 		return ExtensionType(ext), nil
 	}
+	if !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
 	desc := FindDescriptorByNameInFile(e.f, field)
 	if desc == nil {
-		return nil, ErrNotFound
+		return nil, NewNotFoundError(field)
 	}
 	ext, ok := desc.(protoreflect.FieldDescriptor)
 	if !ok || !ext.IsExtension() {
@@ -420,9 +395,12 @@ func (e *extResolverForFile) FindExtensionByNumber(message protoreflect.FullName
 	if err == nil {
 		return ExtensionType(ext), nil
 	}
+	if !errors.Is(err, ErrNotFound) {
+		return nil, err
+	}
 	ext = FindExtensionByNumberInFile(e.f, message, field)
 	if ext == nil {
-		return nil, ErrNotFound
+		return nil, fmt.Errorf("extension number %d for message %q: %w", field, message, ErrNotFound)
 	}
 	return ExtensionType(ext), nil
 }

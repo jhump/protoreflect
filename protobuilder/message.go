@@ -54,7 +54,8 @@ var _ Builder = (*MessageBuilder)(nil)
 // NewMessage creates a new MessageBuilder for a message with the given name.
 // Since the new message has no parent element, it also has no package name
 // (e.g. it is in the unnamed package, until it is assigned to a file builder
-// that defines a package name).
+// that defines a package name). If the given name is not a valid identifier,
+// this function will panic.
 func NewMessage(name protoreflect.Name) *MessageBuilder {
 	return &MessageBuilder{
 		baseBuilder: baseBuilderWithName(name),
@@ -121,6 +122,9 @@ func fromMessage(md protoreflect.MessageDescriptor,
 	localMessages[md] = mb
 
 	srcOneofs := md.Oneofs()
+	// This is indexed by the oneof's index in the descriptor, so it is sized for
+	// all oneofs. Slots for synthetic oneofs (which are represented by a field's
+	// proto3 optional label instead) are left nil.
 	oneofs := make([]*OneofBuilder, srcOneofs.Len())
 	for i, length := 0, srcOneofs.Len(); i < length; i++ {
 		ood := srcOneofs.Get(i)
@@ -280,24 +284,20 @@ func (mb *MessageBuilder) removeChild(b Builder) {
 	switch b := b.(type) {
 	case *FieldBuilder:
 		if b.IsExtension() {
-			mb.nestedExtensions = deleteBuilder(b.Name(), mb.nestedExtensions).([]*FieldBuilder)
+			mb.nestedExtensions = deleteBuilder(mb.nestedExtensions, b)
 		} else {
-			mb.fieldsAndOneofs = deleteBuilder(b.Name(), mb.fieldsAndOneofs).([]Builder)
-			delete(mb.fieldTags, b.Number())
-			if b.msgType != nil {
-				delete(mb.symbols, b.msgType.Name())
-			}
+			mb.fieldsAndOneofs = deleteBuilder(mb.fieldsAndOneofs, b)
+			mb.unregisterField(b)
 		}
 	case *OneofBuilder:
-		mb.fieldsAndOneofs = deleteBuilder(b.Name(), mb.fieldsAndOneofs).([]Builder)
+		mb.fieldsAndOneofs = deleteBuilder(mb.fieldsAndOneofs, b)
 		for _, flb := range b.choices {
-			delete(mb.symbols, flb.Name())
-			delete(mb.fieldTags, flb.Number())
+			mb.unregisterField(flb)
 		}
 	case *MessageBuilder:
-		mb.nestedMessages = deleteBuilder(b.Name(), mb.nestedMessages).([]*MessageBuilder)
+		mb.nestedMessages = deleteBuilder(mb.nestedMessages, b)
 	case *EnumBuilder:
-		mb.nestedEnums = deleteBuilder(b.Name(), mb.nestedEnums).([]*EnumBuilder)
+		mb.nestedEnums = deleteBuilder(mb.nestedEnums, b)
 	}
 	delete(mb.symbols, b.Name())
 	b.setParent(nil)
@@ -350,6 +350,42 @@ func (mb *MessageBuilder) registerField(flb *FieldBuilder) error {
 		}
 	}
 	return nil
+}
+
+// unregisterField removes the given field, and its group or map entry type if
+// it has one, from this message's name and tag maps. It is the inverse of
+// registerField.
+func (mb *MessageBuilder) unregisterField(flb *FieldBuilder) {
+	delete(mb.symbols, flb.Name())
+	if mb.fieldTags[flb.Number()] == flb {
+		delete(mb.fieldTags, flb.Number())
+	}
+	if flb.msgType != nil {
+		delete(mb.symbols, flb.msgType.Name())
+	}
+}
+
+// fieldMessageTypes returns the group and map entry types of the message's
+// fields, including fields in oneofs. These are nested in the message but are
+// not included in its nestedMessages.
+func (mb *MessageBuilder) fieldMessageTypes() []*MessageBuilder {
+	var msgs []*MessageBuilder
+	addField := func(flb *FieldBuilder) {
+		if flb.msgType != nil {
+			msgs = append(msgs, flb.msgType)
+		}
+	}
+	for _, b := range mb.fieldsAndOneofs {
+		switch b := b.(type) {
+		case *FieldBuilder:
+			addField(b)
+		case *OneofBuilder:
+			for _, flb := range b.choices {
+				addField(flb)
+			}
+		}
+	}
+	return msgs
 }
 
 // GetField returns the field with the given name. If no such field exists in
@@ -479,11 +515,8 @@ func (mb *MessageBuilder) TryAddOneOf(oob *OneofBuilder) error {
 		if err := mb.registerField(flb); err != nil {
 			// must undo all additions we've made so far
 			delete(mb.symbols, oob.Name())
-			for i > 1 {
-				i--
-				flb := oob.choices[i]
-				delete(mb.symbols, flb.Name())
-				delete(mb.fieldTags, flb.Number())
+			for _, registered := range oob.choices[:i] {
+				mb.unregisterField(registered)
 			}
 			return err
 		}
@@ -555,7 +588,12 @@ func (mb *MessageBuilder) TryAddNestedMessage(nmb *MessageBuilder) error {
 	needToUnlinkFirst := mb.isPresentButNotChild(nmb)
 	if needToUnlinkFirst {
 		Unlink(nmb)
-		_ = mb.addSymbol(nmb)
+		if err := mb.addSymbol(nmb); err != nil {
+			// Should never happen since, before above Unlink, it was already
+			// registered with this message.
+			// But if somehow it DOES happen, the message will now be orphaned :(
+			return err
+		}
 	} else {
 		if err := mb.addSymbol(nmb); err != nil {
 			return err
@@ -781,7 +819,9 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 	}
 
 	for _, b := range mb.fieldsAndOneofs {
-		if flb, ok := b.(*FieldBuilder); ok {
+		switch b := b.(type) {
+		case *FieldBuilder:
+			flb := b
 			fldpath := append(path, internal.MessageFieldsTag, int32(len(fields)))
 			fld, err := flb.buildProto(fldpath, sourceInfo, mb.Options.GetMessageSetWireFormat())
 			if err != nil {
@@ -790,9 +830,9 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 			if err := addField(flb, fld); err != nil {
 				return nil, err
 			}
-		} else {
+		case *OneofBuilder:
+			oob := b
 			oopath := append(path, internal.MessageOneofsTag, int32(len(oneofs)))
-			oob := b.(*OneofBuilder)
 			oobIndex := len(oneofs)
 			ood, err := oob.buildProto(oopath, sourceInfo)
 			if err != nil {

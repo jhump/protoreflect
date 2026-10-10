@@ -38,6 +38,7 @@ import (
 	_ "google.golang.org/protobuf/types/known/typepb"
 	_ "google.golang.org/protobuf/types/pluginpb"
 
+	prototesting "github.com/jhump/protoreflect/v2/internal/testing"
 	testprotosgrpc "github.com/jhump/protoreflect/v2/internal/testprotos/grpc"
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
@@ -288,24 +289,8 @@ func TestMultipleFiles(t *testing.T) {
 	svr := grpc.NewServer()
 	refv1alpha.RegisterServerReflectionServer(svr, testReflectionServer{})
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err, "failed to listen")
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		defer cancel()
-		if err := svr.Serve(l); err != nil {
-			t.Logf("serve returned error: %v", err)
-		}
-	}()
-	time.Sleep(100 * time.Millisecond) // give server a chance to start
-	require.NoError(t, ctx.Err(), "failed to start server")
-	defer func() {
-		svr.Stop()
-	}()
-
-	cc, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err, "failed to dial %v", l.Addr().String())
+	ctx := t.Context()
+	cc := prototesting.StartServer(t, svr)
 	cl := refv1alpha.NewServerReflectionClient(cc)
 
 	client := NewClientV1Alpha(ctx, cl)
@@ -330,31 +315,15 @@ func TestAllowMissingFileDescriptors(t *testing.T) {
 	})
 	refv1alpha.RegisterServerReflectionServer(svr, reflectionSvc)
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err, "failed to listen")
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		defer cancel()
-		if err := svr.Serve(l); err != nil {
-			t.Logf("serve returned error: %v", err)
-		}
-	}()
-	time.Sleep(100 * time.Millisecond) // give server a chance to start
-	require.NoError(t, ctx.Err(), "failed to start server")
-	defer func() {
-		svr.Stop()
-	}()
-
-	cc, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err, "failed to dial %v", l.Addr().String())
+	ctx := t.Context()
+	cc := prototesting.StartServer(t, svr)
 	cl := refv1alpha.NewServerReflectionClient(cc)
 
 	client := NewClientV1Alpha(ctx, cl)
 	defer client.Reset()
 
 	// First we try some things that should fail due to missing descriptors.
-	_, err = client.FileByFilename("foo/bar/this.proto")
+	_, err := client.FileByFilename("foo/bar/this.proto")
 	require.Error(t, err)
 	_, err = client.FileContainingSymbol("foo.bar.Bar")
 	require.Error(t, err)
@@ -381,24 +350,8 @@ func TestAllowFallbackResolver(t *testing.T) {
 	svr := grpc.NewServer()
 	reflection.RegisterV1(svr)
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err, "failed to listen")
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		defer cancel()
-		if err := svr.Serve(l); err != nil {
-			t.Logf("serve returned error: %v", err)
-		}
-	}()
-	time.Sleep(100 * time.Millisecond) // give server a chance to start
-	require.NoError(t, ctx.Err(), "failed to start server")
-	defer func() {
-		svr.Stop()
-	}()
-
-	cc, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err, "failed to dial %v", l.Addr().String())
+	ctx := t.Context()
+	cc := prototesting.StartServer(t, svr)
 	cl := refv1.NewServerReflectionClient(cc)
 
 	client := NewClientV1(ctx, cl)
@@ -509,24 +462,8 @@ func TestAllowFallbackResolver_ForDependency(t *testing.T) {
 		},
 	)
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err, "failed to listen")
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		defer cancel()
-		if err := svr.Serve(l); err != nil {
-			t.Logf("serve returned error: %v", err)
-		}
-	}()
-	time.Sleep(100 * time.Millisecond) // give server a chance to start
-	require.NoError(t, ctx.Err(), "failed to start server")
-	defer func() {
-		svr.Stop()
-	}()
-
-	cc, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err, "failed to dial %v", l.Addr().String())
+	ctx := t.Context()
+	cc := prototesting.StartServer(t, svr)
 	cl := refv1.NewServerReflectionClient(cc)
 
 	client := NewClientV1(ctx, cl)
@@ -764,24 +701,7 @@ func testClientAuto(t *testing.T, register func(*grpc.Server), expectedServices 
 	var capture captureStreamNames
 	svr := grpc.NewServer(grpc.StreamInterceptor(capture.intercept), grpc.UnknownServiceHandler(capture.handleUnknown))
 	register(svr)
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		panic(fmt.Sprintf("Failed to open server socket: %s", err.Error()))
-	}
-	go func() {
-		err := svr.Serve(l)
-		require.NoError(t, err)
-	}()
-	defer svr.Stop()
-
-	cconn, err := grpc.NewClient(l.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		panic(fmt.Sprintf("Failed to create grpc client: %s", err.Error()))
-	}
-	defer func() {
-		err := cconn.Close()
-		require.NoError(t, err)
-	}()
+	cconn := prototesting.StartServer(t, svr)
 	client := NewClientAuto(context.Background(), cconn)
 	now := time.Now()
 	client.now = func() time.Time {

@@ -157,8 +157,8 @@ service RpcService {
     // this RPC is deprecated!
     option deprecated = true;
 
-    option (testprotos.mtfubar) = 12.340000;
+    option (testprotos.mtfubar) = 12.34;
 
-    option (testprotos.mtfubard) = 123.456000;
+    option (testprotos.mtfubard) = 123.456;
   }
 }
