@@ -650,6 +650,14 @@ func (flb *FieldBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return flb.Build()
 }
 
+// Clone implements the Builder interface. See Builder.Clone for details.
+func (flb *FieldBuilder) Clone() Builder {
+	c := newCloner()
+	clone := c.field(flb)
+	c.updateReferences()
+	return clone
+}
+
 type extensionTypeDescriptor struct {
 	protoreflect.FieldDescriptor
 	xt protoreflect.ExtensionType
@@ -965,6 +973,14 @@ func (oob *OneofBuilder) Build() (protoreflect.OneofDescriptor, error) {
 // interface.
 func (oob *OneofBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(oob, BuilderOptions{})
+}
+
+// Clone implements the Builder interface. See Builder.Clone for details.
+func (oob *OneofBuilder) Clone() Builder {
+	c := newCloner()
+	clone := c.oneof(oob)
+	c.updateReferences()
+	return clone
 }
 
 func entryTypeName(fieldName protoreflect.Name) protoreflect.Name {

@@ -872,3 +872,11 @@ func (fb *FileBuilder) Build() (protoreflect.FileDescriptor, error) {
 func (fb *FileBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(fb, BuilderOptions{})
 }
+
+// Clone implements the Builder interface. See Builder.Clone for details.
+func (fb *FileBuilder) Clone() Builder {
+	c := newCloner()
+	clone := c.file(fb)
+	c.updateReferences()
+	return clone
+}

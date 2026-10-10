@@ -351,6 +351,14 @@ func (eb *EnumBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(eb, BuilderOptions{})
 }
 
+// Clone implements the Builder interface. See Builder.Clone for details.
+func (eb *EnumBuilder) Clone() Builder {
+	c := newCloner()
+	clone := c.enum(eb)
+	c.updateReferences()
+	return clone
+}
+
 // EnumValueBuilder is a builder used to construct a protoreflect.EnumValueDescriptor.
 // A enum value builder *must* be added to an enum before calling its Build()
 // method.
@@ -525,4 +533,12 @@ func (evb *EnumValueBuilder) Build() (protoreflect.EnumValueDescriptor, error) {
 // the Builder interface.
 func (evb *EnumValueBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(evb, BuilderOptions{})
+}
+
+// Clone implements the Builder interface. See Builder.Clone for details.
+func (evb *EnumValueBuilder) Clone() Builder {
+	c := newCloner()
+	clone := c.enumValue(evb)
+	c.updateReferences()
+	return clone
 }

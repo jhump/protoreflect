@@ -252,6 +252,14 @@ func (sb *ServiceBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(sb, BuilderOptions{})
 }
 
+// Clone implements the Builder interface. See Builder.Clone for details.
+func (sb *ServiceBuilder) Clone() Builder {
+	c := newCloner()
+	clone := c.service(sb)
+	c.updateReferences()
+	return clone
+}
+
 // MethodBuilder is a builder used to construct a protoreflect.MethodDescriptor. A
 // method builder *must* be added to a service before calling its Build()
 // method.
@@ -421,4 +429,12 @@ func (mtb *MethodBuilder) Build() (protoreflect.MethodDescriptor, error) {
 // interface.
 func (mtb *MethodBuilder) BuildDescriptor() (protoreflect.Descriptor, error) {
 	return doBuild(mtb, BuilderOptions{})
+}
+
+// Clone implements the Builder interface. See Builder.Clone for details.
+func (mtb *MethodBuilder) Clone() Builder {
+	c := newCloner()
+	clone := c.method(mtb)
+	c.updateReferences()
+	return clone
 }
