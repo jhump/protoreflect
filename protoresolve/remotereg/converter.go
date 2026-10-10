@@ -724,11 +724,11 @@ func (cc *convertContext) recordTypeAndDependencies(ctx context.Context, url str
 
 	for _, f := range mt.Fields {
 		if f.Kind == typepb.Field_TYPE_GROUP || f.Kind == typepb.Field_TYPE_MESSAGE || f.Kind == typepb.Field_TYPE_ENUM {
-			typeUrl := ensureScheme(f.TypeUrl)
+			typeURL := ensureScheme(f.TypeUrl)
 			if fe.deps == nil {
 				fe.deps = map[string]struct{}{}
 			}
-			dep := cc.typeLocations[typeUrl]
+			dep := cc.typeLocations[typeURL]
 			if dep != fileName {
 				fe.deps[dep] = struct{}{}
 			}
