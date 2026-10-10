@@ -1,6 +1,10 @@
 .PHONY: ci
 ci: deps checkgofmt checkgenerate errcheck golint vet staticcheck ineffassign test
 
+# Lint and codegen tools are pinned in a separate module, so their
+# dependencies don't become requirements of this library.
+GO_TOOL := go tool -modfile=internal/tools/go.mod
+
 .PHONY: deps
 deps:
 	go get -d -v -t ./...
@@ -30,24 +34,20 @@ vet:
 
 .PHONY: staticcheck
 staticcheck:
-	@go install honnef.co/go/tools/cmd/staticcheck@v0.6.1
-	staticcheck ./...
+	$(GO_TOOL) staticcheck ./...
 
 .PHONY: ineffassign
 ineffassign:
-	@go install github.com/gordonklaus/ineffassign@v0.2.0
-	ineffassign ./...
+	$(GO_TOOL) ineffassign ./...
 
 # Intentionally omitted from CI, but target here for ad-hoc reports.
 .PHONY: golint
 golint:
-	@go install golang.org/x/lint/golint@v0.0.0-20210508222113-6edffad5e616
-	golint -min_confidence 0.9 -set_exit_status ./...
+	$(GO_TOOL) golint -min_confidence 0.9 -set_exit_status ./...
 
 .PHONY: errcheck
 errcheck:
-	@go install github.com/kisielk/errcheck@v1.9.0
-	errcheck ./...
+	$(GO_TOOL) errcheck ./...
 
 .PHONY: test
 test: generate
@@ -56,10 +56,9 @@ test: generate
 
 .PHONY: generate
 generate:
-	@go install golang.org/x/tools/cmd/goimports@v0.37.0
 	go generate ./...
 	go generate ./internal/testprotos
-	goimports -w -local github.com/jhump/protoreflect/v2 .
+	$(GO_TOOL) goimports -w -local github.com/jhump/protoreflect/v2 .
 
 .PHONY: checkgenerate
 checkgenerate: generate

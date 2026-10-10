@@ -190,8 +190,9 @@ func (dc *DescriptorConverter) DescriptorAsApi(sd protoreflect.ServiceDescriptor
 			RequestTypeUrl:    reg.URLForType(mtd.Input()),
 			ResponseTypeUrl:   reg.URLForType(mtd.Output()),
 			Options:           dc.options(mtd.Options()),
-			Syntax:            syntax(mtd.ParentFile().Syntax()),
 		}
+		//lint:ignore SA1019 readers should use Api.syntax instead, but we still populate this for older readers
+		methods[i].Syntax = syntax(mtd.ParentFile().Syntax())
 	}
 	return &apipb.Api{
 		Name:          string(sd.FullName()),
