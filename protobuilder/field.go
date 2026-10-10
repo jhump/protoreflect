@@ -50,7 +50,7 @@ type FieldBuilder struct {
 	Proto3Optional bool
 
 	Default  string
-	JsonName string
+	JSONName string
 
 	foreignExtendee protoreflect.MessageDescriptor
 	localExtendee   *MessageBuilder
@@ -226,7 +226,7 @@ func fromField(fld protoreflect.FieldDescriptor) (*FieldBuilder, error) {
 	flb.Proto3Optional = fld.ContainingOneof() != nil && fld.ContainingOneof().IsSynthetic()
 	flb.Default = fielddefault.DefaultValue(fld)
 	if !fld.IsExtension() {
-		flb.JsonName = fld.JSONName()
+		flb.JSONName = fld.JSONName()
 	}
 	setComments(&flb.comments, fld.ParentFile().SourceLocations().ByDescriptor(fld))
 
@@ -535,10 +535,10 @@ func (flb *FieldBuilder) SetDefaultValue(defValue string) *FieldBuilder {
 	return flb
 }
 
-// SetJsonName sets the name used in the field's JSON representation and then
+// SetJSONName sets the name used in the field's JSON representation and then
 // returns the field builder, for method chaining.
-func (flb *FieldBuilder) SetJsonName(jsonName string) *FieldBuilder {
-	flb.JsonName = jsonName
+func (flb *FieldBuilder) SetJSONName(jsonName string) *FieldBuilder {
+	flb.JSONName = jsonName
 	return flb
 }
 
@@ -590,9 +590,9 @@ func (flb *FieldBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sourc
 	if flb.IsExtension() {
 		extendee = new("." + string(flb.ExtendeeTypeName()))
 	}
-	jsName := flb.JsonName
+	jsName := flb.JSONName
 	if jsName == "" {
-		jsName = internal.JsonName(flb.name)
+		jsName = internal.JSONName(flb.name)
 	}
 	var def *string
 	if flb.Default != "" {
@@ -984,5 +984,5 @@ func (oob *OneofBuilder) Clone() Builder {
 }
 
 func entryTypeName(fieldName protoreflect.Name) protoreflect.Name {
-	return protoreflect.Name(internal.InitCap(internal.JsonName(fieldName)) + "Entry")
+	return protoreflect.Name(internal.InitCap(internal.JSONName(fieldName)) + "Entry")
 }

@@ -127,7 +127,7 @@ func testRenameEnumValuesAndMethods(t *testing.T) {
 	assert.ErrorContains(t, val.TrySetName("VAL_ONE"), "already contains")
 	assert.Equal(t, protoreflect.Name("VAL_NONE"), val.Name())
 
-	req := RpcTypeMessage(NewMessage("Req"), false)
+	req := RPCTypeMessage(NewMessage("Req"), false)
 	method := NewMethod("Method", req, req)
 	svc := NewService("Svc").AddMethod(method).AddMethod(NewMethod("Other", req, req))
 	method.SetName("Method2")
@@ -251,7 +251,7 @@ func TestBuildWithoutFile(t *testing.T) {
 	assert.ErrorContains(t, err, "one-of must be added to message")
 	_, err = NewEnumValue("VALUE").Build()
 	assert.ErrorContains(t, err, "enum value must be added to enum")
-	req := RpcTypeMessage(NewMessage("Req"), false)
+	req := RPCTypeMessage(NewMessage("Req"), false)
 	_, err = NewMethod("Method", req, req).Build()
 	assert.ErrorContains(t, err, "method must be added to service")
 }
@@ -386,7 +386,7 @@ func TestRemoveOneofChoiceEnumValueAndMethod(t *testing.T) {
 	enum.RemoveValue("ONE")
 	assert.Nil(t, enum.GetValue("ONE"))
 
-	req := RpcTypeMessage(NewMessage("Req"), false)
+	req := RPCTypeMessage(NewMessage("Req"), false)
 	svc := NewService("Svc").AddMethod(NewMethod("Method", req, req))
 	assert.True(t, svc.TryRemoveMethod("Method"))
 	assert.False(t, svc.TryRemoveMethod("Method"))
@@ -432,7 +432,7 @@ func TestBuilderSetters(t *testing.T) {
 	enum.SetReservedRanges(append(enum.ReservedRanges, EnumRange{30, 40}))
 	enum.SetReservedNames(append(enum.ReservedNames, "THIRTY"))
 
-	field := NewField("field", FieldTypeInt32()).SetNumber(1).SetJsonName("customName").
+	field := NewField("field", FieldTypeInt32()).SetNumber(1).SetJSONName("customName").
 		SetComments(comments("field")).
 		SetOptions(&descriptorpb.FieldOptions{Deprecated: new(true)})
 	field.SetType(FieldTypeEnum(enum))
@@ -444,10 +444,10 @@ func TestBuilderSetters(t *testing.T) {
 		SetOptions(&descriptorpb.MessageOptions{Deprecated: new(true)}).
 		SetReservedRanges([]FieldRange{{10, 20}}).
 		SetReservedNames([]protoreflect.Name{"ten"})
-	req := RpcTypeMessage(msg, false)
+	req := RPCTypeMessage(msg, false)
 	method := NewMethod("Method", req, req).
-		SetRequestType(RpcTypeMessage(msg, true)).
-		SetResponseType(RpcTypeMessage(msg, true)).
+		SetRequestType(RPCTypeMessage(msg, true)).
+		SetResponseType(RPCTypeMessage(msg, true)).
 		SetComments(comments("method")).
 		SetOptions(&descriptorpb.MethodOptions{Deprecated: new(true)})
 	svc := NewService("Svc").AddMethod(method).

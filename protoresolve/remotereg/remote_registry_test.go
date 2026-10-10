@@ -632,7 +632,7 @@ func TestDescriptorConverter_ToServiceDescriptor(t *testing.T) {
 	rr := &Registry{TypeFetcher: tf}
 	dc := rr.AsDescriptorConverter()
 
-	sd, err := dc.ToServiceDescriptor(context.Background(), getApi(t))
+	sd, err := dc.ToServiceDescriptor(context.Background(), getAPI(t))
 	require.NoError(t, err)
 
 	require.Equal(t, "Service", string(sd.Name()))
@@ -706,7 +706,7 @@ func TestDescriptorConverter_ToServiceDescriptor(t *testing.T) {
 	require.Equal(t, protoreflect.Proto3, md4.ParentFile().Syntax())
 }
 
-func getApi(t *testing.T) *apipb.Api {
+func getAPI(t *testing.T) *apipb.Api {
 	var bol anypb.Any
 	err := anypb.MarshalFrom(&bol, &wrapperspb.BoolValue{Value: true}, proto.MarshalOptions{})
 	require.NoError(t, err)
@@ -794,7 +794,7 @@ func getApi(t *testing.T) *apipb.Api {
 	}
 }
 
-func TestDescriptorConverter_DescriptorAsApi(t *testing.T) {
+func TestDescriptorConverter_DescriptorAsAPI(t *testing.T) {
 	svcOpts := &descriptorpb.ServiceOptions{
 		Deprecated: new(true),
 	}
@@ -847,7 +847,7 @@ func TestDescriptorConverter_DescriptorAsApi(t *testing.T) {
 	require.NoError(t, err)
 
 	rr := &Registry{DefaultBaseURL: "foo.com"}
-	api := rr.AsDescriptorConverter().DescriptorAsApi(fd.Services().Get(0))
+	api := rr.AsDescriptorConverter().DescriptorAsAPI(fd.Services().Get(0))
 
 	expected := &apipb.Api{
 		Name:   "foo.FooService",

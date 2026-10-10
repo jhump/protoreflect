@@ -22,13 +22,13 @@ import (
 func TestWrongMethodType(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
-	_, err := stub.InvokeRpc(ctx, clientStreamingMd, &grpctestprotos.StreamingInputCallRequest{})
+	_, err := stub.InvokeRPC(ctx, clientStreamingMd, &grpctestprotos.StreamingInputCallRequest{})
 	assert.ErrorContains(t, err, "is client-streaming")
-	_, err = stub.InvokeRpcServerStream(ctx, unaryMd, &grpctestprotos.SimpleRequest{})
+	_, err = stub.InvokeRPCServerStream(ctx, unaryMd, &grpctestprotos.SimpleRequest{})
 	assert.ErrorContains(t, err, "is unary")
-	_, err = stub.InvokeRpcClientStream(ctx, bidiStreamingMd)
+	_, err = stub.InvokeRPCClientStream(ctx, bidiStreamingMd)
 	assert.ErrorContains(t, err, "is bidi-streaming")
-	_, err = stub.InvokeRpcBidiStream(ctx, serverStreamingMd)
+	_, err = stub.InvokeRPCBidiStream(ctx, serverStreamingMd)
 	assert.ErrorContains(t, err, "is server-streaming")
 }
 
@@ -37,18 +37,18 @@ func TestWrongMessageType(t *testing.T) {
 	ctx := t.Context()
 	wrongMsg := &grpctestprotos.Payload{}
 	const errSubstr = "got grpc.testing.Payload"
-	_, err := stub.InvokeRpc(ctx, unaryMd, wrongMsg)
+	_, err := stub.InvokeRPC(ctx, unaryMd, wrongMsg)
 	assert.ErrorContains(t, err, errSubstr)
-	_, err = stub.InvokeRpcServerStream(ctx, serverStreamingMd, wrongMsg)
+	_, err = stub.InvokeRPCServerStream(ctx, serverStreamingMd, wrongMsg)
 	assert.ErrorContains(t, err, errSubstr)
 
-	clientStream, err := stub.InvokeRpcClientStream(ctx, clientStreamingMd)
+	clientStream, err := stub.InvokeRPCClientStream(ctx, clientStreamingMd)
 	require.NoError(t, err)
 	assert.ErrorContains(t, clientStream.SendMsg(wrongMsg), errSubstr)
 	_, err = clientStream.CloseAndReceive()
 	require.NoError(t, err)
 
-	bidiStream, err := stub.InvokeRpcBidiStream(ctx, bidiStreamingMd)
+	bidiStream, err := stub.InvokeRPCBidiStream(ctx, bidiStreamingMd)
 	require.NoError(t, err)
 	assert.ErrorContains(t, bidiStream.SendMsg(wrongMsg), errSubstr)
 	require.NoError(t, bidiStream.CloseSend())
@@ -60,12 +60,12 @@ func TestNilMessage(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 	const errSubstr = "got nil"
-	_, err := stub.InvokeRpc(ctx, unaryMd, nil)
+	_, err := stub.InvokeRPC(ctx, unaryMd, nil)
 	assert.ErrorContains(t, err, errSubstr)
-	_, err = stub.InvokeRpcServerStream(ctx, serverStreamingMd, nil)
+	_, err = stub.InvokeRPCServerStream(ctx, serverStreamingMd, nil)
 	assert.ErrorContains(t, err, errSubstr)
 
-	clientStream, err := stub.InvokeRpcClientStream(ctx, clientStreamingMd)
+	clientStream, err := stub.InvokeRPCClientStream(ctx, clientStreamingMd)
 	require.NoError(t, err)
 	assert.ErrorContains(t, clientStream.SendMsg(nil), errSubstr)
 	_, err = clientStream.CloseAndReceive()
@@ -80,23 +80,23 @@ func TestChannelErrors(t *testing.T) {
 	t.Run("invoke", func(t *testing.T) {
 		t.Parallel()
 		fakeStub := NewStub(&fakeChannel{invokeErr: errChannel})
-		_, err := fakeStub.InvokeRpc(ctx, unaryMd, &grpctestprotos.SimpleRequest{})
+		_, err := fakeStub.InvokeRPC(ctx, unaryMd, &grpctestprotos.SimpleRequest{})
 		assert.ErrorIs(t, err, errChannel)
 	})
 	t.Run("new stream", func(t *testing.T) {
 		t.Parallel()
 		fakeStub := NewStub(&fakeChannel{newStreamErr: errChannel})
-		_, err := fakeStub.InvokeRpcServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
+		_, err := fakeStub.InvokeRPCServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
 		assert.ErrorIs(t, err, errChannel)
-		_, err = fakeStub.InvokeRpcClientStream(ctx, clientStreamingMd)
+		_, err = fakeStub.InvokeRPCClientStream(ctx, clientStreamingMd)
 		assert.ErrorIs(t, err, errChannel)
-		_, err = fakeStub.InvokeRpcBidiStream(ctx, bidiStreamingMd)
+		_, err = fakeStub.InvokeRPCBidiStream(ctx, bidiStreamingMd)
 		assert.ErrorIs(t, err, errChannel)
 	})
 	t.Run("server stream send", func(t *testing.T) {
 		t.Parallel()
 		fakeStub := NewStub(&fakeChannel{stream: &fakeStream{sendErr: errChannel}})
-		_, err := fakeStub.InvokeRpcServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
+		_, err := fakeStub.InvokeRPCServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
 		assert.ErrorIs(t, err, errChannel)
 	})
 	t.Run("server stream ended before send", func(t *testing.T) {
@@ -105,14 +105,14 @@ func TestChannelErrors(t *testing.T) {
 		// error with the call's status comes from receiving.
 		statusErr := status.Error(codes.PermissionDenied, "not allowed")
 		fakeStub := NewStub(&fakeChannel{stream: &fakeStream{sendErr: io.EOF, recvErr: statusErr}})
-		_, err := fakeStub.InvokeRpcServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
+		_, err := fakeStub.InvokeRPCServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
 		assert.Equal(t, codes.PermissionDenied, status.Code(err))
 		assert.ErrorContains(t, err, "not allowed")
 	})
 	t.Run("server stream close send", func(t *testing.T) {
 		t.Parallel()
 		fakeStub := NewStub(&fakeChannel{stream: &fakeStream{closeSendErr: errChannel}})
-		_, err := fakeStub.InvokeRpcServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
+		_, err := fakeStub.InvokeRPCServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
 		assert.ErrorIs(t, err, errChannel)
 	})
 }
@@ -151,7 +151,7 @@ func TestCloseAndReceiveErrors(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			fakeStub := NewStub(&fakeChannel{stream: testCase.stream})
-			clientStream, err := fakeStub.InvokeRpcClientStream(t.Context(), clientStreamingMd)
+			clientStream, err := fakeStub.InvokeRPCClientStream(t.Context(), clientStreamingMd)
 			require.NoError(t, err)
 			_, err = clientStream.CloseAndReceive()
 			assert.ErrorContains(t, err, testCase.errSubstr)
@@ -161,7 +161,7 @@ func TestCloseAndReceiveErrors(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
 		fakeStub := NewStub(&fakeChannel{stream: &fakeStream{responses: []proto.Message{response}}})
-		clientStream, err := fakeStub.InvokeRpcClientStream(t.Context(), clientStreamingMd)
+		clientStream, err := fakeStub.InvokeRPCClientStream(t.Context(), clientStreamingMd)
 		require.NoError(t, err)
 		resp, err := clientStream.CloseAndReceive()
 		require.NoError(t, err)
@@ -183,7 +183,7 @@ func TestStreamCleanup(t *testing.T) {
 		t.Parallel()
 		stream := &fakeStream{responses: []proto.Message{&grpctestprotos.StreamingOutputCallResponse{}}}
 		fakeStub := NewStub(&fakeChannel{stream: stream})
-		serverStream, err := fakeStub.InvokeRpcServerStream(t.Context(), serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
+		serverStream, err := fakeStub.InvokeRPCServerStream(t.Context(), serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
 		require.NoError(t, err)
 		_, err = serverStream.RecvMsg()
 		require.NoError(t, err)
@@ -196,7 +196,7 @@ func TestStreamCleanup(t *testing.T) {
 		t.Parallel()
 		stream := &fakeStream{responses: []proto.Message{&grpctestprotos.StreamingInputCallResponse{}}}
 		fakeStub := NewStub(&fakeChannel{stream: stream})
-		clientStream, err := fakeStub.InvokeRpcClientStream(t.Context(), clientStreamingMd)
+		clientStream, err := fakeStub.InvokeRPCClientStream(t.Context(), clientStreamingMd)
 		require.NoError(t, err)
 		require.NoError(t, clientStream.SendMsg(&grpctestprotos.StreamingInputCallRequest{}))
 		assert.NoError(t, stream.ctx.Err(), "stream's context should not be cancelled before stream is finished")

@@ -29,7 +29,7 @@ func TestStreamMetadata(t *testing.T) {
 
 	t.Run("server stream", func(t *testing.T) {
 		t.Parallel()
-		stream, err := metadataStub.InvokeRpcServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
+		stream, err := metadataStub.InvokeRPCServerStream(ctx, serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{})
 		require.NoError(t, err)
 		assert.NoError(t, stream.Context().Err())
 		header, headerErr := stream.Header()
@@ -41,7 +41,7 @@ func TestStreamMetadata(t *testing.T) {
 	})
 	t.Run("client stream", func(t *testing.T) {
 		t.Parallel()
-		stream, err := metadataStub.InvokeRpcClientStream(ctx, clientStreamingMd)
+		stream, err := metadataStub.InvokeRPCClientStream(ctx, clientStreamingMd)
 		require.NoError(t, err)
 		assert.NoError(t, stream.Context().Err())
 		require.NoError(t, stream.SendMsg(&grpctestprotos.StreamingInputCallRequest{}))
@@ -52,7 +52,7 @@ func TestStreamMetadata(t *testing.T) {
 	})
 	t.Run("bidi stream", func(t *testing.T) {
 		t.Parallel()
-		stream, err := metadataStub.InvokeRpcBidiStream(ctx, bidiStreamingMd)
+		stream, err := metadataStub.InvokeRPCBidiStream(ctx, bidiStreamingMd)
 		require.NoError(t, err)
 		assert.NoError(t, stream.Context().Err())
 		require.NoError(t, stream.SendMsg(&grpctestprotos.StreamingOutputCallRequest{}))
@@ -72,18 +72,18 @@ func TestWithResolver(t *testing.T) {
 
 	// A resolver that knows the response type produces that type.
 	globalStub := NewStub(stub.channel, WithResolver(protoregistry.GlobalTypes))
-	resp, err := globalStub.InvokeRpc(t.Context(), unaryMd, req)
+	resp, err := globalStub.InvokeRPC(t.Context(), unaryMd, req)
 	require.NoError(t, err)
 	assert.IsType(t, &grpctestprotos.SimpleResponse{}, resp)
 
 	// Otherwise, the response is a dynamic message.
 	emptyStub := NewStub(stub.channel, WithResolver(&protoregistry.Types{}))
-	resp, err = emptyStub.InvokeRpc(t.Context(), unaryMd, req)
+	resp, err = emptyStub.InvokeRPC(t.Context(), unaryMd, req)
 	require.NoError(t, err)
 	assert.IsType(t, &dynamicpb.Message{}, resp)
 	assert.Equal(t, unaryMd.Output().FullName(), resp.ProtoReflect().Descriptor().FullName())
 
-	stream, err := emptyStub.InvokeRpcServerStream(t.Context(), serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{
+	stream, err := emptyStub.InvokeRPCServerStream(t.Context(), serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{
 		Payload:            payload,
 		ResponseParameters: []*grpctestprotos.ResponseParameters{{}},
 	})

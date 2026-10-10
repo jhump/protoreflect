@@ -83,7 +83,7 @@ func (c *cloner) field(flb *FieldBuilder) *FieldBuilder {
 		Cardinality:     flb.Cardinality,
 		Proto3Optional:  flb.Proto3Optional,
 		Default:         flb.Default,
-		JsonName:        flb.JsonName,
+		JSONName:        flb.JSONName,
 		foreignExtendee: flb.foreignExtendee,
 		localExtendee:   flb.localExtendee,
 	}
@@ -149,8 +149,8 @@ func (c *cloner) method(mtb *MethodBuilder) *MethodBuilder {
 	clone := &MethodBuilder{
 		baseBuilder: cloneBase(mtb.baseBuilder),
 		Options:     cloneOptions(mtb.Options),
-		ReqType:     cloneRpcType(mtb.ReqType),
-		RespType:    cloneRpcType(mtb.RespType),
+		ReqType:     cloneRPCType(mtb.ReqType),
+		RespType:    cloneRPCType(mtb.RespType),
 	}
 	c.clones[mtb] = clone
 	return clone
@@ -242,7 +242,7 @@ func cloneOptions[T proto.Message](opts T) T {
 	return proto.Clone(opts).(T)
 }
 
-func cloneRpcType(rpcType *RpcType) *RpcType {
+func cloneRPCType(rpcType *RPCType) *RPCType {
 	if rpcType == nil {
 		return nil
 	}

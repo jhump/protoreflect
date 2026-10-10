@@ -220,11 +220,11 @@ const (
 	UninterpretedNameNameTag = 1
 )
 
-// JsonName returns the default JSON name for a field with the given name.
+// JSONName returns the default JSON name for a field with the given name.
 // This mirrors the algorithm in protoc:
 //
 //	https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L95
-func JsonName(name protoreflect.Name) string {
+func JSONName(name protoreflect.Name) string {
 	var js []rune
 	nextUpper := false
 	for _, r := range name {

@@ -295,7 +295,7 @@ func (p *Printer) printField(
 		}
 
 		jsn := fld.JSONName()
-		if !fld.IsExtension() && jsn != "" && jsn != internal.JsonName(fld.Name()) {
+		if !fld.IsExtension() && jsn != "" && jsn != internal.JSONName(fld.Name()) {
 			opts[-internal.FieldJSONNameTag] = []option{{name: "json_name", val: jsn}}
 		}
 

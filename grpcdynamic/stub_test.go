@@ -78,8 +78,8 @@ var payload = &grpctestprotos.Payload{
 	Body: []byte{3, 14, 159, 2, 65, 35, 9},
 }
 
-func TestUnaryRpc(t *testing.T) {
-	resp, err := stub.InvokeRpc(context.Background(), unaryMd, &grpctestprotos.SimpleRequest{Payload: payload})
+func TestUnaryRPC(t *testing.T) {
+	resp, err := stub.InvokeRPC(context.Background(), unaryMd, &grpctestprotos.SimpleRequest{Payload: payload})
 	require.NoError(t, err, "Failed to invoke unary RPC")
 	refMsg := resp.ProtoReflect()
 	fd := refMsg.Descriptor().Fields().ByName("payload")
@@ -87,8 +87,8 @@ func TestUnaryRpc(t *testing.T) {
 	require.True(t, proto.Equal(p.Message().Interface(), payload), "Incorrect payload returned from RPC: %v != %v", p, payload)
 }
 
-func TestClientStreamingRpc(t *testing.T) {
-	cs, err := stub.InvokeRpcClientStream(context.Background(), clientStreamingMd)
+func TestClientStreamingRPC(t *testing.T) {
+	cs, err := stub.InvokeRPCClientStream(context.Background(), clientStreamingMd)
 	require.NoError(t, err, "Failed to invoke client-streaming RPC")
 	req := &grpctestprotos.StreamingInputCallRequest{Payload: payload}
 	for range 3 {
@@ -104,8 +104,8 @@ func TestClientStreamingRpc(t *testing.T) {
 	require.Equal(t, expectedSz, int(sz.Int()), "Incorrect response returned from RPC")
 }
 
-func TestServerStreamingRpc(t *testing.T) {
-	ss, err := stub.InvokeRpcServerStream(context.Background(), serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{
+func TestServerStreamingRPC(t *testing.T) {
+	ss, err := stub.InvokeRPCServerStream(context.Background(), serverStreamingMd, &grpctestprotos.StreamingOutputCallRequest{
 		Payload: payload,
 		ResponseParameters: []*grpctestprotos.ResponseParameters{
 			{}, {}, {}, // three entries means we'll get back three responses
@@ -124,8 +124,8 @@ func TestServerStreamingRpc(t *testing.T) {
 	require.Equal(t, io.EOF, err, "Incorrect number of messages in response")
 }
 
-func TestBidiStreamingRpc(t *testing.T) {
-	bds, err := stub.InvokeRpcBidiStream(context.Background(), bidiStreamingMd)
+func TestBidiStreamingRPC(t *testing.T) {
+	bds, err := stub.InvokeRPCBidiStream(context.Background(), bidiStreamingMd)
 	require.NoError(t, err)
 	req := &grpctestprotos.StreamingOutputCallRequest{Payload: payload}
 	for range 3 {

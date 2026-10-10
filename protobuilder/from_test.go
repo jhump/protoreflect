@@ -23,7 +23,7 @@ func TestFindElement(t *testing.T) {
 		SetPackageName("foo.bar").
 		AddMessage(msg).
 		AddEnum(NewEnum("Enum").AddValue(NewEnumValue("VALUE"))).
-		AddService(NewService("Svc").AddMethod(NewMethod("Do", RpcTypeMessage(msg, false), RpcTypeMessage(msg, false))))
+		AddService(NewService("Svc").AddMethod(NewMethod("Do", RPCTypeMessage(msg, false), RPCTypeMessage(msg, false))))
 
 	testCases := []struct {
 		name     protoreflect.FullName

@@ -140,7 +140,7 @@ func TestClone_RecursiveTypes(t *testing.T) {
 		AddField(NewMapField("by_name", FieldTypeString(), FieldTypeMessage(node))).
 		AddField(NewField("a", FieldTypeMessage(a)))
 	svc := NewService("NodeService").
-		AddMethod(NewMethod("Walk", RpcTypeMessage(node, false), RpcTypeMessage(node, true)))
+		AddMethod(NewMethod("Walk", RPCTypeMessage(node, false), RPCTypeMessage(node, true)))
 	file := NewFile("recursive.proto").SetPackageName("recursive").AddMessage(node).AddService(svc)
 	expected, err := file.Build()
 	require.NoError(t, err)
@@ -211,7 +211,7 @@ func TestClone_EnumAndService(t *testing.T) {
 	require.Equal(t, []protoreflect.Name{"BLUE"}, enum.ReservedNames)
 
 	msg := NewMessage("Msg")
-	method := NewMethod("Do", RpcTypeMessage(msg, false), RpcTypeMessage(msg, true))
+	method := NewMethod("Do", RPCTypeMessage(msg, false), RPCTypeMessage(msg, true))
 	svc := NewService("Svc").AddMethod(method)
 	cloneSvc := Clone(svc)
 	checkClonedTree(t, svc, cloneSvc)
