@@ -355,17 +355,17 @@ func (r *dependencyResolver) resolveTypesInService(root Builder, seen []Builder,
 		if mtb.ReqType == nil || mtb.RespType == nil {
 			return fmt.Errorf("method %s must have both request and response types", FullName(mtb))
 		}
-		if err := r.resolveRpcType(root, seen, mtb.ReqType, deps); err != nil {
+		if err := r.resolveRPCType(root, seen, mtb.ReqType, deps); err != nil {
 			return err
 		}
-		if err := r.resolveRpcType(root, seen, mtb.RespType, deps); err != nil {
+		if err := r.resolveRPCType(root, seen, mtb.RespType, deps); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *dependencyResolver) resolveRpcType(root Builder, seen []Builder, t *RpcType, deps *dependencies) error {
+func (r *dependencyResolver) resolveRPCType(root Builder, seen []Builder, t *RPCType, deps *dependencies) error {
 	if t.foreignType != nil {
 		deps.add(t.foreignType.ParentFile())
 	} else {

@@ -170,7 +170,7 @@ func TestMovingBuilders(t *testing.T) {
 		assert.Nil(t, fromEnum.GetValue("VALUE"))
 		fromEnum.AddValue(NewEnumValue("VALUE").SetNumber(1))
 
-		req := RpcTypeMessage(NewMessage("Req"), false)
+		req := RPCTypeMessage(NewMessage("Req"), false)
 		method := NewMethod("Method", req, req)
 		fromSvc := NewService("From").AddMethod(method)
 		toSvc := NewService("To").AddMethod(method)

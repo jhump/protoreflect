@@ -167,8 +167,8 @@ func FromFile(fd protoreflect.FileDescriptor) (*FileBuilder, error) {
 	}
 	for _, sb := range fb.services {
 		for _, mtb := range sb.methods {
-			updateLocalRefsInRpcType(mtb.ReqType, localMessages)
-			updateLocalRefsInRpcType(mtb.RespType, localMessages)
+			updateLocalRefsInRPCType(mtb.ReqType, localMessages)
+			updateLocalRefsInRPCType(mtb.RespType, localMessages)
 		}
 	}
 
@@ -218,7 +218,7 @@ func updateLocalRefsInField(flb *FieldBuilder, localMessages map[protoreflect.Me
 	}
 }
 
-func updateLocalRefsInRpcType(rpcType *RpcType, localMessages map[protoreflect.MessageDescriptor]*MessageBuilder) {
+func updateLocalRefsInRPCType(rpcType *RPCType, localMessages map[protoreflect.MessageDescriptor]*MessageBuilder) {
 	if rpcType.foreignType != nil {
 		if mb, ok := localMessages[rpcType.foreignType]; ok {
 			rpcType.foreignType = nil

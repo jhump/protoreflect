@@ -62,10 +62,10 @@ func requestMethod(md protoreflect.MethodDescriptor) string {
 	return fmt.Sprintf("/%s/%s", md.Parent().FullName(), md.Name())
 }
 
-// InvokeRpc sends a unary RPC and returns the response. Use this for unary methods.
-func (s *Stub) InvokeRpc(ctx context.Context, method protoreflect.MethodDescriptor, request proto.Message, opts ...grpc.CallOption) (proto.Message, error) {
+// InvokeRPC sends a unary RPC and returns the response. Use this for unary methods.
+func (s *Stub) InvokeRPC(ctx context.Context, method protoreflect.MethodDescriptor, request proto.Message, opts ...grpc.CallOption) (proto.Message, error) {
 	if method.IsStreamingClient() || method.IsStreamingServer() {
-		return nil, fmt.Errorf("InvokeRpc is for unary methods; %q is %s", method.FullName(), methodType(method))
+		return nil, fmt.Errorf("InvokeRPC is for unary methods; %q is %s", method.FullName(), methodType(method))
 	}
 	if err := checkMessageType(method.Input(), request); err != nil {
 		return nil, err
@@ -80,14 +80,14 @@ func (s *Stub) InvokeRpc(ctx context.Context, method protoreflect.MethodDescript
 	return resp, nil
 }
 
-// InvokeRpcServerStream sends a unary RPC and returns the response stream. Use this for server-streaming methods.
+// InvokeRPCServerStream sends a unary RPC and returns the response stream. Use this for server-streaming methods.
 //
 // To release the stream's resources, callers must either call RecvMsg until it
 // returns an error (which is io.EOF when the stream completes normally) or
 // cancel ctx.
-func (s *Stub) InvokeRpcServerStream(ctx context.Context, method protoreflect.MethodDescriptor, request proto.Message, opts ...grpc.CallOption) (*ServerStream, error) {
+func (s *Stub) InvokeRPCServerStream(ctx context.Context, method protoreflect.MethodDescriptor, request proto.Message, opts ...grpc.CallOption) (*ServerStream, error) {
 	if method.IsStreamingClient() || !method.IsStreamingServer() {
-		return nil, fmt.Errorf("InvokeRpcServerStream is for server-streaming methods; %q is %s", method.FullName(), methodType(method))
+		return nil, fmt.Errorf("InvokeRPCServerStream is for server-streaming methods; %q is %s", method.FullName(), methodType(method))
 	}
 	if err := checkMessageType(method.Input(), request); err != nil {
 		return nil, err
@@ -119,11 +119,11 @@ func (s *Stub) InvokeRpcServerStream(ctx context.Context, method protoreflect.Me
 	return &ServerStream{baseStream{cs}, method.Output(), s.resolver, cancel}, nil
 }
 
-// InvokeRpcClientStream creates a new stream that is used to send request messages and, at the end,
+// InvokeRPCClientStream creates a new stream that is used to send request messages and, at the end,
 // receive the response message. Use this for client-streaming methods.
-func (s *Stub) InvokeRpcClientStream(ctx context.Context, method protoreflect.MethodDescriptor, opts ...grpc.CallOption) (*ClientStream, error) {
+func (s *Stub) InvokeRPCClientStream(ctx context.Context, method protoreflect.MethodDescriptor, opts ...grpc.CallOption) (*ClientStream, error) {
 	if !method.IsStreamingClient() || method.IsStreamingServer() {
-		return nil, fmt.Errorf("InvokeRpcClientStream is for client-streaming methods; %q is %s", method.FullName(), methodType(method))
+		return nil, fmt.Errorf("InvokeRPCClientStream is for client-streaming methods; %q is %s", method.FullName(), methodType(method))
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	cs, err := s.channel.NewStream(ctx, streamDesc(method), requestMethod(method), opts...)
@@ -134,11 +134,11 @@ func (s *Stub) InvokeRpcClientStream(ctx context.Context, method protoreflect.Me
 	return &ClientStream{baseStream{cs}, method, s.resolver, cancel}, nil
 }
 
-// InvokeRpcBidiStream creates a new stream that is used to both send request messages and receive response
+// InvokeRPCBidiStream creates a new stream that is used to both send request messages and receive response
 // messages. Use this for bidi-streaming methods.
-func (s *Stub) InvokeRpcBidiStream(ctx context.Context, method protoreflect.MethodDescriptor, opts ...grpc.CallOption) (*BidiStream, error) {
+func (s *Stub) InvokeRPCBidiStream(ctx context.Context, method protoreflect.MethodDescriptor, opts ...grpc.CallOption) (*BidiStream, error) {
 	if !method.IsStreamingClient() || !method.IsStreamingServer() {
-		return nil, fmt.Errorf("InvokeRpcBidiStream is for bidi-streaming methods; %q is %s", method.FullName(), methodType(method))
+		return nil, fmt.Errorf("InvokeRPCBidiStream is for bidi-streaming methods; %q is %s", method.FullName(), methodType(method))
 	}
 	cs, err := s.channel.NewStream(ctx, streamDesc(method), requestMethod(method), opts...)
 	if err != nil {

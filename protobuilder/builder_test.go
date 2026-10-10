@@ -45,8 +45,8 @@ func TestSimpleDescriptorsFromScratch(t *testing.T) {
 	file.AddMessage(msg)
 
 	sb := NewService("FooService").
-		AddMethod(NewMethod("DoSomething", RpcTypeMessage(msg, false), RpcTypeMessage(msg, false))).
-		AddMethod(NewMethod("ReturnThings", RpcTypeImportedMessage(md, false), RpcTypeMessage(msg, true)))
+		AddMethod(NewMethod("DoSomething", RPCTypeMessage(msg, false), RPCTypeMessage(msg, false))).
+		AddMethod(NewMethod("ReturnThings", RPCTypeImportedMessage(md, false), RPCTypeMessage(msg, true)))
 	file.AddService(sb)
 
 	fd, err := file.Build()
@@ -93,8 +93,8 @@ func TestSimpleDescriptorsFromScratch_SyntheticFiles(t *testing.T) {
 		SetRepeated())
 
 	sb := NewService("FooService")
-	sb.AddMethod(NewMethod("DoSomething", RpcTypeMessage(msg, false), RpcTypeMessage(msg, false)))
-	sb.AddMethod(NewMethod("ReturnThings", RpcTypeImportedMessage(md, false), RpcTypeMessage(msg, true)))
+	sb.AddMethod(NewMethod("DoSomething", RPCTypeMessage(msg, false), RPCTypeMessage(msg, false)))
+	sb.AddMethod(NewMethod("ReturnThings", RPCTypeImportedMessage(md, false), RPCTypeMessage(msg, true)))
 
 	sd, err := sb.Build()
 	require.NoError(t, err)
@@ -193,8 +193,8 @@ func TestComplexDescriptorsFromScratch(t *testing.T) {
 		SetPackageName("foo.bar").
 		AddMessage(msgE).
 		AddService(NewService("PppSvc").
-			AddMethod(NewMethod("Method1", RpcTypeMessage(msgE, false), RpcTypeImportedMessage(mdEmpty, false))).
-			AddMethod(NewMethod("Method2", RpcTypeMessage(msgB, false), RpcTypeMessage(msgC, true)))).
+			AddMethod(NewMethod("Method1", RPCTypeMessage(msgE, false), RPCTypeImportedMessage(mdEmpty, false))).
+			AddMethod(NewMethod("Method2", RPCTypeMessage(msgB, false), RPCTypeMessage(msgC, true)))).
 		Build()
 
 	require.NoError(t, err)
@@ -915,12 +915,12 @@ func TestAddRemoveMoveBuilders(t *testing.T) {
 	checkFailedAdd(t, err, msg2, ext3, "already contains element")
 
 	// services and methods
-	mtd1 := NewMethod("foo", RpcTypeMessage(msg1, false), RpcTypeMessage(msg1, false))
+	mtd1 := NewMethod("foo", RPCTypeMessage(msg1, false), RPCTypeMessage(msg1, false))
 	svc1 := NewService("FooService")
 	svc1.AddMethod(mtd1)
 	checkChildren(t, svc1, mtd1)
 	require.Equal(t, svc1.GetMethod("foo"), mtd1)
-	mtd2 := NewMethod("foo", RpcTypeMessage(msg1, false), RpcTypeMessage(msg1, false))
+	mtd2 := NewMethod("foo", RPCTypeMessage(msg1, false), RPCTypeMessage(msg1, false))
 	err = svc1.TryAddMethod(mtd2)
 	checkFailedAdd(t, err, svc1, mtd2, "already contains method")
 
@@ -1124,8 +1124,8 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		req := NewMessage("Request")
 		resp := NewMessage("Response")
 		mtb := NewMethod("Foo",
-			RpcTypeMessage(req, false),
-			RpcTypeMessage(resp, false))
+			RPCTypeMessage(req, false),
+			RPCTypeMessage(resp, false))
 		// methods must be connected to a service
 		sb := NewService("Bar").AddMethod(mtb)
 		mtb.Options = &descriptorpb.MethodOptions{}
@@ -1320,8 +1320,8 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 				req := NewMessage("Request")
 				resp := NewMessage("Response")
 				mtb := NewMethod("Foo",
-					RpcTypeMessage(req, false),
-					RpcTypeMessage(resp, false))
+					RPCTypeMessage(req, false),
+					RPCTypeMessage(resp, false))
 				// methods must be connected to a service
 				sb := NewService("Bar").AddMethod(mtb)
 				mtb.Options = &descriptorpb.MethodOptions{}
@@ -1469,8 +1469,8 @@ func TestUseOfExtensionRegistry(t *testing.T) {
 
 	t.Run("method options", func(t *testing.T) {
 		mtb := NewMethod("Foo",
-			RpcTypeMessage(NewMessage("Request"), false),
-			RpcTypeMessage(NewMessage("Response"), false))
+			RPCTypeMessage(NewMessage("Request"), false),
+			RPCTypeMessage(NewMessage("Response"), false))
 		// methods must be connected to a service
 		NewService("Bar").AddMethod(mtb)
 		mtb.Options = &descriptorpb.MethodOptions{}

@@ -164,8 +164,8 @@ func (dc *DescriptorConverter) ToEnumDescriptor(ctx context.Context, enum *typep
 	return ed, nil
 }
 
-// DescriptorAsApi produces an Api message that represents the given service descriptor.
-func (dc *DescriptorConverter) DescriptorAsApi(sd protoreflect.ServiceDescriptor) *apipb.Api {
+// DescriptorAsAPI produces an Api message that represents the given service descriptor.
+func (dc *DescriptorConverter) DescriptorAsAPI(sd protoreflect.ServiceDescriptor) *apipb.Api {
 	ms := sd.Methods()
 	reg := (*Registry)(dc)
 	methods := make([]*apipb.Method, ms.Len())

@@ -269,8 +269,8 @@ type MethodBuilder struct {
 	baseBuilder
 
 	Options  *descriptorpb.MethodOptions
-	ReqType  *RpcType
-	RespType *RpcType
+	ReqType  *RPCType
+	RespType *RPCType
 }
 
 var _ Builder = (*MethodBuilder)(nil)
@@ -278,7 +278,7 @@ var _ Builder = (*MethodBuilder)(nil)
 // NewMethod creates a new MethodBuilder for a method with the given name and
 // request and response types. If the given name is not a valid identifier, this
 // function will panic.
-func NewMethod(name protoreflect.Name, req, resp *RpcType) *MethodBuilder {
+func NewMethod(name protoreflect.Name, req, resp *RPCType) *MethodBuilder {
 	return &MethodBuilder{
 		baseBuilder: baseBuilderWithName(name),
 		ReqType:     req,
@@ -313,8 +313,8 @@ func FromMethod(mtd protoreflect.MethodDescriptor) (*MethodBuilder, error) {
 }
 
 func fromMethod(mtd protoreflect.MethodDescriptor) (*MethodBuilder, error) {
-	req := RpcTypeImportedMessage(mtd.Input(), mtd.IsStreamingClient())
-	resp := RpcTypeImportedMessage(mtd.Output(), mtd.IsStreamingServer())
+	req := RPCTypeImportedMessage(mtd.Input(), mtd.IsStreamingClient())
+	resp := RPCTypeImportedMessage(mtd.Output(), mtd.IsStreamingServer())
 	mtb := NewMethod(mtd.Name(), req, resp)
 	var err error
 	mtb.Options, err = protomessage.As[*descriptorpb.MethodOptions](mtd.Options())
@@ -380,14 +380,14 @@ func (mtb *MethodBuilder) SetOptions(options *descriptorpb.MethodOptions) *Metho
 
 // SetRequestType changes the request type for the method and then returns the
 // method builder, for method chaining.
-func (mtb *MethodBuilder) SetRequestType(t *RpcType) *MethodBuilder {
+func (mtb *MethodBuilder) SetRequestType(t *RPCType) *MethodBuilder {
 	mtb.ReqType = t
 	return mtb
 }
 
 // SetResponseType changes the response type for the method and then returns the
 // method builder, for method chaining.
-func (mtb *MethodBuilder) SetResponseType(t *RpcType) *MethodBuilder {
+func (mtb *MethodBuilder) SetResponseType(t *RPCType) *MethodBuilder {
 	mtb.RespType = t
 	return mtb
 }

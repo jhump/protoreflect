@@ -200,40 +200,40 @@ func fieldTypeFromDescriptor(fld protoreflect.FieldDescriptor) *FieldType {
 	}
 }
 
-// RpcType represents the type of an RPC request or response. The only allowed
+// RPCType represents the type of an RPC request or response. The only allowed
 // types are messages, but can be streams or unary messages.
 //
 // Message types can reference a message builder. A type that refers to a built
 // message descriptor is called an "imported" type.
 //
-// To create an RpcType, see RpcTypeMessage and RpcTypeImportedMessage.
-type RpcType struct {
+// To create an RPCType, see RPCTypeMessage and RPCTypeImportedMessage.
+type RPCType struct {
 	IsStream bool
 
 	foreignType protoreflect.MessageDescriptor
 	localType   *MessageBuilder
 }
 
-// RpcTypeMessage creates an RpcType that refers to the given message builder.
-func RpcTypeMessage(mb *MessageBuilder, stream bool) *RpcType {
-	return &RpcType{
+// RPCTypeMessage creates an RPCType that refers to the given message builder.
+func RPCTypeMessage(mb *MessageBuilder, stream bool) *RPCType {
+	return &RPCType{
 		IsStream:  stream,
 		localType: mb,
 	}
 }
 
-// RpcTypeImportedMessage creates an RpcType that refers to the given message
+// RPCTypeImportedMessage creates an RPCType that refers to the given message
 // descriptor.
-func RpcTypeImportedMessage(md protoreflect.MessageDescriptor, stream bool) *RpcType {
-	return &RpcType{
+func RPCTypeImportedMessage(md protoreflect.MessageDescriptor, stream bool) *RPCType {
+	return &RPCType{
 		IsStream:    stream,
 		foreignType: md,
 	}
 }
 
 // TypeName returns the fully qualified name of the message type to which
-// this RpcType refers.
-func (rt *RpcType) TypeName() protoreflect.FullName {
+// this RPCType refers.
+func (rt *RPCType) TypeName() protoreflect.FullName {
 	if rt.foreignType != nil {
 		return rt.foreignType.FullName()
 	}
