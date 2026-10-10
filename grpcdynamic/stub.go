@@ -6,6 +6,7 @@ package grpcdynamic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -98,6 +99,14 @@ func (s *Stub) InvokeRpcServerStream(ctx context.Context, method protoreflect.Me
 		return nil, err
 	}
 	err = cs.SendMsg(request)
+	if errors.Is(err, io.EOF) {
+		// The server already ended the call. The actual error, with the
+		// call's status, comes from receiving, and the caller has no stream
+		// with which to do that. So we do it here.
+		if recvErr := cs.RecvMsg(newMessage(method.Output(), s.resolver)); recvErr != nil {
+			err = recvErr
+		}
+	}
 	if err != nil {
 		cancel()
 		return nil, err
@@ -243,7 +252,9 @@ type ClientStream struct {
 	cancel context.CancelFunc
 }
 
-// SendMsg sends a request message to the server.
+// SendMsg sends a request message to the server. If it returns io.EOF, the
+// server has already ended the call; use CloseAndReceive to get the call's
+// status.
 func (s *ClientStream) SendMsg(m proto.Message) error {
 	if err := checkMessageType(s.method.Input(), m); err != nil {
 		return err
@@ -283,7 +294,8 @@ type BidiStream struct {
 	resolver protoresolve.SerializationResolver
 }
 
-// SendMsg sends a request message to the server.
+// SendMsg sends a request message to the server. If it returns io.EOF, the
+// server has already ended the call; use RecvMsg to get the call's status.
 func (s *BidiStream) SendMsg(m proto.Message) error {
 	if err := checkMessageType(s.reqType, m); err != nil {
 		return err
