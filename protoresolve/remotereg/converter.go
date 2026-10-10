@@ -1083,7 +1083,7 @@ func createEnumDescriptor(e *typepb.Enum, res protoresolve.SerializationResolver
 	}
 
 	return &descriptorpb.EnumDescriptorProto{
-		Name:    proto.String(base(e.Name)),
+		Name:    new(base(e.Name)),
 		Options: opts,
 		Value:   vals,
 	}
@@ -1097,8 +1097,8 @@ func createEnumValueDescriptor(v *typepb.EnumValue, res protoresolve.Serializati
 	}
 
 	return &descriptorpb.EnumValueDescriptorProto{
-		Name:    proto.String(v.Name),
-		Number:  proto.Int32(v.Number),
+		Name:    new(v.Name),
+		Number:  new(v.Number),
 		Options: opts,
 	}
 }
@@ -1118,12 +1118,12 @@ func createMessageDescriptor(m *typepb.Type, res protoresolve.SerializationResol
 	var oneOfs []*descriptorpb.OneofDescriptorProto
 	for _, o := range m.Oneofs {
 		oneOfs = append(oneOfs, &descriptorpb.OneofDescriptorProto{
-			Name: proto.String(o),
+			Name: new(o),
 		})
 	}
 
 	return &descriptorpb.DescriptorProto{
-		Name:      proto.String(base(m.Name)),
+		Name:      new(base(m.Name)),
 		Options:   opts,
 		Field:     fields,
 		OneofDecl: oneOfs,
@@ -1138,21 +1138,21 @@ func createFieldDescriptor(f *typepb.Field, res protoresolve.SerializationResolv
 	}
 	if f.Packed {
 		if opts == nil {
-			opts = &descriptorpb.FieldOptions{Packed: proto.Bool(true)}
+			opts = &descriptorpb.FieldOptions{Packed: new(true)}
 		} else {
-			opts.Packed = proto.Bool(true)
+			opts.Packed = new(true)
 		}
 	}
 
 	var oneOf *int32
 	if f.OneofIndex > 0 {
-		oneOf = proto.Int32(f.OneofIndex - 1)
+		oneOf = new(f.OneofIndex - 1)
 	}
 
 	var typeName *string
 	if f.Kind == typepb.Field_TYPE_GROUP || f.Kind == typepb.Field_TYPE_MESSAGE || f.Kind == typepb.Field_TYPE_ENUM {
 		pos := strings.LastIndex(f.TypeUrl, "/")
-		typeName = proto.String("." + f.TypeUrl[pos+1:])
+		typeName = new("." + f.TypeUrl[pos+1:])
 	}
 
 	var label descriptorpb.FieldDescriptorProto_Label
@@ -1206,17 +1206,17 @@ func createFieldDescriptor(f *typepb.Field, res protoresolve.SerializationResolv
 	}
 	var defaultVal *string
 	if f.DefaultValue != "" {
-		defaultVal = proto.String(f.DefaultValue)
+		defaultVal = new(f.DefaultValue)
 	}
 	return &descriptorpb.FieldDescriptorProto{
-		Name:         proto.String(f.Name),
-		Number:       proto.Int32(f.Number),
+		Name:         new(f.Name),
+		Number:       new(f.Number),
 		DefaultValue: defaultVal,
-		JsonName:     proto.String(f.JsonName),
+		JsonName:     new(f.JsonName),
 		OneofIndex:   oneOf,
 		TypeName:     typeName,
-		Label:        label.Enum(),
-		Type:         typ.Enum(),
+		Label:        new(label),
+		Type:         new(typ),
 		Options:      opts,
 	}
 }
@@ -1234,7 +1234,7 @@ func createServiceDescriptor(a *apipb.Api, res protoresolve.SerializationResolve
 	}
 
 	return &descriptorpb.ServiceDescriptorProto{
-		Name:    proto.String(base(a.Name)),
+		Name:    new(base(a.Name)),
 		Method:  methods,
 		Options: opts,
 	}
@@ -1254,18 +1254,18 @@ func createMethodDescriptor(m *apipb.Method, res protoresolve.SerializationResol
 	respType = "." + m.ResponseTypeUrl[pos+1:]
 
 	return &descriptorpb.MethodDescriptorProto{
-		Name:            proto.String(m.Name),
+		Name:            new(m.Name),
 		Options:         opts,
-		ClientStreaming: proto.Bool(m.RequestStreaming),
-		ServerStreaming: proto.Bool(m.ResponseStreaming),
-		InputType:       proto.String(reqType),
-		OutputType:      proto.String(respType),
+		ClientStreaming: new(m.RequestStreaming),
+		ServerStreaming: new(m.ResponseStreaming),
+		InputType:       new(reqType),
+		OutputType:      new(respType),
 	}
 }
 
 func createIntermediateMessageDescriptor(name string) *descriptorpb.DescriptorProto {
 	return &descriptorpb.DescriptorProto{
-		Name: proto.String(name),
+		Name: new(name),
 	}
 }
 
@@ -1282,9 +1282,9 @@ func createFileDescriptor(name, pkg string, proto3 bool, deps map[string]struct{
 		syntax = "proto2"
 	}
 	return &descriptorpb.FileDescriptorProto{
-		Name:       proto.String(name),
-		Package:    proto.String(pkg),
-		Syntax:     proto.String(syntax),
+		Name:       new(name),
+		Package:    new(pkg),
+		Syntax:     new(syntax),
 		Dependency: imports,
 	}
 }

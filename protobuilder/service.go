@@ -3,7 +3,6 @@ package protobuilder
 import (
 	"fmt"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
@@ -222,7 +221,7 @@ func (sb *ServiceBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 	}
 
 	return &descriptorpb.ServiceDescriptorProto{
-		Name:    proto.String(string(sb.name)),
+		Name:    new(string(sb.name)),
 		Options: sb.Options,
 		Method:  methods,
 	}, nil
@@ -379,16 +378,16 @@ func (mtb *MethodBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 	addCommentsTo(sourceInfo, path, &mtb.comments)
 
 	mtd := &descriptorpb.MethodDescriptorProto{
-		Name:       proto.String(string(mtb.name)),
+		Name:       new(string(mtb.name)),
 		Options:    mtb.Options,
-		InputType:  proto.String("." + string(mtb.ReqType.TypeName())),
-		OutputType: proto.String("." + string(mtb.RespType.TypeName())),
+		InputType:  new("." + string(mtb.ReqType.TypeName())),
+		OutputType: new("." + string(mtb.RespType.TypeName())),
 	}
 	if mtb.ReqType.IsStream {
-		mtd.ClientStreaming = proto.Bool(true)
+		mtd.ClientStreaming = new(true)
 	}
 	if mtb.RespType.IsStream {
-		mtd.ServerStreaming = proto.Bool(true)
+		mtd.ServerStreaming = new(true)
 	}
 
 	return mtd, nil

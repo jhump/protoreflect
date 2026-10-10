@@ -29,12 +29,12 @@ func TestCachingTypeFetcher(t *testing.T) {
 	})
 
 	// observe the underlying type fetcher get invoked 10x
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		typ, err := uncached.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Fum")
 		require.NoError(t, err)
 		require.Equal(t, "fee.fi.fo.Fum", typ.Name)
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		en, err := uncached.FetchEnumType(context.Background(), "blah.blah.blah/fee.fi.fo.Foo")
 		require.NoError(t, err)
 		require.Equal(t, "fee.fi.fo.Foo", en.Name)
@@ -47,13 +47,13 @@ func TestCachingTypeFetcher(t *testing.T) {
 	// after which the result is cached
 	cached := CachingTypeFetcher(uncached)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		typ, err := cached.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Fum")
 		require.NoError(t, err)
 		require.Equal(t, "fee.fi.fo.Fum", typ.Name)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		en, err := cached.FetchEnumType(context.Background(), "blah.blah.blah/fee.fi.fo.Foo")
 		require.NoError(t, err)
 		require.Equal(t, "fee.fi.fo.Foo", en.Name)
@@ -97,26 +97,24 @@ func TestCachingTypeFetcher_Concurrency(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	names := []string{"Fee", "Fi", "Fo", "Fum", "I", "Smell", "Blood", "Of", "Englishman"}
-	var queryCount int32
+	var queryCount atomic.Int32
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 10 {
+		wg.Go(func() {
 			for i := 0; ctx.Err() == nil; i = (i + 1) % len(names) {
 				n := "fee.fi.fo." + names[i]
 				// message
 				typ, err := tf.FetchMessageType(context.Background(), "blah.blah.blah/"+n)
 				require.NoError(t, err)
 				require.Equal(t, n, typ.Name)
-				atomic.AddInt32(&queryCount, 1)
+				queryCount.Add(1)
 				// enum
 				en, err := tf.FetchEnumType(context.Background(), "blah.blah.blah.en/"+n)
 				require.NoError(t, err)
 				require.Equal(t, n, en.Name)
-				atomic.AddInt32(&queryCount, 1)
+				queryCount.Add(1)
 			}
-		}()
+		})
 	}
 
 	time.Sleep(2 * time.Second)
@@ -128,7 +126,7 @@ func TestCachingTypeFetcher_Concurrency(t *testing.T) {
 		require.Equal(t, 1, v)
 	}
 
-	require.Greater(t, atomic.LoadInt32(&queryCount), int32(len(counts)))
+	require.Greater(t, queryCount.Load(), int32(len(counts)))
 }
 
 func TestCachingTypeFetcher_CancelledLoad(t *testing.T) {
@@ -219,13 +217,13 @@ func TestHTTPTypeFetcher(t *testing.T) {
 	trt := &testRoundTripper{counts: map[string]int{}}
 	fetcher := HTTPTypeFetcher(trt, 65536, 10)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		typ, err := fetcher.FetchMessageType(context.Background(), "blah.blah.blah/fee.fi.fo.Message")
 		require.NoError(t, err)
 		require.Equal(t, "fee.fi.fo.Message", typ.Name)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		// name must have Enum for test fetcher to return an enum type
 		en, err := fetcher.FetchEnumType(context.Background(), "blah.blah.blah/fee.fi.fo.Enum")
 		require.NoError(t, err)
@@ -259,7 +257,7 @@ func TestHTTPTypeFetcher_ParallelDownloads(t *testing.T) {
 	// one takes 100millis. So it should take about 1 second.
 	start := time.Now()
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		wg.Add(1)
 		index := i // don't capture loop variable
 		go func() {

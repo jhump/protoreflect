@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -91,7 +90,7 @@ func TestCombineWrongKind(t *testing.T) {
 	// resolvers, which might have an element of the right kind.
 	first := newRegistry(t, []protoreflect.FileDescriptor{testprotos.File_desc_test1_proto})
 	otherProto := fileProto("other.proto", "testprotos")
-	otherProto.MessageType = []*descriptorpb.DescriptorProto{{Name: proto.String("SomeEnum")}}
+	otherProto.MessageType = []*descriptorpb.DescriptorProto{{Name: new("SomeEnum")}}
 	other, err := protodesc.NewFile(otherProto, nil)
 	require.NoError(t, err)
 	second := newRegistry(t, []protoreflect.FileDescriptor{other})

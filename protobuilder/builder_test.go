@@ -1196,7 +1196,7 @@ func TestCustomOptionsDiscoveredInDependencies(t *testing.T) {
 
 	// Now we can test referring to these and making sure they show up correctly
 	// in built descriptors
-	for name, useBuilder := range map[string]*bool{"descriptor": proto.Bool(false), "builder": proto.Bool(true), "auto": nil} {
+	for name, useBuilder := range map[string]*bool{"descriptor": new(false), "builder": new(true), "auto": nil} {
 		newFile := func() *FileBuilder {
 			fb := NewFile("foo.proto").AddImportedDependency(otherFileDesc)
 			if useBuilder != nil {

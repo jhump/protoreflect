@@ -759,8 +759,8 @@ func (r *remoteSubResolver) FindMessageByURL(url string) (protoreflect.MessageTy
 }
 
 func ensureScheme(url string) string {
-	pos := strings.Index(url, "://")
-	if pos < 0 {
+	found := strings.Contains(url, "://")
+	if !found {
 		return "https://" + url
 	}
 	return url

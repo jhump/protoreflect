@@ -90,7 +90,7 @@
 //	        SetDefaultValue("bar")).
 //	    AddField(NewField("baz", FieldTypeScalar(descriptor.FieldDescriptorProto_TYPE_INT64)).
 //	        SetCardinality(descriptor.FieldDescriptorProto_LABEL_REPEATED).
-//	        SetOptions(&descriptor.FieldOptions{Packed: proto.Bool(true)})).
+//	        SetOptions(&descriptor.FieldOptions{Packed: new(true)})).
 //	    Build()
 //
 // So the various Set* methods all return the builder itself so that multiple

@@ -3,6 +3,7 @@ package sourceinfo_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/bufbuild/protocompile"
@@ -262,8 +263,8 @@ func checkDescriptor(t *testing.T, srcLocs protoreflect.SourceLocations, d proto
 	require.Same(t, d, registryDesc)
 
 	require.Same(t, ancestors[0], d.ParentFile())
-	for i := len(ancestors) - 1; i >= 0; i-- {
+	for _, ancestor := range slices.Backward(ancestors) {
 		d = d.Parent()
-		require.Same(t, ancestors[i], d)
+		require.Same(t, ancestor, d)
 	}
 }

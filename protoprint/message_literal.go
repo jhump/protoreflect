@@ -172,7 +172,7 @@ func (p *Printer) maybePrintAnyMessageToBuffer(
 	return true
 }
 
-func (p *Printer) printValueLiteralToBuffer(buf *bytes.Buffer, fld protoreflect.FieldDescriptor, value interface{}) {
+func (p *Printer) printValueLiteralToBuffer(buf *bytes.Buffer, fld protoreflect.FieldDescriptor, value any) {
 	switch val := value.(type) {
 	case protoreflect.EnumNumber:
 		ev := fld.Enum().Values().ByNumber(val)

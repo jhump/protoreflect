@@ -307,10 +307,9 @@ func (cr *Client) fileByFilename(filename string, depPath []string) (protoreflec
 			return fd, nil
 		}
 	}
-	var notFoundErr *elementNotFoundError
 	if isNotFound(err) {
 		err = fileNotFound(filename, nil)
-	} else if errors.As(err, &notFoundErr) {
+	} else if notFoundErr, ok := errors.AsType[*elementNotFoundError](err); ok {
 		err = fileNotFound(filename, notFoundErr)
 	}
 	return fd, err
@@ -341,10 +340,9 @@ func (cr *Client) FileContainingSymbol(symbol protoreflect.FullName) (protorefle
 			return d.ParentFile(), nil
 		}
 	}
-	var notFoundErr *elementNotFoundError
 	if isNotFound(err) {
 		err = symbolNotFound(symbol, nil)
-	} else if errors.As(err, &notFoundErr) {
+	} else if notFoundErr, ok := errors.AsType[*elementNotFoundError](err); ok {
 		err = symbolNotFound(symbol, notFoundErr)
 	}
 	return fd, err
@@ -379,10 +377,9 @@ func (cr *Client) FileContainingExtension(extendedMessageName protoreflect.FullN
 			return xt.TypeDescriptor().ParentFile(), nil
 		}
 	}
-	var notFoundErr *elementNotFoundError
 	if isNotFound(err) {
 		err = extensionNotFound(extendedMessageName, extensionNumber, nil)
-	} else if errors.As(err, &notFoundErr) {
+	} else if notFoundErr, ok := errors.AsType[*elementNotFoundError](err); ok {
 		err = extensionNotFound(extendedMessageName, extensionNumber, notFoundErr)
 	}
 	return fd, err

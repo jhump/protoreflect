@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -125,9 +124,9 @@ func TestCorruptSourceInfo(t *testing.T) {
 	if err != nil {
 		// Not registered by an earlier run of this test (e.g. with -count).
 		file, err = protodesc.NewFile(&descriptorpb.FileDescriptorProto{
-			Name:        proto.String(path),
-			Package:     proto.String("sourceinfo_test.corrupt"),
-			MessageType: []*descriptorpb.DescriptorProto{{Name: proto.String("Msg")}},
+			Name:        new(path),
+			Package:     new("sourceinfo_test.corrupt"),
+			MessageType: []*descriptorpb.DescriptorProto{{Name: new("Msg")}},
 		}, nil)
 		require.NoError(t, err)
 		require.NoError(t, protoregistry.GlobalFiles.RegisterFile(file))

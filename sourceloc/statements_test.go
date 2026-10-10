@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -144,14 +143,14 @@ func TestForExtendBlockEdgeCases(t *testing.T) {
 	newFile := func(t *testing.T, locs ...*descriptorpb.SourceCodeInfo_Location) protoreflect.ExtensionDescriptor {
 		t.Helper()
 		file, err := protodesc.NewFile(&descriptorpb.FileDescriptorProto{
-			Name:       proto.String("test.proto"),
+			Name:       new("test.proto"),
 			Dependency: []string{"google/protobuf/descriptor.proto"},
 			Extension: []*descriptorpb.FieldDescriptorProto{{
-				Name:     proto.String("ext"),
-				Number:   proto.Int32(50000),
-				Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-				Type:     descriptorpb.FieldDescriptorProto_TYPE_INT32.Enum(),
-				Extendee: proto.String(".google.protobuf.MessageOptions"),
+				Name:     new("ext"),
+				Number:   new(int32(50000)),
+				Label:    new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+				Type:     new(descriptorpb.FieldDescriptorProto_TYPE_INT32),
+				Extendee: new(".google.protobuf.MessageOptions"),
 			}},
 			SourceCodeInfo: &descriptorpb.SourceCodeInfo{Location: locs},
 		}, protoregistry.GlobalFiles)

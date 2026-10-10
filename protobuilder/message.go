@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
@@ -845,7 +844,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 				if err != nil {
 					return nil, err
 				}
-				fld.OneofIndex = proto.Int32(int32(oobIndex))
+				fld.OneofIndex = new(int32(oobIndex))
 				if err := addField(flb, fld); err != nil {
 					return nil, err
 				}
@@ -870,7 +869,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 				t++
 				tags = tags[1:]
 			}
-			needTagsAssigned[0].Number = proto.Int32(int32(t))
+			needTagsAssigned[0].Number = new(int32(t))
 			needTagsAssigned = needTagsAssigned[1:]
 			t++
 		}
@@ -908,16 +907,16 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 	extRanges := make([]*descriptorpb.DescriptorProto_ExtensionRange, len(mb.ExtensionRanges))
 	for i, r := range mb.ExtensionRanges {
 		extRanges[i] = &descriptorpb.DescriptorProto_ExtensionRange{
-			Start:   proto.Int32(int32(r.FieldRange[0])),
-			End:     proto.Int32(int32(r.FieldRange[1])),
+			Start:   new(int32(r.FieldRange[0])),
+			End:     new(int32(r.FieldRange[1])),
 			Options: r.Options,
 		}
 	}
 	resRanges := make([]*descriptorpb.DescriptorProto_ReservedRange, len(mb.ReservedRanges))
 	for i, r := range mb.ReservedRanges {
 		resRanges[i] = &descriptorpb.DescriptorProto_ReservedRange{
-			Start: proto.Int32(int32(r[0])),
-			End:   proto.Int32(int32(r[1])),
+			Start: new(int32(r[0])),
+			End:   new(int32(r[1])),
 		}
 	}
 	resNames := make([]string, len(mb.ReservedNames))
@@ -926,7 +925,7 @@ func (mb *MessageBuilder) buildProto(path []int32, sourceInfo *descriptorpb.Sour
 	}
 
 	md := &descriptorpb.DescriptorProto{
-		Name:           proto.String(string(mb.name)),
+		Name:           new(string(mb.name)),
 		Options:        mb.Options,
 		Field:          fields,
 		OneofDecl:      oneofs,
@@ -1021,8 +1020,8 @@ func processProto3OptionalFields(msgd *descriptorpb.DescriptorProto) {
 				ooName = "X" + ooName
 			}
 
-			fd.OneofIndex = proto.Int32(int32(len(msgd.OneofDecl)))
-			ood := &descriptorpb.OneofDescriptorProto{Name: proto.String(ooName)}
+			fd.OneofIndex = new(int32(len(msgd.OneofDecl)))
+			ood := &descriptorpb.OneofDescriptorProto{Name: new(ooName)}
 			msgd.OneofDecl = append(msgd.OneofDecl, ood)
 		}
 	}

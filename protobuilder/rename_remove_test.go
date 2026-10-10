@@ -419,7 +419,7 @@ func TestBuilderSetters(t *testing.T) {
 		return Comments{LeadingComment: " " + s + "\n"}
 	}
 	enumVal := NewEnumValue("ONE").SetNumber(1).SetComments(comments("enum value")).
-		SetOptions(&descriptorpb.EnumValueOptions{Deprecated: proto.Bool(true)})
+		SetOptions(&descriptorpb.EnumValueOptions{Deprecated: new(true)})
 	assert.True(t, enumVal.HasNumber())
 	assert.Equal(t, protoreflect.EnumNumber(1), enumVal.Number())
 	enumVal.ClearNumber()
@@ -427,21 +427,21 @@ func TestBuilderSetters(t *testing.T) {
 	enumVal.SetNumber(1)
 	enum := NewEnum("Enum").AddValue(NewEnumValue("ZERO")).AddValue(enumVal).
 		SetComments(comments("enum")).
-		SetOptions(&descriptorpb.EnumOptions{Deprecated: proto.Bool(true)}).
+		SetOptions(&descriptorpb.EnumOptions{Deprecated: new(true)}).
 		AddReservedRange(10, 20).AddReservedName("TEN")
 	enum.SetReservedRanges(append(enum.ReservedRanges, EnumRange{30, 40}))
 	enum.SetReservedNames(append(enum.ReservedNames, "THIRTY"))
 
 	field := NewField("field", FieldTypeInt32()).SetNumber(1).SetJsonName("customName").
 		SetComments(comments("field")).
-		SetOptions(&descriptorpb.FieldOptions{Deprecated: proto.Bool(true)})
+		SetOptions(&descriptorpb.FieldOptions{Deprecated: new(true)})
 	field.SetType(FieldTypeEnum(enum))
 	oneof := NewOneof("oneof").AddChoice(NewField("choice", FieldTypeBytes()).SetNumber(2)).
 		SetComments(comments("oneof")).
 		SetOptions(&descriptorpb.OneofOptions{})
 	msg := NewMessage("Msg").AddField(field).AddOneOf(oneof).
 		SetComments(comments("message")).
-		SetOptions(&descriptorpb.MessageOptions{Deprecated: proto.Bool(true)}).
+		SetOptions(&descriptorpb.MessageOptions{Deprecated: new(true)}).
 		SetReservedRanges([]FieldRange{{10, 20}}).
 		SetReservedNames([]protoreflect.Name{"ten"})
 	req := RpcTypeMessage(msg, false)
@@ -449,16 +449,16 @@ func TestBuilderSetters(t *testing.T) {
 		SetRequestType(RpcTypeMessage(msg, true)).
 		SetResponseType(RpcTypeMessage(msg, true)).
 		SetComments(comments("method")).
-		SetOptions(&descriptorpb.MethodOptions{Deprecated: proto.Bool(true)})
+		SetOptions(&descriptorpb.MethodOptions{Deprecated: new(true)})
 	svc := NewService("Svc").AddMethod(method).
 		SetComments(comments("service")).
-		SetOptions(&descriptorpb.ServiceOptions{Deprecated: proto.Bool(true)})
+		SetOptions(&descriptorpb.ServiceOptions{Deprecated: new(true)})
 	file := NewFile("before.proto").SetPath("test.proto").SetPackageName("test").
 		SetEdition(descriptorpb.Edition_EDITION_2023).
 		SetComments(comments("file")).
 		SetSyntaxComments(comments("syntax")).
 		SetPackageComments(comments("package")).
-		SetOptions(&descriptorpb.FileOptions{Deprecated: proto.Bool(true)}).
+		SetOptions(&descriptorpb.FileOptions{Deprecated: new(true)}).
 		AddEnum(enum).AddMessage(msg).AddService(svc)
 	assert.Equal(t, "test.proto", file.Path())
 	assert.Same(t, file, field.ParentFile())

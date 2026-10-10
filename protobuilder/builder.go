@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 
@@ -134,10 +133,10 @@ func setComments(c *Comments, loc protoreflect.SourceLocation) {
 func addCommentsTo(sourceInfo *descriptorpb.SourceCodeInfo, path []int32, c *Comments) {
 	var lead, trail *string
 	if c.LeadingComment != "" {
-		lead = proto.String(c.LeadingComment)
+		lead = new(c.LeadingComment)
 	}
 	if c.TrailingComment != "" {
-		trail = proto.String(c.TrailingComment)
+		trail = new(c.TrailingComment)
 	}
 
 	// we need defensive copies of the slices

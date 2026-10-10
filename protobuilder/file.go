@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -18,10 +17,10 @@ import (
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
 
-var uniqueFileCounter uint64
+var uniqueFileCounter atomic.Uint64
 
 func uniqueFilePath() string {
-	i := atomic.AddUint64(&uniqueFileCounter, 1)
+	i := uniqueFileCounter.Add(1)
 	return fmt.Sprintf("{generated-file-%04x}.proto", i)
 }
 
@@ -728,12 +727,12 @@ func (fb *FileBuilder) buildProto(deps []protoreflect.FileDescriptor) (*descript
 	var edition *descriptorpb.Edition
 	switch fb.Syntax {
 	case protoreflect.Proto3:
-		syntax = proto.String("proto3")
+		syntax = new("proto3")
 	case protoreflect.Proto2:
-		syntax = proto.String("proto2")
+		syntax = new("proto2")
 	case 0: // default (unset) is proto2 unless and edition was specified
 		if fb.Edition == 0 {
-			syntax = proto.String("proto2")
+			syntax = new("proto2")
 			break
 		}
 		fallthrough
@@ -746,22 +745,22 @@ func (fb *FileBuilder) buildProto(deps []protoreflect.FileDescriptor) (*descript
 			return nil, fmt.Errorf("builder contains unknown or invalid edition: %v", fb.Edition)
 		case fb.Edition == descriptorpb.Edition_EDITION_PROTO2 && fb.Syntax == 0:
 			// Edition set to proto2 instead of syntax? We'll allow it.
-			syntax = proto.String("proto2")
+			syntax = new("proto2")
 		case fb.Edition == descriptorpb.Edition_EDITION_PROTO3 && fb.Syntax == 0:
 			// Edition set to proto3 instead of syntax? We'll allow it.
-			syntax = proto.String("proto3")
+			syntax = new("proto3")
 		case fb.Edition == descriptorpb.Edition_EDITION_PROTO2 || fb.Edition == descriptorpb.Edition_EDITION_PROTO3:
 			return nil, fmt.Errorf("builder indicates syntax editions but edition %v; set syntax instead", fb.Edition)
 		default:
-			syntax = proto.String("editions")
-			edition = fb.Edition.Enum()
+			syntax = new("editions")
+			edition = new(fb.Edition)
 		}
 	default:
 		return nil, fmt.Errorf("builder contains unknown syntax: %v", fb.Syntax)
 	}
 	var pkg *string
 	if fb.Package != "" {
-		pkg = proto.String(string(fb.Package))
+		pkg = new(string(fb.Package))
 	}
 
 	path := make([]int32, 0, 10)
@@ -817,7 +816,7 @@ func (fb *FileBuilder) buildProto(deps []protoreflect.FileDescriptor) (*descript
 	}
 
 	return &descriptorpb.FileDescriptorProto{
-		Name:           proto.String(filePath),
+		Name:           new(filePath),
 		Package:        pkg,
 		Dependency:     imports,
 		Options:        fb.Options,

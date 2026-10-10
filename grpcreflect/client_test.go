@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -230,9 +231,7 @@ func TestListServices(t *testing.T) {
 		s, err := client.ListServices()
 		require.NoError(t, err)
 
-		sort.Slice(s, func(i, j int) bool {
-			return s[i] < s[j]
-		})
+		slices.Sort(s)
 		require.Equal(t, []protoreflect.FullName{
 			"grpc.reflection.v1.ServerReflection",
 			"grpc.reflection.v1alpha.ServerReflection",
@@ -374,22 +373,22 @@ func TestAllowFallbackResolver(t *testing.T) {
 
 	// Now we configure a fallback.
 	fdp := &descriptorpb.FileDescriptorProto{
-		Name:       proto.String("foo/bar/this.proto"),
-		Package:    proto.String("foo.bar"),
+		Name:       new("foo/bar/this.proto"),
+		Package:    new("foo.bar"),
 		Dependency: []string{"google/protobuf/descriptor.proto"},
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
-				Name: proto.String("Bar"),
+				Name: new("Bar"),
 			},
 		},
 		Extension: []*descriptorpb.FieldDescriptorProto{
 			{
-				Name:     proto.String("opt"),
-				Extendee: proto.String(".google.protobuf.MessageOptions"),
-				Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-				Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
-				TypeName: proto.String(".foo.bar.Bar"),
-				Number:   proto.Int32(23456),
+				Name:     new("opt"),
+				Extendee: new(".google.protobuf.MessageOptions"),
+				Label:    new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+				Type:     new(descriptorpb.FieldDescriptorProto_TYPE_MESSAGE),
+				TypeName: new(".foo.bar.Bar"),
+				Number:   new(int32(23456)),
 			},
 		},
 	}
@@ -423,22 +422,22 @@ func TestAllowFallbackResolver(t *testing.T) {
 func TestAllowFallbackResolver_ForDependency(t *testing.T) {
 	// Create resolver with some extra files.
 	fdp := &descriptorpb.FileDescriptorProto{
-		Name:       proto.String("foo/bar/this.proto"),
-		Package:    proto.String("foo.bar"),
+		Name:       new("foo/bar/this.proto"),
+		Package:    new("foo.bar"),
 		Dependency: []string{"google/protobuf/descriptor.proto"},
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
-				Name: proto.String("Bar"),
+				Name: new("Bar"),
 			},
 		},
 		Extension: []*descriptorpb.FieldDescriptorProto{
 			{
-				Name:     proto.String("opt"),
-				Extendee: proto.String(".google.protobuf.MessageOptions"),
-				Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-				Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
-				TypeName: proto.String(".foo.bar.Bar"),
-				Number:   proto.Int32(23456),
+				Name:     new("opt"),
+				Extendee: new(".google.protobuf.MessageOptions"),
+				Label:    new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+				Type:     new(descriptorpb.FieldDescriptorProto_TYPE_MESSAGE),
+				TypeName: new(".foo.bar.Bar"),
+				Number:   new(int32(23456)),
 			},
 		},
 	}
@@ -710,9 +709,7 @@ func testClientAuto(t *testing.T, register func(*grpc.Server), expectedServices 
 
 	svcs, err := client.ListServices()
 	require.NoError(t, err)
-	sort.Slice(svcs, func(i, j int) bool {
-		return svcs[i] < svcs[j]
-	})
+	slices.Sort(svcs)
 	require.Equal(t, expectedServices, svcs)
 	client.Reset()
 
@@ -749,14 +746,14 @@ func (c *captureStreamNames) names() []string {
 	return ret
 }
 
-func (c *captureStreamNames) intercept(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+func (c *captureStreamNames) intercept(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 	c.mu.Lock()
 	c.log = append(c.log, info.FullMethod)
 	c.mu.Unlock()
 	return handler(srv, ss)
 }
 
-func (c *captureStreamNames) handleUnknown(_ interface{}, _ grpc.ServerStream) error {
+func (c *captureStreamNames) handleUnknown(_ any, _ grpc.ServerStream) error {
 	return status.Errorf(codes.Unimplemented, "WTF?")
 }
 
@@ -770,7 +767,7 @@ func testClientAutoOnUnavailable(t *testing.T) {
 	var capture captureStreamNames
 	svr := grpc.NewServer(
 		grpc.StreamInterceptor(capture.intercept),
-		grpc.UnknownServiceHandler(func(_ interface{}, _ grpc.ServerStream) error {
+		grpc.UnknownServiceHandler(func(_ any, _ grpc.ServerStream) error {
 			// On unknown method, forcibly close the net.Conn, without sending
 			// back any reply, which should result in an "unavailable" error.
 			return captureConn.latest().Close()
@@ -807,9 +804,7 @@ func testClientAutoOnUnavailable(t *testing.T) {
 
 	svcs, err := client.ListServices()
 	require.NoError(t, err)
-	sort.Slice(svcs, func(i, j int) bool {
-		return svcs[i] < svcs[j]
-	})
+	slices.Sort(svcs)
 	require.Equal(t, []protoreflect.FullName{
 		"grpc.reflection.v1alpha.ServerReflection",
 		"testprotos.DummyService",
@@ -880,16 +875,16 @@ func (c *captureErrors) codes() []codes.Code {
 type captureErrorStream struct {
 	grpc.ClientStream
 	c    *captureErrors
-	done int32
+	done atomic.Int32
 }
 
-func (c *captureErrorStream) RecvMsg(m interface{}) error {
+func (c *captureErrorStream) RecvMsg(m any) error {
 	err := c.ClientStream.RecvMsg(m)
 	if err == nil || errors.Is(err, io.EOF) {
 		return nil
 	}
 	// Only record one error per RPC.
-	if atomic.CompareAndSwapInt32(&c.done, 0, 1) {
+	if c.done.CompareAndSwap(0, 1) {
 		c.c.observe(err)
 	}
 	return err
@@ -943,8 +938,8 @@ func createFilesWithMissingDeps(t *testing.T) *files {
 	t.Helper()
 	var result files
 	empty, err := protodesc.NewFile(&descriptorpb.FileDescriptorProto{
-		Name:   proto.String("empty.proto"),
-		Syntax: proto.String("proto2"),
+		Name:   new("empty.proto"),
+		Syntax: new("proto2"),
 	}, &result)
 	require.NoError(t, err)
 
@@ -961,63 +956,63 @@ func createFilesWithMissingDeps(t *testing.T) *files {
 	require.NoError(t, err)
 
 	importedFile := &descriptorpb.FileDescriptorProto{
-		Name:             proto.String("test/imported.proto"),
-		Syntax:           proto.String("proto3"),
-		Package:          proto.String("test"),
+		Name:             new("test/imported.proto"),
+		Syntax:           new("proto3"),
+		Package:          new("test"),
 		Dependency:       []string{"google/protobuf/descriptor.proto", "test/unused.proto"},
 		PublicDependency: []int32{1}, // unused is public
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
-				Name: proto.String("Message"),
+				Name: new("Message"),
 				Field: []*descriptorpb.FieldDescriptorProto{
 					{
-						Name:     proto.String("name"),
-						Number:   proto.Int32(1),
-						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
-						JsonName: proto.String("name"),
+						Name:     new("name"),
+						Number:   new(int32(1)),
+						Label:    new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+						Type:     new(descriptorpb.FieldDescriptorProto_TYPE_STRING),
+						JsonName: new("name"),
 					},
 					{
-						Name:     proto.String("tags"),
-						Number:   proto.Int32(2),
-						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
-						Type:     descriptorpb.FieldDescriptorProto_TYPE_UINT64.Enum(),
-						JsonName: proto.String("tags"),
+						Name:     new("tags"),
+						Number:   new(int32(2)),
+						Label:    new(descriptorpb.FieldDescriptorProto_LABEL_REPEATED),
+						Type:     new(descriptorpb.FieldDescriptorProto_TYPE_UINT64),
+						JsonName: new("tags"),
 					},
 				},
 				Extension: []*descriptorpb.FieldDescriptorProto{
 					{
-						Extendee: proto.String(".google.protobuf.MessageOptions"),
-						Name:     proto.String("message_option"),
-						Number:   proto.Int32(10101),
-						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+						Extendee: new(".google.protobuf.MessageOptions"),
+						Name:     new("message_option"),
+						Number:   new(int32(10101)),
+						Label:    new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+						Type:     new(descriptorpb.FieldDescriptorProto_TYPE_STRING),
 					},
 				},
 			},
 		},
 		EnumType: []*descriptorpb.EnumDescriptorProto{
 			{
-				Name: proto.String("Enum"),
+				Name: new("Enum"),
 				Value: []*descriptorpb.EnumValueDescriptorProto{
 					{
-						Name:   proto.String("VAL0"),
-						Number: proto.Int32(0),
+						Name:   new("VAL0"),
+						Number: new(int32(0)),
 					},
 					{
-						Name:   proto.String("VAL1"),
-						Number: proto.Int32(1),
+						Name:   new("VAL1"),
+						Number: new(int32(1)),
 					},
 				},
 			},
 		},
 		Extension: []*descriptorpb.FieldDescriptorProto{
 			{
-				Extendee: proto.String(".google.protobuf.FileOptions"),
-				Name:     proto.String("file_option"),
-				Number:   proto.Int32(10101),
-				Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-				Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+				Extendee: new(".google.protobuf.FileOptions"),
+				Name:     new("file_option"),
+				Number:   new(int32(10101)),
+				Label:    new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+				Type:     new(descriptorpb.FieldDescriptorProto_TYPE_STRING),
 			},
 		},
 	}
@@ -1027,42 +1022,42 @@ func createFilesWithMissingDeps(t *testing.T) *files {
 	require.NoError(t, err)
 
 	topFile := &descriptorpb.FileDescriptorProto{
-		Name:       proto.String("foo/bar/this.proto"),
-		Syntax:     proto.String("proto3"),
-		Package:    proto.String("foo.bar"),
+		Name:       new("foo/bar/this.proto"),
+		Syntax:     new("proto3"),
+		Package:    new("foo.bar"),
 		Dependency: []string{"test/imported.proto", "test/unused.proto", "test/custom/options.proto"},
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
-				Name: proto.String("Foo"),
+				Name: new("Foo"),
 				Field: []*descriptorpb.FieldDescriptorProto{
 					{
-						Name:     proto.String("msg"),
-						Number:   proto.Int32(1),
-						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
-						TypeName: proto.String(".test.Message"),
-						JsonName: proto.String("msg"),
+						Name:     new("msg"),
+						Number:   new(int32(1)),
+						Label:    new(descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL),
+						Type:     new(descriptorpb.FieldDescriptorProto_TYPE_MESSAGE),
+						TypeName: new(".test.Message"),
+						JsonName: new("msg"),
 					},
 					{
-						Name:     proto.String("en"),
-						Number:   proto.Int32(2),
-						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
-						Type:     descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum(),
-						TypeName: proto.String(".test.Enum"),
-						JsonName: proto.String("en"),
+						Name:     new("en"),
+						Number:   new(int32(2)),
+						Label:    new(descriptorpb.FieldDescriptorProto_LABEL_REPEATED),
+						Type:     new(descriptorpb.FieldDescriptorProto_TYPE_ENUM),
+						TypeName: new(".test.Enum"),
+						JsonName: new("en"),
 					},
 				},
 			},
 			{
-				Name: proto.String("Bar"),
+				Name: new("Bar"),
 				Field: []*descriptorpb.FieldDescriptorProto{
 					{
-						Name:     proto.String("foos"),
-						Number:   proto.Int32(1),
-						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
-						Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
-						TypeName: proto.String(".foo.bar.Foo"),
-						JsonName: proto.String("foos"),
+						Name:     new("foos"),
+						Number:   new(int32(1)),
+						Label:    new(descriptorpb.FieldDescriptorProto_LABEL_REPEATED),
+						Type:     new(descriptorpb.FieldDescriptorProto_TYPE_MESSAGE),
+						TypeName: new(".foo.bar.Foo"),
+						JsonName: new("foos"),
 					},
 				},
 			},

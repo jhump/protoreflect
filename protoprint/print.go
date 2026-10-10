@@ -263,7 +263,7 @@ type messageVal struct {
 // option represents a resolved descriptor option
 type option struct {
 	name string
-	val  interface{}
+	val  any
 }
 
 // reservedRange represents a reserved range from a message or enum
@@ -403,7 +403,7 @@ func (p *Printer) printFile(
 	})
 	p.newLine(w)
 
-	skip := map[interface{}]bool{}
+	skip := map[any]bool{}
 
 	elements := elementAddrs{dsc: fd, opts: opts}
 	if fd.Package() != "" {
@@ -729,7 +729,7 @@ func (p *Printer) printMessageBody(
 ) {
 	opts := p.extractOptions(md, reg, md.Options())
 
-	skip := map[interface{}]bool{}
+	skip := map[any]bool{}
 	maxTag := internal.GetMaxTag(isMessageSet(md))
 
 	elements := elementAddrs{dsc: md, opts: opts}
@@ -1266,7 +1266,7 @@ func (p *Printer) printEnum(
 
 		opts := p.extractOptions(ed, reg, ed.Options())
 
-		skip := map[interface{}]bool{}
+		skip := map[any]bool{}
 
 		elements := elementAddrs{dsc: ed, opts: opts}
 		elements.addrs = append(elements.addrs, optionsAsElementAddrs(internal.EnumOptionsTag, -1, opts)...)
@@ -1505,7 +1505,7 @@ func (p *Printer) printOptionsLong(
 }
 
 func (p *Printer) extractAndPrintOptionsShort(
-	dsc interface{},
+	dsc any,
 	optsMsg proto.Message,
 	reg *protoregistry.Types,
 	optsTag int32,
@@ -1523,7 +1523,7 @@ func (p *Printer) extractAndPrintOptionsShort(
 }
 
 func (p *Printer) printOptionsShort(
-	dsc interface{},
+	dsc any,
 	opts map[protoreflect.FieldNumber][]option,
 	optsTag int32,
 	reg *protoregistry.Types,
@@ -1693,7 +1693,7 @@ func sortKeys(m protoreflect.Map) []protoreflect.MapKey {
 	return res
 }
 
-func (p *Printer) printOption(reg *protoregistry.Types, name string, optVal interface{}, w *writer, indent int) {
+func (p *Printer) printOption(reg *protoregistry.Types, name string, optVal any, w *writer, indent int) {
 	_, _ = fmt.Fprintf(w, "%s = ", name)
 
 	switch optVal := optVal.(type) {
@@ -1897,7 +1897,7 @@ func (p *Printer) extractOptions(dsc protoreflect.Descriptor, reg *protoregistry
 	return options
 }
 
-func valueToOptions(fld protoreflect.FieldDescriptor, name string, val interface{}) []option {
+func valueToOptions(fld protoreflect.FieldDescriptor, name string, val any) []option {
 	switch val := val.(type) {
 	case protoreflect.List:
 		if fld.Number() == internal.UninterpretedOptionsTag {
@@ -1945,7 +1945,7 @@ func valueToOptions(fld protoreflect.FieldDescriptor, name string, val interface
 	}
 }
 
-func valueForOption(fld protoreflect.FieldDescriptor, val interface{}) interface{} {
+func valueForOption(fld protoreflect.FieldDescriptor, val any) any {
 	switch val := val.(type) {
 	case protoreflect.EnumNumber:
 		ev := fld.Enum().Values().ByNumber(val)
@@ -1992,7 +1992,7 @@ func uninterpretedToOptions(uninterp []*descriptorpb.UninterpretedOption) []opti
 			}
 		}
 
-		var v interface{}
+		var v any
 		switch {
 		case unint.IdentifierValue != nil:
 			v = ident(unint.GetIdentifierValue())
@@ -2124,7 +2124,7 @@ type elementAddr struct {
 
 type elementAddrs struct {
 	addrs []elementAddr
-	dsc   interface{}
+	dsc   any
 	opts  map[protoreflect.FieldNumber][]option
 }
 
@@ -2218,7 +2218,7 @@ func (a elementAddrs) Swap(i, j int) {
 	a.addrs[i], a.addrs[j] = a.addrs[j], a.addrs[i]
 }
 
-func (a elementAddrs) at(addr elementAddr) interface{} {
+func (a elementAddrs) at(addr elementAddr) any {
 	switch dsc := a.dsc.(type) {
 	case protoreflect.FileDescriptor:
 		switch addr.elementType {
@@ -2709,7 +2709,7 @@ func (p *Printer) printComment(comments string, w *writer, indent int, forceNext
 }
 
 func (p *Printer) indent(w io.Writer, indent int) {
-	for i := 0; i < indent; i++ {
+	for range indent {
 		_, _ = fmt.Fprint(w, p.Indent)
 	}
 }

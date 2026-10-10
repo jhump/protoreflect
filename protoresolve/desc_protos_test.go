@@ -86,7 +86,7 @@ func TestRegistryProtoFromFileDescriptor(t *testing.T) {
 		reg := newRegistry(t, []protoreflect.FileDescriptor{file})
 		// Same contents as a registered file, so its symbols conflict.
 		otherProto := protodesc.ToFileDescriptorProto(file)
-		otherProto.Name = proto.String("other.proto")
+		otherProto.Name = new("other.proto")
 		other, err := protodesc.NewFile(otherProto, nil)
 		require.NoError(t, err)
 		got, err := reg.ProtoFromFileDescriptor(other)
@@ -217,7 +217,7 @@ func TestNewProtoOracleErrors(t *testing.T) {
 	t.Run("wrong name", func(t *testing.T) {
 		t.Parallel()
 		oracle := mismatchedOracle(func(fileProto *descriptorpb.FileDescriptorProto) {
-			fileProto.MessageType[0].Name = proto.String("Foo")
+			fileProto.MessageType[0].Name = new("Foo")
 		})
 		_, err := oracle.ProtoFromMessageDescriptor(firstMsg)
 		assert.ErrorContains(t, err, `found descriptor with name "Foo"`)

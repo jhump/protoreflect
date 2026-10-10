@@ -277,6 +277,6 @@ func HTTPTypeFetcher(transport http.RoundTripper, szLimit, parLimit int) TypeFet
 	}))
 }
 
-var bufferPool = sync.Pool{New: func() interface{} {
+var bufferPool = sync.Pool{New: func() any {
 	return bytes.NewBuffer(make([]byte, 0, 8192))
 }}

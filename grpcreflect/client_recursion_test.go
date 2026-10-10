@@ -211,8 +211,8 @@ func startFakeReflectionServer(t *testing.T, svc fakeReflectionServer) *grpc.Cli
 // thing under test.
 func newFileProto(name string, deps ...string) *descriptorpb.FileDescriptorProto {
 	return &descriptorpb.FileDescriptorProto{
-		Name:       proto.String(name),
-		Syntax:     proto.String("proto3"),
+		Name:       new(name),
+		Syntax:     new("proto3"),
 		Dependency: deps,
 	}
 }
