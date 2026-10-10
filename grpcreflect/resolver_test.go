@@ -107,7 +107,7 @@ func TestClientAsResolverWithFallback(t *testing.T) {
 
 // startReflectionServer starts a reflection server that serves exactly the
 // given files and returns a connection to it.
-func startReflectionServer(t *testing.T, files []protoreflect.FileDescriptor) *grpc.ClientConn {
+func startReflectionServer(t *testing.T, files []protoreflect.FileDescriptor, opts ...grpc.ServerOption) *grpc.ClientConn {
 	t.Helper()
 	var reg protoregistry.Files
 	for _, file := range files {
@@ -116,7 +116,7 @@ func startReflectionServer(t *testing.T, files []protoreflect.FileDescriptor) *g
 	var types protoregistry.Types
 	require.NoError(t, protoresolve.RegisterTypesInFilesRecursive(&reg, &types, protoresolve.TypeKindsAll))
 	serverOpts := reflection.ServerOptions{DescriptorResolver: &reg, ExtensionResolver: &types}
-	svr := grpc.NewServer()
+	svr := grpc.NewServer(opts...)
 	refv1.RegisterServerReflectionServer(svr, reflection.NewServerV1(serverOpts))
 	refv1alpha.RegisterServerReflectionServer(svr, reflection.NewServer(serverOpts))
 	return prototesting.StartServer(t, svr)
