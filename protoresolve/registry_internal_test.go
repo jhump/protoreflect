@@ -54,8 +54,8 @@ func TestExtResolverForFile(t *testing.T) {
 		}
 
 		_, err := res.FindExtensionByName("file.unknown")
-		assert.ErrorIs(t, err, ErrNotFound)
-		assert.ErrorContains(t, err, "file.unknown")
+		// Unmarshalling requires exactly ErrNotFound, not a wrapped error.
+		assert.Same(t, ErrNotFound, err)
 
 		// Elements of the wrong kind, in the registry and in the file.
 		for _, name := range []protoreflect.FullName{"dep.Extendee", "file.Msg"} {
@@ -76,7 +76,6 @@ func TestExtResolverForFile(t *testing.T) {
 		}
 
 		_, err := res.FindExtensionByNumber("dep.Extendee", 102)
-		assert.ErrorIs(t, err, ErrNotFound)
-		assert.ErrorContains(t, err, "102")
+		assert.Same(t, ErrNotFound, err)
 	})
 }

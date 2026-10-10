@@ -10,6 +10,10 @@
 // types for many of these cases. This package provides named types, useful for more
 // compact parameter and field declarations as well as type assertions.
 //
+// The resolver implementations in this package are compatible with those in
+// [protoregistry] and are intended for use with these core runtime APIs, such
+// as for marshalling and unmarshalling messages.
+//
 // The core protobuf runtime API also includes two resolver implementations:
 //   - *[protoregistry.Files]: for resolving descriptors.
 //   - *[protoregistry.Types]: for resolving types.

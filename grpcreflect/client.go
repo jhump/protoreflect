@@ -795,9 +795,24 @@ func (cr *Client) AsResolver() protoresolve.Resolver {
 
 type clientResolver Client
 
+// resolverError converts an error from the client into an error for the
+// protoresolve.Resolver interface: not-found errors must be exactly
+// protoresolve.ErrNotFound (which is protoregistry.NotFound), as its doc comment
+// requires, since the protobuf runtime compares errors to it with ==.
+func resolverError(err error) error {
+	if errors.Is(err, protoresolve.ErrNotFound) {
+		return protoresolve.ErrNotFound
+	}
+	return err
+}
+
 func (c *clientResolver) FindFileByPath(path string) (protoreflect.FileDescriptor, error) {
 	cr := (*Client)(c)
-	return cr.FileByFilename(path)
+	file, err := cr.FileByFilename(path)
+	if err != nil {
+		return nil, resolverError(err)
+	}
+	return file, nil
 }
 
 func (c *clientResolver) NumFiles() int {
@@ -860,11 +875,11 @@ func (c *clientResolver) findDescriptor(name protoreflect.FullName) (protoreflec
 	cr := (*Client)(c)
 	file, err := cr.FileContainingSymbol(name)
 	if err != nil {
-		return nil, err
+		return nil, resolverError(err)
 	}
 	d := protoresolve.FindDescriptorByNameInFile(file, name)
 	if d == nil {
-		return nil, symbolNotFound(name, nil)
+		return nil, protoresolve.ErrNotFound
 	}
 	return d, nil
 }
@@ -911,11 +926,11 @@ func (c *clientResolver) FindExtensionByNumber(message protoreflect.FullName, fi
 	cr := (*Client)(c)
 	file, err := cr.FileContainingExtension(message, field)
 	if err != nil {
-		return nil, err
+		return nil, resolverError(err)
 	}
 	ext := protoresolve.FindExtensionByNumberInFile(file, message, field)
 	if ext == nil {
-		return nil, extensionNotFound(message, field, nil)
+		return nil, protoresolve.ErrNotFound
 	}
 	return ext, nil
 }
