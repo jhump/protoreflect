@@ -45,8 +45,8 @@ func (t *typeTrie) addType(key string, typ proto.Message) {
 // returned that contains the trie's children as nested message and/or enum
 // types.
 //
-// If the value in t.typ is already a *descriptor.DescriptorProto or a
-// *descriptor.EnumDescriptorProto then it is returned as is. This function
+// If the value in t.typ is already a *descriptorpb.DescriptorProto or a
+// *descriptorpb.EnumDescriptorProto then it is returned as is. This function
 // should not be used in type tries that may have service descriptors. That will
 // result in a panic.
 func (t *typeTrie) typeToDescriptor(name string, res protoresolve.SerializationResolver) (*descriptorpb.DescriptorProto, *descriptorpb.EnumDescriptorProto) {
