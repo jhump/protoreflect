@@ -1020,7 +1020,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 	// in built descriptors
 
 	t.Run("file options", func(t *testing.T) {
-		fb := clone(t, file)
+		fb := Clone(file)
 		fb.Options = &descriptorpb.FileOptions{}
 		ext, err := fileOpt.Build()
 		require.NoError(t, err)
@@ -1035,7 +1035,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		require.NoError(t, err)
 		mb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
-		fb := clone(t, file)
+		fb := Clone(file)
 		fb.AddMessage(mb)
 		checkBuildWithLocalExtensions(t, mb)
 	})
@@ -1049,7 +1049,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		require.NoError(t, err)
 		flb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
-		fb := clone(t, file)
+		fb := Clone(file)
 		fb.AddMessage(mb)
 		checkBuildWithLocalExtensions(t, flb)
 	})
@@ -1064,7 +1064,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		require.NoError(t, err)
 		oob.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
-		fb := clone(t, file)
+		fb := Clone(file)
 		fb.AddMessage(mb)
 		checkBuildWithLocalExtensions(t, oob)
 	})
@@ -1076,7 +1076,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		erOpts.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 		mb := NewMessage("foo").AddExtensionRangeWithOptions(100, 200, &erOpts)
 
-		fb := clone(t, file)
+		fb := Clone(file)
 		fb.AddMessage(mb)
 		checkBuildWithLocalExtensions(t, mb)
 	})
@@ -1089,7 +1089,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		require.NoError(t, err)
 		eb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
-		fb := clone(t, file)
+		fb := Clone(file)
 		fb.AddEnum(eb)
 		checkBuildWithLocalExtensions(t, eb)
 	})
@@ -1103,7 +1103,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		require.NoError(t, err)
 		evb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
-		fb := clone(t, file)
+		fb := Clone(file)
 		fb.AddEnum(eb)
 		checkBuildWithLocalExtensions(t, evb)
 	})
@@ -1115,7 +1115,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		require.NoError(t, err)
 		sb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
-		fb := clone(t, file)
+		fb := Clone(file)
 		fb.AddService(sb)
 		checkBuildWithLocalExtensions(t, sb)
 	})
@@ -1133,7 +1133,7 @@ func TestCustomOptionsDiscoveredInSameFile(t *testing.T) {
 		require.NoError(t, err)
 		mtb.Options.ProtoReflect().Set(ext, protoreflect.ValueOfString("fubar"))
 
-		fb := clone(t, file)
+		fb := Clone(file)
 		fb.AddService(sb).AddMessage(req).AddMessage(resp)
 		checkBuildWithLocalExtensions(t, mtb)
 	})
@@ -1591,14 +1591,6 @@ func TestInterleavedEnumNumbers(t *testing.T) {
 	evd = ed.Values().ByName("OPTION_6")
 	require.NotNil(t, evd)
 	require.Equal(t, protoreflect.EnumNumber(100), evd.Number())
-}
-
-func clone(t *testing.T, fb *FileBuilder) *FileBuilder {
-	fd, err := fb.Build()
-	require.NoError(t, err)
-	fb, err = FromFile(fd)
-	require.NoError(t, err)
-	return fb
 }
 
 func TestPruneDependencies(t *testing.T) {

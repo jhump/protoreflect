@@ -80,7 +80,8 @@ func (s *Stub) InvokeRPC(ctx context.Context, method protoreflect.MethodDescript
 	return resp, nil
 }
 
-// InvokeRPCServerStream sends a unary RPC and returns the response stream. Use this for server-streaming methods.
+// InvokeRPCServerStream sends a single request message and returns the response stream. Use this
+// for server-streaming methods.
 //
 // To release the stream's resources, callers must either call RecvMsg until it
 // returns an error (which is io.EOF when the stream completes normally) or
@@ -121,6 +122,9 @@ func (s *Stub) InvokeRPCServerStream(ctx context.Context, method protoreflect.Me
 
 // InvokeRPCClientStream creates a new stream that is used to send request messages and, at the end,
 // receive the response message. Use this for client-streaming methods.
+//
+// To release the stream's resources, callers must either call CloseAndReceive
+// or cancel ctx.
 func (s *Stub) InvokeRPCClientStream(ctx context.Context, method protoreflect.MethodDescriptor, opts ...grpc.CallOption) (*ClientStream, error) {
 	if !method.IsStreamingClient() || method.IsStreamingServer() {
 		return nil, fmt.Errorf("InvokeRPCClientStream is for client-streaming methods; %q is %s", method.FullName(), methodType(method))
@@ -136,6 +140,11 @@ func (s *Stub) InvokeRPCClientStream(ctx context.Context, method protoreflect.Me
 
 // InvokeRPCBidiStream creates a new stream that is used to both send request messages and receive response
 // messages. Use this for bidi-streaming methods.
+//
+// To release the stream's resources, callers must either call RecvMsg until it
+// returns an error (which is io.EOF when the stream completes normally) or
+// cancel ctx. Usually, the server doesn't end the stream until after the
+// client calls CloseSend.
 func (s *Stub) InvokeRPCBidiStream(ctx context.Context, method protoreflect.MethodDescriptor, opts ...grpc.CallOption) (*BidiStream, error) {
 	if !method.IsStreamingClient() || !method.IsStreamingServer() {
 		return nil, fmt.Errorf("InvokeRPCBidiStream is for bidi-streaming methods; %q is %s", method.FullName(), methodType(method))

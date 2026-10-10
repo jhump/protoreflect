@@ -656,7 +656,7 @@ func (fb *FileBuilder) addExtensionsFromImport(dep protoreflect.FileDescriptor) 
 // for the file that contains the custom options.
 //
 // Knowledge of custom options can also be provided by using BuilderOptions with
-// an ExtensionRegistry, when building the file.
+// a Resolver, when building the file.
 func (fb *FileBuilder) AddDependency(dep *FileBuilder) *FileBuilder {
 	if fb.explicitDeps == nil {
 		fb.explicitDeps = map[*FileBuilder]struct{}{}
@@ -673,7 +673,7 @@ func (fb *FileBuilder) AddDependency(dep *FileBuilder) *FileBuilder {
 // for the file that contains the custom options.
 //
 // Knowledge of custom options can also be provided by using BuilderOptions with
-// an ExtensionRegistry, when building the file.
+// a Resolver, when building the file.
 func (fb *FileBuilder) AddImportedDependency(dep protoreflect.FileDescriptor) *FileBuilder {
 	if fb.explicitImports == nil {
 		fb.explicitImports = map[protoreflect.FileDescriptor]struct{}{}
@@ -685,7 +685,7 @@ func (fb *FileBuilder) AddImportedDependency(dep protoreflect.FileDescriptor) *F
 // PruneUnusedDependencies removes all imports that are not actually used in the
 // file. Note that this undoes any calls to AddDependency or AddImportedDependency
 // which means that custom options may be missing from the resulting built
-// descriptor unless BuilderOptions are used that include an ExtensionRegistry with
+// descriptor unless BuilderOptions are used that include a Resolver with
 // knowledge of all custom options.
 //
 // When FromFile is used to create a FileBuilder from an existing descriptor, all
@@ -695,8 +695,8 @@ func (fb *FileBuilder) AddImportedDependency(dep protoreflect.FileDescriptor) *F
 // is used, any custom options present in the original descriptor will be correctly
 // retained. If the file is mutated such that new custom options are added to the file,
 // they may be missing unless AddImportedDependency is called after pruning OR
-// BuilderOptions are used that include an ExtensionRegistry with knowledge of the
-// new custom options.
+// BuilderOptions are used that include a Resolver with knowledge of the new
+// custom options.
 func (fb *FileBuilder) PruneUnusedDependencies() *FileBuilder {
 	fb.explicitImports = nil
 	fb.explicitDeps = nil

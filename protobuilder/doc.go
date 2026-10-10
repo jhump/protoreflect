@@ -87,8 +87,8 @@
 // declared. However, it is *not* necessary to construct this full hierarchy
 // with builders. One can create a message builder, for example, and then
 // immediately build it to get the descriptor for that message. If it was never
-// added to a file then the GetFile() method on the resulting descriptor returns
-// a synthetic file that contains only the one message.
+// added to a file then the ParentFile() method on the resulting descriptor
+// returns a synthetic file that contains only the one message.
 //
 // Note, however, that this is not true for enum values, methods, and
 // non-extension fields. These kinds of builders *must* be added to an enum, a
@@ -107,12 +107,12 @@
 // methods in order to support a typical method-chaining flow when building
 // objects:
 //
-//	msg, err := builder.NewMessage("MyMessage").
-//	    AddField(NewField("foo", FieldTypeScalar(descriptor.FieldDescriptorProto_TYPE_STRING)).
+//	msg, err := protobuilder.NewMessage("MyMessage").
+//	    AddField(protobuilder.NewField("foo", protobuilder.FieldTypeString()).
 //	        SetDefaultValue("bar")).
-//	    AddField(NewField("baz", FieldTypeScalar(descriptor.FieldDescriptorProto_TYPE_INT64)).
-//	        SetCardinality(descriptor.FieldDescriptorProto_LABEL_REPEATED).
-//	        SetOptions(&descriptor.FieldOptions{Packed: new(true)})).
+//	    AddField(protobuilder.NewField("baz", protobuilder.FieldTypeInt64()).
+//	        SetCardinality(protoreflect.Repeated).
+//	        SetOptions(&descriptorpb.FieldOptions{Packed: new(true)})).
 //	    Build()
 //
 // So the various Set* methods all return the builder itself so that multiple
@@ -126,8 +126,8 @@
 //
 // When defining fields whose type is a message or enum and when defining
 // methods (whose request and response type are a message), the type can be set
-// to an actual descriptor (e.g. a *desc.MessageDescriptor) or to a builder for
-// the type (e.g. a *builder.MessageBuilder). Since Go does not allow method
+// to an actual descriptor (e.g. a protoreflect.MessageDescriptor) or to a builder
+// for the type (e.g. a *MessageBuilder). Since Go does not allow method
 // overloading, the naming convention is that types referring to descriptors are
 // "imported types" (since their use will result in an import statement in the
 // resulting file descriptor, to import the file in which the type was defined.)
