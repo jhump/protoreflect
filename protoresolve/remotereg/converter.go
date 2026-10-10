@@ -608,6 +608,9 @@ type convertContext struct {
 	files map[string]*fileEntry
 	// map of type URLs to the file name that defines them
 	typeLocations map[string]string
+	// map of type URLs to descriptors found in the fallback resolver, for
+	// types that the fetcher didn't have
+	fallbackTypes map[string]protoreflect.Descriptor
 }
 
 func newConvertContext(reg *Registry, fetcher TypeFetcher) *convertContext {
@@ -616,6 +619,7 @@ func newConvertContext(reg *Registry, fetcher TypeFetcher) *convertContext {
 		res:           (*remoteSubResolver)(reg),
 		fetcher:       fetcher,
 		typeLocations: map[string]string{},
+		fallbackTypes: map[string]protoreflect.Descriptor{},
 		files:         map[string]*fileEntry{},
 	}
 }
@@ -790,6 +794,7 @@ func (cc *convertContext) findWithFallback(url string, enum bool) (err error) {
 		if d != nil && err == nil {
 			cc.mu.Lock()
 			cc.typeLocations[url] = d.ParentFile().Path()
+			cc.fallbackTypes[url] = d
 			cc.mu.Unlock()
 		}
 	}()
