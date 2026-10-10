@@ -37,17 +37,22 @@ func NewService(name protoreflect.Name) *ServiceBuilder {
 // descriptor.
 //
 // Note that it is not just the given service that is copied but its entire
-// file. So the caller can get the parent element of the returned builder and
+// file. So the caller can get the parent element of the returned builder, and
 // the result would be a builder that is effectively a copy of the service
 // descriptor's parent file.
 //
 // This means that service builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original service's
 // package name.
+//
+// To get builders for multiple elements in the same file, without creating
+// multiple copies of the enclosing file (which can lead to conflicts when
+// building later), use FromFile to get a single builder for the file, and
+// then use FileBuilder.FindElement to find each element.
 func FromService(sd protoreflect.ServiceDescriptor) (*ServiceBuilder, error) {
 	if fb, err := FromFile(sd.ParentFile()); err != nil {
 		return nil, err
-	} else if sb, ok := fb.findFullyQualifiedElement(sd.FullName()).(*ServiceBuilder); ok {
+	} else if sb, ok := fb.FindElement(sd.FullName()).(*ServiceBuilder); ok {
 		return sb, nil
 	} else {
 		return nil, fmt.Errorf("could not find service %s after converting file %q to builder", sd.FullName(), sd.ParentFile().Path())
@@ -277,17 +282,22 @@ func NewMethod(name protoreflect.Name, req, resp *RpcType) *MethodBuilder {
 // descriptor.
 //
 // Note that it is not just the given method that is copied but its entire file.
-// So the caller can get the parent element of the returned builder and the
+// So the caller can get the parent element of the returned builder, and the
 // result would be a builder that is effectively a copy of the method
 // descriptor's parent service.
 //
 // This means that method builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original method's
 // package name.
+//
+// To get builders for multiple elements in the same file, without creating
+// multiple copies of the enclosing file (which can lead to conflicts when
+// building later), use FromFile to get a single builder for the file, and
+// then use FileBuilder.FindElement to find each element.
 func FromMethod(mtd protoreflect.MethodDescriptor) (*MethodBuilder, error) {
 	if fb, err := FromFile(mtd.ParentFile()); err != nil {
 		return nil, err
-	} else if mtb, ok := fb.findFullyQualifiedElement(mtd.FullName()).(*MethodBuilder); ok {
+	} else if mtb, ok := fb.FindElement(mtd.FullName()).(*MethodBuilder); ok {
 		return mtb, nil
 	} else {
 		return nil, fmt.Errorf("could not find method %s after converting file %q to builder", mtd.FullName(), mtd.ParentFile().Path())

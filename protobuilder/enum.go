@@ -49,17 +49,22 @@ func NewEnum(name protoreflect.Name) *EnumBuilder {
 // descriptor.
 //
 // Note that it is not just the given enum that is copied but its entire file.
-// So the caller can get the parent element of the returned builder and the
+// So the caller can get the parent element of the returned builder, and the
 // result would be a builder that is effectively a copy of the enum descriptor's
 // parent.
 //
 // This means that enum builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original enum's
 // package name.
+//
+// To get builders for multiple elements in the same file, without creating
+// multiple copies of the enclosing file (which can lead to conflicts when
+// building later), use FromFile to get a single builder for the file, and
+// then use FileBuilder.FindElement to find each element.
 func FromEnum(ed protoreflect.EnumDescriptor) (*EnumBuilder, error) {
 	if fb, err := FromFile(ed.ParentFile()); err != nil {
 		return nil, err
-	} else if eb, ok := fb.findFullyQualifiedElement(ed.FullName()).(*EnumBuilder); ok {
+	} else if eb, ok := fb.FindElement(ed.FullName()).(*EnumBuilder); ok {
 		return eb, nil
 	} else {
 		return nil, fmt.Errorf("could not find enum %s after converting file %q to builder", ed.FullName(), ed.ParentFile().Path())
@@ -374,17 +379,22 @@ func NewEnumValue(name protoreflect.Name) *EnumValueBuilder {
 // given descriptor.
 //
 // Note that it is not just the given enum value that is copied but its entire
-// file. So the caller can get the parent element of the returned builder and
+// file. So the caller can get the parent element of the returned builder, and
 // the result would be a builder that is effectively a copy of the enum value
 // descriptor's parent enum.
 //
 // This means that enum value builders created from descriptors do not need to
 // be explicitly assigned to a file in order to preserve the original enum
 // value's package name.
+//
+// To get builders for multiple elements in the same file, without creating
+// multiple copies of the enclosing file (which can lead to conflicts when
+// building later), use FromFile to get a single builder for the file, and
+// then use FileBuilder.FindElement to find each element.
 func FromEnumValue(evd protoreflect.EnumValueDescriptor) (*EnumValueBuilder, error) {
 	if fb, err := FromFile(evd.ParentFile()); err != nil {
 		return nil, err
-	} else if evb, ok := fb.findFullyQualifiedElement(evd.FullName()).(*EnumValueBuilder); ok {
+	} else if evb, ok := fb.FindElement(evd.FullName()).(*EnumValueBuilder); ok {
 		return evb, nil
 	} else {
 		return nil, fmt.Errorf("could not find enum value %s after converting file %q to builder", evd.FullName(), evd.ParentFile().Path())

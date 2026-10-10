@@ -67,17 +67,22 @@ func NewMessage(name protoreflect.Name) *MessageBuilder {
 // descriptor.
 //
 // Note that it is not just the given message that is copied but its entire
-// file. So the caller can get the parent element of the returned builder and
+// file. So the caller can get the parent element of the returned builder, and
 // the result would be a builder that is effectively a copy of the message
 // descriptor's parent.
 //
 // This means that message builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original message's
 // package name.
+//
+// To get builders for multiple elements in the same file, without creating
+// multiple copies of the enclosing file (which can lead to conflicts when
+// building later), use FromFile to get a single builder for the file, and
+// then use FileBuilder.FindElement to find each element.
 func FromMessage(md protoreflect.MessageDescriptor) (*MessageBuilder, error) {
 	if fb, err := FromFile(md.ParentFile()); err != nil {
 		return nil, err
-	} else if mb, ok := fb.findFullyQualifiedElement(md.FullName()).(*MessageBuilder); ok {
+	} else if mb, ok := fb.FindElement(md.FullName()).(*MessageBuilder); ok {
 		return mb, nil
 	} else {
 		return nil, fmt.Errorf("could not find message %s after converting file %q to builder", md.FullName(), md.ParentFile().Path())
