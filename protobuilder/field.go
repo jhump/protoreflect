@@ -187,17 +187,22 @@ func NewExtensionImported(name protoreflect.Name, tag protoreflect.FieldNumber, 
 // descriptor.
 //
 // Note that it is not just the given field that is copied but its entire file.
-// So the caller can get the parent element of the returned builder and the
+// So the caller can get the parent element of the returned builder, and the
 // result would be a builder that is effectively a copy of the field
 // descriptor's parent.
 //
 // This means that field builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original field's
 // package name.
+//
+// To get builders for multiple elements in the same file, without creating
+// multiple copies of the enclosing file (which can lead to conflicts when
+// building later), use FromFile to get a single builder for the file, and
+// then use FileBuilder.FindElement to find each element.
 func FromField(fld protoreflect.FieldDescriptor) (*FieldBuilder, error) {
 	if fb, err := FromFile(fld.ParentFile()); err != nil {
 		return nil, err
-	} else if flb, ok := fb.findFullyQualifiedElement(fld.FullName()).(*FieldBuilder); ok {
+	} else if flb, ok := fb.FindElement(fld.FullName()).(*FieldBuilder); ok {
 		return flb, nil
 	} else {
 		return nil, fmt.Errorf("could not find field %s after converting file %q to builder", fld.FullName(), fld.ParentFile().Path())
@@ -688,13 +693,18 @@ func NewOneof(name protoreflect.Name) *OneofBuilder {
 // descriptor.
 //
 // Note that it is not just the given oneof that is copied but its entire file.
-// So the caller can get the parent element of the returned builder and the
+// So the caller can get the parent element of the returned builder, and the
 // result would be a builder that is effectively a copy of the oneof
 // descriptor's parent message.
 //
 // This means that oneof builders created from descriptors do not need to be
 // explicitly assigned to a file in order to preserve the original oneof's
 // package name.
+//
+// To get builders for multiple elements in the same file, without creating
+// multiple copies of the enclosing file (which can lead to conflicts when
+// building later), use FromFile to get a single builder for the file, and
+// then use FileBuilder.FindElement to find each element.
 //
 // This function returns an error if the given descriptor is synthetic.
 func FromOneof(ood protoreflect.OneofDescriptor) (*OneofBuilder, error) {
@@ -703,7 +713,7 @@ func FromOneof(ood protoreflect.OneofDescriptor) (*OneofBuilder, error) {
 	}
 	if fb, err := FromFile(ood.ParentFile()); err != nil {
 		return nil, err
-	} else if oob, ok := fb.findFullyQualifiedElement(ood.FullName()).(*OneofBuilder); ok {
+	} else if oob, ok := fb.FindElement(ood.FullName()).(*OneofBuilder); ok {
 		return oob, nil
 	} else {
 		return nil, fmt.Errorf("could not find oneof %s after converting file %q to builder", ood.FullName(), ood.ParentFile().Path())

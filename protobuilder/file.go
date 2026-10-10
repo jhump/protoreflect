@@ -387,7 +387,22 @@ func (fb *FileBuilder) addSymbol(b Builder) error {
 	return nil
 }
 
-func (fb *FileBuilder) findFullyQualifiedElement(fqn protoreflect.FullName) Builder {
+// FindElement returns the element in this file with the given fully-qualified
+// name, or nil if there is no such element. Unlike the Get* methods, which only
+// return immediate children, this searches all descendants. So it can be used
+// to find nested messages, fields, enum values, etc.
+//
+// The given name must include the file's package. As with descriptors, the
+// full name of an enum value is in the scope of its enum's parent, not of the
+// enum itself. Similarly, a field in a oneof is found by its name in the
+// enclosing message; the name of the oneof isn't part of the field's name.
+//
+// This is useful for getting builders for several elements in one file. The
+// From* functions other than FromFile, such as FromMessage, copy the element's
+// entire file. So calling them for two elements in the same file produces two
+// separate copies of that file. Instead, use FromFile to get a single builder
+// for the file, and then use this method to get builders for elements therein.
+func (fb *FileBuilder) FindElement(fqn protoreflect.FullName) Builder {
 	if fb.Package != "" {
 		if !strings.HasPrefix(string(fqn), string(fb.Package+".")) {
 			return nil

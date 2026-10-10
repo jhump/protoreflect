@@ -48,6 +48,10 @@ type dependencyResolver struct {
 	resolvedRoots map[Builder]protoreflect.FileDescriptor
 	seen          map[Builder]struct{}
 	opts          BuilderOptions
+	// builtFiles has the descriptor proto for each file built from a
+	// FileBuilder, keyed by path. These are copies, taken before the file
+	// was registered, since registering may modify the proto.
+	builtFiles map[string]*descriptorpb.FileDescriptorProto
 }
 
 func newResolver(opts BuilderOptions) *dependencyResolver {
@@ -55,6 +59,7 @@ func newResolver(opts BuilderOptions) *dependencyResolver {
 		resolvedRoots: map[Builder]protoreflect.FileDescriptor{},
 		seen:          map[Builder]struct{}{},
 		opts:          opts,
+		builtFiles:    map[string]*descriptorpb.FileDescriptorProto{},
 	}
 }
 
@@ -170,7 +175,44 @@ func (r *dependencyResolver) resolveFile(fb *FileBuilder, root Builder, seen []B
 			return nil, err
 		}
 	}
+
+	// Several file builders may have the same path. For example, calling
+	// FromMessage for two messages in the same file creates a separate copy of
+	// that file for each. That's fine if the copies are identical. Similarly,
+	// another file may have already imported the original descriptor.
+	if prev, ok := r.builtFiles[fp.GetName()]; ok {
+		if !proto.Equal(prev, fp) {
+			return nil, multipleVersionsError(fp.GetName())
+		}
+		return r.registry.FindFileByPath(fp.GetName())
+	}
+	if existing, err := r.registry.FindFileByPath(fp.GetName()); err == nil {
+		existingProto, err := r.registry.ProtoFromFileDescriptor(existing)
+		if err != nil {
+			return nil, err
+		}
+		if !equalIgnoringSourceInfo(existingProto, fp) {
+			return nil, multipleVersionsError(fp.GetName())
+		}
+		return existing, nil
+	}
+	r.builtFiles[fp.GetName()] = proto.CloneOf(fp)
 	return r.registry.RegisterFileProto(fp)
+}
+
+// equalIgnoringSourceInfo reports whether the given file protos are equal,
+// other than their source code info.
+func equalIgnoringSourceInfo(a, b *descriptorpb.FileDescriptorProto) bool {
+	// temporarily reset source code info: builders do not have them
+	defer setSourceCodeInfo(a, nil)()
+	defer setSourceCodeInfo(b, nil)()
+	return proto.Equal(a, b)
+}
+
+func multipleVersionsError(path string) error {
+	return fmt.Errorf("multiple versions of descriptors found with same file path: %s "+
+		"(to modify several elements of one file, use FromFile and FileBuilder.FindElement "+
+		"instead of a separate From* call for each element)", path)
 }
 
 type filesByPath map[string]protoreflect.FileDescriptor
@@ -200,13 +242,8 @@ func isDuplicateDependency(dep protoreflect.FileDescriptor, files protoresolve.F
 	if depFDP == nil {
 		depFDP = protodesc.ToFileDescriptorProto(dep)
 	}
-
-	// temporarily reset source code info: builders do not have them
-	defer setSourceCodeInfo(prevFDP, nil)()
-	defer setSourceCodeInfo(depFDP, nil)()
-
-	if !proto.Equal(prevFDP, depFDP) {
-		return true, fmt.Errorf("multiple versions of descriptors found with same file path: %s", dep.Path())
+	if !equalIgnoringSourceInfo(prevFDP, depFDP) {
+		return true, multipleVersionsError(dep.Path())
 	}
 	return true, nil
 }

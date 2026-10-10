@@ -25,6 +25,17 @@
 // nil values for required fields (such as field types, RPC method types, and
 // extendee type for extensions).
 //
+// The From* functions for elements other than files create a new builder for
+// the enclosing file and then find and return the corresponding builder
+// therein. If you use these functions to get builders for a number of
+// different elements that are defined in the same file, they each reside in
+// separate copies of the enclosing file. This can cause conflicts if you then
+// refer to these elements from another builder, since the referring builder now
+// depends on multiple, different copies of the same file. The correct way to do
+// this, to get builders for multiple elements in the same file, is to instead
+// use FromFile to create a FileBuilder and then call its FindElement method to
+// find each descendant element.
+//
 // # Auto-Assigning Tag Numbers and File Names
 //
 // The factory function for fields does not accept a tag number. This is because
