@@ -18,15 +18,11 @@
 //   - *[protoregistry.Files]: for resolving descriptors.
 //   - *[protoregistry.Types]: for resolving types.
 //
-// When using descriptors, such that all types are dynamic, using the above two
-// types requires double the work to register everything with both. The first must
-// be used in order to process [FileDescriptorProto] instances into more useful
-// [FileDescriptor] instances, and the second must be used to create a resolver
-// that the other APIs accept.
-//
-// The Registry type in this package, on the other hand, allows callers to register
-// descriptors once, and the result can automatically be used as a type registry,
-// too, with all dynamic types.
+// The Registry type in this package is similar to *[protoregistry.Files], but
+// it implements more of the resolver interfaces in this package. Like
+// [dynamicpb.NewTypes], it can also be used as a type resolver, that provides
+// dynamic types for all of its registered descriptors. (See
+// Registry.AsTypeResolver.)
 //
 // This package also provides functions for composition: layering resolvers
 // such that one is tried first (the "preferred" resolver), and then others
@@ -119,8 +115,6 @@
 // (ResolverFromPool, ResolverFromPools, TypesFromDescriptorPool, and TypesFromResolver).
 //
 // [google.golang.org/protobuf]: https://pkg.go.dev/google.golang.org/protobuf
-// [FileDescriptorProto]: https://pkg.go.dev/google.golang.org/protobuf/types/descriptorpb#FileDescriptorProto
-// [FileDescriptor]: https://pkg.go.dev/google.golang.org/protobuf/reflect/protoreflect#FileDescriptor
 package protoresolve
 
 import (
