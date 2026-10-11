@@ -79,8 +79,9 @@ func FromFileDescriptorSet(files *descriptorpb.FileDescriptorSet) (*Registry, er
 //
 // This will retain the given proto message, so calling code should not attempt to
 // mutate it (or re-use it in a way that could mutate it). The given proto message
-// will be supplied to callers of [ProtoFromFileDescriptor], to improve performance
-// and fidelity over use of the [protodesc] package to recover the descriptor proto.
+// will be supplied to callers of [Registry.ProtoFromFileDescriptor], to improve
+// performance and fidelity over use of the [protodesc] package to recover the
+// descriptor proto.
 //
 // In general, prefer calling this method instead of calling [protodesc.NewFile]
 // followed by RegisterFile.

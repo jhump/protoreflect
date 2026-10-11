@@ -30,7 +30,7 @@ var _ TypeRegistry = (*protoregistry.Types)(nil)
 
 // TypesFromResolver adapts a resolver that returns descriptors into a resolver
 // that returns types. This can be used by implementations of Resolver to
-// implement the [Resolver.AsTypeResolver] method.
+// implement the [Resolver].AsTypeResolver method.
 //
 // It returns all dynamic types except for extensions, in which case, if an
 // extension implements [protoreflect.ExtensionTypeDescriptor], it will return
@@ -60,11 +60,11 @@ func TypesFromResolver(resolver interface {
 
 // TypesFromDescriptorPool adapts a descriptor pool into a pool that returns
 // types. This can be used by implementations of Resolver to implement the
-// [Resolver.AsTypeResolver] method.
+// [Resolver].AsTypeResolver method.
 //
 // If the given resolver implements ExtensionResolver, then the returned type
 // pool provides an efficient implementation for the
-// [ExtensionTypeResolver.FindExtensionByNumber] method. Otherwise, it will
+// [ExtensionTypeResolver].FindExtensionByNumber method. Otherwise, it will
 // use an inefficient implementation that searches through all files for the
 // requested extension.
 func TypesFromDescriptorPool(pool DescriptorPool) TypePool {
