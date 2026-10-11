@@ -121,7 +121,7 @@ func RangeExtensionsByMessage(res DescriptorPool, message protoreflect.FullName,
 
 // FindDescriptorByNameInFile searches the given file for the element with the given
 // fully-qualified name. This could be used to implement the
-// [DescriptorResolver.FindDescriptorByName] method for a resolver that doesn't want
+// [DescriptorResolver].FindDescriptorByName method for a resolver that doesn't want
 // to create an index of all descriptors. This returns nil if no element with the
 // given name belongs to this file.
 //
