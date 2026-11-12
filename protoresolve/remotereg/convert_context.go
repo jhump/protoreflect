@@ -5,6 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"sync"
 
 	"golang.org/x/sync/errgroup"
@@ -12,10 +15,25 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/known/sourcecontextpb"
 	"google.golang.org/protobuf/types/known/typepb"
 
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
+
+// defaultMaxReachableTypes is the default for Registry.MaxReachableTypes, which
+// bounds the number of types that a single resolution operation may add to a
+// convertContext.
+//
+// Besides preventing a malicious server from causing the client to fetch
+// forever, this limit is also what bounds the depth of recursion when
+// assembling the fetched types into files and descriptors, since there can be
+// no more files than there are types.
+//
+// The largest schemas measured when choosing this default (Google Ads' API and
+// Perfetto's trace format, both of which have a type that refers to nearly
+// everything else) have about 1100-1200 types reachable from a single type.
+const defaultMaxReachableTypes = 1500
 
 // convertContext provides the state for a resolution operation, accumulating details about
 // type descriptions and the files that contain them.
@@ -62,8 +80,10 @@ func (cc *convertContext) addType(ctx context.Context, url string, enum bool) er
 		if err != nil {
 			return err
 		}
-		cc.recordEnum(url, et)
-		return nil
+		if err := checkFetchedName(url, et.Name); err != nil {
+			return err
+		}
+		return cc.recordEnum(url, et)
 	}
 
 	mt, err := cc.fetcher.FetchMessageType(ctx, url)
@@ -73,34 +93,45 @@ func (cc *convertContext) addType(ctx context.Context, url string, enum bool) er
 	if err != nil {
 		return err
 	}
+	if err := checkFetchedName(url, mt.Name); err != nil {
+		return err
+	}
 	return cc.recordTypeAndDependencies(ctx, url, mt)
 }
 
-func (cc *convertContext) recordEnum(url string, e *typepb.Enum) {
+// checkFetchedName verifies that the name of a type definition that was fetched
+// for the given URL matches the type name in the URL. (Whether the name is
+// valid is checked when the type is recorded.)
+func checkFetchedName(url, name string) error {
+	if want := protoresolve.TypeNameFromURL(url); protoreflect.FullName(name) != want {
+		return fmt.Errorf("type fetched for URL %s has wrong name: wanted %q, got %q", url, want, name)
+	}
+	return nil
+}
+
+func (cc *convertContext) recordEnum(url string, e *typepb.Enum) error {
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
 
-	var fileName string
-	if e.SourceContext != nil && e.SourceContext.FileName != "" {
-		fileName = e.SourceContext.FileName
-	} else {
-		fileName = fmt.Sprintf("--unknown--%d.proto", cc.reg.fileCounter.Add(1))
+	if _, ok := cc.typeLocations[url]; ok {
+		// already resolved this one
+		return nil
 	}
-	cc.typeLocations[url] = fileName
-
-	fe := cc.files[fileName]
-	if fe == nil {
-		fe = &fileEntry{}
-		cc.files[fileName] = fe
+	fe, err := cc.newTypeEntryLocked(url, e.Name, e.SourceContext, e)
+	if err != nil {
+		return err
 	}
-	fe.types.addType(e.Name, e)
 	if e.Syntax == typepb.Syntax_SYNTAX_PROTO3 {
 		fe.proto3 = true
 	}
+	return nil
 }
 
 func (cc *convertContext) recordTypeAndDependencies(ctx context.Context, url string, mt *typepb.Type) error {
-	fe, fileName := cc.recordType(url, mt)
+	fe, fileName, err := cc.recordType(url, mt)
+	if err != nil {
+		return err
+	}
 	if fe == nil {
 		// already resolved this one
 		return nil
@@ -120,15 +151,22 @@ func (cc *convertContext) recordTypeAndDependencies(ctx context.Context, url str
 
 				if d != nil {
 					// found it!
-					cc.recordDescriptor(typeURL, fileName, d)
-					return nil
+					return cc.recordDescriptor(typeURL, fileName, d)
 				}
 
 				// not in registry, so we have to recursively fetch
-				if err := cc.addType(grpCtx, typeURL, kind == typepb.Field_TYPE_ENUM); err != nil {
-					return err
+				err := cc.addType(grpCtx, typeURL, kind == typepb.Field_TYPE_ENUM)
+				if errors.Is(err, protoresolve.ErrNotFound) {
+					// The type we're resolving exists, but one that it refers
+					// to does not. So we deliberately do not wrap the error with
+					// %w: callers of the registry use ErrNotFound to mean that
+					// the requested type is unknown, not that it is invalid.
+					// (Since the returned error no longer wraps ErrNotFound,
+					// callers further up the stack return it as is, instead of
+					// adding more context for each level of recursion.)
+					return fmt.Errorf("could not resolve type %s for field %s.%s: %v", typeURL, mt.Name, f.Name, err)
 				}
-				return nil
+				return err
 			})
 		}
 	}
@@ -158,54 +196,107 @@ func (cc *convertContext) recordTypeAndDependencies(ctx context.Context, url str
 	return nil
 }
 
-func (cc *convertContext) recordType(url string, t *typepb.Type) (*fileEntry, string) {
+// recordType records the given message type, returning the entry and name of
+// the file to which it was added. If a type was already recorded for the given
+// URL, it returns a nil entry.
+func (cc *convertContext) recordType(url string, t *typepb.Type) (*fileEntry, string, error) {
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
 
 	if _, ok := cc.typeLocations[url]; ok {
-		return nil, ""
+		return nil, "", nil
+	}
+	fe, err := cc.newTypeEntryLocked(url, t.Name, t.SourceContext, t)
+	if err != nil {
+		return nil, "", err
+	}
+	if t.Syntax == typepb.Syntax_SYNTAX_PROTO3 {
+		fe.proto3 = true
+	}
+	return fe, cc.typeLocations[url], nil
+}
+
+// newTypeEntryLocked records the given message or enum type, which has the
+// given name and source context, for the given URL. It returns the entry for
+// the file to which it was added. Types with no source context are each put
+// into their own synthesized file. The caller must hold cc.mu.
+func (cc *convertContext) newTypeEntryLocked(
+	url string,
+	name string,
+	sourceContext *sourcecontextpb.SourceContext,
+	typ proto.Message,
+) (*fileEntry, error) {
+	if !protoreflect.FullName(name).IsValid() {
+		return nil, fmt.Errorf("type for URL %s has invalid name %q", url, name)
+	}
+	if err := cc.checkLimitLocked(); err != nil {
+		return nil, err
 	}
 
 	var fileName string
-	if t.SourceContext != nil && t.SourceContext.FileName != "" {
-		fileName = t.SourceContext.FileName
-	} else {
+	synthetic := sourceContext.GetFileName() == ""
+	if synthetic {
 		fileName = fmt.Sprintf("--unknown--%d.proto", cc.reg.fileCounter.Add(1))
+	} else {
+		fileName = sourceContext.GetFileName()
 	}
 	cc.typeLocations[url] = fileName
 
 	fe := cc.files[fileName]
 	if fe == nil {
-		fe = &fileEntry{}
+		fe = &fileEntry{synthetic: synthetic}
 		cc.files[fileName] = fe
 	}
-	fe.types.addType(t.Name, t)
-	if t.Syntax == typepb.Syntax_SYNTAX_PROTO3 {
-		fe.proto3 = true
-	}
-
-	return fe, fileName
+	fe.types.addType(name, typ)
+	return fe, nil
 }
 
-func (cc *convertContext) recordDescriptor(url, ref string, d protoreflect.Descriptor) {
+// checkLimitLocked returns an error if the context has already reached the
+// limit on the number of types it may contain (see Registry.MaxReachableTypes).
+// The caller must hold cc.mu.
+func (cc *convertContext) checkLimitLocked() error {
+	if limit := cc.reg.maxReachableTypes(); len(cc.typeLocations) >= limit {
+		return fmt.Errorf("too many types reachable from requested type(s): limit is %d", limit)
+	}
+	return nil
+}
+
+func (cc *convertContext) recordDescriptor(url, ref string, d protoreflect.Descriptor) error {
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
 
 	dc := (*DescriptorConverter)(cc.reg)
-	dc.addDescriptors(ref, cc.files, d, nil, func(dsc protoreflect.Descriptor) bool {
+	var limitErr error
+	location := d.ParentFile().Path()
+	dc.addDescriptors(ref, cc.files, d, nil, func(dsc protoreflect.Descriptor) (string, bool) {
 		u := ensureScheme(cc.reg.urlForType(dsc.FullName(), dsc.ParentFile().Package()))
-		if _, ok := cc.typeLocations[u]; ok {
+		if fileName, ok := cc.typeLocations[u]; ok {
 			// already seen this one
-			return false
+			if dsc == d {
+				location = fileName
+			}
+			return fileName, false
 		}
-		fileName := dsc.ParentFile().Path()
-		cc.typeLocations[u] = fileName
-		if dsc == d {
-			// make sure we're also adding the actual URL reference used
-			cc.typeLocations[url] = fileName
+		if limitErr != nil {
+			return dsc.ParentFile().Path(), false
 		}
-		return true
+		if limitErr = cc.checkLimitLocked(); limitErr != nil {
+			// stop crawling
+			return dsc.ParentFile().Path(), false
+		}
+		cc.typeLocations[u] = dsc.ParentFile().Path()
+		return dsc.ParentFile().Path(), true
 	})
+	if limitErr != nil {
+		return limitErr
+	}
+	// Make sure we're also recording the actual URL reference used. This may
+	// differ from the URL computed above, and must be recorded even if d was
+	// already seen via another URL.
+	if _, ok := cc.typeLocations[url]; !ok {
+		cc.typeLocations[url] = location
+	}
+	return nil
 }
 
 func (cc *convertContext) findWithFallback(url string, enum bool) (err error) {
@@ -214,9 +305,15 @@ func (cc *convertContext) findWithFallback(url string, enum bool) (err error) {
 		// on success, record location
 		if d != nil && err == nil {
 			cc.mu.Lock()
+			defer cc.mu.Unlock()
+			if _, ok := cc.typeLocations[url]; ok {
+				return
+			}
+			if err = cc.checkLimitLocked(); err != nil {
+				return
+			}
 			cc.typeLocations[url] = d.ParentFile().Path()
 			cc.fallbackTypes[url] = d
-			cc.mu.Unlock()
 		}
 	}()
 	fb := cc.res.Fallback
@@ -254,12 +351,17 @@ func (cc *convertContext) toFileDescriptors() (*protoresolve.Registry, error) {
 	} else {
 		fallback = protoregistry.GlobalFiles
 	}
-	return toFileDescriptors(cc.files, fallback, func(tt *typeTrie, name string) (proto.Message, error) {
-		mdp, edp := tt.typeToDescriptor(name, cc.res)
-		if mdp != nil {
-			return mdp, nil
+	renamed, err := mergeSyntheticFiles(cc.files)
+	if err != nil {
+		return nil, err
+	}
+	for url, fileName := range cc.typeLocations {
+		if newName, ok := renamed[fileName]; ok {
+			cc.typeLocations[url] = newName
 		}
-		return edp, nil
+	}
+	return toFileDescriptors(cc.files, fallback, func(tt *typeTrie, name string) (proto.Message, error) {
+		return tt.typeToDescriptor(name, cc.res)
 	})
 }
 
@@ -275,34 +377,54 @@ func toFileDescriptors(files map[string]*fileEntry, fallback protoresolve.FileRe
 		fdps[name] = fdp
 	}
 	var reg protoresolve.Registry
-	for _, fdp := range fdps {
-		if err := addToRegistry(fdp, &reg, fdps, fallback); err != nil {
+	// Visit files in a deterministic order so that results, including errors,
+	// are reproducible.
+	for _, name := range slices.Sorted(maps.Keys(fdps)) {
+		if err := addToRegistry(fdps[name], &reg, fdps, fallback, nil); err != nil {
 			return nil, err
 		}
 	}
 	return &reg, nil
 }
 
-func addToRegistry(fdp *descriptorpb.FileDescriptorProto, reg *protoresolve.Registry, fdps map[string]*descriptorpb.FileDescriptorProto, fallback protoresolve.FileResolver) error {
+// addToRegistry registers the given file in reg, after first recursively
+// registering its dependencies. The given depPath is the chain of files whose
+// imports led to this one. It is used to detect import cycles, since the files
+// may have been synthesized from type definitions provided by an untrusted
+// server. (The depth of the recursion is bounded by the number of files, which
+// is in turn bounded by Registry.MaxReachableTypes.)
+func addToRegistry(
+	fdp *descriptorpb.FileDescriptorProto,
+	reg *protoresolve.Registry,
+	fdps map[string]*descriptorpb.FileDescriptorProto,
+	fallback protoresolve.FileResolver,
+	depPath []string,
+) error {
 	if _, err := reg.FindFileByPath(fdp.GetName()); err == nil {
 		return nil // already registered
 	}
+	if idx := slices.Index(depPath, fdp.GetName()); idx != -1 {
+		return fmt.Errorf("file %s has cyclic import path: %s -> %s", fdp.GetName(), strings.Join(depPath[idx:], " -> "), fdp.GetName())
+	}
+	depPath = append(depPath, fdp.GetName()) // record ourselves in the path before we recurse
 	for _, dep := range fdp.Dependency {
 		depFd := fdps[dep]
 		if depFd == nil {
 			if fallback == nil {
-				return fmt.Errorf("missing dependency: %s", dep)
+				return fmt.Errorf("file %s has missing dependency %s", fdp.GetName(), dep)
 			}
 			file, err := fallback.FindFileByPath(dep)
 			if err != nil {
-				return fmt.Errorf("missing dependency: %s: %w", dep, err)
+				// Not wrapped with %w since, if this is ErrNotFound, it would
+				// be mistaken for the requested type being unknown.
+				return fmt.Errorf("file %s has missing dependency %s: %v", fdp.GetName(), dep, err)
 			}
 			if err := reg.RegisterFile(file); err != nil {
 				return err
 			}
 			continue
 		}
-		if err := addToRegistry(depFd, reg, fdps, fallback); err != nil {
+		if err := addToRegistry(depFd, reg, fdps, fallback, depPath); err != nil {
 			return err
 		}
 	}
@@ -315,11 +437,41 @@ type fileEntry struct {
 	types  typeTrie
 	deps   map[string]struct{}
 	proto3 bool
+	// synthetic is true if the file's name was synthesized because the types
+	// in it did not indicate the name of the file that defines them.
+	synthetic bool
 }
 
 // toFileDescriptor converts this file entry into a file descriptor proto. The given function
 // is used to transform nodes in a typeTrie into message and/or enum descriptor protos.
 func (fe *fileEntry) toFileDescriptor(name string, trieFn func(*typeTrie, string) (proto.Message, error)) (*descriptorpb.FileDescriptorProto, error) {
+	pkg, elements := fe.packageAndElements()
+	fd := createFileDescriptor(name, pkg, fe.proto3, fe.deps)
+	// sort elements for deterministic output
+	for _, elemName := range slices.Sorted(maps.Keys(elements)) {
+		pm, err := trieFn(elements[elemName], elemName)
+		if err != nil {
+			return nil, err
+		}
+		if mdp, ok := pm.(*descriptorpb.DescriptorProto); ok {
+			fd.MessageType = append(fd.MessageType, mdp)
+		} else if edp, ok := pm.(*descriptorpb.EnumDescriptorProto); ok {
+			fd.EnumType = append(fd.EnumType, edp)
+		} else {
+			sdp := pm.(*descriptorpb.ServiceDescriptorProto)
+			fd.Service = append(fd.Service, sdp)
+		}
+	}
+	return fd, nil
+}
+
+// packageAndElements computes the package for this file and returns it along
+// with the trie nodes for the file's top-level elements, keyed by their simple
+// names. Since type definitions do not distinguish a type's package from its
+// enclosing messages, the package is the longest name prefix shared by all of
+// the file's types. Anything in the trie below the package that is not one of
+// the file's types becomes a placeholder message.
+func (fe *fileEntry) packageAndElements() (string, map[string]*typeTrie) {
 	var pkg bytes.Buffer
 	tt := &fe.types
 	first := true
@@ -339,35 +491,22 @@ func (fe *fileEntry) toFileDescriptor(name string, trieFn func(*typeTrie, string
 		for last, tt = range tt.children {
 		}
 	}
-	fd := createFileDescriptor(name, pkg.String(), fe.proto3, fe.deps)
 	if tt.typ != nil {
-		pm, err := trieFn(tt, last)
-		if err != nil {
-			return nil, err
-		}
-		if mdp, ok := pm.(*descriptorpb.DescriptorProto); ok {
-			fd.MessageType = append(fd.MessageType, mdp)
-		} else if edp, ok := pm.(*descriptorpb.EnumDescriptorProto); ok {
-			fd.EnumType = append(fd.EnumType, edp)
-		} else {
-			sdp := pm.(*descriptorpb.ServiceDescriptorProto)
-			fd.Service = append(fd.Service, sdp)
-		}
-	} else {
-		for name, nested := range tt.children {
-			pm, err := trieFn(nested, name)
-			if err != nil {
-				return nil, err
-			}
-			if mdp, ok := pm.(*descriptorpb.DescriptorProto); ok {
-				fd.MessageType = append(fd.MessageType, mdp)
-			} else if edp, ok := pm.(*descriptorpb.EnumDescriptorProto); ok {
-				fd.EnumType = append(fd.EnumType, edp)
-			} else {
-				sdp := pm.(*descriptorpb.ServiceDescriptorProto)
-				fd.Service = append(fd.Service, sdp)
-			}
-		}
+		return pkg.String(), map[string]*typeTrie{last: tt}
 	}
-	return fd, nil
+	return pkg.String(), tt.children
+}
+
+// forEachMessage calls fn for every message in the file, including the
+// placeholder messages that will be created for trie nodes that are not types.
+// The placeholder argument to fn indicates whether the message is a
+// placeholder.
+func (fe *fileEntry) forEachMessage(fn func(name string, placeholder bool)) {
+	pkg, elements := fe.packageAndElements()
+	for elemName, elem := range elements {
+		if pkg != "" {
+			elemName = pkg + "." + elemName
+		}
+		elem.forEachMessage(elemName, fn)
+	}
 }

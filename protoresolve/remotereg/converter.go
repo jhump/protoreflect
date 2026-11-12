@@ -151,7 +151,9 @@ func (dc *DescriptorConverter) ToEnumDescriptor(ctx context.Context, enum *typep
 	cc := newConvertContext(reg, dc.TypeFetcher)
 	typeName := protoreflect.FullName(enum.Name)
 	typeURL := reg.urlForType(typeName, typeName.Parent())
-	cc.recordEnum(typeURL, enum)
+	if err := cc.recordEnum(typeURL, enum); err != nil {
+		return nil, err
+	}
 	desc, err := reg.resolveURLFromConvertContext(cc, typeURL)
 	if err != nil {
 		return nil, err
@@ -397,24 +399,36 @@ func syntax(s protoreflect.Syntax) typepb.Syntax {
 	}
 }
 
-type tracker func(d protoreflect.Descriptor) bool
+// tracker is called by addDescriptors to track which descriptors have been
+// added. It returns the name of the file in which the descriptor is recorded
+// and whether the descriptor is new (i.e. not previously recorded). If it is
+// new, it should be added to the returned file.
+//
+// The returned file may differ from the descriptor's own file if a descriptor
+// with the same name was previously recorded in another file. This can happen
+// since a registry may have multiple descriptors for the same type: when
+// assembling the types for a resolution, already known types are rebuilt, and
+// the rebuilt descriptors may be in different files than the originals, such
+// as when a synthetic file is merged into another file.
+type tracker func(d protoreflect.Descriptor) (fileName string, isNew bool)
 
 func newNameTracker() tracker {
-	names := map[protoreflect.FullName]struct{}{}
-	return func(d protoreflect.Descriptor) bool {
+	names := map[protoreflect.FullName]string{}
+	return func(d protoreflect.Descriptor) (string, bool) {
 		name := d.FullName()
-		if _, ok := names[name]; ok {
-			return false
+		if fileName, ok := names[name]; ok {
+			return fileName, false
 		}
-		names[name] = struct{}{}
-		return true
+		fileName := d.ParentFile().Path()
+		names[name] = fileName
+		return fileName, true
 	}
 }
 
 func (dc *DescriptorConverter) addDescriptors(ref string, files map[string]*fileEntry, d protoreflect.Descriptor, msgs map[protoreflect.FullName]protoreflect.MessageDescriptor, onAdd tracker) {
 	name := d.FullName()
 
-	fileName := d.ParentFile().Path()
+	fileName, isNew := onAdd(d)
 	if fileName != ref {
 		dependee := files[ref]
 		if dependee.deps == nil {
@@ -422,22 +436,22 @@ func (dc *DescriptorConverter) addDescriptors(ref string, files map[string]*file
 		}
 		dependee.deps[fileName] = struct{}{}
 	}
-
-	if !onAdd(d) {
+	if !isNew {
 		// already added this one
 		return
 	}
 
+	dc.mu.RLock()
+	descProto := dc.descProtos[d]
+	_, synthetic := dc.syntheticFiles[fileName]
+	dc.mu.RUnlock()
+
 	fe := files[fileName]
 	if fe == nil {
-		fe = &fileEntry{}
+		fe = &fileEntry{synthetic: synthetic}
 		fe.proto3 = d.ParentFile().Syntax() == protoreflect.Proto3
 		files[fileName] = fe
 	}
-
-	dc.mu.RLock()
-	descProto := dc.descProtos[d]
-	dc.mu.RUnlock()
 	if descProto == nil {
 		switch d := d.(type) {
 		case protoreflect.MessageDescriptor:
@@ -451,19 +465,30 @@ func (dc *DescriptorConverter) addDescriptors(ref string, files map[string]*file
 	}
 
 	if md, ok := d.(protoreflect.MessageDescriptor); ok {
-		fields := md.Fields()
-		for i, length := 0, fields.Len(); i < length; i++ {
-			fld := fields.Get(i)
-			if fld.Kind() == protoreflect.MessageKind || fld.Kind() == protoreflect.GroupKind {
-				// prefer descriptor in msgs map over what the field descriptor indicates
-				md := msgs[fld.Message().FullName()]
-				if md == nil {
-					md = fld.Message()
-				}
-				dc.addDescriptors(fileName, files, md, msgs, onAdd)
-			} else if fld.Kind() == protoreflect.EnumKind {
-				dc.addDescriptors(fileName, files, fld.Enum(), msgs, onAdd)
+		dc.addFieldDependencies(fileName, files, md, msgs, onAdd)
+	}
+}
+
+// addFieldDependencies calls addDescriptors for the types referenced by the
+// fields of the given message. The message's descriptor proto includes its
+// nested messages, so this also does the same for all nested messages.
+func (dc *DescriptorConverter) addFieldDependencies(fileName string, files map[string]*fileEntry, md protoreflect.MessageDescriptor, msgs map[protoreflect.FullName]protoreflect.MessageDescriptor, onAdd tracker) {
+	fields := md.Fields()
+	for i, length := 0, fields.Len(); i < length; i++ {
+		fld := fields.Get(i)
+		if fld.Kind() == protoreflect.MessageKind || fld.Kind() == protoreflect.GroupKind {
+			// prefer descriptor in msgs map over what the field descriptor indicates
+			fieldMsg := msgs[fld.Message().FullName()]
+			if fieldMsg == nil {
+				fieldMsg = fld.Message()
 			}
+			dc.addDescriptors(fileName, files, fieldMsg, msgs, onAdd)
+		} else if fld.Kind() == protoreflect.EnumKind {
+			dc.addDescriptors(fileName, files, fld.Enum(), msgs, onAdd)
 		}
+	}
+	nested := md.Messages()
+	for i, length := 0, nested.Len(); i < length; i++ {
+		dc.addFieldDependencies(fileName, files, nested.Get(i), msgs, onAdd)
 	}
 }

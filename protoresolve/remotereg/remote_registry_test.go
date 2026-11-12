@@ -625,6 +625,51 @@ func createFetcher(t *testing.T) TypeFetcher {
 	})
 }
 
+func TestDescriptorConverter_ToServiceDescriptorKeepsNestedTypes(t *testing.T) {
+	t.Parallel()
+	fdp := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String("req.proto"),
+		Package: proto.String("foo"),
+		Syntax:  proto.String("proto3"),
+		MessageType: []*descriptorpb.DescriptorProto{{
+			Name: proto.String("Request"),
+			Field: []*descriptorpb.FieldDescriptorProto{{
+				Name:     proto.String("used"),
+				Number:   proto.Int32(1),
+				Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+				Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+				TypeName: proto.String(".foo.Request.Used"),
+				JsonName: proto.String("used"),
+			}},
+			NestedType: []*descriptorpb.DescriptorProto{
+				{Name: proto.String("Used")},
+				// Nothing refers to this one, but it must still be retained.
+				{Name: proto.String("Unused")},
+			},
+		}},
+	}
+	fd, err := protodesc.NewFile(fdp, nil)
+	require.NoError(t, err)
+	var registry Registry
+	require.NoError(t, registry.RegisterMessage(fd.Messages().Get(0)))
+
+	api := &apipb.Api{
+		Name: "foo.Service",
+		Methods: []*apipb.Method{{
+			Name:            "Method",
+			RequestTypeUrl:  "type.googleapis.com/foo.Request",
+			ResponseTypeUrl: "type.googleapis.com/foo.Request",
+		}},
+		Syntax: typepb.Syntax_SYNTAX_PROTO3,
+	}
+	sd, err := registry.AsDescriptorConverter().ToServiceDescriptor(context.Background(), api)
+	require.NoError(t, err)
+	input := sd.Methods().Get(0).Input()
+	require.Equal(t, 2, input.Messages().Len())
+	require.NotNil(t, input.Messages().ByName("Used"))
+	require.NotNil(t, input.Messages().ByName("Unused"))
+}
+
 func TestDescriptorConverter_ToServiceDescriptor(t *testing.T) {
 	tf := createFetcher(t)
 	// we want "defaults" for the message factory so that we can properly process

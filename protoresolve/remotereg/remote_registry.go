@@ -69,12 +69,33 @@ type Registry struct {
 	// an empty resolver, such as a new, empty Registry or
 	// protoregistry.Files.
 	Fallback protoresolve.DescriptorResolver
+	// The maximum number of types that may be reachable from a type that is
+	// resolved using TypeFetcher. This includes the requested type, the types
+	// referenced by its fields, the types referenced by their fields, and so
+	// on. It includes types that are fetched as well as types that were
+	// already known. If resolving a type would exceed this limit, an error is
+	// returned.
+	//
+	// The type definitions that are fetched are controlled by the server
+	// that provides them. So this limit prevents a malicious server from
+	// serving an endless chain of type references, which would cause the
+	// registry to keep fetching types without end. Each type that is fetched
+	// may require a network call, so a lower limit can detect such a server
+	// sooner.
+	//
+	// If not specified or not positive, a default of 1500 is used. Even very
+	// large schemas rarely have more than about 1000 types reachable from a
+	// single type.
+	MaxReachableTypes int
 
 	mu          sync.RWMutex
 	typeCache   map[string]protoreflect.Descriptor
 	typeURLs    map[protoreflect.FullName]string
 	descProtos  map[protoreflect.Descriptor]proto.Message
 	pkgBaseURLs map[protoreflect.FullName]string
+	// The names of files that were synthesized because type definitions did
+	// not indicate the file that defines them.
+	syntheticFiles map[string]struct{}
 	// Used to synthesize file names when source context information is insufficient
 	// when converting google.protobuf.Type, google.protobuf.Enum, and google.protobuf.Api
 	// to descriptors.
@@ -237,6 +258,18 @@ func (r *Registry) initMapsLocked() {
 	if r.pkgBaseURLs == nil {
 		r.pkgBaseURLs = map[protoreflect.FullName]string{}
 	}
+	if r.syntheticFiles == nil {
+		r.syntheticFiles = map[string]struct{}{}
+	}
+}
+
+// maxReachableTypes returns the limit configured via MaxReachableTypes or, if
+// none is configured, the default.
+func (r *Registry) maxReachableTypes() int {
+	if r.MaxReachableTypes <= 0 {
+		return defaultMaxReachableTypes
+	}
+	return r.MaxReachableTypes
 }
 
 func (r *Registry) checkTypeLocked(desc protoreflect.Descriptor, descKind string, url string) error {
@@ -518,6 +551,11 @@ func (r *Registry) recordConvertedTypes(cc *convertContext) (map[string]protoref
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.initMapsLocked()
+	for fileName, file := range cc.files {
+		if file.synthetic {
+			r.syntheticFiles[fileName] = struct{}{}
+		}
+	}
 	recorded := make(map[string]protoreflect.Descriptor, len(cc.typeLocations))
 	for typeURL := range cc.typeLocations {
 		if existing := r.typeCache[typeURL]; existing != nil {
@@ -530,7 +568,9 @@ func (r *Registry) recordConvertedTypes(cc *convertContext) (map[string]protoref
 			// found in the fallback resolver.
 			d, err = files.FindDescriptorByName(protoresolve.TypeNameFromURL(typeURL))
 			if err != nil {
-				return nil, fmt.Errorf("converted files do not include type for URL %s: %w", typeURL, err)
+				// Not wrapped with %w since, if this is ErrNotFound, it would
+				// be mistaken for the requested type being unknown.
+				return nil, fmt.Errorf("converted files do not include type for URL %s: %v", typeURL, err)
 			}
 		}
 		r.typeURLs[d.FullName()] = typeURL
