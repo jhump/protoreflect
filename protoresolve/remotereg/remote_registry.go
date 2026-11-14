@@ -11,7 +11,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
-	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/jhump/protoreflect/v2/protoresolve"
 )
@@ -69,12 +68,33 @@ type Registry struct {
 	// an empty resolver, such as a new, empty Registry or
 	// protoregistry.Files.
 	Fallback protoresolve.DescriptorResolver
+	// The maximum number of types that may be reachable from a type that is
+	// resolved using TypeFetcher. This includes the requested type, the types
+	// referenced by its fields, the types referenced by their fields, and so
+	// on. It includes types that are fetched as well as types that were
+	// already known. If resolving a type would exceed this limit, an error is
+	// returned.
+	//
+	// The type definitions that are fetched are controlled by the server
+	// that provides them. So this limit prevents a malicious server from
+	// serving an endless chain of type references, which would cause the
+	// registry to keep fetching types without end. Each type that is fetched
+	// may require a network call, so a lower limit can detect such a server
+	// sooner.
+	//
+	// If not specified or not positive, a default of 1500 is used. Even very
+	// large schemas rarely have more than about 1000 types reachable from a
+	// single type.
+	MaxReachableTypes int
 
 	mu          sync.RWMutex
 	typeCache   map[string]protoreflect.Descriptor
 	typeURLs    map[protoreflect.FullName]string
 	descProtos  map[protoreflect.Descriptor]proto.Message
 	pkgBaseURLs map[protoreflect.FullName]string
+	// The names of files that were synthesized because type definitions did
+	// not indicate the file that defines them.
+	syntheticFiles map[string]struct{}
 	// Used to synthesize file names when source context information is insufficient
 	// when converting google.protobuf.Type, google.protobuf.Enum, and google.protobuf.Api
 	// to descriptors.
@@ -237,6 +257,18 @@ func (r *Registry) initMapsLocked() {
 	if r.pkgBaseURLs == nil {
 		r.pkgBaseURLs = map[protoreflect.FullName]string{}
 	}
+	if r.syntheticFiles == nil {
+		r.syntheticFiles = map[string]struct{}{}
+	}
+}
+
+// maxReachableTypes returns the limit configured via MaxReachableTypes or, if
+// none is configured, the default.
+func (r *Registry) maxReachableTypes() int {
+	if r.MaxReachableTypes <= 0 {
+		return defaultMaxReachableTypes
+	}
+	return r.MaxReachableTypes
 }
 
 func (r *Registry) checkTypeLocked(desc protoreflect.Descriptor, descKind string, url string) error {
@@ -518,6 +550,11 @@ func (r *Registry) recordConvertedTypes(cc *convertContext) (map[string]protoref
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.initMapsLocked()
+	for fileName, file := range cc.files {
+		if file.synthetic {
+			r.syntheticFiles[fileName] = struct{}{}
+		}
+	}
 	recorded := make(map[string]protoreflect.Descriptor, len(cc.typeLocations))
 	for typeURL := range cc.typeLocations {
 		if existing := r.typeCache[typeURL]; existing != nil {
@@ -530,7 +567,9 @@ func (r *Registry) recordConvertedTypes(cc *convertContext) (map[string]protoref
 			// found in the fallback resolver.
 			d, err = files.FindDescriptorByName(protoresolve.TypeNameFromURL(typeURL))
 			if err != nil {
-				return nil, fmt.Errorf("converted files do not include type for URL %s: %w", typeURL, err)
+				// Not wrapped with %w since, if this is ErrNotFound, it would
+				// be mistaken for the requested type being unknown.
+				return nil, fmt.Errorf("converted files do not include type for URL %s: %v", typeURL, err)
 			}
 		}
 		r.typeURLs[d.FullName()] = typeURL
@@ -555,212 +594,6 @@ func (r *Registry) AsTypeResolver() *RemoteTypeResolver {
 // google.protobuf.Service representations, and vice versa.
 func (r *Registry) AsDescriptorConverter() *DescriptorConverter {
 	return (*DescriptorConverter)(r)
-}
-
-// RemoteTypeResolver is an implementation of TypeResolver that uses
-// a Registry to resolve symbols.
-//
-// All message and enum types returned will be dynamic types, created
-// using the [dynamicpb] package, built on the descriptors resolved by
-// the backing Registry.
-type RemoteTypeResolver Registry
-
-var _ protoresolve.TypeResolver = (*RemoteTypeResolver)(nil)
-
-// FindExtensionByName implements the SerializationResolver interface.
-//
-// This method relies on the underlying Registry's fallback resolver.
-// If the registry's fallback resolver is unconfigured or nil, then
-// protoregistry.GlobalTypes will be used to find the extension. Otherwise,
-// if the fallback has a method named AsTypeResolver that returns a
-// TypeResolver, it will be invoked and the resulting type resolver will be
-// used to find the extension type. Failing all of the above, the fallback's
-// FindDescriptorByName method will be used to find the extension. In this
-// case the returned extension type may be a dynamic extension type, created
-// using the [dynamicpb] package.
-func (r *RemoteTypeResolver) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
-	return (*remoteSubResolver)(r).FindExtensionByName(field)
-}
-
-// FindExtensionByNumber implements the SerializationResolver interface.
-//
-// This method relies on the underlying Registry's fallback resolver.
-// If the registry's fallback resolver is unconfigured or nil, then
-// protoregistry.GlobalTypes will be used to find the extension. Otherwise,
-// if the fallback has a method named AsTypeResolver that returns a
-// TypeResolver, it will be invoked and the resulting type resolver will be
-// used to find the extension type. Failing all of the above, the extension
-// can only be found if the fallback resolver implements DescriptorPool or
-// ExtensionResolver and will otherwise return ErrNotFound.
-func (r *RemoteTypeResolver) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
-	return (*remoteSubResolver)(r).FindExtensionByNumber(message, field)
-}
-
-// FindMessageByName implements the SerializationResolver interface. Since
-// finding a message may incur fetching the definition via a TypeFetcher,
-// it is recommended, where possible, to instead use FindMessageByNameContext.
-// Calling this version will implicitly use [context.Background]().
-func (r *RemoteTypeResolver) FindMessageByName(name protoreflect.FullName) (protoreflect.MessageType, error) {
-	return r.FindMessageByNameContext(context.Background(), name)
-}
-
-// FindMessageByNameContext finds a message by name, using the given context
-// if necessary to fetch the message type via a TypeFetcher. This uses the
-// underlying Registry's method of the same name.
-func (r *RemoteTypeResolver) FindMessageByNameContext(ctx context.Context, name protoreflect.FullName) (protoreflect.MessageType, error) {
-	md, err := (*Registry)(r).FindMessageByNameContext(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	return dynamicpb.NewMessageType(md), nil
-}
-
-// FindMessageByURL implements the SerializationResolver interface. Since
-// finding a message may incur fetching the definition via a TypeFetcher,
-// it is recommended, where possible, to instead use FindMessageByURLContext.
-// Calling this version will implicitly use [context.Background]().
-func (r *RemoteTypeResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
-	return r.FindMessageByURLContext(context.Background(), url)
-}
-
-// FindMessageByURLContext finds a message by type URL, using the given
-// context if necessary to fetch the message type via a TypeFetcher. This
-// uses the underlying Registry's method of the same name.
-func (r *RemoteTypeResolver) FindMessageByURLContext(ctx context.Context, url string) (protoreflect.MessageType, error) {
-	md, err := (*Registry)(r).FindMessageByURLContext(ctx, url)
-	if err != nil {
-		return nil, err
-	}
-	return dynamicpb.NewMessageType(md), nil
-}
-
-// FindEnumByName implements the method of the same name on the TypeResolver
-// interface. Since finding an enum may incur fetching the definition via a
-// TypeFetcher, it is recommended, where possible, to instead use
-// FindEnumByNameContext. Calling this version will implicitly use
-// [context.Background]().
-func (r *RemoteTypeResolver) FindEnumByName(name protoreflect.FullName) (protoreflect.EnumType, error) {
-	return r.FindEnumByNameContext(context.Background(), name)
-}
-
-// FindEnumByNameContext finds an enum by name, using the given context
-// if necessary to fetch the message type via a TypeFetcher. This uses the
-// underlying Registry's method of the same name.
-func (r *RemoteTypeResolver) FindEnumByNameContext(ctx context.Context, name protoreflect.FullName) (protoreflect.EnumType, error) {
-	ed, err := (*Registry)(r).FindEnumByNameContext(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	return dynamicpb.NewEnumType(ed), nil
-}
-
-// FindEnumByURL has a signature that is consistent with that of
-// FindMessageByURL and is present for symmetry. Since finding an
-// enum may incur fetching the definition via a TypeFetcher, it is
-// recommended, where possible, to instead use FindEnumByURLContext.
-// Calling this version will implicitly use [context.Background]().
-func (r *RemoteTypeResolver) FindEnumByURL(url string) (protoreflect.EnumType, error) {
-	return r.FindEnumByURLContext(context.Background(), url)
-}
-
-// FindEnumByURLContext finds an enum by type URL, using the given context
-// if necessary to fetch the message type via a TypeFetcher. This uses the
-// underlying Registry's method of the same name.
-func (r *RemoteTypeResolver) FindEnumByURLContext(ctx context.Context, url string) (protoreflect.EnumType, error) {
-	ed, err := (*Registry)(r).FindEnumByURLContext(ctx, url)
-	if err != nil {
-		return nil, err
-	}
-	return dynamicpb.NewEnumType(ed), nil
-}
-
-// remoteSubResolver is an implementation of SerializationResolver that
-// uses a Registry to resolve symbols. This is used when resolving
-// fetched types, when the Registry's TypeFetcher cannot fetch a
-// named type. It is also used to resolve extensions when processing the
-// custom options of fetched types. Unlike Registry.AsTypeResolver,
-// this resolver will *not* recursively resolve types via fetching remote
-// types -- it only uses locally cached types and the registry's fallback
-// resolver.
-type remoteSubResolver Registry
-
-var _ protoresolve.SerializationResolver = (*remoteSubResolver)(nil)
-
-func (r *remoteSubResolver) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
-	fb := r.Fallback
-	if fb == nil {
-		return protoregistry.GlobalTypes.FindExtensionByName(field)
-	}
-	type typeRes interface {
-		AsTypeResolver() protoresolve.TypeResolver
-	}
-	if tr, ok := fb.(typeRes); ok {
-		return tr.AsTypeResolver().FindExtensionByName(field)
-	}
-	d, err := fb.FindDescriptorByName(field)
-	if err != nil {
-		return nil, err
-	}
-	fld, ok := d.(protoreflect.FieldDescriptor)
-	if !ok {
-		return nil, protoresolve.NewUnexpectedTypeError(protoresolve.DescriptorKindExtension, d, "")
-	}
-	if !fld.IsExtension() {
-		return nil, protoresolve.NewUnexpectedTypeError(protoresolve.DescriptorKindExtension, fld, "")
-	}
-	return protoresolve.ExtensionType(fld), nil
-}
-
-type typeResolvable interface {
-	AsTypeResolver() protoresolve.TypeResolver
-}
-
-func (r *remoteSubResolver) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
-	fb := r.Fallback
-	if fb == nil {
-		return protoregistry.GlobalTypes.FindExtensionByNumber(message, field)
-	}
-	if tr, ok := fb.(typeResolvable); ok {
-		return tr.AsTypeResolver().FindExtensionByNumber(message, field)
-	}
-	if pool, ok := fb.(protoresolve.DescriptorPool); ok {
-		ext := protoresolve.FindExtensionByNumber(pool, message, field)
-		if ext != nil {
-			return protoresolve.ExtensionType(ext), nil
-		}
-	}
-	return nil, protoresolve.ErrNotFound
-}
-
-func (r *remoteSubResolver) FindMessageByName(message protoreflect.FullName) (protoreflect.MessageType, error) {
-	reg := (*Registry)(r)
-	return r.FindMessageByURL(reg.urlForType(message, message.Parent()))
-}
-
-func (r *remoteSubResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
-	url = ensureScheme(url)
-	r.mu.RLock()
-	d := r.typeCache[url]
-	r.mu.RUnlock()
-	if d == nil {
-		fb := r.Fallback
-		if fb == nil {
-			fb = protoregistry.GlobalFiles
-		}
-		if tr, ok := fb.(typeResolvable); ok {
-			return tr.AsTypeResolver().FindMessageByURL(url)
-		}
-		var err error
-		d, err = fb.FindDescriptorByName(protoresolve.TypeNameFromURL(url))
-		if err != nil {
-			return nil, err
-		}
-	}
-	md, ok := d.(protoreflect.MessageDescriptor)
-	if !ok {
-		return nil, protoresolve.NewUnexpectedTypeError(protoresolve.DescriptorKindMessage, d, url)
-	}
-	return dynamicpb.NewMessageType(md), nil
 }
 
 func ensureScheme(url string) string {
